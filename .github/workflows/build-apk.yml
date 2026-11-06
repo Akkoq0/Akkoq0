@@ -1,9 +1,15 @@
-name: Build GhostLink Android APK
+name: Build Meva HUD Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+    paths:
+      - 'ghostlink/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-apk:
@@ -33,6 +39,12 @@ jobs:
         working-directory: ghostlink
         run: npm ci
 
+      - name: Typecheck & Lint
+        working-directory: ghostlink
+        run: |
+          npx tsc --noEmit
+          npm run lint
+
       - name: Build Next.js Static Export
         working-directory: ghostlink
         run: npm run mobile:export
@@ -50,7 +62,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostLink-v0.1.0-debug.apk
+          name: MevaHUD-v0.1.0-debug.apk
           path: ghostlink/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
-

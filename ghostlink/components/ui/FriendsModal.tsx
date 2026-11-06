@@ -4,7 +4,7 @@
 // Meva HUD — Squad Operators & 1v1 Direct Lines Modal
 // ─────────────────────────────────────────────────────────
 
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import { OperatorAvatar } from '@/components/ui/HudPrimitives';
 import { IconClose, IconUsers, IconMessage } from '@/components/ui/MevaIcons';
@@ -21,6 +21,13 @@ export const FriendsModal = memo(function FriendsModal() {
   const [tab, setTab] = useState<'all' | 'pending' | 'add'>('all');
   const [usernameInput, setUsernameInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    };
+  }, []);
 
   if (!showFriendsModal) return null;
 
@@ -29,16 +36,21 @@ export const FriendsModal = memo(function FriendsModal() {
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!usernameInput.trim()) return;
-    addFriendRequest(usernameInput);
-    setFeedback(`"${usernameInput.trim()}" operatörüne çağrı iletildi.`);
+    const clean = usernameInput
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, 32);
+    if (clean.length < 2) return;
+    addFriendRequest(clean);
+    setFeedback(`"${clean}" operatörüne çağrı iletildi.`);
     setUsernameInput('');
-    setTimeout(() => setFeedback(null), 3000);
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3000);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 font-sans"
       onClick={() => setShowFriendsModal(false)}
     >
       <div
@@ -52,10 +64,10 @@ export const FriendsModal = memo(function FriendsModal() {
               <IconUsers size={17} />
             </div>
             <div>
-              <h2 className="font-mono text-xs font-bold tracking-[0.18em] uppercase text-gl-text-bright">
-                OPERATÖR AĞI VE 1V1 HATLAR
+              <h2 className="font-sans text-sm font-bold tracking-wide text-gl-text-bright">
+                Operatör Ağı ve 1v1 Hatlar
               </h2>
-              <p className="text-[11px] font-mono text-gl-text-muted mt-0.5">
+              <p className="text-xs text-gl-text-muted mt-0.5">
                 Doğrudan P2P İletişim Dizini
               </p>
             </div>
@@ -73,33 +85,33 @@ export const FriendsModal = memo(function FriendsModal() {
         <div className="grid grid-cols-3 gap-1.5 mb-4">
           <button
             onClick={() => setTab('all')}
-            className={`rounded-sm min-h-[38px] font-mono text-[11px] font-bold uppercase border transition-colors ${
+            className={`rounded-sm min-h-[38px] text-xs font-bold uppercase border transition-colors ${
               tab === 'all'
                 ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
                 : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
             }`}
           >
-            KADRO ({acceptedFriends.length})
+            Kadro (<span className="font-mono">{acceptedFriends.length}</span>)
           </button>
           <button
             onClick={() => setTab('pending')}
-            className={`rounded-sm min-h-[38px] font-mono text-[11px] font-bold uppercase border transition-colors ${
+            className={`rounded-sm min-h-[38px] text-xs font-bold uppercase border transition-colors ${
               tab === 'pending'
                 ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
                 : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
             }`}
           >
-            TALEPLER ({pendingFriends.length})
+            Talepler (<span className="font-mono">{pendingFriends.length}</span>)
           </button>
           <button
             onClick={() => setTab('add')}
-            className={`rounded-sm min-h-[38px] font-mono text-[11px] font-bold uppercase border transition-colors ${
+            className={`rounded-sm min-h-[38px] text-xs font-bold uppercase border transition-colors ${
               tab === 'add'
                 ? 'bg-[#12151C] text-gl-accent border-gl-accent/60'
                 : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
             }`}
           >
-            + EKLE
+            + Operatör Ekle
           </button>
         </div>
 
@@ -124,7 +136,7 @@ export const FriendsModal = memo(function FriendsModal() {
                       <p className="text-sm font-bold text-gl-text-bright truncate">
                         {friend.username}
                       </p>
-                      <p className="text-[11px] font-mono text-gl-text-muted truncate">
+                      <p className="text-xs text-gl-text-muted truncate">
                         {friend.activity ?? 'Hazır Kıta'}
                       </p>
                     </div>
@@ -136,15 +148,16 @@ export const FriendsModal = memo(function FriendsModal() {
                         setActiveDMUser(friend.id);
                         setShowFriendsModal(false);
                       }}
-                      className="rounded-sm min-h-[36px] px-3 bg-[#12151C] hover:bg-gl-accent text-gl-text-bright hover:text-white border border-white/[0.08] font-mono text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+                      className="rounded-sm min-h-[36px] px-3 bg-[#12151C] hover:bg-gl-accent text-gl-text-bright hover:text-white border border-white/[0.08] text-xs font-bold flex items-center gap-1.5 transition-colors"
                     >
                       <IconMessage size={13} />
-                      <span>1V1</span>
+                      <span>1v1</span>
                     </button>
                     <button
                       onClick={() => removeFriend(friend.id)}
                       className="rounded-sm w-9 h-9 bg-[#050608] hover:bg-gl-danger/15 text-gl-text-muted hover:text-gl-danger border border-white/[0.06] flex items-center justify-center transition-colors"
                       title="Kaldır"
+                      aria-label="Operatörü kaldır"
                     >
                       <IconClose size={14} />
                     </button>
@@ -155,8 +168,8 @@ export const FriendsModal = memo(function FriendsModal() {
 
           {tab === 'pending' &&
             (pendingFriends.length === 0 ? (
-              <p className="text-xs font-mono text-gl-text-muted text-center py-8">
-                Bekleyen bağlantı talebi yok.
+              <p className="text-xs text-gl-text-muted text-center py-8">
+                Bekleyen bağlantı talebi bulunmuyor.
               </p>
             ) : (
               pendingFriends.map((f) => {
@@ -173,8 +186,8 @@ export const FriendsModal = memo(function FriendsModal() {
                         <p className="text-sm font-bold text-gl-text-bright">
                           {friend.username}
                         </p>
-                        <p className="text-[10px] font-mono text-[#F59E0B]">
-                          GELEN ÇAĞRI
+                        <p className="text-[11px] font-semibold text-[#F59E0B]">
+                          Gelen Bağlantı Çağrısı
                         </p>
                       </div>
                     </div>
@@ -182,13 +195,14 @@ export const FriendsModal = memo(function FriendsModal() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => acceptFriendRequest(f.id)}
-                        className="rounded-sm min-h-[36px] px-3 bg-gl-accent text-white font-mono text-[11px] font-bold"
+                        className="rounded-sm min-h-[36px] px-3 bg-gl-accent text-white text-xs font-bold"
                       >
-                        ONAYLA
+                        Onayla
                       </button>
                       <button
                         onClick={() => removeFriend(friend.id)}
                         className="rounded-sm w-9 h-9 bg-[#050608] text-gl-danger border border-white/[0.06] flex items-center justify-center"
+                        aria-label="Reddet"
                       >
                         <IconClose size={14} />
                       </button>
@@ -200,8 +214,8 @@ export const FriendsModal = memo(function FriendsModal() {
 
           {tab === 'add' && (
             <form onSubmit={handleAddSubmit} className="space-y-3 pt-1">
-              <label className="block text-[11px] font-mono font-bold text-gl-text-normal uppercase">
-                OPERATÖR ÇAĞRI KODU / KULLANICI ADI
+              <label className="block text-xs font-semibold text-gl-text-normal">
+                Operatör Çağrı Kodu / Kullanıcı Adı
               </label>
               <div className="flex gap-2">
                 <input
@@ -209,17 +223,19 @@ export const FriendsModal = memo(function FriendsModal() {
                   value={usernameInput}
                   onChange={(e) => setUsernameInput(e.target.value)}
                   placeholder="Örn: woxic, Majer..."
+                  maxLength={32}
                   className="rounded-sm flex-1 h-11 bg-[#050608] text-xs text-gl-text-bright px-3.5 border border-white/[0.08] focus:outline-none focus:border-gl-accent"
                 />
                 <button
                   type="submit"
-                  className="rounded-sm min-h-[44px] px-4 bg-gl-accent hover:bg-gl-accent-hover text-white font-mono text-xs font-bold tracking-wider"
+                  disabled={usernameInput.trim().length < 2}
+                  className="rounded-sm min-h-[44px] px-4 bg-gl-accent hover:bg-gl-accent-hover disabled:opacity-40 text-white text-xs font-bold tracking-wide"
                 >
-                  EKLE
+                  Ekle
                 </button>
               </div>
               {feedback && (
-                <p className="rounded-sm text-xs font-mono text-[#F59E0B] bg-[#0C0E12] border border-[#F59E0B]/40 px-3 py-2">
+                <p className="rounded-sm text-xs font-medium text-[#F59E0B] bg-[#0C0E12] border border-[#F59E0B]/40 px-3 py-2">
                   {feedback}
                 </p>
               )}

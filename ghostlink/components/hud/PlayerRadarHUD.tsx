@@ -61,13 +61,13 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
   ];
 
   return (
-    <aside className="w-full md:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module md:rounded-sm">
+    <aside className="w-full md:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module md:rounded-sm font-sans">
       {/* ── Module Header ── */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-white/[0.06] flex-shrink-0">
         <div className="flex items-center gap-2">
           <IconRadar size={15} className="text-gl-accent" />
-          <h3 className="font-mono text-[11px] font-bold tracking-[0.2em] text-gl-text-bright uppercase">
-            KADRO RADARI
+          <h3 className="font-sans text-xs font-bold tracking-wider text-gl-text-bright uppercase">
+            Kadro Radarı
           </h3>
         </div>
         <span className="rounded-sm px-1.5 py-0.5 bg-[#060709] border border-white/[0.06] font-mono text-[10px] font-bold text-gl-text-normal">
@@ -88,7 +88,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
           (g) =>
             g.members.length > 0 && (
               <section key={g.key} className="space-y-2">
-                <h4 className="px-1.5 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.18em] text-gl-text-muted">
+                <h4 className="px-1.5 flex items-center justify-between font-sans text-[11px] font-bold tracking-wider text-gl-text-muted">
                   <span className="flex items-center gap-2">
                     <span
                       aria-hidden
@@ -96,7 +96,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
                     />
                     <span>{g.title}</span>
                   </span>
-                  <span>{g.members.length}</span>
+                  <span className="font-mono">{g.members.length}</span>
                 </h4>
 
                 <div className="space-y-1.5">
@@ -116,7 +116,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
                           {m.username}
                         </span>
                         {m.activity && (
-                          <span className="block truncate font-mono text-[10px] text-gl-text-muted mt-0.5">
+                          <span className="block truncate font-sans text-[11px] text-gl-text-muted mt-0.5">
                             {m.activity}
                           </span>
                         )}

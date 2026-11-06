@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────
-// GhostLink — Auth Hook
+// Meva HUD — Auth Hook (Unmount-Safe & Sanitized)
 // ─────────────────────────────────────────────────────────
 
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import type { Profile } from '@/types';
 
@@ -15,38 +15,56 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setLoading(false);
+      return;
+    }
+
+    let mounted = true;
     const supabase = getSupabase();
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    async function fetchProfile(userId: string) {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        if (mounted && data) setProfile(data as Profile);
+      } catch {
+        // Ignore profile lookup errors when offline
+      }
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!mounted) return;
+        setUser(session?.user ?? null);
+        if (session?.user) void fetchProfile(session.user.id);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      setLoading(false);
+      if (session?.user) void fetchProfile(session.user.id);
+      else setProfile(null);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) fetchProfile(session.user.id);
-        else setProfile(null);
-      },
-    );
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  async function fetchProfile(userId: string) {
-    const supabase = getSupabase();
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    if (data) setProfile(data as Profile);
-  }
-
   const signInWithDiscord = async () => {
+    if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
     await supabase.auth.signInWithOAuth({
       provider: 'discord',
@@ -56,20 +74,28 @@ export function useAuth() {
 
   const signInWithEmail = async (email: string, password: string) => {
     const supabase = getSupabase();
-    return supabase.auth.signInWithPassword({ email, password });
+    return supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
   };
 
   const signUp = async (email: string, password: string, username: string) => {
     const supabase = getSupabase();
+    const cleanUsername = username
+      .replace(/[\u0000-\u001F\u007F]/g, '')
+      .trim()
+      .slice(0, 32);
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
-      options: { data: { username } },
+      options: { data: { username: cleanUsername } },
     });
     return { data, error };
   };
 
   const signOut = async () => {
+    if (!isSupabaseConfigured()) return;
     const supabase = getSupabase();
     await supabase.auth.signOut();
   };
@@ -84,4 +110,3 @@ export function useAuth() {
     signOut,
   };
 }
-

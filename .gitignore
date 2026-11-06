@@ -5,10 +5,22 @@
 **/dist/
 **/build/
 **/.gradle/
+**/*.tsbuildinfo
 android-sdk/
-*.apk
+**/*.apk
+**/*.aab
 
-# Local Environment Secrets
-**/.env.local
-**/.env.*.local
+# Secrets, Signing Keys & Local Environment
+**/.env
+**/.env.*
+!**/.env.example
+**/*.keystore
+**/*.jks
+**/*.pem
+**/*.key
+**/local.properties
+
+# OS & Logs
 .DS_Store
+Thumbs.db
+**/*.log

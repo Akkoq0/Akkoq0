@@ -1,13 +1,15 @@
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Realtime Tactical Comms Hook (Pre-Populated)
+// Meva HUD — Realtime Tactical Comms Hook (Hydration-Safe)
 // ─────────────────────────────────────────────────────────
 
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/lib/store';
 import type { Message } from '@/types';
+
+const BASE_PROFILE_ISO = '2026-11-06T19:00:00.000Z';
 
 export const INITIAL_TACTICAL_MESSAGES: Message[] = [
   {
@@ -16,14 +18,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-local',
     content:
       '[ROUND 14 — ECO KARARI] Bu el tam eco, kredi koruyoruz (min 4100). Sadece Sheriff ile Mid-Market info alıyoruz; 15. roundda çift Operator + tam utility ile çıkacağız.',
-    created_at: new Date(Date.now() - 420_000).toISOString(),
+    created_at: '2026-11-06T19:42:10.000Z',
     author: {
       id: 'usr-local',
       username: 'Operatör',
       avatar_url: null,
       status: 'online',
       activity: 'IGL · Taktik Komuta',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
   {
@@ -32,14 +34,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-5',
     content:
       '[SESLİ BRİFİNG · 0:08] Ascent B-Main retake zamanlaması: Killjoy ultisi kurulduğu an Sova recon oku arka duvara düşecek, 1.5 saniye sonra ikili flash ile giriş yapıyoruz.',
-    created_at: new Date(Date.now() - 310_000).toISOString(),
+    created_at: '2026-11-06T19:44:05.000Z',
     author: {
       id: 'usr-5',
       username: 'AimCoach_Mert',
       avatar_url: null,
       status: 'online',
       activity: 'Baş Antrenör · Analist',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
   {
@@ -48,14 +50,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-1',
     content:
       '[TAKTİK ÇAĞRI: ROTATE B] A-Main tamamen temiz, Operator ile Mid-Cubby hattını kilitledim. 3 ayak sesi B-Lobby yönüne kaydı, hızlı rotasyon!',
-    created_at: new Date(Date.now() - 210_000).toISOString(),
+    created_at: '2026-11-06T19:45:42.000Z',
     author: {
       id: 'usr-1',
       username: 'cNed',
       avatar_url: null,
       status: 'in-game',
       activity: 'AWP · Jett (Radiant #14)',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
   {
@@ -64,14 +66,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-4',
     content:
       '[GİRİŞ KOORDİNASYONU] B-Main boğazına tek yön duman + çift flash hazır. Komutla birlikte 3-2-1 patlatıp site içine sızıyoruz, takaslara yakın durun.',
-    created_at: new Date(Date.now() - 140_000).toISOString(),
+    created_at: '2026-11-06T19:46:55.000Z',
     author: {
       id: 'usr-4',
       username: 'XANTARES',
       avatar_url: null,
       status: 'in-game',
       activity: 'ENTRY · Raze / AK-47',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
   {
@@ -80,14 +82,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-2',
     content:
       '[CLUTCH RAPORU — 2v2] Spike B-Default konumuna kuruldu. CT-Spawn ve Market penceresini çapraz ateşe aldık, pozisyon bozmadan süreyi oynuyoruz.',
-    created_at: new Date(Date.now() - 75_000).toISOString(),
+    created_at: '2026-11-06T19:48:18.000Z',
     author: {
       id: 'usr-2',
       username: 'woxic',
       avatar_url: null,
       status: 'in-game',
       activity: 'LURKER · Sova (Faceit Lvl 10)',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
   {
@@ -96,14 +98,14 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
     author_id: 'usr-3',
     content:
       '[SAVUNMA KİLİDİ] Lockdown ultisi %100 hazır. Rakip retake denediği an B-Boathouse köşesinden cihazı aktif ediyorum, herkes geri çekilip süreyi eritsin.',
-    created_at: new Date(Date.now() - 25_000).toISOString(),
+    created_at: '2026-11-06T19:49:30.000Z',
     author: {
       id: 'usr-3',
       username: 'Alfajer',
       avatar_url: null,
       status: 'in-game',
       activity: 'ANCHOR · Killjoy',
-      created_at: new Date().toISOString(),
+      created_at: BASE_PROFILE_ISO,
     },
   },
 ];
@@ -115,15 +117,15 @@ const SEED_BY_CHANNEL: Record<string, Message[]> = {
       channel_id: 'ch-1',
       author_id: 'usr-5',
       content:
-        '[TURNUVA DUYURUSU] VCT EMEA Kapalı Eleme Scrim bloğu saat 20:00\'de başlıyor. Tüm kadro Taktik Lobi #1 frekansında (96kbps Opus P2P) hazır bulunsun.',
-      created_at: new Date(Date.now() - 600_000).toISOString(),
+        "[TURNUVA DUYURUSU] VCT EMEA Kapalı Eleme Scrim bloğu saat 20:00'de başlıyor. Tüm kadro Taktik Lobi #1 frekansında (96kbps Opus P2P) hazır bulunsun.",
+      created_at: '2026-11-06T19:38:00.000Z',
       author: {
         id: 'usr-5',
         username: 'AimCoach_Mert',
         avatar_url: null,
         status: 'online',
         activity: 'Baş Antrenör',
-        created_at: new Date().toISOString(),
+        created_at: BASE_PROFILE_ISO,
       },
     },
     ...INITIAL_TACTICAL_MESSAGES.slice(0, 4),
@@ -136,14 +138,14 @@ const SEED_BY_CHANNEL: Record<string, Message[]> = {
       author_id: 'usr-1',
       content:
         '[SCRIM ARAMA — BO3] Saat 21:00 için Ascent / Bind / Lotus BO3 antrenman maçı arıyoruz. Sunucu: Frankfurt / İstanbul P2P (11ms).',
-      created_at: new Date(Date.now() - 500_000).toISOString(),
+      created_at: '2026-11-06T19:40:15.000Z',
       author: {
         id: 'usr-1',
         username: 'cNed',
         avatar_url: null,
         status: 'in-game',
         activity: 'AWP · Radiant #14',
-        created_at: new Date().toISOString(),
+        created_at: BASE_PROFILE_ISO,
       },
     },
     ...INITIAL_TACTICAL_MESSAGES.slice(2),
@@ -155,14 +157,14 @@ const SEED_BY_CHANNEL: Record<string, Message[]> = {
       author_id: 'usr-3',
       content:
         '[SESLİ BRİFİNG · 0:14] FUT vs Fnatic Lotus haritası C-Bend savunma dizilimi ve erken rotasyon zamanlamaları analiz kaydı.',
-      created_at: new Date(Date.now() - 480_000).toISOString(),
+      created_at: '2026-11-06T19:41:00.000Z',
       author: {
         id: 'usr-3',
         username: 'Alfajer',
         avatar_url: null,
         status: 'in-game',
         activity: 'ANCHOR · Analiz',
-        created_at: new Date().toISOString(),
+        created_at: BASE_PROFILE_ISO,
       },
     },
     ...INITIAL_TACTICAL_MESSAGES.slice(1, 5),
@@ -190,30 +192,32 @@ export function useRealtimeChat(channelId: string | null) {
           id: `dm-seed-1-${activeDMUserId}`,
           channel_id: effectiveTargetId,
           author_id: activeDMUserId,
-          content: `[DOĞRUDAN P2P HAT] Selam komutan, 1v1 şifreli ses ve metin hattı aktif (11ms). Maç öncesi taktik üzerinden geçelim mi?`,
-          created_at: new Date(Date.now() - 240_000).toISOString(),
+          content:
+            '[DOĞRUDAN P2P HAT] Selam komutan, 1v1 şifreli ses ve metin hattı aktif (11ms). Maç öncesi taktik üzerinden geçelim mi?',
+          created_at: '2026-11-06T19:46:00.000Z',
           author: targetFriend ?? {
             id: activeDMUserId,
             username: friendName,
             avatar_url: null,
             status: 'in-game',
             activity: 'Doğrudan P2P Bağlantı',
-            created_at: new Date().toISOString(),
+            created_at: BASE_PROFILE_ISO,
           },
         },
         {
           id: `dm-seed-2-${activeDMUserId}`,
           channel_id: effectiveTargetId,
           author_id: 'usr-local',
-          content: `[ONAYLANDI] Taktik Lobi #1 frekansına geçiyorum, harita dizilimini orada netleştirelim.`,
-          created_at: new Date(Date.now() - 120_000).toISOString(),
+          content:
+            '[ONAYLANDI] Taktik Lobi #1 frekansına geçiyorum, harita dizilimini orada netleştirelim.',
+          created_at: '2026-11-06T19:48:00.000Z',
           author: {
             id: 'usr-local',
             username: 'Operatör',
             avatar_url: null,
             status: 'online',
             activity: 'IGL · Taktik Komuta',
-            created_at: new Date().toISOString(),
+            created_at: BASE_PROFILE_ISO,
           },
         },
       ]);
@@ -227,25 +231,37 @@ export function useRealtimeChat(channelId: string | null) {
 
   const sendMessage = useCallback(
     async (content: string) => {
-      const trimmed = content.trim();
-      if (!trimmed) return;
+      // Strip non-printable control characters and cap at 2000 chars (matches DB CHECK)
+      const sanitized = content
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, 2000);
+      if (!sanitized) return;
+
+      const msgId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? `local-${crypto.randomUUID()}`
+          : `local-${Date.now()}`;
+      const nowIso = new Date().toISOString();
 
       const optimisticMsg: Message = {
-        id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: msgId,
         channel_id: effectiveTargetId,
         author_id: 'usr-local',
-        content: trimmed,
-        created_at: new Date().toISOString(),
+        content: sanitized,
+        created_at: nowIso,
         author: {
           id: 'usr-local',
           username: 'Operatör',
           avatar_url: null,
           status: 'online',
           activity: 'IGL · Taktik Komuta',
-          created_at: new Date().toISOString(),
+          created_at: BASE_PROFILE_ISO,
         },
       };
       addMessage(optimisticMsg);
+
+      if (!isSupabaseConfigured()) return;
 
       try {
         const supabase = getSupabase();
@@ -256,11 +272,11 @@ export function useRealtimeChat(channelId: string | null) {
           await supabase.from('messages').insert({
             channel_id: effectiveTargetId,
             author_id: user.id,
-            content: trimmed,
+            content: sanitized,
           });
         }
       } catch {
-        // Optimistic message already rendered
+        // Optimistic message already rendered locally
       }
     },
     [effectiveTargetId, activeDMUserId, addMessage],

@@ -2,15 +2,14 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'gg.ghostlink.app',
-  appName: 'GhostLink',
+  appName: 'Meva HUD',
   webDir: 'out',
   server: {
     androidScheme: 'https',
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
   },
 };
 
 export default config;
-

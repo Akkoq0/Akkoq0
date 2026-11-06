@@ -1,46 +1,35 @@
 // ─────────────────────────────────────────────────────────
-// GhostLink — INNOVATION #2: Instant Scrim Link
-// ─────────────────────────────────────────────────────────
-//
-// WHAT IT DOES:
-//   Creates a temporary, zero-database P2P voice room with
-//   a shareable short link. Perfect for scrimmages (practice
-//   matches) against rival teams.
-//
-// HOW IT WORKS:
-//   1. Generate a short random code (e.g. "xK3m9p")
-//   2. Use Supabase Realtime Broadcast channel as signaling
-//      (ephemeral — nothing written to DB)
-//   3. Share link: ghostlink.gg/scrim/xK3m9p
-//   4. Room auto-expires after 4 hours (TTL in-memory)
-//   5. Optional password protection
-//
-// ZERO DB COST:
-//   Broadcast channels are ephemeral — no row inserts,
-//   no storage consumed. True $0.
+// Meva HUD — Ephemeral Scrim Link Hook (CSPRNG + Sanitized)
 // ─────────────────────────────────────────────────────────
 
 'use client';
 
-import { useCallback, useRef } from 'react';
-import { getSupabase } from '@/lib/supabase';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { ScrimRoom } from '@/types';
 
-/** Generate a short alphanumeric code */
-function generateCode(length = 6): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let code = '';
+const SCRIM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const SCRIM_TTL = 4 * 60 * 60 * 1000;
+
+export function generateSecureScrimCode(length = 6): string {
   const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(array);
+  } else {
+    for (let i = 0; i < length; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  let code = '';
   for (let i = 0; i < length; i++) {
-    code += chars[array[i] % chars.length];
+    code += SCRIM_ALPHABET[array[i] % SCRIM_ALPHABET.length];
   }
   return code;
 }
 
-/** 4 hours in milliseconds */
-const SCRIM_TTL = 4 * 60 * 60 * 1000;
+export function sanitizeScrimCode(raw: string): string {
+  return raw.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16);
+}
 
 export function useScrimLink() {
   const setActiveScrimRoom = useAppStore((s) => s.setActiveScrimRoom);
@@ -48,15 +37,35 @@ export function useScrimLink() {
   const activeScrimRoom = useAppStore((s) => s.activeScrimRoom);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Create a new scrim room ──
+  const clearExpiryTimer = useCallback(() => {
+    if (expiryTimerRef.current !== null) {
+      clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => clearExpiryTimer();
+  }, [clearExpiryTimer]);
+
   const createScrimRoom = useCallback(
-    (options: { name: string; password?: string; maxParticipants?: number; creatorId: string }) => {
+    (options: {
+      name: string;
+      password?: string;
+      maxParticipants?: number;
+      creatorId: string;
+    }) => {
+      clearExpiryTimer();
+      const safeName =
+        options.name.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 40) ||
+        'Scrim Odası';
+
       const room: ScrimRoom = {
-        code: generateCode(),
-        name: options.name || 'Scrim Odası',
+        code: generateSecureScrimCode(),
+        name: safeName,
         created_by: options.creatorId,
         password: options.password || null,
-        max_participants: options.maxParticipants || 10,
+        max_participants: Math.max(2, Math.min(20, options.maxParticipants || 10)),
         created_at: Date.now(),
         ttl: SCRIM_TTL,
       };
@@ -64,24 +73,23 @@ export function useScrimLink() {
       setActiveScrimRoom(room);
       setShowScrimModal(false);
 
-      // Auto-expire
       expiryTimerRef.current = setTimeout(() => {
         setActiveScrimRoom(null);
       }, SCRIM_TTL);
 
       return room;
     },
-    [setActiveScrimRoom, setShowScrimModal],
+    [setActiveScrimRoom, setShowScrimModal, clearExpiryTimer],
   );
 
-  // ── Join existing scrim room by code ──
   const joinScrimRoom = useCallback(
     async (code: string, password?: string) => {
-      // In a real app, we'd verify via broadcast presence.
-      // For now, construct the room reference and connect.
+      const safeCode = sanitizeScrimCode(code).toUpperCase();
+      if (safeCode.length < 3) return null;
+
       const room: ScrimRoom = {
-        code,
-        name: `Scrim #${code}`,
+        code: safeCode,
+        name: `Scrim #${safeCode}`,
         created_by: '',
         password: password || null,
         max_participants: 10,
@@ -95,30 +103,28 @@ export function useScrimLink() {
     [setActiveScrimRoom],
   );
 
-  // ── Leave / destroy scrim room ──
   const leaveScrimRoom = useCallback(() => {
-    if (expiryTimerRef.current) {
-      clearTimeout(expiryTimerRef.current);
-      expiryTimerRef.current = null;
-    }
+    clearExpiryTimer();
     setActiveScrimRoom(null);
-  }, [setActiveScrimRoom]);
+  }, [setActiveScrimRoom, clearExpiryTimer]);
 
-  // ── Get shareable link ──
   const getShareLink = useCallback(() => {
-    if (!activeScrimRoom) return '';
-    if (typeof window === 'undefined') return '';
-    return `${window.location.origin}/scrim/${activeScrimRoom.code}`;
+    if (!activeScrimRoom || typeof window === 'undefined') return '';
+    const safeCode = sanitizeScrimCode(activeScrimRoom.code);
+    return `${window.location.origin}/scrim/${encodeURIComponent(safeCode)}`;
   }, [activeScrimRoom]);
 
-  // ── Copy link to clipboard ──
   const copyShareLink = useCallback(async () => {
     const link = getShareLink();
-    if (link) {
+    if (!link || typeof navigator === 'undefined' || !navigator.clipboard) {
+      return false;
+    }
+    try {
       await navigator.clipboard.writeText(link);
       return true;
+    } catch {
+      return false;
     }
-    return false;
   }, [getShareLink]);
 
   return {
@@ -130,4 +136,3 @@ export function useScrimLink() {
     copyShareLink,
   };
 }
-

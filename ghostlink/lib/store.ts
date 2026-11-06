@@ -1,13 +1,18 @@
 // ─────────────────────────────────────────────────────────
-// GhostLink — Global State v2 (Zustand — Full Interactive)
+// Meva HUD — Global State Store (Zustand — Selector Optimized)
 // ─────────────────────────────────────────────────────────
-// ~1 KB gzipped. Selector pattern: each panel subscribes
-// only to its own slice → zero cross-panel re-renders.
 
 import { create } from 'zustand';
-import type { AppState, Message, EcoModeState, NetGuardStats, Friendship } from '@/types';
+import type {
+  AppState,
+  Message,
+  EcoModeState,
+  NetGuardStats,
+  Friendship,
+} from '@/types';
 
-// Default esports friends for instant 1v1 testing
+const SEED_ISO = '2026-11-06T19:00:00.000Z';
+
 const DEFAULT_FRIENDS: Friendship[] = [
   {
     id: 'f-1',
@@ -19,10 +24,10 @@ const DEFAULT_FRIENDS: Friendship[] = [
       username: 'cNed',
       avatar_url: null,
       status: 'in-game',
-      activity: 'Valorant — Radiant',
-      created_at: new Date().toISOString(),
+      activity: 'Valorant — Radiant #14',
+      created_at: SEED_ISO,
     },
-    created_at: new Date().toISOString(),
+    created_at: SEED_ISO,
   },
   {
     id: 'f-2',
@@ -35,9 +40,9 @@ const DEFAULT_FRIENDS: Friendship[] = [
       avatar_url: null,
       status: 'in-game',
       activity: 'CS2 — Faceit Lvl 10',
-      created_at: new Date().toISOString(),
+      created_at: SEED_ISO,
     },
-    created_at: new Date().toISOString(),
+    created_at: SEED_ISO,
   },
   {
     id: 'f-3',
@@ -50,9 +55,9 @@ const DEFAULT_FRIENDS: Friendship[] = [
       avatar_url: null,
       status: 'in-game',
       activity: 'CS2 — 3140 ELO Entry',
-      created_at: new Date().toISOString(),
+      created_at: SEED_ISO,
     },
-    created_at: new Date().toISOString(),
+    created_at: SEED_ISO,
   },
   {
     id: 'f-4',
@@ -65,17 +70,13 @@ const DEFAULT_FRIENDS: Friendship[] = [
       avatar_url: null,
       status: 'online',
       activity: 'Valorant — Sentinel / Analiz',
-      created_at: new Date().toISOString(),
+      created_at: SEED_ISO,
     },
-    created_at: new Date().toISOString(),
+    created_at: SEED_ISO,
   },
 ];
 
-export const useAppStore = create<AppState>((set, get) => ({
-  // ════════════════════════════════════════════════════
-  // STATE
-  // ════════════════════════════════════════════════════
-
+export const useAppStore = create<AppState>((set) => ({
   activeServerId: 'srv-1',
   activeChannelId: 'ch-2',
   activeVoiceChannelId: 'ch-4',
@@ -91,7 +92,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   ecoMode: {
     isActive: false,
-    isEnabled: true,     // On by default — competitive advantage
+    isEnabled: true,
     cpuEstimate: 0,
     animationsPaused: false,
   },
@@ -100,10 +101,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   showScrimModal: false,
 
   netGuard: {
-    jitterMs: 0,
+    jitterMs: 0.2,
     packetLossPercent: 0,
-    bufferSizeMs: 20,
-    qualityScore: 100,
+    bufferSizeMs: 12,
+    qualityScore: 99,
     qualityLabel: 'Mükemmel',
   },
 
@@ -113,10 +114,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRadarOpen: false,
   isMobileSidebarOpen: false,
   isMobileRadarOpen: false,
-
-  // ════════════════════════════════════════════════════
-  // ACTIONS — Navigation
-  // ════════════════════════════════════════════════════
 
   setActiveServer: (id) =>
     set({
@@ -130,17 +127,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   setActiveChannel: (id) =>
-    set({ activeChannelId: id, activeDMUserId: null, messages: [], isMobileSidebarOpen: false }),
+    set({
+      activeChannelId: id,
+      activeDMUserId: null,
+      messages: [],
+      isMobileSidebarOpen: false,
+    }),
 
   setActiveVoiceChannel: (id) =>
     set({ activeVoiceChannelId: id, isMobileSidebarOpen: false }),
 
   setActiveDMUser: (userId) =>
-    set({ activeDMUserId: userId, activeChannelId: null, messages: [], isMobileSidebarOpen: false }),
-
-  // ════════════════════════════════════════════════════
-  // ACTIONS — Data
-  // ════════════════════════════════════════════════════
+    set({
+      activeDMUserId: userId,
+      activeChannelId: null,
+      messages: [],
+      isMobileSidebarOpen: false,
+    }),
 
   setServers: (servers) => set({ servers }),
 
@@ -164,22 +167,37 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   addFriendRequest: (username) =>
     set((s) => {
-      const cleanName = username.trim();
-      if (!cleanName) return s;
+      const cleanName = username
+        .replace(/[\u0000-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, 32);
+      if (cleanName.length < 2) return s;
+
+      const exists = s.friends.some(
+        (f) => f.friend?.username.toLowerCase() === cleanName.toLowerCase(),
+      );
+      if (exists) return s;
+
+      const uid =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}`;
+      const nowIso = new Date().toISOString();
+
       const newFriendship: Friendship = {
-        id: `f-${Date.now()}`,
+        id: `f-${uid}`,
         user_id: 'usr-current',
-        friend_id: `usr-${Date.now()}`,
+        friend_id: `usr-${uid}`,
         status: 'pending',
         friend: {
-          id: `usr-${Date.now()}`,
+          id: `usr-${uid}`,
           username: cleanName,
           avatar_url: null,
           status: 'online',
-          activity: null,
-          created_at: new Date().toISOString(),
+          activity: 'Çağrı Bekleniyor',
+          created_at: nowIso,
         },
-        created_at: new Date().toISOString(),
+        created_at: nowIso,
       };
       return { friends: [...s.friends, newFriendship] };
     }),
@@ -187,7 +205,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   acceptFriendRequest: (friendshipId) =>
     set((s) => ({
       friends: s.friends.map((f) =>
-        f.id === friendshipId ? { ...f, status: 'accepted' } : f
+        f.id === friendshipId ? { ...f, status: 'accepted' } : f,
       ),
     })),
 
@@ -197,10 +215,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeDMUserId: s.activeDMUserId === friendId ? null : s.activeDMUserId,
     })),
 
-  // ════════════════════════════════════════════════════
-  // ACTIONS — Eco Mode (Innovation #1)
-  // ════════════════════════════════════════════════════
-
   setEcoMode: (update: Partial<EcoModeState>) =>
     set((s) => ({ ecoMode: { ...s.ecoMode, ...update } })),
 
@@ -209,24 +223,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       ecoMode: { ...s.ecoMode, isEnabled: !s.ecoMode.isEnabled },
     })),
 
-  // ════════════════════════════════════════════════════
-  // ACTIONS — Scrim (Innovation #2)
-  // ════════════════════════════════════════════════════
-
   setActiveScrimRoom: (room) => set({ activeScrimRoom: room }),
 
   setShowScrimModal: (show) => set({ showScrimModal: show }),
 
-  // ════════════════════════════════════════════════════
-  // ACTIONS — Net-Guard (Innovation #3)
-  // ════════════════════════════════════════════════════
-
   setNetGuard: (stats: Partial<NetGuardStats>) =>
     set((s) => ({ netGuard: { ...s.netGuard, ...stats } })),
-
-  // ════════════════════════════════════════════════════
-  // ACTIONS — UI & Mobile
-  // ════════════════════════════════════════════════════
 
   toggleCategory: (categoryId) =>
     set((s) => {

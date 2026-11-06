@@ -1,9 +1,14 @@
 // ─────────────────────────────────────────────────────────
-// GhostLink — Tactical Player HUD Store (store/useHUDStore.ts)
+// Meva HUD — Unified Operator Audio & Telemetry Store
 // ─────────────────────────────────────────────────────────
+// Synchronizes per-operator gain (0–200%), individual mute,
+// and 3D spatial pan (L/C/R) across Squad Pods, Telemetry
+// Drawer, and live WebRTC peer audio elements.
 
 import { create } from 'zustand';
 import type { Profile } from '@/types';
+
+export type SpatialPan = 'L' | 'C' | 'R';
 
 export interface TacticalMetrics {
   ping: number;
@@ -16,49 +21,67 @@ export interface TacticalMetrics {
 interface HUDState {
   selectedPlayer: Profile | null;
   isOpen: boolean;
-  playerGains: Record<string, number>; // 0 to 200%
+  playerGains: Record<string, number>;
   localMutes: Record<string, boolean>;
+  spatialPans: Record<string, SpatialPan>;
   metrics: TacticalMetrics;
 
   openHUD: (player: Profile) => void;
   closeHUD: () => void;
   setPlayerGain: (playerId: string, gain: number) => void;
   toggleLocalMute: (playerId: string) => void;
+  cycleSpatialPan: (playerId: string) => void;
 }
 
 export const useHUDStore = create<HUDState>((set) => ({
   selectedPlayer: null,
   isOpen: false,
-  playerGains: {},
+  playerGains: {
+    'usr-local': 100,
+    'usr-1': 125,
+    'usr-4': 115,
+    'usr-2': 100,
+    'usr-3': 95,
+  },
   localMutes: {},
+  spatialPans: {
+    'usr-local': 'C',
+    'usr-1': 'L',
+    'usr-4': 'R',
+    'usr-2': 'L',
+    'usr-3': 'C',
+  },
   metrics: {
-    ping: 18,
-    jitter: 1.2,
+    ping: 12,
+    jitter: 0.2,
     packetLoss: 0.0,
-    inputBitrate: 24,
-    micCodec: 'Opus 48kHz (Mono)',
+    inputBitrate: 96,
+    micCodec: 'Opus 48kHz (CBR)',
   },
 
   openHUD: (player) =>
     set({
       selectedPlayer: player,
       isOpen: true,
-      // Generates tactical simulated live network stats for target peer
       metrics: {
-        ping: Math.floor(12 + Math.random() * 15),
-        jitter: Math.round((0.8 + Math.random() * 1.5) * 10) / 10,
-        packetLoss: Math.random() > 0.85 ? 0.4 : 0.0,
-        inputBitrate: 24,
-        micCodec: 'Opus 48kHz (Mono)',
+        ping: 11,
+        jitter: 0.2,
+        packetLoss: 0.0,
+        inputBitrate: 96,
+        micCodec: 'Opus 48kHz (CBR)',
       },
     }),
 
   closeHUD: () => set({ isOpen: false, selectedPlayer: null }),
 
-  setPlayerGain: (playerId, gain) =>
+  setPlayerGain: (playerId, gain) => {
+    const clamped = Math.max(0, Math.min(200, Math.round(gain)));
     set((s) => ({
-      playerGains: { ...s.playerGains, [playerId]: gain },
-    })),
+      playerGains: { ...s.playerGains, [playerId]: clamped },
+      localMutes:
+        clamped > 0 ? { ...s.localMutes, [playerId]: false } : s.localMutes,
+    }));
+  },
 
   toggleLocalMute: (playerId) =>
     set((s) => ({
@@ -67,5 +90,13 @@ export const useHUDStore = create<HUDState>((set) => ({
         [playerId]: !s.localMutes[playerId],
       },
     })),
-}));
 
+  cycleSpatialPan: (playerId) =>
+    set((s) => {
+      const curr = s.spatialPans[playerId] ?? 'C';
+      const next: SpatialPan = curr === 'L' ? 'C' : curr === 'C' ? 'R' : 'L';
+      return {
+        spatialPans: { ...s.spatialPans, [playerId]: next },
+      };
+    }),
+}));

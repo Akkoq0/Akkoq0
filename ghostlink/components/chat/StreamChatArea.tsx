@@ -15,6 +15,7 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useHUDStore } from '@/store/useHUDStore';
 import {
   useRealtimeChat,
   INITIAL_TACTICAL_MESSAGES,
@@ -29,8 +30,6 @@ import {
   IconShield,
 } from '@/components/ui/MevaIcons';
 import type { Profile, VoiceControls } from '@/types';
-
-type SpatialPan = 'L' | 'C' | 'R';
 
 interface SquadOperatorMeta {
   id: string;
@@ -187,24 +186,14 @@ export const StreamChatArea = memo(function StreamChatArea({
   const messages =
     storeMessages.length > 0 ? storeMessages : INITIAL_TACTICAL_MESSAGES;
 
-  // Individual operator gain (0-200%), mute, and 3D spatial audio pan (L/C/R)
-  const [gains, setGains] = useState<Record<string, number>>({
-    'usr-local': 100,
-    'usr-1': 125,
-    'usr-4': 115,
-    'usr-2': 100,
-    'usr-3': 95,
-  });
+  // Synchronized per-operator gain (0-200%), mute, and 3D spatial audio pan (L/C/R)
+  const gains = useHUDStore((s) => s.playerGains);
+  const mutedPeers = useHUDStore((s) => s.localMutes);
+  const spatialPan = useHUDStore((s) => s.spatialPans);
+  const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
+  const togglePeerMute = useHUDStore((s) => s.toggleLocalMute);
+  const cycleSpatialPan = useHUDStore((s) => s.cycleSpatialPan);
 
-  const [spatialPan, setSpatialPan] = useState<Record<string, SpatialPan>>({
-    'usr-local': 'C',
-    'usr-1': 'L',
-    'usr-4': 'R',
-    'usr-2': 'L',
-    'usr-3': 'C',
-  });
-
-  const [mutedPeers, setMutedPeers] = useState<Record<string, boolean>>({});
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({
     'usr-1': true,
     'usr-4': true,
@@ -229,6 +218,41 @@ export const StreamChatArea = memo(function StreamChatArea({
 
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    };
+  }, []);
+
+  // Push-To-Talk keyboard shortcut (hold 'V' when not typing in an input)
+  useEffect(() => {
+    const isEditable = (el: EventTarget | null) =>
+      el instanceof HTMLElement &&
+      (el.tagName === 'INPUT' ||
+        el.tagName === 'TEXTAREA' ||
+        el.isContentEditable);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat || isEditable(e.target)) return;
+      if (e.key === 'v' || e.key === 'V') {
+        setPttActive(true);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'v' || e.key === 'V') {
+        setPttActive(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
 
   // Live voice activity & telemetry simulation
   useEffect(() => {
@@ -278,7 +302,8 @@ export const StreamChatArea = memo(function StreamChatArea({
 
   const triggerSelfSpeakingPulse = useCallback(() => {
     setSpeakingPeers((prev) => ({ ...prev, 'usr-local': true }));
-    setTimeout(() => {
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = setTimeout(() => {
       setSpeakingPeers((prev) => ({ ...prev, 'usr-local': false }));
     }, 2200);
   }, []);
@@ -324,24 +349,12 @@ export const StreamChatArea = memo(function StreamChatArea({
     [onlineMembers, onSelectPlayer, username, activeServerId],
   );
 
-  const togglePeerMute = useCallback((id: string) => {
-    setMutedPeers((prev) => ({ ...prev, [id]: !prev[id] }));
-  }, []);
-
-  const cycleSpatialPan = useCallback((id: string) => {
-    setSpatialPan((prev) => {
-      const curr = prev[id] ?? 'C';
-      const next: SpatialPan = curr === 'L' ? 'C' : curr === 'C' ? 'R' : 'L';
-      return { ...prev, [id]: next };
-    });
-  }, []);
-
-  const handleGainChange = useCallback((id: string, val: number) => {
-    setGains((prev) => ({ ...prev, [id]: val }));
-    if (val > 0) {
-      setMutedPeers((prev) => ({ ...prev, [id]: false }));
-    }
-  }, []);
+  const handleGainChange = useCallback(
+    (id: string, val: number) => {
+      setPlayerGain(id, val);
+    },
+    [setPlayerGain],
+  );
 
   const activeRoomName = activeVoiceChannel
     ? cleanLabel(activeVoiceChannel.name)
@@ -400,22 +413,32 @@ export const StreamChatArea = memo(function StreamChatArea({
             })}
 
             <button
-              onMouseDown={() => setPttActive(true)}
-              onMouseUp={() => setPttActive(false)}
-              onMouseLeave={() => setPttActive(false)}
-              onClick={() => {
-                setPttActive((v) => !v);
+              type="button"
+              onPointerDown={() => setPttActive(true)}
+              onPointerUp={() => {
+                setPttActive(false);
                 triggerSelfSpeakingPulse();
+              }}
+              onPointerLeave={() => setPttActive(false)}
+              onPointerCancel={() => setPttActive(false)}
+              onKeyDown={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') setPttActive(true);
+              }}
+              onKeyUp={(e) => {
+                if (e.key === ' ' || e.key === 'Enter') {
+                  setPttActive(false);
+                  triggerSelfSpeakingPulse();
+                }
               }}
               className={`rounded-sm h-7 px-3 font-sans text-xs font-bold border transition-all flex items-center gap-1.5 ${
                 pttActive || speakingPeers['usr-local']
                   ? 'bg-[#10B981] text-[#06070A] border-[#10B981]'
                   : 'bg-[#06070A] text-gl-text-bright hover:border-[#F59E0B]/50 border-white/[0.08]'
               }`}
-              title="Bas-Konuş (PTT)"
+              title="Bas-Konuş (Basılı tutun veya V tuşunu kullanın)"
             >
               <IconMic size={12} />
-              <span>{pttActive ? 'İletiliyor...' : 'Bas-Konuş (PTT)'}</span>
+              <span>{pttActive ? 'İletiliyor...' : 'Bas-Konuş [V]'}</span>
             </button>
           </div>
         </div>
@@ -735,7 +758,10 @@ export const StreamChatArea = memo(function StreamChatArea({
                         </span>
                       )}
                     </div>
-                    <time className="font-mono text-[10px] text-gl-text-muted tabular-nums flex-shrink-0">
+                    <time
+                      suppressHydrationWarning
+                      className="font-mono text-[10px] text-gl-text-muted tabular-nums flex-shrink-0"
+                    >
                       {time}
                     </time>
                   </div>
@@ -1004,21 +1030,25 @@ export const StreamChatArea = memo(function StreamChatArea({
                   <line x1="54" y1="116" x2="126" y2="116" />
                 </g>
 
-                {/* Flowing Live P2P Audio Data Packets */}
-                <circle r="2.5" fill="#10B981">
-                  <animateMotion
-                    dur={stressTestActive ? '0.9s' : '1.6s'}
-                    repeatCount="indefinite"
-                    path="M90,14 L34,52 L54,116 L126,116 L146,52 Z"
-                  />
-                </circle>
-                <circle r="2.5" fill="#F59E0B">
-                  <animateMotion
-                    dur={stressTestActive ? '1.1s' : '2.1s'}
-                    repeatCount="indefinite"
-                    path="M90,14 L126,116 L34,52 L146,52 L54,116 Z"
-                  />
-                </circle>
+                {/* Flowing Live P2P Audio Data Packets (paused in Game-Boost Eco Mode) */}
+                {!ecoActive && (
+                  <>
+                    <circle r="2.5" fill="#10B981">
+                      <animateMotion
+                        dur={stressTestActive ? '0.9s' : '1.6s'}
+                        repeatCount="indefinite"
+                        path="M90,14 L34,52 L54,116 L126,116 L146,52 Z"
+                      />
+                    </circle>
+                    <circle r="2.5" fill="#F59E0B">
+                      <animateMotion
+                        dur={stressTestActive ? '1.1s' : '2.1s'}
+                        repeatCount="indefinite"
+                        path="M90,14 L126,116 L34,52 L146,52 L54,116 Z"
+                      />
+                    </circle>
+                  </>
+                )}
 
                 {/* 5 Operator Vertices + Callsign Labels */}
                 <g className="font-sans" fontSize="9" fontWeight="700" fill="#F3F4F6">

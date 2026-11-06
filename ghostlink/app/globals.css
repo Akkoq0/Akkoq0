@@ -81,14 +81,23 @@ select {
 
 /* ── Brushed Titanium & Carbon Bento Surfaces ── */
 .titanium-module {
-  background: linear-gradient(180deg, #0E1118 0%, #0A0C11 100%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    180deg,
+    var(--ghost-bg-mid, #12151E) 0%,
+    var(--ghost-bg-dark, #0C0E14) 100%
+  );
+  opacity: var(--ghost-glass-opacity, 0.96);
+  border: 1px solid var(--ghost-border, rgba(255, 255, 255, 0.06));
   box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .cockpit-pod {
-  background: linear-gradient(165deg, #12151E 0%, #0B0D13 100%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(
+    165deg,
+    var(--ghost-bg-mid, #12151E) 0%,
+    var(--ghost-bg-darkest, #06070A) 100%
+  );
+  border: 1px solid var(--ghost-border, rgba(255, 255, 255, 0.06));
   position: relative;
 }
 
@@ -163,7 +172,7 @@ select {
 }
 
 /* ─────────────────────────────────────────────────────────
-   GAME-BOOST ECO MODE: Low-End Hardware & Battery Optimizer
+   GAME-BOOST ECO MODE & REDUCED MOTION ACCESSIBILITY
    ───────────────────────────────────────────────────────── */
 body.eco-active *,
 body.eco-active *::before,
@@ -171,4 +180,12 @@ body.eco-active *::after {
   animation: none !important;
   transition: none !important;
   box-shadow: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar-1,
+  .eq-bar-2,
+  .eq-bar-3 {
+    animation: none !important;
+  }
 }

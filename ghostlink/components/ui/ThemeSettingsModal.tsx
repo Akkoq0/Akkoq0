@@ -4,7 +4,7 @@
 // Meva HUD — Industrial Surface & Accent Configuration Modal
 // ─────────────────────────────────────────────────────────
 
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   useThemeStore,
   THEME_PRESETS,
@@ -25,14 +25,39 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
 
   const [tab, setTab] = useState<'themes' | 'wallpaper'>('themes');
   const [wallpaperInput, setWallpaperInput] = useState(customWallpaper ?? '');
+  const [urlError, setUrlError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setWallpaperInput(customWallpaper ?? '');
+      setUrlError(null);
+    }
+  }, [isOpen, customWallpaper]);
 
   if (!isOpen) return null;
 
   const presetKeys = Object.keys(THEME_PRESETS) as ThemePreset[];
 
+  const handleApplyWallpaper = () => {
+    const trimmed = wallpaperInput.trim();
+    if (!trimmed) {
+      setCustomWallpaper(null);
+      setUrlError(null);
+      return;
+    }
+    const ok = setCustomWallpaper(trimmed);
+    if (!ok) {
+      setUrlError(
+        'Güvenlik kuralı: Yalnızca geçerli bir HTTPS görsel adresi (https://...) kullanılabilir.',
+      );
+    } else {
+      setUrlError(null);
+    }
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 font-sans"
       onClick={() => setShowThemeModal(false)}
     >
       <div
@@ -46,10 +71,10 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
               <IconSliders size={17} />
             </div>
             <div>
-              <h2 className="font-mono text-xs font-bold tracking-[0.18em] uppercase text-gl-text-bright">
-                ENDÜSTRİYEL YÜZEY VE VURGU MOTORU
+              <h2 className="font-sans text-sm font-bold tracking-wide text-gl-text-bright">
+                Endüstriyel Yüzey ve Vurgu Motoru
               </h2>
-              <p className="text-[11px] font-mono text-gl-text-muted mt-0.5">
+              <p className="text-xs text-gl-text-muted mt-0.5">
                 Sıfır Re-Render Kök CSS Değişken Mimarisi
               </p>
             </div>
@@ -67,23 +92,23 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
         <div className="grid grid-cols-2 gap-2 mb-5">
           <button
             onClick={() => setTab('themes')}
-            className={`rounded-sm min-h-[40px] font-mono text-[11px] font-bold uppercase tracking-[0.14em] border transition-colors ${
+            className={`rounded-sm min-h-[40px] text-xs font-bold uppercase tracking-wider border transition-colors ${
               tab === 'themes'
                 ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
                 : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
             }`}
           >
-            TAKTİK PALETLER
+            Taktik Paletler
           </button>
           <button
             onClick={() => setTab('wallpaper')}
-            className={`rounded-sm min-h-[40px] font-mono text-[11px] font-bold uppercase tracking-[0.14em] border transition-colors ${
+            className={`rounded-sm min-h-[40px] text-xs font-bold uppercase tracking-wider border transition-colors ${
               tab === 'wallpaper'
                 ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
                 : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
             }`}
           >
-            YÜZEY YOĞUNLUĞU
+            Yüzey Yoğunluğu
           </button>
         </div>
 
@@ -114,12 +139,12 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
                         {preset.name}
                       </span>
                       {isSelected && (
-                        <span className="rounded-sm text-[9px] font-mono font-bold px-1.5 py-0.5 bg-gl-accent text-white">
+                        <span className="rounded-sm text-[9px] font-bold px-1.5 py-0.5 bg-gl-accent text-white">
                           AKTİF
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-mono text-gl-text-muted mt-1">
+                    <p className="text-xs text-gl-text-muted mt-1">
                       {preset.tagline}
                     </p>
                   </div>
@@ -141,12 +166,12 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-sm p-4 bg-[#0C0E12] border border-white/[0.06]">
-              <div className="flex justify-between text-xs font-mono mb-2.5">
-                <span className="text-gl-text-normal font-bold">
-                  PANEL MATLIK YOĞUNLUĞU
+              <div className="flex justify-between text-xs mb-2.5">
+                <span className="text-gl-text-normal font-semibold">
+                  Panel Matlık Yoğunluğu
                 </span>
-                <span className="text-gl-accent font-bold">
-                  {Math.round(glassOpacity * 100)}%
+                <span className="font-mono text-gl-accent font-bold">
+                  %{Math.round(glassOpacity * 100)}
                 </span>
               </div>
               <input
@@ -161,33 +186,39 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
             </div>
 
             <div className="rounded-sm p-4 bg-[#0C0E12] border border-white/[0.06] space-y-3">
-              <label className="block text-[11px] font-mono font-bold text-gl-text-normal uppercase tracking-wider">
-                ARKA PLAN DOKU URL (İSTEĞE BAĞLI)
+              <label className="block text-xs font-semibold text-gl-text-normal">
+                Arka Plan Doku URL (Yalnızca HTTPS)
               </label>
               <div className="flex gap-2">
                 <input
                   type="url"
                   value={wallpaperInput}
-                  onChange={(e) => setWallpaperInput(e.target.value)}
+                  onChange={(e) => {
+                    setWallpaperInput(e.target.value);
+                    if (urlError) setUrlError(null);
+                  }}
                   placeholder="https://..."
+                  maxLength={512}
                   className="rounded-sm flex-1 h-10 bg-[#050608] text-xs text-gl-text-bright px-3.5 border border-white/[0.08] focus:outline-none focus:border-gl-accent"
                 />
                 <button
-                  onClick={() =>
-                    setCustomWallpaper(wallpaperInput.trim() || null)
-                  }
-                  className="rounded-sm min-h-[40px] px-4 bg-gl-accent hover:bg-gl-accent-hover text-white text-xs font-mono font-bold"
+                  onClick={handleApplyWallpaper}
+                  className="rounded-sm min-h-[40px] px-4 bg-gl-accent hover:bg-gl-accent-hover text-white text-xs font-bold"
                 >
-                  UYGULA
+                  Uygula
                 </button>
               </div>
+              {urlError && (
+                <p className="text-xs text-gl-danger font-medium">{urlError}</p>
+              )}
               {customWallpaper && (
                 <button
                   onClick={() => {
                     setWallpaperInput('');
+                    setUrlError(null);
                     setCustomWallpaper(null);
                   }}
-                  className="text-xs font-mono text-gl-danger hover:underline"
+                  className="text-xs font-semibold text-gl-danger hover:underline"
                 >
                   Dokuyu kaldır
                 </button>
