@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TimeNest Admin Paneli</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style nonce="__CSP_NONCE__">
+      :root {
+        --bg: #f5f1ea;
+        --panel: #fffdfb;
+        --primary: #171b22;
+        --accent: #b68a52;
+        --muted: #5f5a54;
+        --border: rgba(17, 24, 39, 0.08);
+        --success: #176d4d;
+        --danger: #7a1d1d;
+        --chip: #f4e7ce;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background: linear-gradient(180deg, #f8f4ef 0%, var(--bg) 100%);
+        color: var(--primary);
+      }
+
+      .container {
+        width: min(1280px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        background: rgba(255,255,255,0.9);
+        border-bottom: 1px solid var(--border);
+        backdrop-filter: blur(12px);
+      }
+
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 76px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 800;
+        font-size: 1.5rem;
+      }
+
+      .brand-mark {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, #f4e9cf, #d9c5a2);
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .link-btn,
+      button {
+        border: none;
+        border-radius: 999px;
+        padding: 11px 16px;
+        cursor: pointer;
+        font-weight: 700;
+        font: inherit;
+      }
+
+      .link-btn {
+        background: transparent;
+        color: var(--primary);
+        text-decoration: none;
+      }
+
+      .primary-btn {
+        background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #b68a52 100%);
+        color: white;
+      }
+
+      .secondary-btn {
+        background: #f3e6cf;
+        color: var(--primary);
+      }
+
+      .danger-btn {
+        background: #f2dede;
+        color: var(--danger);
+      }
+
+      .page {
+        padding: 32px 0 56px;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+
+      .stat-card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 14px 24px rgba(17, 24, 39, 0.03);
+      }
+
+      .stat-card span {
+        display: block;
+        color: var(--muted);
+        margin-bottom: 8px;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .stat-card strong {
+        font-size: clamp(1.7rem, 2vw, 2.3rem);
+        letter-spacing: -0.05em;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 420px 1fr;
+        gap: 24px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: 0 18px 32px rgba(17, 24, 39, 0.04);
+      }
+
+      .panel-body {
+        padding: 24px;
+      }
+
+      h1, h2, h3 {
+        margin-top: 0;
+      }
+
+      form {
+        display: grid;
+        gap: 16px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      input, textarea, select {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid rgba(17,24,39,0.1);
+        border-radius: 12px;
+        background: #faf8f5;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 90px;
+        resize: vertical;
+      }
+
+      .full {
+        grid-column: 1 / -1;
+      }
+
+      .product-list,
+      .order-list {
+        display: grid;
+        gap: 16px;
+        margin-top: 20px;
+      }
+
+      .product-item,
+      .order-item {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        background: #fff;
+      }
+
+      .product-top,
+      .order-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: #7c5a2b;
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+
+      .status-pill {
+        background: rgba(23, 109, 77, 0.1);
+        color: var(--success);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .small-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .empty-state {
+        padding: 18px;
+        border: 1px dashed var(--border);
+        border-radius: 16px;
+        color: var(--muted);
+      }
+
+      .status-select {
+        max-width: 180px;
+      }
+
+      .order-meta {
+        display: grid;
+        gap: 4px;
+        margin-top: 10px;
+      }
+
+      .order-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .order-row > input,
+      .order-row > select {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .order-row > button {
+        flex: 0 0 auto;
+      }
+
+      @media (max-width: 900px) {
+        .stats-grid,
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="styles-redesign.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <div class="brand">
+          <span class="brand-mark">⌚</span>
+          <span>TimeNest · Yönetim</span>
+        </div>
+
+        <div class="topbar-actions">
+          <a class="link-btn" href="/">Mağaza</a>
+          <button id="logoutBtn" class="secondary-btn" type="button">Çıkış</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>Toplam ürün</span>
+            <strong id="totalProducts">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Bekleyen sipariş</span>
+            <strong id="pendingOrders">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Kayıtlı sipariş toplamı</span>
+            <strong id="totalOrderValue">₺0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Aktif kullanıcı</span>
+            <strong id="activeUser">—</strong>
+          </div>
+        </div>
+
+        <div class="layout">
+          <section class="panel">
+            <div class="panel-body">
+              <h1 id="formTitle">Ürün ekle</h1>
+              <form id="productForm">
+                <input type="hidden" name="productId" />
+
+                <div class="form-grid">
+                  <label>
+                    Ürün adı
+                    <input name="name" placeholder="Urban Elite" required />
+                  </label>
+                  <label>
+                    Kategori
+                    <input name="tag" placeholder="Lüks" required />
+                  </label>
+                  <label>
+                    Etiket
+                    <input name="badge" placeholder="Yeni" />
+                  </label>
+                  <label>
+                    Fiyat
+                    <input name="price" type="number" placeholder="3299" required />
+                  </label>
+                  <label>
+                    Stok adedi
+                    <input name="stock" type="number" min="0" step="1" value="0" required />
+                  </label>
+                  <label class="full">
+                    Görsel URL
+                    <input name="image" placeholder="https://..." />
+                  </label>
+                  <label class="full">
+                    Shopier ödeme bağlantısı
+                    <input name="paymentUrl" type="url" placeholder="https://www.shopier.com/..." />
+                    <small class="muted">Shopier hesabındaki ürün ödeme bağlantısını yapıştır. Shopier fiyatı ile buradaki ürün fiyatı aynı olmalı.</small>
+                  </label>
+                  <label class="full">
+                    Açıklama
+                    <textarea name="description" placeholder="Ürün açıklaması..."></textarea>
+                  </label>
+                  <label class="full">
+                    Özellikler
+                    <textarea name="details" placeholder="Suya dayanıklı yüzey, 7 gün pil, premium kasa"></textarea>
+                  </label>
+                </div>
+
+                <div class="small-actions">
+                  <button class="primary-btn" type="submit" id="submitBtn">Ürünü kaydet</button>
+                  <button class="secondary-btn" type="button" id="resetBtn">Temizle</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section>
+            <div class="panel">
+              <div class="panel-body">
+                <h2>Ürün listesi</h2>
+                <div id="productList" class="product-list"></div>
+              </div>
+            </div>
+
+            <div class="panel panel-spaced">
+              <div class="panel-body">
+                <h2>Shopier ödemeli sipariş kaydet</h2>
+                <p class="muted">Önce Shopier panelinde ödemenin başarılı olduğunu doğrula. Sonra bu formu doldur; sipariş hazırlanıyor durumunda kaydedilir ve stok düşer.</p>
+                <form id="paidOrderForm">
+                  <div class="form-grid">
+                    <label>Müşteri adı<input name="customerName" maxlength="120" required /></label>
+                    <label>E-posta<input name="email" type="email" maxlength="254" required /></label>
+                    <label>Telefon<input name="phone" maxlength="40" required /></label>
+                    <label>Şehir<input name="city" maxlength="100" required /></label>
+                    <label class="full">Adres<textarea name="address" maxlength="1000" required></textarea></label>
+                    <label>Ürün<select name="productId" id="paidOrderProduct" required></select></label>
+                    <label>Adet<input name="quantity" type="number" min="1" max="20" value="1" required /></label>
+                    <label class="full">Shopier ödeme referansı<input name="paymentReference" maxlength="120" required /></label>
+                  </div>
+                  <button class="primary-btn" type="submit">Ödenmiş sipariş kaydet</button>
+                </form>
+              </div>
+            </div>
+
+            <div class="panel panel-spaced">
+              <div class="panel-body">
+                <h2>Siparişler</h2>
+                <p class="muted">Shopier tahsilatını Shopier panelinde doğrulamadan siparişi “İşleniyor” yapma. Bu işlem ürün stoğunu ayırır; iptal stoğu geri ekler.</p>
+                <div id="orderList" class="order-list"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script nonce="__CSP_NONCE__">
+      const productForm = document.getElementById('productForm');
+      const productList = document.getElementById('productList');
+      const orderList = document.getElementById('orderList');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const totalProducts = document.getElementById('totalProducts');
+      const pendingOrders = document.getElementById('pendingOrders');
+      const totalOrderValue = document.getElementById('totalOrderValue');
+      const activeUser = document.getElementById('activeUser');
+      const formTitle = document.getElementById('formTitle');
+      const submitBtn = document.getElementById('submitBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const paidOrderForm = document.getElementById('paidOrderForm');
+      const paidOrderProduct = document.getElementById('paidOrderProduct');
+
+      function escapeHTML(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[character]);
+      }
+
+      function parseDetails(text) {
+        return text
+          .split('\n')
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+      }
+
+      function statusLabel(status) {
+        return {
+          pending: 'Ödeme doğrulanmalı',
+          processing: 'Hazırlanıyor',
+          shipped: 'Kargoda',
+          completed: 'Tamamlandı',
+          cancelled: 'İptal edildi'
+        }[status] || status;
+      }
+
+      function resetForm() {
+        productForm.reset();
+        productForm.querySelector('input[name="productId"]').value = '';
+        formTitle.textContent = 'Ürün ekle';
+        submitBtn.textContent = 'Ürünü kaydet';
+      }
+
+      async function fetchSession() {
+        const response = await fetch('/api/session');
+        const data = await response.json();
+
+        if (!data.authenticated) {
+          window.location.href = '/login';
+          return null;
+        }
+
+        activeUser.textContent = data.user.username;
+        return data.user;
+      }
+
+      async function loadProducts() {
+        const response = await fetch('/api/products');
+        const products = await response.json();
+        totalProducts.textContent = String(products.length);
+        const stockedProducts = products.filter((product) => Number(product.stock) > 0);
+        paidOrderProduct.innerHTML = stockedProducts
+          .map((product) => `<option value="${product.id}">${escapeHTML(product.name)} · ${Number(product.stock)} adet · ₺${Number(product.price).toLocaleString('tr-TR')}</option>`)
+          .join('');
+        if (!stockedProducts.length) paidOrderProduct.innerHTML = '<option value="">Stokta ürün yok</option>';
+
+        if (!products.length) {
+          productList.innerHTML = '<div class="empty-state">Henüz ürün eklenmemiş.</div>';
+          return;
+        }
+
+        productList.innerHTML = products
+          .map(
+            (product) => `
+              <div class="product-item">
+                <div class="product-top">
+                  <div>
+                    <h3>${escapeHTML(product.name)}</h3>
+                    <div class="muted">${escapeHTML(product.tag)}</div>
+                  </div>
+                  <span class="badge">${escapeHTML(product.badge || 'Yeni')}</span>
+                </div>
+                <p class="muted">₺${Number(product.price).toLocaleString('tr-TR')}</p>
+                <p class="muted">Stok: ${Number(product.stock || 0)}</p>
+                <p class="muted">${product.paymentUrl ? 'Shopier bağlantısı hazır' : 'Ödeme bağlantısı eklenmedi'}</p>
+                <div class="small-actions">
+                  <button class="secondary-btn" type="button" data-action="edit" data-id="${product.id}">Düzenle</button>
+                  <button class="danger-btn" type="button" data-action="delete" data-id="${product.id}">Sil</button>
+                </div>
+              </div>
+            `
+          )
+          .join('');
+
+        productList.querySelectorAll('button[data-action="delete"]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const id = button.dataset.id;
+            if (!window.confirm('Bu ürün kalıcı olarak silinsin mi?')) return;
+            const response = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+            if (response.ok) await loadProducts();
+          });
+        });
+
+        productList.querySelectorAll('button[data-action="edit"]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const productId = Number(button.dataset.id);
+            const product = products.find((item) => item.id === productId);
+            if (!product) return;
+
+            productForm.querySelector('input[name="productId"]').value = product.id;
+            productForm.querySelector('input[name="name"]').value = product.name;
+            productForm.querySelector('input[name="tag"]').value = product.tag;
+            productForm.querySelector('input[name="badge"]').value = product.badge || '';
+            productForm.querySelector('input[name="price"]').value = product.price;
+            productForm.querySelector('input[name="stock"]').value = product.stock || 0;
+            productForm.querySelector('input[name="image"]').value = product.image || '';
+            productForm.querySelector('input[name="paymentUrl"]').value = product.paymentUrl || '';
+            productForm.querySelector('textarea[name="description"]').value = product.description || '';
+            productForm.querySelector('textarea[name="details"]').value = (product.details || []).join('\n');
+
+            formTitle.textContent = 'Ürün düzenle';
+            submitBtn.textContent = 'Güncelle';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        });
+      }
+
+      async function loadOrders() {
+        const response = await fetch('/api/orders');
+        const orders = await response.json();
+
+        if (!orders.length) {
+          orderList.innerHTML = '<div class="empty-state">Sipariş bulunmuyor.</div>';
+          pendingOrders.textContent = '0';
+          totalOrderValue.textContent = '₺0';
+          return;
+        }
+
+        const pending = orders.filter((order) => order.status === 'pending' || order.status === 'processing').length;
+        const revenue = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+        pendingOrders.textContent = String(pending);
+        totalOrderValue.textContent = `₺${revenue.toLocaleString('tr-TR')}`;
+
+        orderList.innerHTML = orders
+          .map(
+            (order) => `
+              <div class="order-item">
+                <div class="order-top">
+                  <div>
+                    <strong>${escapeHTML(order.customer_name)}</strong>
+                    <div class="muted">${escapeHTML(order.email || 'E-posta yok')}</div>
+                  </div>
+                  <span class="status-pill">${order.payment_source === 'shopier_manual' ? 'Shopier ödendi · ' : ''}${escapeHTML(statusLabel(order.status))}</span>
+                </div>
+                <div class="order-meta">
+                  <div class="muted">Toplam: ₺${Number(order.total || 0).toLocaleString('tr-TR')}</div>
+                  <div class="muted">${(order.items || []).map((item) => `${escapeHTML(item.name)} × ${Number(item.quantity)}`).join(', ')}</div>
+                  ${order.payment_reference ? `<div class="muted">Shopier ref: ${escapeHTML(order.payment_reference)}</div>` : ''}
+                  ${order.refund_reference ? `<div class="muted">İade ref: ${escapeHTML(order.refund_reference)}</div>` : ''}
+                  <div class="muted">Stok ${order.stock_reserved ? 'ayrıldı' : 'ayrılmadı'} · ${escapeHTML(order.carrier || 'Kargo girilmedi')} ${escapeHTML(order.tracking_number || '')}</div>
+                </div>
+                <div class="order-row">
+                  <select class="status-select" data-order-id="${order.id}" data-status="${escapeHTML(order.status)}">
+                    <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Ödeme doğrulanmalı</option>
+                    <option value="processing" ${order.status === 'processing' ? 'selected' : ''}>İşleniyor</option>
+                    <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>Kargoya verildi</option>
+                    <option value="completed" ${order.status === 'completed' ? 'selected' : ''}>Tamamlandı</option>
+                    <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>İptal edildi</option>
+                  </select>
+                </div>
+                <div class="order-row">
+                  <input type="text" data-carrier="${order.id}" value="${escapeHTML(order.carrier || '')}" placeholder="Kargo firması" aria-label="Kargo firması" />
+                  <input type="text" data-tracking="${order.id}" value="${escapeHTML(order.tracking_number || '')}" placeholder="Takip numarası" aria-label="Takip numarası" />
+                  <button class="secondary-btn" type="button" data-update-order="${order.id}">Kaydet</button>
+                </div>
+                ${order.payment_source === 'shopier_manual' && order.status !== 'cancelled' ? `<label>İade referansı<input type="text" data-refund="${order.id}" maxlength="120" value="${escapeHTML(order.refund_reference || '')}" placeholder="İade işlemi yaptıysan referans" /></label>` : ''}
+              </div>
+            `
+          )
+          .join('');
+
+        orderList.querySelectorAll('[data-update-order]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const orderId = button.dataset.updateOrder;
+            const select = document.querySelector(`select[data-order-id="${orderId}"]`);
+            const nextStatus = select ? select.value : 'pending';
+            const carrier = orderList.querySelector(`[data-carrier="${orderId}"]`)?.value || '';
+            const trackingNumber = orderList.querySelector(`[data-tracking="${orderId}"]`)?.value || '';
+            const refundReference = orderList.querySelector(`[data-refund="${orderId}"]`)?.value || '';
+            if (nextStatus === 'cancelled' && !window.confirm('Siparişi iptal edelim mi? Shopier ödemeli sipariş için önce ödeme sağlayıcısında iadeyi tamamlayıp referansı gir.')) return;
+
+            const response = await fetch(`/api/orders/${orderId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: nextStatus, carrier, trackingNumber, refundReference })
+            });
+
+            if (response.ok) {
+              await loadOrders();
+              await loadProducts();
+            } else {
+              const result = await response.json();
+              window.alert(result.message || 'Sipariş güncellenemedi.');
+            }
+          });
+        });
+      }
+
+      productForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const formData = new FormData(productForm);
+        const payload = {
+          name: formData.get('name'),
+          tag: formData.get('tag'),
+          badge: formData.get('badge') || 'Yeni',
+          rating: 4.8,
+          reviews: 0,
+          description: formData.get('description') || '',
+          price: Number(formData.get('price')),
+          stock: Number(formData.get('stock')),
+          image: formData.get('image') || '',
+          paymentUrl: formData.get('paymentUrl') || '',
+          details: parseDetails(formData.get('details'))
+        };
+
+        const productId = formData.get('productId');
+        const endpoint = productId ? `/api/products/${productId}` : '/api/products';
+        const method = productId ? 'PUT' : 'POST';
+
+        try {
+          const response = await fetch(endpoint, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            resetForm();
+            await loadProducts();
+          } else {
+            const result = await response.json();
+            window.alert(result.message || 'Ürün kaydedilemedi.');
+          }
+        } catch (error) {
+          window.alert('Sunucuya ulaşılamadı. Değişiklik kaydedilmedi.');
+        }
+      });
+
+      paidOrderForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(paidOrderForm);
+        const payload = Object.fromEntries(formData.entries());
+        payload.productId = Number(payload.productId);
+        payload.quantity = Number(payload.quantity);
+
+        try {
+          const response = await fetch('/api/admin/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            window.alert(result.message || 'Ödenmiş sipariş kaydedilemedi.');
+            return;
+          }
+          paidOrderForm.reset();
+          await loadProducts();
+          await loadOrders();
+          window.alert(`Shopier ödemesi doğrulanmış sipariş #${result.id} kaydedildi.`);
+        } catch (error) {
+          window.alert('Sunucuya ulaşılamadı. Sipariş kaydedilmedi.');
+        }
+      });
+
+      resetBtn.addEventListener('click', () => resetForm());
+
+      logoutBtn.addEventListener('click', async () => {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login';
+      });
+
+      (async function initAdmin() {
+        const user = await fetchSession();
+        if (!user) return;
+        resetForm();
+        await loadProducts();
+        await loadOrders();
+      })();
+    </script>
+  </body>
+</html>

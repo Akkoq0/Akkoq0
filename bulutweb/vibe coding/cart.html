@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sepet | TimeNest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-redesign.css" />
+  </head>
+  <body data-page="cart">
+    <header class="topbar">
+      <div class="container nav">
+        <div class="brand">
+          <span class="brand-mark">⌚</span>
+          <span>TimeNest</span>
+        </div>
+
+        <nav class="menu" id="siteMenu">
+          <a href="index.html">Anasayfa</a>
+          <a href="index.html#urunler">Ürünler</a>
+          <a href="index.html#kategoriler">Kategoriler</a>
+        </nav>
+
+        <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-expanded="false" aria-controls="siteMenu">Menü</button>
+
+        <a class="cart-button" href="cart.html">
+          Sepet <span id="cartCount">0</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="cart-main">
+      <div class="container cart-layout">
+        <div class="cart-stack">
+          <section class="cart-panel">
+            <div class="section-heading">
+              <p>Sepetiniz</p>
+              <h2>Seçtiğiniz ürünler</h2>
+            </div>
+
+            <div id="cartItems"></div>
+          </section>
+
+          <section class="checkout-panel" hidden>
+            <h2>Sipariş bilgileri</h2>
+            <p class="demo-notice">Bu form yalnızca deneme siparişi kaydeder; kartınızdan ücret alınmaz ve Shopier ödemesiyle otomatik eşleşmez. Shopier ödemesi, ödeme bağlantısı bulunan ürünlerde Shopier sayfasında tamamlanır. <a href="legal.html">Yasal bilgilendirme taslağını</a> görüntüle.</p>
+            <form id="checkoutForm" class="checkout-form">
+              <div class="form-grid">
+                <label>
+                  Ad Soyad
+                  <input type="text" name="name" placeholder="Adınız soyadınız" required />
+                </label>
+
+                <label>
+                  E-posta
+                  <input type="email" name="email" placeholder="ornek@email.com" required />
+                </label>
+
+                <label class="full-width">
+                  Adres
+                  <textarea name="address" rows="3" placeholder="Tam adresiniz" required></textarea>
+                </label>
+
+                <label>
+                  Şehir
+                  <input type="text" name="city" placeholder="İstanbul" required />
+                </label>
+
+                <label>
+                  Telefon
+                  <input type="tel" name="phone" placeholder="0555 123 45 67" required />
+                </label>
+              </div>
+
+              <button class="primary-btn" type="submit">Deneme siparişi oluştur</button>
+            </form>
+          </section>
+          <p id="checkoutUnavailable" class="production-checkout-notice" role="status" hidden></p>
+        </div>
+
+        <aside class="summary-panel">
+          <h2>Özet</h2>
+
+          <div class="coupon-box">
+            <label for="couponInput">Kupon kodu</label>
+            <div class="coupon-row">
+              <input id="couponInput" type="text" placeholder="TIME10" />
+              <button id="applyCoupon" class="secondary-btn" type="button">Uygula</button>
+            </div>
+            <small id="couponMessage" class="coupon-message">Kupon ekleyin: TIME10 veya WATCH15</small>
+          </div>
+
+          <div class="summary-row">
+            <span>Ürünler</span>
+            <strong id="cartTotal">₺0</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>İndirim</span>
+            <strong id="discountValue">₺0</strong>
+          </div>
+
+          <div class="summary-row">
+            <span>Kargo</span>
+            <span>Demo akışında hesaplanmaz</span>
+          </div>
+
+          <div class="summary-row total">
+            <span>Toplam</span>
+            <span id="cartTotalFinal">₺0</span>
+          </div>
+
+          <div class="hero-actions">
+            <a class="primary-btn" href="index.html">Alışverişe devam et</a>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite">Ürün sepete eklendi.</div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

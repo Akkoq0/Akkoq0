@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TimeNest | Saat Satışı</title>
+    <meta
+      name="description"
+      content="Modern saatler, spor modeller ve şık tasarımlar için TimeNest e-ticaret sitesi."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-redesign.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container nav">
+        <div class="brand">
+          <span class="brand-mark">⌚</span>
+          <span>TimeNest</span>
+        </div>
+
+        <nav class="menu" id="siteMenu">
+          <a href="#anasayfa">Anasayfa</a>
+          <a href="#urunler">Ürünler</a>
+          <a href="#kategoriler">Kategoriler</a>
+          <a href="#hakkimizda">Hakkımızda</a>
+        </nav>
+
+        <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-expanded="false" aria-controls="siteMenu">Menü</button>
+
+        <a class="cart-button" href="cart.html">
+          Sepet <span id="cartCount">0</span>
+        </a>
+      </div>
+    </header>
+
+    <main id="anasayfa">
+      <section class="hero">
+        <div class="container hero-inner">
+          <div class="hero-copy">
+            <p class="eyebrow">Yeni sezon, yeni stil</p>
+            <h1>Ritimini anlatan saatler, her günün küçük bir öyküsü.</h1>
+            <p class="lead">
+              Kendi tarzına uygun, günlük yaşamla uyumlu ve dikkat çeken tasarımlar. Zaten
+              zamanın en iyi anlatıcısı sensin; saatler de onu tamamlar.
+            </p>
+
+            <div class="hero-actions">
+              <a class="primary-btn" href="#urunler">Ürünleri İncele</a>
+              <a class="secondary-btn" href="#hakkimizda">Daha Fazla Bilgi</a>
+            </div>
+
+            <div class="stats">
+              <div>
+                <strong id="catalogCount">6</strong>
+                <span>Model seçeneği</span>
+              </div>
+              <div>
+                <strong>4</strong>
+                <span>Kullanım kategorisi</span>
+              </div>
+              <div>
+                <strong>Canlı</strong>
+                <span>Güncel ürün kataloğu</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <div class="hero-product">
+              <img class="hero-product-image" src="https://images.unsplash.com/photo-1523170335258-f5ed11844a49?auto=format&fit=crop&w=1100&q=88" alt="Aero Classic kol saati" fetchpriority="high" decoding="async" />
+              <div class="hero-product-label">
+                <span>TimeNest seçkisi · 01</span>
+                <strong>Aero Classic</strong>
+              </div>
+              <div class="watch-card">
+                <div id="watchFace" class="watch-face" aria-label="Yerel saati gösteren analog saat">
+                  <div class="watch-center"></div>
+                  <div id="hourHand" class="watch-hand hand-long"></div>
+                  <div id="minuteHand" class="watch-hand hand-short"></div>
+                  <div id="secondHand" class="watch-hand hand-second"></div>
+                </div>
+                <div class="watch-details">
+                  <span>Yerel saat</span>
+                  <strong id="watchTimeLabel">--:--</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="kategoriler" class="categories">
+        <div class="container">
+          <div class="section-heading">
+            <p>Kategoriler</p>
+            <h2>İhtiyacına göre saat seç</h2>
+          </div>
+
+          <div class="category-grid">
+            <button class="category-box" type="button" data-filter-category="Spor" aria-label="Spor saatlerini göster">
+              <span>🏃</span>
+              <h3>Spor</h3>
+            </button>
+            <button class="category-box" type="button" data-filter-category="İş" aria-label="İş saatlerini göster">
+              <span>💼</span>
+              <h3>İş</h3>
+            </button>
+            <button class="category-box" type="button" data-filter-category="Lüks" aria-label="Lüks saatleri göster">
+              <span>✨</span>
+              <h3>Lüks</h3>
+            </button>
+            <button class="category-box" type="button" data-filter-category="Günlük" aria-label="Günlük saatleri göster">
+              <span>👟</span>
+              <h3>Günlük</h3>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="urunler" class="products">
+        <div class="container">
+          <div class="section-heading">
+            <p>Öne çıkan ürünler</p>
+            <h2>En çok tercih edilen modeller</h2>
+          </div>
+
+          <div class="shop-tools">
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Saat ara..."
+              aria-label="Saat ara"
+            />
+
+            <div class="filter-group" aria-label="Kategori filtreleri">
+              <button class="filter-btn active" type="button" data-filter="Hepsi">Hepsi</button>
+              <button class="filter-btn" type="button" data-filter="Spor">Spor</button>
+              <button class="filter-btn" type="button" data-filter="İş">İş</button>
+              <button class="filter-btn" type="button" data-filter="Lüks">Lüks</button>
+              <button class="filter-btn" type="button" data-filter="Günlük">Günlük</button>
+            </div>
+
+            <div class="filter-group" aria-label="Fiyat filtreleri">
+              <button class="price-filter-btn active" type="button" data-price="Hepsi">Tümü</button>
+              <button class="price-filter-btn" type="button" data-price="Alt3000">₺0-₺3000</button>
+              <button class="price-filter-btn" type="button" data-price="Orta">₺3000-₺4000</button>
+              <button class="price-filter-btn" type="button" data-price="Yuksek">₺4000+</button>
+            </div>
+          </div>
+
+          <div id="productGrid" class="product-grid"></div>
+        </div>
+      </section>
+
+      <section id="hakkimizda" class="about">
+        <div class="container about-grid">
+          <div class="about-copy">
+            <p class="eyebrow">Neden TimeNest?</p>
+            <h2>Zamana göre seçilmiş, sade bir koleksiyon.</h2>
+            <p>
+              Spor, günlük ve klasik stiller arasından sana uygun modeli bul. Ürün özelliklerini
+              incele, favorilerine ekle ve sepetini istediğin zaman düzenle.
+            </p>
+            <ul>
+              <li>Ürün bilgileri admin panelinden güncellenir</li>
+              <li>Favoriler ve sepet bu tarayıcıda saklanır</li>
+              <li>Ödeme Shopier bağlantısıyla dışarıda tamamlanır</li>
+            </ul>
+          </div>
+
+          <div class="about-box">
+            <div class="mini-card">
+                <strong>Ürün</strong>
+                <span>Detay ve özellik bilgisi</span>
+            </div>
+            <div class="mini-card accent">
+                <strong>Sepet</strong>
+                <span>Tarayıcıda kaydedilir</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="testimonials">
+        <div class="container">
+          <div class="section-heading">
+            <p>Mağaza durumu</p>
+            <h2>Şu anda neler kullanılabilir?</h2>
+          </div>
+
+          <div class="testimonial-grid">
+            <article>
+              <h3>Ürün kataloğu</h3>
+              <p>Ürünler admin panelindeki kayıtlarla güncellenir; fiyatlar mağazada gösterilir.</p>
+            </article>
+            <article>
+              <h3>Sipariş kaydı</h3>
+              <p>Deneme siparişi oluşturulabilir ve admin panelinde durum takibi yapılabilir.</p>
+            </article>
+            <article>
+              <h3>Online ödeme</h3>
+              <p>Henüz bağlı değil. Bu sitede şu anda karttan ödeme alınmaz.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer-inner">
+        <p>© 2026 TimeNest. Tüm hakları saklıdır.</p>
+        <div class="footer-links">
+          <a href="#urunler">Ürünler</a>
+          <a href="cart.html">Sepet</a>
+          <a href="legal.html">Yasal bilgiler</a>
+          <a href="/login">Yönetim</a>
+        </div>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" aria-live="polite">Ürün sepete eklendi.</div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

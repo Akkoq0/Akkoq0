@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ürün Detayı | TimeNest</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles-redesign.css" />
+  </head>
+  <body class="detail-page">
+    <header class="topbar">
+      <div class="container nav">
+        <div class="brand">
+          <span class="brand-mark">⌚</span>
+          <span>TimeNest</span>
+        </div>
+
+        <nav class="menu" id="siteMenu">
+          <a href="index.html">Anasayfa</a>
+          <a href="index.html#urunler">Ürünler</a>
+          <a href="index.html#kategoriler">Kategoriler</a>
+        </nav>
+
+        <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-expanded="false" aria-controls="siteMenu">Menü</button>
+
+        <a class="cart-button" href="cart.html">
+          Sepet <span id="cartCount">0</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="detail-main">
+      <div class="container detail-layout">
+        <div class="detail-visual">
+          <div id="detailIcon" class="detail-icon">⌚</div>
+        </div>
+
+        <div class="detail-content">
+          <p class="eyebrow">Ürün detayı</p>
+          <h1 id="detailName">Aero Classic</h1>
+
+          <div class="detail-price-row">
+            <span id="detailPrice" class="detail-price">₺2.499</span>
+            <span id="detailTag" class="detail-badge">Spor</span>
+          </div>
+
+          <div class="detail-meta-row">
+            <button id="detailFavorite" class="favorite-btn" type="button">Favorilere ekle</button>
+          </div>
+
+          <p id="detailDescription">
+            Hafif ve modern tasarımıyla günlük kullanım için ideal.
+          </p>
+          <p id="detailStock" class="stock-label">Stok bilgisi yükleniyor</p>
+
+          <ul id="detailFeatures" class="feature-list"></ul>
+
+          <div class="detail-actions">
+            <button id="detailAddToCart" class="primary-btn" type="button">Sepete ekle</button>
+            <a id="detailPaymentLink" class="primary-btn payment-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Shopier'de satın al</a>
+            <a href="index.html" class="secondary-btn">Geri dön</a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" aria-live="polite">Ürün sepete eklendi.</div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

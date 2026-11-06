@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────
+   Meva HUD — Tactical Industrial Luxury & Bento Cockpit
+   ───────────────────────────────────────────────────────── */
+:root {
+  --ghost-bg-darkest: #06070A;
+  --ghost-bg-dark: #0C0E14;
+  --ghost-bg-mid: #12151E;
+  --ghost-bg-panel: rgba(12, 14, 20, 0.95);
+  --ghost-bg-hover: rgba(245, 158, 11, 0.07);
+  --ghost-bg-active: rgba(239, 68, 68, 0.12);
+
+  /* Tactical LED Accents: Crimson (#EF4444), Amber (#F59E0B), Emerald (#10B981) */
+  --ghost-accent: #EF4444;
+  --ghost-accent-rgb: 239 68 68;
+  --ghost-accent-hover: #F87171;
+  --ghost-amber: #F59E0B;
+  --ghost-emerald: #10B981;
+  --ghost-border: rgba(255, 255, 255, 0.06);
+  --ghost-border-subtle: rgba(255, 255, 255, 0.04);
+
+  /* Crisp Titanium Typography */
+  --ghost-text-primary: #F3F4F6;
+  --ghost-text-secondary: #9CA3AF;
+  --ghost-text-muted: #64748B;
+
+  --ghost-glow: rgba(239, 68, 68, 0.16);
+  --ghost-glass-blur: 8px;
+  --ghost-glass-opacity: 0.95;
+}
+
+/* ── Global Resets & Mobile WebView Optimizations ── */
+* {
+  scrollbar-width: none;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+html,
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  background-color: var(--ghost-bg-darkest);
+  color: var(--ghost-text-primary);
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: relative;
+  height: 100dvh;
+  width: 100vw;
+  user-select: none;
+}
+
+input,
+textarea,
+p,
+span {
+  user-select: text;
+}
+
+button,
+a,
+input,
+select {
+  touch-action: manipulation;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Brushed Titanium & Carbon Bento Surfaces ── */
+.titanium-module {
+  background: linear-gradient(180deg, #0E1118 0%, #0A0C11 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+}
+
+.cockpit-pod {
+  background: linear-gradient(165deg, #12151E 0%, #0B0D13 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+/* Subtle Technical HUD Corner Brackets */
+.hud-corners {
+  position: relative;
+}
+.hud-corners::before,
+.hud-corners::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  transition: border-color 0.25s ease;
+}
+.hud-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-left: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+.hud-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-right: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+
+.hud-corners-emerald::before,
+.hud-corners-emerald::after {
+  border-color: #10B981;
+}
+
+.hud-corners-amber::before,
+.hud-corners-amber::after {
+  border-color: #F59E0B;
+}
+
+/* ── Live Voice Equalizer Keyframes (GPU-Accelerated scaleY) ── */
+@keyframes eqPulse1 {
+  0%, 100% { transform: scaleY(0.22); }
+  50% { transform: scaleY(0.95); }
+}
+@keyframes eqPulse2 {
+  0%, 100% { transform: scaleY(0.65); }
+  35% { transform: scaleY(0.2); }
+  75% { transform: scaleY(1); }
+}
+@keyframes eqPulse3 {
+  0%, 100% { transform: scaleY(0.35); }
+  40% { transform: scaleY(0.9); }
+  80% { transform: scaleY(0.25); }
+}
+
+.eq-bar-1 {
+  animation: eqPulse1 0.65s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.eq-bar-2 {
+  animation: eqPulse2 0.52s ease-in-out infinite;
+  transform-origin: bottom;
+}
+.eq-bar-3 {
+  animation: eqPulse3 0.78s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+::selection {
+  background-color: var(--ghost-accent);
+  color: #FFFFFF;
+}
+
+/* ─────────────────────────────────────────────────────────
+   GAME-BOOST ECO MODE: Low-End Hardware & Battery Optimizer
+   ───────────────────────────────────────────────────────── */
+body.eco-active *,
+body.eco-active *::before,
+body.eco-active *::after {
+  animation: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+}

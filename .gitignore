@@ -1,0 +1,14 @@
+# Dependencies & Build Artifacts
+**/node_modules/
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/.gradle/
+android-sdk/
+*.apk
+
+# Local Environment Secrets
+**/.env.local
+**/.env.*.local
+.DS_Store
