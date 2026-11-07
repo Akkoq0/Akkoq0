@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/OperatorContextMenu';
 import { TacticalPlayerHUD } from '@/components/ui/TacticalPlayerHUD';
 import { FriendsModal } from '@/components/ui/FriendsModal';
+import { TacticalStratDrawer } from '@/components/tactical/TacticalStratDrawer';
 import type {
   Profile,
   Server,
@@ -445,6 +446,7 @@ export default function MevaHUDApp() {
       <ScrimModal />
       <ThemeSettingsModal />
       <MevaCommandSettingsModal />
+      <TacticalStratDrawer />
       <FriendsModal />
       <OperatorContextMenu
         target={radarContextTarget}

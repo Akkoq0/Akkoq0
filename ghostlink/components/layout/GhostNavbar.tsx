@@ -7,6 +7,7 @@
 import { memo, type ReactNode } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useThemeStore } from '@/store/useThemeStore';
+import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { cleanLabel, serverCode } from '@/lib/format';
 import { SignalBars } from '@/components/ui/HudPrimitives';
 import {
@@ -16,6 +17,8 @@ import {
   IconSliders,
   IconRadar,
   IconGauge,
+  IconMapBoard,
+  IconMiniOverlay,
 } from '@/components/ui/MevaIcons';
 
 interface CommandButtonProps {
@@ -86,6 +89,10 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const toggleRadar = useAppStore((s) => s.toggleRadar);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
   const setShowThemeModal = useThemeStore((s) => s.setShowThemeModal);
+  const showStratBoard = useVoiceSettingsStore((s) => s.showStratBoard);
+  const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
+  const toggleStratBoard = useVoiceSettingsStore((s) => s.toggleStratBoard);
+  const toggleMiniHud = useVoiceSettingsStore((s) => s.toggleMiniHud);
 
   const mobileTitle = activeDMName
     ? `@${activeDMName}`
@@ -200,6 +207,23 @@ export const GhostNavbar = memo(function GhostNavbar() {
           <IconBolt size={14} className="text-[#F5B5BC]" />
           <span>{activeScrim ? `Scrim #${activeScrim.code}` : 'Scrim Odası'}</span>
         </button>
+
+        <CommandButton
+          label="Taktik Harita & Çizim Tahtası (B)"
+          onClick={toggleStratBoard}
+          active={showStratBoard}
+        >
+          <IconMapBoard size={16} />
+        </CommandButton>
+
+        <CommandButton
+          label="Kompakt Overlay Modu · Mini HUD (O)"
+          onClick={toggleMiniHud}
+          active={miniHudActive}
+          className="hidden sm:flex"
+        >
+          <IconMiniOverlay size={16} />
+        </CommandButton>
 
         <CommandButton
           label="Game-Boost güç koruması"
