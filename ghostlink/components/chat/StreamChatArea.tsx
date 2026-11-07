@@ -656,6 +656,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                   '--fill': `${Math.round((gainVal / 200) * 100)}%`,
                 } as React.CSSProperties
               }
+              suppressHydrationWarning
               aria-label={`${displayName} ses seviyesi`}
               className="exec-range flex-1"
             />
