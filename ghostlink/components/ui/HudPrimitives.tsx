@@ -5,8 +5,9 @@
 //   • SignalBars     — burgundy-to-champagne gradient meter
 //   • FluidWave      — silky multi-stop aurora ribbon wave
 
-import { memo, useId } from 'react';
+import { memo, useId, useEffect, useRef } from 'react';
 import type { UserStatus } from '@/types';
+import { getMasterWaveTicker } from '@/src/lib/waveMasterTicker';
 
 const STATUS_DOT: Record<UserStatus, string> = {
   'in-game': 'bg-[#C82333]',
@@ -109,189 +110,54 @@ export const SignalBars = memo(function SignalBars({ score }: { score: number })
   );
 });
 
-// ── Luminous Ribbon Fluid Wave ─────────────────────────────
-
-const WAVE_W = 120;
-const WAVE_H = 32;
-
-function buildWavePath(amplitude: number, wavelength: number, phase = 0): string {
-  const mid = WAVE_H / 2;
-  let d = '';
-  for (let x = 0; x <= WAVE_W * 2; x += 2) {
-    const y = mid + amplitude * Math.sin((x / wavelength) * Math.PI * 2 + phase);
-    d += `${x === 0 ? 'M' : 'L'}${x} ${y.toFixed(2)} `;
-  }
-  return d.trim();
-}
-
-function buildWaveArea(amplitude: number, wavelength: number, phase = 0): string {
-  const line = buildWavePath(amplitude, wavelength, phase);
-  const mid = WAVE_H / 2;
-  return `${line} L${WAVE_W * 2} ${mid} L0 ${mid} Z`;
-}
-
-// Wavelengths divide WAVE_W (120) evenly for seamless infinite loop
-const PRIMARY_WAVE = buildWavePath(11, 40);
-const PRIMARY_AREA = buildWaveArea(11, 40);
-const SECONDARY_WAVE = buildWavePath(7.5, 30, 1.35);
+// ── High-Performance Canvas 2D Fluid Wave (Zero-React-Render) ─────
 
 interface FluidWaveProps {
-  /** 0–1 primary vocal harmonic amplitude (FFT low-mid band) */
-  level: number;
-  /** Optional 0–1 secondary presence harmonic amplitude (FFT 2kHz–6kHz band) */
-  secondaryLevel?: number;
+  /** Optional operator ID for direct WebAudio DSP FFT sampling */
+  peerId?: string;
   /** Animate the flow (speaking / playing) */
   active: boolean;
   muted?: boolean;
   className?: string;
   /** Seconds per loop for the primary wave */
   speed?: number;
+  /** Legacy compatibility props (no-op in zero-re-render architecture) */
+  level?: number;
+  secondaryLevel?: number;
 }
 
 export const FluidWave = memo(function FluidWave({
-  level,
-  secondaryLevel,
+  peerId,
   active,
   muted = false,
   className = '',
   speed = 1.4,
 }: FluidWaveProps) {
-  const uid = useId().replace(/:/g, '');
-  const strokeId = `wave-stroke-${uid}`;
-  const areaId = `wave-area-${uid}`;
-  const fadeId = `wave-fade-${uid}`;
-  const maskId = `wave-mask-${uid}`;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const waveId = useId();
 
-  const primaryScale = muted
-    ? 0
-    : active
-      ? Math.max(0.18, Math.min(1, level))
-      : 0.07;
-  const secondaryScale = muted
-    ? 0
-    : active
-      ? Math.max(
-          0.14,
-          Math.min(1, secondaryLevel !== undefined ? secondaryLevel : level * 0.86),
-        )
-      : 0.06;
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ticker = getMasterWaveTicker();
+    ticker.register(waveId, canvas, { peerId, active, muted, speed });
+
+    return () => {
+      ticker.unregister(waveId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waveId, peerId, speed]); // initial mount and geometry bindings
+
+  useEffect(() => {
+    getMasterWaveTicker().updateSpeakerState(waveId, active, muted, peerId);
+  }, [waveId, active, muted, peerId]);
 
   return (
-    <svg
-      viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}
-      preserveAspectRatio="none"
-      className={className}
+    <canvas
+      ref={canvasRef}
+      className={`block w-full h-full ${className}`}
+      style={{ contain: 'strict' }}
       aria-hidden
-    >
-      <defs>
-        <linearGradient
-          id={strokeId}
-          gradientUnits="userSpaceOnUse"
-          x1="0"
-          y1="0"
-          x2="60"
-          y2="0"
-          spreadMethod="reflect"
-        >
-          <stop offset="0%" stopColor="#6E111B" />
-          <stop offset="50%" stopColor="#C82333" />
-          <stop offset="100%" stopColor="#E34B5A" />
-        </linearGradient>
-
-        <linearGradient id={areaId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#C82333" stopOpacity="0.26" />
-          <stop offset="60%" stopColor="#6E111B" stopOpacity="0.08" />
-          <stop offset="100%" stopColor="#090708" stopOpacity="0" />
-        </linearGradient>
-
-        <linearGradient id={fadeId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#fff" stopOpacity="0" />
-          <stop offset="12%" stopColor="#fff" stopOpacity="1" />
-          <stop offset="88%" stopColor="#fff" stopOpacity="1" />
-          <stop offset="100%" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-
-        <mask id={maskId}>
-          <rect width={WAVE_W} height={WAVE_H} fill={`url(#${fadeId})`} />
-        </mask>
-      </defs>
-
-      <line
-        x1="0"
-        y1={WAVE_H / 2}
-        x2={WAVE_W}
-        y2={WAVE_H / 2}
-        stroke={muted ? '#B3222C' : '#3B242B'}
-        strokeOpacity={muted ? 0.72 : 0.85}
-        strokeWidth="1"
-        vectorEffect="non-scaling-stroke"
-      />
-
-      <g mask={`url(#${maskId})`}>
-        {/* Secondary Silk Harmonic (Presence Band 2kHz–6kHz) */}
-        <g
-          style={{
-            transform: `scaleY(${secondaryScale})`,
-            transformOrigin: 'center',
-            transformBox: 'view-box',
-            transition: 'transform 160ms cubic-bezier(0.22, 1, 0.36, 1)',
-          }}
-        >
-          <g>
-            <path
-              d={SECONDARY_WAVE}
-              fill="none"
-              stroke={`url(#${strokeId})`}
-              strokeOpacity="0.48"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            {active && !muted && (
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                from="0 0"
-                to={`-${WAVE_W} 0`}
-                dur={`${speed * 1.65}s`}
-                repeatCount="indefinite"
-              />
-            )}
-          </g>
-        </g>
-
-        {/* Primary Ribbon Glow + Crest (Vocal Fundamental Band 180Hz–1.8kHz) */}
-        <g
-          style={{
-            transform: `scaleY(${primaryScale})`,
-            transformOrigin: 'center',
-            transformBox: 'view-box',
-            transition: 'transform 140ms cubic-bezier(0.22, 1, 0.36, 1)',
-          }}
-        >
-          <g>
-            <path d={PRIMARY_AREA} fill={`url(#${areaId})`} />
-            <path
-              d={PRIMARY_WAVE}
-              fill="none"
-              stroke={`url(#${strokeId})`}
-              strokeWidth="1.85"
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            {active && !muted && (
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                from="0 0"
-                to={`-${WAVE_W} 0`}
-                dur={`${speed}s`}
-                repeatCount="indefinite"
-              />
-            )}
-          </g>
-        </g>
-      </g>
-    </svg>
+    />
   );
 });

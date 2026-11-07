@@ -75,6 +75,8 @@ export class MevaTelemetryEngine {
   private prevBytesByPeer = new Map<string, { bytes: number; ts: number }>();
   private nodeMap = new Map<string, NodeInspectTelemetry>();
   private listeners = new Set<TelemetryListener>();
+  private lastEmitTime = 0;
+  private emitThrottleTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.seedInitialNodes();
@@ -129,6 +131,10 @@ export class MevaTelemetryEngine {
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
+    }
+    if (this.emitThrottleTimer) {
+      clearTimeout(this.emitThrottleTimer);
+      this.emitThrottleTimer = null;
     }
   }
 
@@ -227,7 +233,7 @@ export class MevaTelemetryEngine {
       void this.executeEncryptedStressBurst();
     }, 100);
 
-    this.emitSummary();
+    this.emitSummary(true);
   }
 
   public stopStressTest(): void {
@@ -239,7 +245,7 @@ export class MevaTelemetryEngine {
     }
     this.stressPacketsPerSec = 0;
     this.measuredThroughputKbps = 96;
-    this.emitSummary();
+    this.emitSummary(true);
   }
 
   private async executeEncryptedStressBurst(): Promise<void> {
@@ -494,10 +500,32 @@ export class MevaTelemetryEngine {
     };
   }
 
-  private emitSummary(): void {
-    const snap = this.getSummary();
-    for (const listener of this.listeners) {
-      listener(snap);
+  private emitSummary(forceImmediate = false): void {
+    const now = Date.now();
+    const elapsed = now - this.lastEmitTime;
+
+    if (forceImmediate || elapsed >= 1400) {
+      if (this.emitThrottleTimer) {
+        clearTimeout(this.emitThrottleTimer);
+        this.emitThrottleTimer = null;
+      }
+      this.lastEmitTime = now;
+      const snap = this.getSummary();
+      for (const listener of this.listeners) {
+        listener(snap);
+      }
+      return;
+    }
+
+    if (!this.emitThrottleTimer) {
+      this.emitThrottleTimer = setTimeout(() => {
+        this.emitThrottleTimer = null;
+        this.lastEmitTime = Date.now();
+        const snap = this.getSummary();
+        for (const listener of this.listeners) {
+          listener(snap);
+        }
+      }, 1400 - elapsed);
     }
   }
 }

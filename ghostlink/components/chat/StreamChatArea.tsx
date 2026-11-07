@@ -254,11 +254,9 @@ export const StreamChatArea = memo(function StreamChatArea({
   const operatorRoles = useHUDStore((s) => s.operatorRoles);
   const prioritySpeakers = useHUDStore((s) => s.prioritySpeakers);
   const iglDuckingEnabled = useHUDStore((s) => s.iglDuckingEnabled);
-  const peerSpectrums = useHUDStore((s) => s.peerSpectrums);
   const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
   const togglePeerMute = useHUDStore((s) => s.toggleLocalMute);
   const cycleSpatialPan = useHUDStore((s) => s.cycleSpatialPan);
-  const setPeerSpectrum = useHUDStore((s) => s.setPeerSpectrum);
 
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({
     'usr-1': true,
@@ -365,49 +363,6 @@ export const StreamChatArea = memo(function StreamChatArea({
       unsubTel();
     };
   }, []);
-
-  // Real-time FFT 256 spectrum sampling + IGL Priority Ducking (-30%) + squad activity
-  useEffect(() => {
-    if (ecoActive) return;
-    const audio = getMevaAudioEngine();
-
-    const fftTimer = setInterval(() => {
-      const micSpec = audio.sampleMicSpectrum();
-      if (micSpec.rmsLevel > 4) {
-        setPeerSpectrum('usr-local', {
-          primary: micSpec.primaryHarmonic,
-          secondary: micSpec.secondaryHarmonic,
-          rms: micSpec.rmsLevel,
-        });
-      }
-
-      for (const peerId of audio.getAttachedPeerIds()) {
-        const spec = audio.samplePeerSpectrum(peerId);
-        if (spec.rmsLevel > 2) {
-          setPeerSpectrum(peerId, {
-            primary: spec.primaryHarmonic,
-            secondary: spec.secondaryHarmonic,
-            rms: spec.rmsLevel,
-          });
-        }
-      }
-    }, 110);
-
-    const cadenceTimer = setInterval(() => {
-      setSpeakingPeers((prev) => ({
-        ...prev,
-        'usr-1': Math.random() > 0.3,
-        'usr-4': Math.random() > 0.4,
-        'usr-2': Math.random() > 0.62,
-        'usr-3': Math.random() > 0.72,
-      }));
-    }, 1800);
-
-    return () => {
-      clearInterval(fftTimer);
-      clearInterval(cadenceTimer);
-    };
-  }, [ecoActive, setPeerSpectrum]);
 
   // Apply IGL Priority Ducking (-30% on non-priority peers when IGL speaks)
   useEffect(() => {
@@ -525,14 +480,6 @@ export const StreamChatArea = memo(function StreamChatArea({
       const pan = spatialPans[op.id] ?? 'C';
       const activeRole = operatorRoles[op.id] ?? op.role;
       const isBoosted = gainVal > 100;
-      const spec = peerSpectrums[op.id];
-      const baseWave = Math.min(1, Math.max(0.22, gainVal / 135));
-      const waveLevel = spec
-        ? Math.min(1, spec.primary * (gainVal / 100))
-        : baseWave;
-      const secondaryWaveLevel = spec
-        ? Math.min(1, spec.secondary * (gainVal / 100))
-        : baseWave * 0.84;
       const livePing = telemetry.nodes[op.id]?.rttMs ?? op.pingMs;
 
       return (
@@ -685,8 +632,7 @@ export const StreamChatArea = memo(function StreamChatArea({
             }`}
           >
             <FluidWave
-              level={waveLevel}
-              secondaryLevel={secondaryWaveLevel}
+              peerId={op.id}
               active={isSpeaking && !ecoActive}
               muted={isMuted}
               speed={op.waveSpeed}
@@ -1572,19 +1518,23 @@ export const StreamChatArea = memo(function StreamChatArea({
         </section>
       </div>
 
-      <E2eeFingerprintPopover
-        open={showFingerprintModal}
-        onClose={() => setShowFingerprintModal(false)}
-      />
+      {showFingerprintModal && (
+        <E2eeFingerprintPopover
+          open={showFingerprintModal}
+          onClose={() => setShowFingerprintModal(false)}
+        />
+      )}
 
-      <MeshNodeInspectModal
-        node={inspectedNodeId ? (telemetry.nodes[inspectedNodeId] ?? null) : null}
-        onClose={() => setInspectedNodeId(null)}
-        onOpenDspDrawer={(id) => {
-          const op = SQUAD_OPERATORS.find((o) => o.id === id);
-          if (op) handleInspectOperator(op);
-        }}
-      />
+      {inspectedNodeId && (
+        <MeshNodeInspectModal
+          node={telemetry.nodes[inspectedNodeId] ?? null}
+          onClose={() => setInspectedNodeId(null)}
+          onOpenDspDrawer={(id) => {
+            const op = SQUAD_OPERATORS.find((o) => o.id === id);
+            if (op) handleInspectOperator(op);
+          }}
+        />
+      )}
 
       <OperatorContextMenu
         target={contextTarget}

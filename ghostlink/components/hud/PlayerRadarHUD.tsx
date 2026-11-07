@@ -33,7 +33,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
   const isRadarOpen = useAppStore((s) => s.isRadarOpen);
   const isMobileRadarOpen = useAppStore((s) => s.isMobileRadarOpen);
   const onlineMembers = useAppStore((s) => s.onlineMembers);
-  const netGuard = useAppStore((s) => s.netGuard);
+  const bufferSizeMs = useAppStore((s) => s.netGuard.bufferSizeMs);
   const setIsMobileRadarOpen = useAppStore((s) => s.setIsMobileRadarOpen);
 
   const [telemetry, setTelemetry] = useState<MeshTelemetrySummary>(() =>
@@ -181,7 +181,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
         <div className="rounded-xl py-1.5 px-1 bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(14,9,11,0.85)_100%)] border border-[#7A121D]/45">
           <span className="block text-[9px] text-[#B8AAAC]">Buffer</span>
           <span className="block text-[11px] font-bold text-[#F08C96] mt-0.5">
-            {netGuard.bufferSizeMs}ms
+            {bufferSizeMs}ms
           </span>
         </div>
       </div>

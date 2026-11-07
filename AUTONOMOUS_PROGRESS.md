@@ -20,6 +20,7 @@
 | **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | TAMAMLANDI | OK | `143a1c7` |
 | **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | TAMAMLANDI | OK | `0489f8f` |
 | **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | TAMAMLANDI | OK | Release Push |
+| **FAZ 11 (PERF)** | Ultra-Performans 60 FPS Zero-Re-Render Çekirdeği, Master Wave Ticker & GPU Paint İzolasyonu | TAMAMLANDI | OK | 60 FPS Ready |
 
 ## Tamamlanan Teknik Çıktılar
 - **FAZ 0:** Keep-alive arka plan döngüsü (`/tmp/keepalive.txt`) ve otonom checkpoint sistemi devreye alındı.
@@ -41,3 +42,9 @@
   - 280ms yazma birleştirmeli (write-coalescing) gerçek `IndexedDB` (`meva_hud_db_v1`: `kv_prefs`, `chat_history`, `pro_analytics`) + `LocalStorage` yedekli kalıcılık motoru ve **Meva Pro Maç Sonu Akustik & İletişim Analitiği** (Callout yoğunluğu, netlik skoru, Auto-Leveler Peak koruması, IGL içgörüsü) entegre edildi.
 - **FAZ 10 (Optimizasyon, Doğrulama & Canlı Yayın):**
   - Referans-korumalı Zustand abonelikleri (`storageEngine.ts`), çift katmanlı `rAF` Canvas çizimi (`TacticalStratDrawer.tsx`), `Game-Boost` arka plan zamanlayıcı duraklatmaları, uçtan uca birim doğrulama paketi (`verify-suite.mjs`), `tsc --noEmit`, `next lint` ve `next build` %100 sıfır hatayla tamamlandı.
+- **FAZ 11 (60 FPS Zero-Re-Render Performans Mimarisi):**
+  - **Zero-React-Render Ses Dalgaları (`waveMasterTicker.ts` & `HudPrimitives.tsx`):** FFT spektrum ve sinüs dalgası verileri React state ve Zustand store'undan tamamen koparıldı. `FluidWave` doğrudan Canvas 2D context mutasyonuyla çalışır, React re-render sayısı saniyede sıfıra (0) indirildi.
+  - **Tekil Master RAF Ticker & Uyku Modu:** Her operatör kartı için bağımsız rAF ve interval döngüleri kaldırıldı; 50 FPS akıllı kare atlamalı ve sessiz modda otomatik uyuyan (`isSleeping = true`) merkezi Master Ticker mimarisine geçildi.
+  - **Zustand Atomik Seçiciler & Telemetri Throttling (`telemetryEngine.ts`):** Tüm geniş abonelikler atomik seçicilere dönüştürüldü, telemetri bildirimleri 1.4-1.5 saniyeye (1400ms) kilitlendi. VAD/Noise Gate bildirimleri sadece durum değişiminde veya 100ms throttle ile sınırlandırıldı.
+  - **GPU Compositing & Paint İzolasyonu (`globals.css`):** `.cockpit-pod`, `.cockpit-pod-live`, `.cockpit-pod-muted` ve `.gpu-contained` için `contain: layout style paint;` ve `will-change: transform;` eklenerek tam sayfa yeniden boyamaları engellendi.
+  - **Kapalı Modalların Koşullu Unmount Edilmesi (`app/page.tsx`):** `TacticalStratDrawer`, `MevaCommandSettingsModal`, `ScrimModal`, `ThemeSettingsModal` ve `FriendsModal` sadece açık olduklarında mount edilerek arka plandaki tüm dinleyiciler ve rAF döngüleri sıfırlandı.

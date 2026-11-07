@@ -163,7 +163,14 @@ export default function MevaHUDApp() {
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const isMobileSidebarOpen = useAppStore((s) => s.isMobileSidebarOpen);
   const isMobileRadarOpen = useAppStore((s) => s.isMobileRadarOpen);
+  const showScrimModal = useAppStore((s) => s.showScrimModal);
+  const showFriendsModal = useAppStore((s) => s.showFriendsModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
+  const showCommandSettingsModal = useVoiceSettingsStore(
+    (s) => s.showCommandSettingsModal,
+  );
+  const showStratBoard = useVoiceSettingsStore((s) => s.showStratBoard);
+  const showThemeModal = useThemeStore((s) => s.showThemeModal);
 
   const setServers = useAppStore((s) => s.setServers);
   const setActiveServer = useAppStore((s) => s.setActiveServer);
@@ -456,25 +463,29 @@ export default function MevaHUDApp() {
         </>
       )}
 
-      {/* 4. MODALS & OVERLAYS */}
-      <ScrimModal />
-      <ThemeSettingsModal />
-      <MevaCommandSettingsModal />
-      <TacticalStratDrawer />
-      <FriendsModal />
-      <OperatorContextMenu
-        target={radarContextTarget}
-        onClose={() => setRadarContextTarget(null)}
-        onOpenDspDrawer={(id) => {
-          const found = DEFAULT_MEMBERS.find((m) => m.id === id);
-          if (found) setSelectedPlayer(found);
-        }}
-        voiceControls={voiceControls}
-      />
-      <TacticalPlayerHUD
-        player={selectedPlayer}
-        onClose={() => setSelectedPlayer(null)}
-      />
+      {/* 4. MODALS & OVERLAYS (Conditional Zero-Footprint Rendering) */}
+      {showScrimModal && <ScrimModal />}
+      {showThemeModal && <ThemeSettingsModal />}
+      {showCommandSettingsModal && <MevaCommandSettingsModal />}
+      {showStratBoard && <TacticalStratDrawer />}
+      {showFriendsModal && <FriendsModal />}
+      {radarContextTarget && (
+        <OperatorContextMenu
+          target={radarContextTarget}
+          onClose={() => setRadarContextTarget(null)}
+          onOpenDspDrawer={(id) => {
+            const found = DEFAULT_MEMBERS.find((m) => m.id === id);
+            if (found) setSelectedPlayer(found);
+          }}
+          voiceControls={voiceControls}
+        />
+      )}
+      {selectedPlayer && (
+        <TacticalPlayerHUD
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 }

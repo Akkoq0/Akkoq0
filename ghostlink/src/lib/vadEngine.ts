@@ -89,6 +89,7 @@ export class MevaVadEngine {
   private keyUpHandler: ((e: KeyboardEvent) => void) | null = null;
   private blurHandler: (() => void) | null = null;
   private listeners = new Set<VadStateListener>();
+  private lastEmitTime = 0;
 
   private lastSnapshot: VadTelemetrySnapshot = {
     inputDb: -96,
@@ -428,9 +429,21 @@ export class MevaVadEngine {
       pttPressed: this.pttPressed,
     };
 
-    this.lastSnapshot = snapshot;
-    for (const listener of this.listeners) {
-      listener(snapshot);
+    const stateChanged =
+      this.lastSnapshot.gateOpen !== snapshot.gateOpen ||
+      this.lastSnapshot.transmitting !== snapshot.transmitting ||
+      this.lastSnapshot.mode !== snapshot.mode ||
+      this.lastSnapshot.pttPressed !== snapshot.pttPressed;
+
+    const now = Date.now();
+    if (stateChanged || now - this.lastEmitTime >= 100) {
+      this.lastEmitTime = now;
+      this.lastSnapshot = snapshot;
+      for (const listener of this.listeners) {
+        listener(snapshot);
+      }
+    } else {
+      this.lastSnapshot = snapshot;
     }
   }
 

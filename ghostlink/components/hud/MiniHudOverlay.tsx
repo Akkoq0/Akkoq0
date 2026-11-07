@@ -101,7 +101,6 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
   const localMutes = useHUDStore((s) => s.localMutes);
   const spatialPans = useHUDStore((s) => s.spatialPans);
   const operatorRoles = useHUDStore((s) => s.operatorRoles);
-  const peerSpectrums = useHUDStore((s) => s.peerSpectrums);
   const acousticCuesEnabled = useHUDStore((s) => s.acousticCuesEnabled);
   const toggleLocalMute = useHUDStore((s) => s.toggleLocalMute);
   const setAcousticCuesEnabled = useHUDStore((s) => s.setAcousticCuesEnabled);
@@ -193,12 +192,11 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
             const muted = isSelf
               ? voiceControls.isMuted || voiceControls.isDeafened
               : Boolean(localMutes[op.id]);
-            const spec = peerSpectrums[op.id];
             const speaking =
               !muted &&
               (isSelf
                 ? voiceControls.isSpeaking || pttHeld
-                : (spec?.rms ?? 0) > 0.08 || idx === 1 || idx === 2);
+                : idx === 1 || idx === 2);
             const role = operatorRoles[op.id] ?? op.defaultRole;
             const pan = spatialPans[op.id] ?? 'C';
             const rtt = telemetry.nodes[op.id]?.rttMs ?? op.fallbackPing;
@@ -237,10 +235,10 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
                 </div>
 
                 <FluidWave
-                  level={spec?.primary ?? 0.68}
-                  secondaryLevel={spec?.secondary ?? 0.52}
+                  peerId={op.id}
                   active={speaking && !ecoActive}
                   muted={muted}
+                  speed={1.2}
                   className="w-full h-4"
                 />
 

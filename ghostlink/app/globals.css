@@ -129,6 +129,8 @@ body.eco-active .titanium-module {
 /* ── Operator Voice Pods (Subtle Black-Burgundy Idle + Clean Speaking Highlight) ── */
 .cockpit-pod {
   position: relative;
+  contain: layout style paint;
+  will-change: transform;
   border: 1px solid rgba(128, 24, 36, 0.20);
   background: linear-gradient(
     160deg,
@@ -152,6 +154,8 @@ body.eco-active .titanium-module {
 }
 
 .cockpit-pod-live {
+  contain: layout style paint;
+  will-change: transform;
   border: 1px solid rgba(208, 36, 52, 0.52);
   background: linear-gradient(
     145deg,
@@ -165,12 +169,19 @@ body.eco-active .titanium-module {
 }
 
 .cockpit-pod-muted {
+  contain: layout style paint;
+  will-change: transform;
   border-color: rgba(148, 24, 36, 0.28);
   background: linear-gradient(
     160deg,
     rgba(28, 10, 14, 0.55) 0%,
     rgba(9, 7, 8, 0.80) 100%
   );
+}
+
+.gpu-contained {
+  contain: layout style paint;
+  will-change: transform;
 }
 
 /* ── Refined Burgundy-to-Black Primary Button ── */
