@@ -8,13 +8,15 @@
 //     multi-view architecture (İletişim + Canlı Ses Şeridi | Ses Matrisi |
 //     P2P Ağ & Scrim) synchronized with MobileBottomNav.
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useHUDStore } from '@/store/useHUDStore';
 import {
   useRealtimeChat,
   INITIAL_TACTICAL_MESSAGES,
 } from '@/hooks/useRealtimeChat';
+import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
+import { E2eeFingerprintPopover } from '@/components/chat/E2eeFingerprintPopover';
 import { cleanLabel } from '@/lib/format';
 import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
@@ -249,8 +251,56 @@ export const StreamChatArea = memo(function StreamChatArea({
   });
 
   const [input, setInput] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [showFingerprintModal, setShowFingerprintModal] = useState(false);
+  const [localFingerprint, setLocalFingerprint] = useState('ECDH-256');
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const cryptoEngine = getMevaCryptoEngine();
+    void cryptoEngine.initialize();
+    return cryptoEngine.subscribeStatus((snap) => {
+      if (snap.initialized) {
+        setLocalFingerprint(snap.localFingerprint.slice(0, 9));
+      }
+    });
+  }, []);
+
+  const filteredMessages = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return messages.filter((m) => {
+      if (activeTagFilter && !m.content.toUpperCase().includes(activeTagFilter)) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        m.content.toLowerCase().includes(q) ||
+        (m.author?.username.toLowerCase().includes(q) ?? false)
+      );
+    });
+  }, [messages, searchQuery, activeTagFilter]);
+
+  const handleCopyMessage = useCallback(async (msg: Message) => {
+    try {
+      await navigator.clipboard?.writeText(msg.content);
+      setCopiedMsgId(msg.id);
+      setTimeout(() => {
+        setCopiedMsgId((curr) => (curr === msg.id ? null : curr));
+      }, 1500);
+    } catch {}
+  }, []);
+
+  const handleInsertTacticalTag = useCallback((tag: string) => {
+    setInput((prev) => {
+      const stripped = prev.replace(/^\[[^\]]+\]\s*/, '');
+      return `[${tag}] ${stripped}`;
+    });
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -774,16 +824,64 @@ export const StreamChatArea = memo(function StreamChatArea({
                   </button>
                 )}
               </div>
-              <span className="text-[11px] font-bold text-[#D63344] flex-shrink-0">
-                E2EE Aktif
-              </span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen((v) => !v)}
+                  className={`rounded-lg px-2 py-1 text-[10.5px] font-bold border transition-colors ${
+                    searchOpen || searchQuery || activeTagFilter
+                      ? 'bg-[#7A121D]/30 text-[#F08C96] border-[#A61B29]/50'
+                      : 'bg-[#140A0D] text-[#8E7E81] border-[#281318]'
+                  }`}
+                >
+                  Ara
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFingerprintModal(true)}
+                  className="rounded-lg px-2 py-1 bg-[#160A0E] border border-[#881A26]/40 text-[10.5px] font-mono font-bold text-[#ED8793]"
+                  title="ECDH P-256 & AES-256-GCM Anahtar Parmak İzini Doğrula"
+                >
+                  🔒 {localFingerprint}
+                </button>
+              </div>
             </div>
 
+            {searchOpen && (
+              <div className="px-3 py-2 bg-[#0B0709] border-b border-[#241116] flex flex-wrap items-center gap-1.5 flex-shrink-0">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Mesaj veya operatör ara..."
+                  className="rounded-lg flex-1 min-w-[140px] h-7 px-2.5 bg-[#120A0D] border border-[#2C141A] focus:border-[#C82333]/65 text-[11.5px] text-[#F4EFF0] placeholder:text-[#7D6E71] outline-none"
+                />
+                {(['ROTATE', 'ECO', 'CLUTCH', 'FORCE'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() =>
+                      setActiveTagFilter((curr) => (curr === t ? null : t))
+                    }
+                    className={`rounded-md h-7 px-2 text-[10px] font-bold border ${
+                      activeTagFilter === t
+                        ? 'crimson-cta text-[#F4EFF0]'
+                        : 'bg-[#140A0D] text-[#B8AAAC] border-[#2C141A]'
+                    }`}
+                  >
+                    #{t}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <TacticalMessageFeed
-              messages={messages}
+              messages={filteredMessages}
               userId={userId}
               playingVoiceNoteId={playingVoiceNoteId}
               onToggleVoiceNote={setPlayingVoiceNoteId}
+              copiedMsgId={copiedMsgId}
+              onCopyMessage={handleCopyMessage}
               ecoActive={ecoActive}
               bottomRef={bottomRef}
             />
@@ -1120,6 +1218,26 @@ export const StreamChatArea = memo(function StreamChatArea({
                   Genel Akış
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setShowFingerprintModal(true)}
+                title="ECDH P-256 & AES-256-GCM Anahtar Parmak İzi Doğrulaması"
+                className="rounded-md px-2 py-0.5 bg-[#14090D] hover:bg-[#210C12] border border-[#881A26]/35 text-[10px] font-mono font-bold text-[#ED8793] transition-colors whitespace-nowrap"
+              >
+                🔒 {localFingerprint}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                title="Mesaj Ara & Taktik Etiket Filtrele"
+                className={`rounded-md px-2 py-0.5 text-[10.5px] font-bold border transition-colors whitespace-nowrap ${
+                  searchOpen || searchQuery || activeTagFilter
+                    ? 'bg-[#7A121D]/35 text-[#F08C96] border-[#A61B29]/55'
+                    : 'bg-[#14090D] hover:bg-[#1E0C11] text-[#9E8E91] hover:text-[#F4EFF0] border-[#2A1319]'
+                }`}
+              >
+                Ara · Etiket
+              </button>
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -1136,11 +1254,57 @@ export const StreamChatArea = memo(function StreamChatArea({
             </div>
           </div>
 
+          {searchOpen && (
+            <div className="px-3.5 py-1.5 bg-[#0A0708]/95 border-b border-[#241116] flex items-center justify-between gap-2 flex-shrink-0">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Mesaj içeriği veya operatör ara..."
+                className="rounded-lg flex-1 h-7 px-2.5 bg-[#120A0D] border border-[#2C141A] focus:border-[#C82333]/65 text-[11.5px] text-[#F4EFF0] placeholder:text-[#7D6E71] outline-none"
+              />
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {(['ROTATE', 'ECO', 'INFO', 'CLUTCH'] as const).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() =>
+                      setActiveTagFilter((curr) => (curr === tag ? null : tag))
+                    }
+                    onDoubleClick={() => handleInsertTacticalTag(tag)}
+                    title="Tıkla: Filtrele · Çift tıkla: Mesaja etiket ekle"
+                    className={`rounded-md h-6 px-2 text-[10px] font-bold border transition-colors ${
+                      activeTagFilter === tag
+                        ? 'crimson-cta text-[#F4EFF0]'
+                        : 'bg-[#140A0D] hover:bg-[#1E0C12] text-[#B8AAAC] border-[#2C141A]'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+                {(searchQuery || activeTagFilter) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setActiveTagFilter(null);
+                    }}
+                    className="rounded-md h-6 px-2 bg-[#1A0B10] text-[10px] font-bold text-[#F08C96] border border-[#7A121D]/45"
+                  >
+                    Temizle
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <TacticalMessageFeed
-            messages={messages}
+            messages={filteredMessages}
             userId={userId}
             playingVoiceNoteId={playingVoiceNoteId}
             onToggleVoiceNote={setPlayingVoiceNoteId}
+            copiedMsgId={copiedMsgId}
+            onCopyMessage={handleCopyMessage}
             ecoActive={ecoActive}
             bottomRef={bottomRef}
           />
@@ -1265,6 +1429,11 @@ export const StreamChatArea = memo(function StreamChatArea({
           </div>
         </section>
       </div>
+
+      <E2eeFingerprintPopover
+        open={showFingerprintModal}
+        onClose={() => setShowFingerprintModal(false)}
+      />
     </main>
   );
 });
@@ -1274,6 +1443,8 @@ interface TacticalMessageFeedProps {
   userId: string;
   playingVoiceNoteId: string | null;
   onToggleVoiceNote: (id: string | null) => void;
+  copiedMsgId: string | null;
+  onCopyMessage: (msg: Message) => void;
   ecoActive: boolean;
   bottomRef: React.RefObject<HTMLDivElement>;
 }
@@ -1283,6 +1454,8 @@ const TacticalMessageFeed = memo(function TacticalMessageFeed({
   userId,
   playingVoiceNoteId,
   onToggleVoiceNote,
+  copiedMsgId,
+  onCopyMessage,
   ecoActive,
   bottomRef,
 }: TacticalMessageFeedProps) {
@@ -1349,12 +1522,22 @@ const TacticalMessageFeed = memo(function TacticalMessageFeed({
                   </span>
                 )}
               </div>
-              <time
-                suppressHydrationWarning
-                className="text-[11px] font-semibold text-[#827376] tabular-nums flex-shrink-0"
-              >
-                {time}
-              </time>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onCopyMessage(msg)}
+                  title="Mesajı panoya kopyala"
+                  className="rounded px-1.5 py-0.5 bg-[#120A0D]/80 hover:bg-[#1E0C12] border border-[#2C141A] text-[10px] font-bold text-[#9E8E91] hover:text-[#F4EFF0] transition-colors"
+                >
+                  {copiedMsgId === msg.id ? 'Kopyalandı' : 'Kopyala'}
+                </button>
+                <time
+                  suppressHydrationWarning
+                  className="text-[11px] font-semibold text-[#827376] tabular-nums"
+                >
+                  {time}
+                </time>
+              </div>
             </div>
 
             <p className="text-[13px] lg:text-[12.5px] leading-relaxed lg:leading-snug text-[#F4EFF0]/95 break-words pl-7">

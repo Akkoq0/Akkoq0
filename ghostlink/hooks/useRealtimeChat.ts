@@ -7,6 +7,8 @@
 import { useEffect, useCallback } from 'react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/lib/store';
+import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
+import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
 import type { Message } from '@/types';
 
 const BASE_PROFILE_ISO = '2026-11-06T19:00:00.000Z';
@@ -228,7 +230,58 @@ export function useRealtimeChat(channelId: string | null) {
       SEED_BY_CHANNEL[effectiveTargetId] ?? INITIAL_TACTICAL_MESSAGES;
     setMessages(seeded);
 
-    if (!isSupabaseConfigured()) return;
+    // Initialize ECDH P-256 + AES-256-GCM E2EE engine and listen for encrypted DataChannel chat/callouts
+    const cryptoEngine = getMevaCryptoEngine();
+    void cryptoEngine.initialize();
+    const mesh = getMevaWebRTCMesh();
+
+    const unsubMesh = mesh.onDataPacket((envelope) => {
+      if (envelope.kind !== 'e2ee-chat' && envelope.kind !== 'e2ee-callout') {
+        return;
+      }
+      void cryptoEngine
+        .decryptPayload(
+          envelope.payload,
+          envelope.room,
+          envelope.kind,
+          envelope.from,
+        )
+        .then((result) => {
+          if (!result) return;
+          try {
+            const wire = JSON.parse(result.plaintext) as {
+              id: string;
+              channelId: string;
+              content: string;
+              createdAt: string;
+              authorName: string;
+              role?: string;
+            };
+            if (wire.channelId !== effectiveTargetId) return;
+            addMessage({
+              id: wire.id,
+              channel_id: wire.channelId,
+              author_id: envelope.from,
+              content: wire.content,
+              created_at: wire.createdAt,
+              author: {
+                id: envelope.from,
+                username: wire.authorName || envelope.fromName || 'Operatör',
+                avatar_url: null,
+                status: 'online',
+                activity: wire.role ?? 'P2P E2EE',
+                created_at: BASE_PROFILE_ISO,
+              },
+            });
+          } catch {}
+        });
+    });
+
+    if (!isSupabaseConfigured()) {
+      return () => {
+        unsubMesh();
+      };
+    }
 
     const safeChan = effectiveTargetId.replace(/[^A-Za-z0-9_:-]/g, '');
     if (!safeChan) return;
@@ -276,6 +329,7 @@ export function useRealtimeChat(channelId: string | null) {
 
     return () => {
       cancelled = true;
+      unsubMesh();
       void supabase.removeChannel(rtSub);
     };
   }, [effectiveTargetId, activeDMUserId, setMessages, addMessage]);
@@ -311,6 +365,24 @@ export function useRealtimeChat(channelId: string | null) {
         },
       };
       addMessage(optimisticMsg);
+
+      // Encrypt with AES-256-GCM and transmit over WebRTC DataChannel / Mesh
+      const isCallout = sanitized.startsWith('[');
+      try {
+        await getMevaCryptoEngine().sendEncryptedMeshPacket(
+          isCallout ? 'e2ee-callout' : 'e2ee-chat',
+          JSON.stringify({
+            id: msgId,
+            channelId: effectiveTargetId,
+            content: sanitized,
+            createdAt: nowIso,
+            authorName: 'Operatör',
+            role: 'IGL',
+          }),
+        );
+      } catch {
+        // Local optimistic render remains intact
+      }
 
       if (!isSupabaseConfigured()) return;
 
