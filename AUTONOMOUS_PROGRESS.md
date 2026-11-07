@@ -17,9 +17,9 @@
 | **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | TAMAMLANDI | OK | `c415de8` |
 | **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | TAMAMLANDI | OK | `33b2d34` |
 | **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | TAMAMLANDI | OK | `059e5a6` |
-| **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | TAMAMLANDI | OK | Commit/Push |
-| **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | DEVAM EDİYOR | - | - |
-| **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | BEKLİYOR | - | - |
+| **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | TAMAMLANDI | OK | `143a1c7` |
+| **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | TAMAMLANDI | OK | Commit/Push |
+| **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | DEVAM EDİYOR | - | - |
 
 ## Tamamlanan Teknik Çıktılar
 - **FAZ 0:** Keep-alive arka plan döngüsü (`/tmp/keepalive.txt`) ve otonom checkpoint sistemi devreye alındı.
@@ -37,3 +37,5 @@
   - Çift katmanlı (`bgCanvas` statik harita şeması + `rAF` birleştirilmiş `fgCanvas` çizim katmanı) **Ascent, Bind, Mirage, Inferno** taktik tahtası, Duman/Flaş/Rotasyon Oku/Serbest Çizim araçları ve `strat-op` üzerinden AES-256-GCM gerçek zamanlı P2P senkronizasyon motoru tamamlandı.
 - **FAZ 8 (`MiniHudOverlay.tsx`, `useRealtimeChat.ts`):**
   - İkinci ekran / oyun içi düşük CPU'lu **Kompakt Overlay Modu (Mini HUD)** (`O` kısayolu + üst komuta barı ikonu) ve yerel + uzak P2P operatörlerde WebAudio sentezli **Taktiksel Akustik Callout Bildirim Sesleri** (`Hazır`, `Rotate B`, `Eco`, `Drop AWP`, `Force`, `GG WP`) tamamlandı.
+- **FAZ 9 (`ghostlink/src/lib/storageEngine.ts`):**
+  - 280ms yazma birleştirmeli (write-coalescing) gerçek `IndexedDB` (`meva_hud_db_v1`: `kv_prefs`, `chat_history`, `pro_analytics`) + `LocalStorage` yedekli kalıcılık motoru ve **Meva Pro Maç Sonu Akustik & İletişim Analitiği** (Callout yoğunluğu, netlik skoru, Auto-Leveler Peak koruması, IGL içgörüsü) entegre edildi.

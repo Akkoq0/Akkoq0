@@ -11,6 +11,7 @@ import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { useGameBoost } from '@/hooks/useGameBoost';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { parseServerlessInviteHash } from '@/src/lib/webrtcMesh';
+import { getMevaStorageEngine } from '@/src/lib/storageEngine';
 import { GhostNavbar } from '@/components/layout/GhostNavbar';
 import { TacticalSidebar } from '@/components/layout/TacticalSidebar';
 import { StreamChatArea } from '@/components/chat/StreamChatArea';
@@ -182,6 +183,11 @@ export default function MevaHUDApp() {
 
   useEffect(() => {
     useThemeStore.getState().applyCSSVariables();
+    const storage = getMevaStorageEngine();
+    void storage.hydrateAndBindStores();
+    return () => {
+      storage.disposeBindings();
+    };
   }, []);
 
   // Auto-join P2P room when opened via serverless URL Hash (#meva=...)

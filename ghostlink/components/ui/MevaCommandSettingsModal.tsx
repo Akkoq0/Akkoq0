@@ -26,6 +26,10 @@ import {
 } from '@/src/lib/vadEngine';
 import { getMevaTelemetryEngine } from '@/src/lib/telemetryEngine';
 import {
+  getMevaStorageEngine,
+  type ProAnalyticsReport,
+} from '@/src/lib/storageEngine';
+import {
   IconClose,
   IconMic,
   IconHeadphones,
@@ -117,6 +121,9 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
   const [vadSnap, setVadSnap] = useState<VadTelemetrySnapshot>(() =>
     getMevaVadEngine().getSnapshot(),
   );
+  const [proReport, setProReport] = useState<ProAnalyticsReport>(() =>
+    getMevaStorageEngine().getProReport(),
+  );
   const [loopbackActive, setLoopbackActive] = useState(false);
   const [micTesting, setMicTesting] = useState(false);
   const [recordingKeyFor, setRecordingKeyFor] = useState<
@@ -138,8 +145,12 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
     }
     void refreshDevices();
     const unsub = getMevaVadEngine().subscribe((snap) => setVadSnap(snap));
+    const unsubPro = getMevaStorageEngine().subscribeProReport((rep) =>
+      setProReport(rep),
+    );
     return () => {
       unsub();
+      unsubPro();
       getMevaVadEngine().setMicLoopbackTest(false);
     };
   }, [open, refreshDevices]);
@@ -654,30 +665,65 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
                 </div>
 
                 {proAnalyticsEnabled && (
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
-                      <span className="block text-[10px] text-[#8E7F83]">
-                        İletişim Netlik Skoru
-                      </span>
-                      <span className="block text-sm font-extrabold text-[#F08C96] mt-0.5">
-                        98.4 / 100
-                      </span>
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
+                        <span className="block text-[10px] text-[#8E7F83]">
+                          İletişim Netlik Skoru
+                        </span>
+                        <span className="block text-sm font-extrabold text-[#F08C96] mt-0.5">
+                          {proReport.clarityScore} / 100
+                        </span>
+                      </div>
+                      <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
+                        <span className="block text-[10px] text-[#8E7F83]">
+                          Ortalama Mesh RTT
+                        </span>
+                        <span className="block text-sm font-extrabold text-[#F4EFF0] mt-0.5">
+                          {proReport.avgRttMs || telemetry.rttMs} ms · %
+                          {proReport.meshStabilityPercent}
+                        </span>
+                      </div>
+                      <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
+                        <span className="block text-[10px] text-[#8E7F83]">
+                          Auto-Leveler Koruması
+                        </span>
+                        <span className="block text-sm font-extrabold text-[#F4EFF0] mt-0.5">
+                          {proReport.peakLimiterSaves} Peak Engellendi
+                        </span>
+                      </div>
                     </div>
-                    <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
-                      <span className="block text-[10px] text-[#8E7F83]">
-                        Ortalama Mesh RTT
-                      </span>
-                      <span className="block text-sm font-extrabold text-[#F4EFF0] mt-0.5">
-                        {telemetry.rttMs} ms · %{telemetry.stabilityPercent}
-                      </span>
-                    </div>
-                    <div className="rounded-lg p-2.5 bg-[#0C0709]/85 border border-[#2C141A]">
-                      <span className="block text-[10px] text-[#8E7F83]">
-                        Klavye/Peak Koruması
-                      </span>
-                      <span className="block text-sm font-extrabold text-[#F4EFF0] mt-0.5">
-                        85Hz HPF + Limiter
-                      </span>
+
+                    {/* Callout Density & Operator Talk Balance */}
+                    <div className="rounded-lg p-3 bg-[#0C0709]/85 border border-[#2C141A] space-y-2">
+                      <div className="flex items-center justify-between text-[10.5px]">
+                        <span className="font-bold text-[#B8AAAC]">
+                          Taktik Çağrı Yoğunluğu ({proReport.totalCallouts} /{' '}
+                          {proReport.totalMessages} Mesaj)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => getMevaStorageEngine().resetProReport()}
+                          className="text-[10px] font-bold text-[#E35D6A] hover:underline"
+                        >
+                          Raporu Sıfırla
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {Object.entries(proReport.calloutBreakdown).map(
+                          ([tag, count]) => (
+                            <span
+                              key={tag}
+                              className="rounded-md px-2 py-0.5 bg-[#180B10] border border-[#7A121D]/45 text-[10px] font-bold text-[#F08C96]"
+                            >
+                              #{tag}: {count}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#B8AAAC] leading-snug pt-0.5">
+                        {proReport.iglInsight}
+                      </p>
                     </div>
                   </div>
                 )}

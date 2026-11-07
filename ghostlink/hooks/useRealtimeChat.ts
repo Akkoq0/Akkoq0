@@ -13,6 +13,7 @@ import {
 } from '@/src/lib/audioEngine';
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
+import { getMevaStorageEngine } from '@/src/lib/storageEngine';
 import type { Message } from '@/types';
 
 function inferCalloutCue(content: string): CalloutCueType | undefined {
@@ -245,6 +246,15 @@ export function useRealtimeChat(channelId: string | null) {
       SEED_BY_CHANNEL[effectiveTargetId] ?? INITIAL_TACTICAL_MESSAGES;
     setMessages(seeded);
 
+    let disposed = false;
+    void getMevaStorageEngine()
+      .loadChannelMessages(effectiveTargetId)
+      .then((persisted) => {
+        if (!disposed && persisted && persisted.length > 0) {
+          setMessages(persisted);
+        }
+      });
+
     // Initialize ECDH P-256 + AES-256-GCM E2EE engine and listen for encrypted DataChannel chat/callouts
     const cryptoEngine = getMevaCryptoEngine();
     void cryptoEngine.initialize();
@@ -299,12 +309,18 @@ export function useRealtimeChat(channelId: string | null) {
 
     if (!isSupabaseConfigured()) {
       return () => {
+        disposed = true;
         unsubMesh();
       };
     }
 
     const safeChan = effectiveTargetId.replace(/[^A-Za-z0-9_:-]/g, '');
-    if (!safeChan) return;
+    if (!safeChan) {
+      return () => {
+        disposed = true;
+        unsubMesh();
+      };
+    }
 
     let cancelled = false;
     const supabase = getSupabase();
@@ -348,6 +364,7 @@ export function useRealtimeChat(channelId: string | null) {
       .subscribe();
 
     return () => {
+      disposed = true;
       cancelled = true;
       unsubMesh();
       void supabase.removeChannel(rtSub);
@@ -385,6 +402,7 @@ export function useRealtimeChat(channelId: string | null) {
         },
       };
       addMessage(optimisticMsg);
+      getMevaStorageEngine().recordTacticalMessage(sanitized);
 
       // Encrypt with AES-256-GCM and transmit over WebRTC DataChannel / Mesh
       const isCallout = sanitized.startsWith('[');
