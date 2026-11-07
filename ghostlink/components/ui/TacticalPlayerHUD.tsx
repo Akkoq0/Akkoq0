@@ -7,6 +7,7 @@
 import { memo } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useHUDStore, type SpatialPan } from '@/store/useHUDStore';
+import type { OperatorEqProfile } from '@/src/lib/audioEngine';
 import { OperatorAvatar } from '@/components/ui/HudPrimitives';
 import {
   IconClose,
@@ -31,9 +32,19 @@ const PEER_RTT: Record<string, number> = {
 };
 
 const PAN_OPTIONS: Array<{ key: SpatialPan; label: string; hint: string }> = [
-  { key: 'L', label: 'Sol · L', hint: '-78%' },
-  { key: 'C', label: 'Merkez · C', hint: '0%' },
-  { key: 'R', label: 'Sağ · R', hint: '+78%' },
+  { key: 'L', label: 'Sol · L', hint: '-100% (-1.0)' },
+  { key: 'C', label: 'Merkez · C', hint: '0% (0.0)' },
+  { key: 'R', label: 'Sağ · R', hint: '+100% (+1.0)' },
+];
+
+const EQ_PROFILES: Array<{
+  key: OperatorEqProfile;
+  label: string;
+  sub: string;
+}> = [
+  { key: 'crisp', label: 'Keskin Tiz', sub: '+4.5dB 3.5kHz' },
+  { key: 'balanced', label: 'Dengeli', sub: 'Referans EQ' },
+  { key: 'warm', label: 'Tok Bas', sub: '+3.2dB 220Hz' },
 ];
 
 export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
@@ -45,9 +56,13 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
   const playerGains = useHUDStore((s) => s.playerGains);
   const localMutes = useHUDStore((s) => s.localMutes);
   const spatialPans = useHUDStore((s) => s.spatialPans);
+  const eqProfiles = useHUDStore((s) => s.eqProfiles);
+  const prioritySpeakers = useHUDStore((s) => s.prioritySpeakers);
   const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
   const toggleLocalMute = useHUDStore((s) => s.toggleLocalMute);
   const setSpatialPan = useHUDStore((s) => s.setSpatialPan);
+  const setEqProfile = useHUDStore((s) => s.setEqProfile);
+  const togglePrioritySpeaker = useHUDStore((s) => s.togglePrioritySpeaker);
 
   if (!player) return null;
 
@@ -55,6 +70,8 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
   const gain = playerGains[player.id] ?? 100;
   const localMuted = Boolean(localMutes[player.id]) || gain === 0;
   const activePan = spatialPans[player.id] ?? 'C';
+  const activeEq = eqProfiles[player.id] ?? 'balanced';
+  const isPriority = Boolean(prioritySpeakers[player.id]);
   const rttMs = PEER_RTT[player.id] ?? 12;
 
   return (
@@ -168,6 +185,56 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
               </div>
             </div>
           )}
+
+          {/* ── Per-Operator Biquad EQ & Priority Ducking ── */}
+          <div className="rounded-2xl p-4 bg-[#11090C]/90 border border-[#881A26]/25 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-[#C4B6BA]">
+                BiquadFilter EQ Profili
+              </span>
+              <span className="text-[11px] font-semibold text-[#E35D6A]">
+                85Hz HPF + 3.5kHz
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#090608] border border-[#881A26]/20">
+              {EQ_PROFILES.map((eq) => {
+                const selected = activeEq === eq.key;
+                return (
+                  <button
+                    key={eq.key}
+                    type="button"
+                    onClick={() => setEqProfile(player.id, eq.key)}
+                    className={`rounded-lg py-2 px-1.5 text-center transition-all ${
+                      selected
+                        ? 'bg-gradient-to-b from-[#6B111B]/45 to-[#1F0B10]/80 text-[#F4EFF0] border border-[#A61B29]/55'
+                        : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
+                    }`}
+                  >
+                    <span className="block text-[11px] font-bold">
+                      {eq.label}
+                    </span>
+                    <span className="block text-[9px] text-[#E35D6A] mt-0.5">
+                      {eq.sub}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => togglePrioritySpeaker(player.id)}
+              className={`rounded-xl w-full py-2 px-3 text-xs font-bold border flex items-center justify-between transition-all ${
+                isPriority
+                  ? 'crimson-cta text-[#F4EFF0]'
+                  : 'bg-[#090608] hover:bg-[#140A0E] text-[#B8AAAC] border-[#881A26]/25'
+              }`}
+            >
+              <span>IGL Öncelikli Konuşmacı (%30 Ducking)</span>
+              <span>{isPriority ? 'AKTİF ✓' : 'KAPALI'}</span>
+            </button>
+          </div>
 
           {/* ── Audio Gain & Actions ── */}
           <div className="rounded-2xl p-4 bg-[#11090C]/90 border border-[#881A26]/25 space-y-4">

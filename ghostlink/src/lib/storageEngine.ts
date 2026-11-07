@@ -365,8 +365,23 @@ export class MevaStorageEngine {
       this.proReport = savedPro;
     }
 
-    // Subscribe to HUD Audio DSP store changes
+    // Subscribe to HUD Audio DSP store changes (reference-guarded so live FFT spectrum ticks never trigger storage I/O)
+    let prevHudRef = useHUDStore.getState();
     const unsubHud = useHUDStore.subscribe((s) => {
+      if (
+        s.playerGains === prevHudRef.playerGains &&
+        s.localMutes === prevHudRef.localMutes &&
+        s.spatialPans === prevHudRef.spatialPans &&
+        s.eqProfiles === prevHudRef.eqProfiles &&
+        s.prioritySpeakers === prevHudRef.prioritySpeakers &&
+        s.operatorRoles === prevHudRef.operatorRoles &&
+        s.iglDuckingEnabled === prevHudRef.iglDuckingEnabled &&
+        s.autoLevelerEnabled === prevHudRef.autoLevelerEnabled &&
+        s.acousticCuesEnabled === prevHudRef.acousticCuesEnabled
+      ) {
+        return;
+      }
+      prevHudRef = s;
       const snapshot: PersistedHudAudioPrefs = {
         playerGains: s.playerGains,
         localMutes: s.localMutes,
