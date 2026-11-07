@@ -16,16 +16,29 @@ import {
   applyAdaptiveReceiverBuffer,
 } from '@/lib/opus-sdp';
 import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import { getMevaPublicBrokerRelay } from '@/src/lib/publicBrokerRelay';
 
 export const MULTI_STUN_POOL: RTCIceServer[] = [
   {
     urls: [
       'stun:stun.l.google.com:19302',
       'stun:stun1.l.google.com:19302',
+      'stun:stun2.l.google.com:19302',
     ],
   },
   { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:global.stun.twilio.com:3478' },
+  // OpenRelay Public TURN (UDP/TCP/TLS 443 — penetrates Turkish CGNAT & firewall restrictions)
+  {
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp',
+      'turns:openrelay.metered.ca:443?transport=tcp',
+    ],
+    username: 'openrelay',
+    credential: 'openrelay',
+  },
 ];
 
 export type MeshPacketKind =
@@ -131,7 +144,7 @@ const HEARTBEAT_INTERVAL_MS = 6_000;
 export function buildMultiStunRtcConfig(): RTCConfiguration {
   return {
     iceServers: MULTI_STUN_POOL,
-    iceCandidatePoolSize: 6,
+    iceCandidatePoolSize: 10,
     bundlePolicy: 'max-bundle',
     rtcpMuxPolicy: 'require',
   };
@@ -340,6 +353,17 @@ export class MevaWebRTCMesh {
       }
     }
 
+    try {
+      const publicRelay = getMevaPublicBrokerRelay();
+      publicRelay.setOnSignal((rawPayload) => {
+        try {
+          const frame = JSON.parse(rawPayload) as SignalFrame;
+          void this.handleSignalFrame(frame);
+        } catch {}
+      });
+      publicRelay.joinRoom(cleanRoom);
+    } catch {}
+
     this.emitSignal({
       sig: 'hello',
       room: cleanRoom,
@@ -390,6 +414,9 @@ export class MevaWebRTCMesh {
     } catch {}
     try {
       this.externalSignalSender?.(frame);
+    } catch {}
+    try {
+      getMevaPublicBrokerRelay().publishSignal(JSON.stringify(frame));
     } catch {}
   }
 
@@ -928,6 +955,10 @@ export class MevaWebRTCMesh {
       } catch {}
       this.broadcastBus = null;
     }
+
+    try {
+      getMevaPublicBrokerRelay().leaveRoom();
+    } catch {}
 
     for (const peerId of Array.from(this.nodes.keys())) {
       this.removePeerNode(peerId);

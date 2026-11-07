@@ -200,9 +200,10 @@ export interface AppState {
   // ── Eco Mode ──
   ecoMode: EcoModeState;
 
-  // ── Scrim ──
+  // ── Scrim & Lobby ──
   activeScrimRoom: ScrimRoom | null;
   showScrimModal: boolean;
+  showLobbyGate: boolean;
 
   // ── Net-Guard ──
   netGuard: NetGuardStats;
@@ -239,9 +240,10 @@ export interface AppState {
   setEcoMode: (update: Partial<EcoModeState>) => void;
   toggleEcoEnabled: () => void;
 
-  // ── Actions — Scrim ──
+  // ── Actions — Scrim & Lobby ──
   setActiveScrimRoom: (room: ScrimRoom | null) => void;
   setShowScrimModal: (show: boolean) => void;
+  setShowLobbyGate: (show: boolean) => void;
 
   // ── Actions — Net-Guard ──
   setNetGuard: (stats: Partial<NetGuardStats>) => void;

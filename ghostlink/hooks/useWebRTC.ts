@@ -59,41 +59,6 @@ const STATS_INTERVAL_MS = 2000;
 const JITTER_BUFFER_MIN_MS = 10;
 const JITTER_BUFFER_MAX_MS = 150;
 
-const SQUAD_PEERS: VoicePresence[] = [
-  {
-    user_id: 'usr-1',
-    username: 'cNed',
-    avatar_url: null,
-    is_muted: false,
-    is_deafened: false,
-    is_speaking: true,
-  },
-  {
-    user_id: 'usr-2',
-    username: 'woxic',
-    avatar_url: null,
-    is_muted: false,
-    is_deafened: false,
-    is_speaking: false,
-  },
-  {
-    user_id: 'usr-4',
-    username: 'XANTARES',
-    avatar_url: null,
-    is_muted: false,
-    is_deafened: false,
-    is_speaking: true,
-  },
-  {
-    user_id: 'usr-3',
-    username: 'Alfajer',
-    avatar_url: null,
-    is_muted: false,
-    is_deafened: false,
-    is_speaking: false,
-  },
-];
-
 interface PeerSession {
   pc: RTCPeerConnection;
   remoteStream: MediaStream;
@@ -245,6 +210,7 @@ export function useWebRTC({
   const statsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wasSpeakingRef = useRef(false);
   const joinGenRef = useRef(0);
+  const meshPeersUnsubRef = useRef<(() => void) | null>(null);
   const isMutedRef = useRef(isMuted);
   isMutedRef.current = isMuted;
   const isDeafenedRef = useRef(isDeafened);
@@ -595,6 +561,8 @@ export function useWebRTC({
     peersRef.current.clear();
     rateBucketsRef.current.clear();
 
+    meshPeersUnsubRef.current?.();
+    meshPeersUnsubRef.current = null;
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     getMevaVadEngine().releaseStreamNodes();
@@ -674,8 +642,21 @@ export function useWebRTC({
       localStreamRef.current,
     );
 
-    syncParticipants([selfPresence, ...SQUAD_PEERS]);
+    syncParticipants([selfPresence]);
     setConnectionState('connected');
+
+    meshPeersUnsubRef.current?.();
+    meshPeersUnsubRef.current = getMevaWebRTCMesh().onPeersChange((meshPeers) => {
+      const peerPresences: VoicePresence[] = meshPeers.map((p) => ({
+        user_id: p.peerId,
+        username: p.username,
+        avatar_url: null,
+        is_muted: false,
+        is_deafened: false,
+        is_speaking: false,
+      }));
+      syncParticipants([selfPresence, ...peerPresences]);
+    });
 
     if (!isSupabaseConfigured()) return;
 

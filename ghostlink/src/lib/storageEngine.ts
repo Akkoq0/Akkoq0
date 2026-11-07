@@ -26,9 +26,9 @@ import type { Message, ScrimRoom } from '@/types';
 
 const DB_NAME = 'meva_hud_db_v1';
 const DB_VERSION = 1;
-const STORE_PREFS = 'kv_prefs';
-const STORE_CHAT = 'chat_history';
-const STORE_PRO = 'pro_analytics';
+export const STORE_PREFS = 'kv_prefs';
+export const STORE_CHAT = 'chat_history';
+export const STORE_PRO = 'pro_analytics';
 const LS_PREFIX = 'meva_kv_v1:';
 const BATCH_FLUSH_MS = 1000; // 1000ms debounced disk flush
 const MAX_MESSAGES_PER_CHANNEL = 100;

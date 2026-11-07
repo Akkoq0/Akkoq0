@@ -13,68 +13,7 @@ import type {
 
 const SEED_ISO = '2026-11-06T19:00:00.000Z';
 
-const DEFAULT_FRIENDS: Friendship[] = [
-  {
-    id: 'f-1',
-    user_id: 'usr-current',
-    friend_id: 'usr-1',
-    status: 'accepted',
-    friend: {
-      id: 'usr-1',
-      username: 'cNed',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'AWP',
-      created_at: SEED_ISO,
-    },
-    created_at: SEED_ISO,
-  },
-  {
-    id: 'f-2',
-    user_id: 'usr-current',
-    friend_id: 'usr-2',
-    status: 'accepted',
-    friend: {
-      id: 'usr-2',
-      username: 'woxic',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'LURKER',
-      created_at: SEED_ISO,
-    },
-    created_at: SEED_ISO,
-  },
-  {
-    id: 'f-3',
-    user_id: 'usr-current',
-    friend_id: 'usr-4',
-    status: 'accepted',
-    friend: {
-      id: 'usr-4',
-      username: 'XANTARES',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'ENTRY',
-      created_at: SEED_ISO,
-    },
-    created_at: SEED_ISO,
-  },
-  {
-    id: 'f-4',
-    user_id: 'usr-current',
-    friend_id: 'usr-3',
-    status: 'accepted',
-    friend: {
-      id: 'usr-3',
-      username: 'Alfajer',
-      avatar_url: null,
-      status: 'online',
-      activity: 'COACH',
-      created_at: SEED_ISO,
-    },
-    created_at: SEED_ISO,
-  },
-];
+const DEFAULT_FRIENDS: Friendship[] = [];
 
 export const useAppStore = create<AppState>((set) => ({
   activeServerId: 'srv-1',
@@ -99,6 +38,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   activeScrimRoom: null,
   showScrimModal: false,
+  showLobbyGate: false,
 
   netGuard: {
     jitterMs: 0.2,
@@ -233,6 +173,8 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveScrimRoom: (room) => set({ activeScrimRoom: room }),
 
   setShowScrimModal: (show) => set({ showScrimModal: show }),
+
+  setShowLobbyGate: (show) => set({ showLobbyGate: show }),
 
   setNetGuard: (stats: Partial<NetGuardStats>) =>
     set((s) => ({ netGuard: { ...s.netGuard, ...stats } })),

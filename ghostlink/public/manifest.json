@@ -1,0 +1,29 @@
+{
+  "name": "Meva HUD — Tactical Esports P2P Command Platform",
+  "short_name": "Meva HUD",
+  "description": "Ultra-lightweight P2P WebRTC tactical voice & chat HUD for competitive esports teams.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0708",
+  "theme_color": "#0B0708",
+  "orientation": "any",
+  "categories": ["games", "utilities", "entertainment"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

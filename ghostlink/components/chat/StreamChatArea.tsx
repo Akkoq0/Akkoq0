@@ -54,49 +54,6 @@ interface SquadOperatorMeta {
   waveSpeed: number;
 }
 
-const SQUAD_OPERATORS: SquadOperatorMeta[] = [
-  {
-    id: 'usr-local',
-    username: 'Operatör',
-    role: 'IGL',
-    roleTone: 'bronze',
-    pingMs: 9,
-    waveSpeed: 1.35,
-  },
-  {
-    id: 'usr-1',
-    username: 'cNed',
-    role: 'AWP',
-    roleTone: 'burgundy',
-    pingMs: 11,
-    waveSpeed: 1.2,
-  },
-  {
-    id: 'usr-4',
-    username: 'XANTARES',
-    role: 'ENTRY',
-    roleTone: 'burgundy',
-    pingMs: 12,
-    waveSpeed: 1.15,
-  },
-  {
-    id: 'usr-2',
-    username: 'woxic',
-    role: 'LURKER',
-    roleTone: 'bronze',
-    pingMs: 14,
-    waveSpeed: 1.45,
-  },
-  {
-    id: 'usr-3',
-    username: 'Alfajer',
-    role: 'COACH',
-    roleTone: 'neutral',
-    pingMs: 13,
-    waveSpeed: 1.55,
-  },
-];
-
 const MESH_NODES: Array<{
   opIndex: number;
   cx: number;
@@ -187,22 +144,22 @@ const CALLOUTS: ReadonlyArray<{
   {
     label: 'Rotate B',
     cue: 'rotate',
-    text: '[TAKTİK ÇAĞRI: ROTATE B] B-Site yönüne hızlı rotasyon, Mid hattından 2 temas var.',
+    text: '[TAKTİK ÇAĞRI: ROTATE B] B-Site yönüne hızlı rotasyon.',
   },
   {
     label: 'Eco',
     cue: 'eco',
-    text: '[ROUND 14 — ECO KARARI] Bu el kredi koruyoruz (min 4100), sonraki tur tam teçhizat.',
+    text: '[ECO KARARI] Bu el kredi koruyoruz, sonraki tur tam teçhizat.',
   },
   {
-    label: 'Drop AWP',
+    label: 'Drop',
     cue: 'drop',
-    text: '[DROP AWP] cNed için birincil Operator / AWP drop gerekiyor, kredisi uygun olan atsın.',
+    text: '[DROP İSTEĞİ] Silah / AWP drop gerekiyor, kredisi uygun olan atsın.',
   },
   {
     label: 'Force',
     cue: 'force',
-    text: '[FORCE BUY] Kritik tur! Tüm krediyle zırh, tüfek ve tam utility çekiyoruz.',
+    text: '[FORCE BUY] Kritik tur! Tam teçhizat çekiyoruz.',
   },
   {
     label: 'GG WP',
@@ -236,6 +193,8 @@ export const StreamChatArea = memo(function StreamChatArea({
   const ecoCpu = useAppStore((s) => s.ecoMode.cpuEstimate);
   const activeScrim = useAppStore((s) => s.activeScrimRoom);
   const mobileTab = useAppStore((s) => s.mobileTab);
+  const voiceParticipants = useAppStore((s) => s.voiceParticipants);
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
   const setActiveDMUser = useAppStore((s) => s.setActiveDMUser);
@@ -466,8 +425,47 @@ export const StreamChatArea = memo(function StreamChatArea({
       Boolean(voiceControls?.isSpeaking) ||
       Boolean(speakingPeers['usr-local']));
 
-  const renderOperatorCards = (mobileComfort: boolean) =>
-    SQUAD_OPERATORS.map((op) => {
+  const activePeers = useMemo(() => {
+    return voiceParticipants.filter(
+      (p) => p.user_id !== 'usr-local' && p.user_id !== userId,
+    );
+  }, [voiceParticipants, userId]);
+
+  const activeSquadOperators = useMemo<SquadOperatorMeta[]>(() => {
+    const list: SquadOperatorMeta[] = [
+      {
+        id: 'usr-local',
+        username: username || 'Operatör',
+        role: operatorRoles['usr-local'] ?? 'IGL',
+        roleTone: 'burgundy',
+        pingMs: 9,
+        waveSpeed: 1.35,
+      },
+    ];
+
+    for (let i = 0; i < activePeers.length && list.length < 5; i++) {
+      const p = activePeers[i];
+      const role = operatorRoles[p.user_id] ?? 'ENTRY';
+      list.push({
+        id: p.user_id,
+        username: p.username || `Operatör #${i + 2}`,
+        role,
+        roleTone:
+          role === 'IGL'
+            ? 'burgundy'
+            : role === 'AWP'
+              ? 'bronze'
+              : 'neutral',
+        pingMs: telemetry.nodes[p.user_id]?.rttMs ?? 11,
+        waveSpeed: 1.2,
+      });
+    }
+
+    return list;
+  }, [username, operatorRoles, activePeers, telemetry.nodes]);
+
+  const renderOperatorCards = (mobileComfort: boolean) => {
+    const cards = activeSquadOperators.map((op) => {
       const isSelf = op.id === 'usr-local';
       const displayName = isSelf ? username : op.username;
       const isMuted = isSelf
@@ -672,6 +670,54 @@ export const StreamChatArea = memo(function StreamChatArea({
       );
     });
 
+    // Render empty slots up to 5
+    for (let i = activeSquadOperators.length; i < 5; i++) {
+      cards.push(
+        <div
+          key={`empty-slot-${i}`}
+          className={`cockpit-pod rounded-xl border border-dashed border-[#2A1319] bg-[#0E0709]/50 ${
+            mobileComfort
+              ? 'p-3.5 gap-2.5 min-h-[140px]'
+              : 'p-3 gap-2 min-h-[130px]'
+          } flex flex-col justify-between items-center text-center`}
+        >
+          <div className="flex flex-col items-center gap-1.5 pt-2">
+            <div className="w-8 h-8 rounded-full border border-dashed border-[#3D1A22] bg-[#1A0B10]/60 flex items-center justify-center text-[#7A5A60]">
+              <span className="text-sm font-bold">+</span>
+            </div>
+            <span className="text-[12px] font-bold text-[#827376]">
+              Operatör Bekleniyor
+            </span>
+            <span className="text-[10px] font-semibold text-[#57484B]">
+              Slot #{i + 1} (Boş)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const code =
+                activeScrim?.code ??
+                activeVoiceChannelId?.replace(/^scrim-/, '') ??
+                'MEVA-8492';
+              const link =
+                typeof window !== 'undefined'
+                  ? `${window.location.origin}/?room=${code}`
+                  : code;
+              void navigator.clipboard.writeText(link);
+              setInviteCopied(true);
+              setTimeout(() => setInviteCopied(false), 2000);
+            }}
+            className="w-full h-7 rounded-lg text-[10.5px] font-extrabold border border-[#3D1A22] bg-[#1A0B10]/80 hover:bg-[#2A0E18] text-[#D65D6E] transition-all flex items-center justify-center gap-1 active:scale-95"
+          >
+            {inviteCopied ? 'Kopyalandı!' : 'Davet Et (+)'}
+          </button>
+        </div>,
+      );
+    }
+
+    return cards;
+  };
+
   const renderMeshSvg = (maxHeightClass: string, idPrefix: string) => (
     <svg
       viewBox="0 0 320 164"
@@ -757,7 +803,32 @@ export const StreamChatArea = memo(function StreamChatArea({
 
       <g fontSize="10" fontWeight="700" fill="#F4EFF0">
         {MESH_NODES.map((node) => {
-          const op = SQUAD_OPERATORS[node.opIndex];
+          const op = activeSquadOperators[node.opIndex];
+          if (!op) {
+            return (
+              <g key={`empty-mesh-${node.opIndex}`} className="opacity-40">
+                <circle
+                  cx={node.cx}
+                  cy={node.cy}
+                  r={node.r}
+                  fill="#15080C"
+                  stroke="#3D121A"
+                  strokeWidth="1.5"
+                  strokeDasharray="2 2"
+                />
+                <text
+                  x={node.tx}
+                  y={node.ty}
+                  textAnchor={node.anchor}
+                  fontSize="9.5"
+                  fontWeight="600"
+                  fill="#7A686B"
+                >
+                  Slot #{node.opIndex + 1}
+                </text>
+              </g>
+            );
+          }
           const isSelf = op.id === 'usr-local';
           const callsign = isSelf ? username : op.username;
           const nodeSpeaking = isSelf
@@ -1204,7 +1275,7 @@ export const StreamChatArea = memo(function StreamChatArea({
               · {activeRoomName}
             </span>
             <span className="inline-flex items-center rounded-md px-2.5 py-0.5 bg-[#190B10] border border-[#7A121D]/45 text-[11px] font-bold text-[#F08C96]">
-              5/5 Aktif · 96 kbps Opus
+              {activeSquadOperators.length}/5 Aktif · 96 kbps Opus
             </span>
           </div>
 
@@ -1531,7 +1602,7 @@ export const StreamChatArea = memo(function StreamChatArea({
           node={telemetry.nodes[inspectedNodeId] ?? null}
           onClose={() => setInspectedNodeId(null)}
           onOpenDspDrawer={(id) => {
-            const op = SQUAD_OPERATORS.find((o) => o.id === id);
+            const op = activeSquadOperators.find((o) => o.id === id);
             if (op) handleInspectOperator(op);
           }}
         />
@@ -1541,7 +1612,7 @@ export const StreamChatArea = memo(function StreamChatArea({
         target={contextTarget}
         onClose={() => setContextTarget(null)}
         onOpenDspDrawer={(id) => {
-          const op = SQUAD_OPERATORS.find((o) => o.id === id);
+          const op = activeSquadOperators.find((o) => o.id === id);
           if (op) handleInspectOperator(op);
         }}
         voiceControls={voiceControls}

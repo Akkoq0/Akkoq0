@@ -105,58 +105,73 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
 
       {/* ── Squad Roster ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3.5 space-y-4">
-        {groups.map(
-          (g) =>
-            g.members.length > 0 && (
-              <section key={g.key} className="space-y-1.5">
-                <h4 className="px-1.5 flex items-center justify-between text-[11px] font-semibold text-[#8E7E81]">
-                  <span className="flex items-center gap-2">
-                    <span
-                      aria-hidden
-                      className={`w-1.5 h-1.5 rounded-full ${g.dot}`}
-                    />
-                    <span>{g.title}</span>
-                  </span>
-                  <span className="text-[#C82333]">{g.members.length}</span>
-                </h4>
-
-                <div className="space-y-1.5">
-                  {g.members.map((m) => (
-                    <button
-                      type="button"
-                      key={m.id}
-                      onClick={() => select(m)}
-                      onContextMenu={(e) => {
-                        if (onContextMenuPlayer) {
-                          e.preventDefault();
-                          onContextMenuPlayer(m, e.clientX, e.clientY);
-                        }
-                      }}
-                      className="group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
-                    >
-                      <OperatorAvatar
-                        name={m.username}
-                        status={m.status}
-                        size="sm"
+        {onlineMembers.length === 0 ? (
+          <div className="py-8 px-2 flex flex-col items-center justify-center text-center gap-2 text-[#8E7E81]">
+            <div className="w-10 h-10 rounded-full border border-dashed border-[#3D141F] bg-[#160A0E] flex items-center justify-center text-[#D65D6E]">
+              <IconRadar size={18} />
+            </div>
+            <span className="text-[12px] font-bold text-[#F4EFF0]">
+              Lobi Bekleniyor
+            </span>
+            <span className="text-[11px] text-[#7A686B] leading-relaxed">
+              Odaya henüz başka operatör katılmadı. Üst bardan davet kodunu
+              paylaşabilirsiniz.
+            </span>
+          </div>
+        ) : (
+          groups.map(
+            (g) =>
+              g.members.length > 0 && (
+                <section key={g.key} className="space-y-1.5">
+                  <h4 className="px-1.5 flex items-center justify-between text-[11px] font-semibold text-[#8E7E81]">
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className={`w-1.5 h-1.5 rounded-full ${g.dot}`}
                       />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F28C96] transition-colors">
-                          {m.username}
-                        </span>
-                        {m.activity && (
-                          <span className="block truncate text-[11px] text-[#8E7E81] mt-0.5">
-                            {m.activity}
+                      <span>{g.title}</span>
+                    </span>
+                    <span className="text-[#C82333]">{g.members.length}</span>
+                  </h4>
+
+                  <div className="space-y-1.5">
+                    {g.members.map((m) => (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => select(m)}
+                        onContextMenu={(e) => {
+                          if (onContextMenuPlayer) {
+                            e.preventDefault();
+                            onContextMenuPlayer(m, e.clientX, e.clientY);
+                          }
+                        }}
+                        className="group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
+                      >
+                        <OperatorAvatar
+                          name={m.username}
+                          status={m.status}
+                          size="sm"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F28C96] transition-colors">
+                            {m.username}
                           </span>
-                        )}
-                      </span>
-                      <span className="rounded-md px-2 py-0.5 bg-[#0D080A] border border-[#2B1319] text-[10.5px] font-bold text-[#C9B8BB] tabular-nums">
-                        {telemetry.nodes[m.id]?.rttMs ?? PING_MAP[m.id] ?? 12}ms
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ),
+                          {m.activity && (
+                            <span className="block truncate text-[11px] text-[#8E7E81] mt-0.5">
+                              {m.activity}
+                            </span>
+                          )}
+                        </span>
+                        <span className="rounded-md px-2 py-0.5 bg-[#0D080A] border border-[#2B1319] text-[10.5px] font-bold text-[#C9B8BB] tabular-nums">
+                          {telemetry.nodes[m.id]?.rttMs ?? PING_MAP[m.id] ?? 12}ms
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ),
+          )
         )}
       </div>
 

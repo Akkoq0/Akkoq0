@@ -85,6 +85,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const setActiveServer = useAppStore((s) => s.setActiveServer);
   const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
   const setShowScrimModal = useAppStore((s) => s.setShowScrimModal);
+  const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
   const setShowFriendsModal = useAppStore((s) => s.setShowFriendsModal);
   const toggleRadar = useAppStore((s) => s.toggleRadar);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
@@ -197,7 +198,8 @@ export const GhostNavbar = memo(function GhostNavbar() {
 
         <button
           type="button"
-          onClick={() => setShowScrimModal(true)}
+          onClick={() => setShowLobbyGate(true)}
+          title="Taktik Lobi Kur veya Koda Göre Katıl"
           className={`hidden lg:flex rounded-xl h-9 px-3.5 items-center gap-2 text-[#F4EFF0] text-[12px] font-bold transition-all active:scale-[0.97] ${
             activeScrim
               ? 'bg-[#2A0E16] border border-[#C82333]/55'
@@ -205,7 +207,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
           }`}
         >
           <IconBolt size={14} className="text-[#F5B5BC]" />
-          <span>{activeScrim ? `Scrim #${activeScrim.code}` : 'Scrim Odası'}</span>
+          <span>{activeScrim ? `Lobi #${activeScrim.code}` : 'Taktik Lobi'}</span>
         </button>
 
         <CommandButton

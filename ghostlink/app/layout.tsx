@@ -9,7 +9,16 @@ export const metadata: Metadata = {
   title: 'Meva HUD — Tactical Esports P2P Command Platform',
   description:
     'Ultra-lightweight P2P WebRTC tactical voice & chat HUD for competitive esports teams.',
-  icons: { icon: '/favicon.ico' },
+  manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icon-192.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Meva HUD',
+  },
 };
 
 export const viewport: Viewport = {

@@ -28,6 +28,9 @@ import { TacticalPlayerHUD } from '@/components/ui/TacticalPlayerHUD';
 import { FriendsModal } from '@/components/ui/FriendsModal';
 import { TacticalStratDrawer } from '@/components/tactical/TacticalStratDrawer';
 import { MiniHudOverlay } from '@/components/hud/MiniHudOverlay';
+import { LobbyGateModal } from '@/components/lobby/LobbyGateModal';
+import { type TacticalRole } from '@/store/useHUDStore';
+import { STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
   Profile,
   Server,
@@ -136,17 +139,12 @@ const DEFAULT_CHANNELS: Record<string, Channel[]> = {
   ],
 };
 
-const DEFAULT_MEMBERS: Profile[] = [
-  { id: 'usr-1', username: 'cNed', avatar_url: null, status: 'in-game', activity: 'AWP', created_at: SEED_ISO },
-  { id: 'usr-2', username: 'woxic', avatar_url: null, status: 'in-game', activity: 'LURKER', created_at: SEED_ISO },
-  { id: 'usr-4', username: 'XANTARES', avatar_url: null, status: 'online', activity: 'ENTRY', created_at: SEED_ISO },
-  { id: 'usr-3', username: 'Alfajer', avatar_url: null, status: 'idle', activity: 'COACH', created_at: SEED_ISO },
-];
+const DEFAULT_MEMBERS: Profile[] = [];
 
 export default function MevaHUDApp() {
   useGameBoost();
 
-  const [user] = useState<Profile>({
+  const [user, setUser] = useState<Profile>({
     id: 'usr-local',
     username: 'Operatör',
     avatar_url: null,
@@ -165,6 +163,8 @@ export default function MevaHUDApp() {
   const isMobileRadarOpen = useAppStore((s) => s.isMobileRadarOpen);
   const showScrimModal = useAppStore((s) => s.showScrimModal);
   const showFriendsModal = useAppStore((s) => s.showFriendsModal);
+  const showLobbyGate = useAppStore((s) => s.showLobbyGate);
+  const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -192,15 +192,50 @@ export default function MevaHUDApp() {
     useThemeStore.getState().applyCSSVariables();
     const storage = getMevaStorageEngine();
     void storage.hydrateAndBindStores();
+
+    // Check saved operator identity from IndexedDB
+    void storage
+      .getRecord<{ callsign: string; role: TacticalRole }>(
+        STORE_PREFS,
+        'operator_identity',
+      )
+      .then((saved) => {
+        if (saved?.callsign) {
+          setUser((prev) => ({ ...prev, username: saved.callsign }));
+        } else {
+          setShowLobbyGate(true);
+        }
+      });
+
     return () => {
       storage.disposeBindings();
     };
-  }, []);
+  }, [setShowLobbyGate]);
 
-  // Auto-join P2P room when opened via serverless URL Hash (#meva=...)
+  // Auto-join P2P room when opened via serverless URL Hash (#meva=...) or Query Param (?room=MEVA-XXXX)
   useEffect(() => {
     const consumeHashInvite = () => {
       if (typeof window === 'undefined') return;
+
+      // 1. Check Query Param (?room=MEVA-XXXX)
+      const params = new URLSearchParams(window.location.search);
+      const queryRoom = params.get('room');
+      if (queryRoom && /^MEVA-[A-Za-z0-9_-]+$/i.test(queryRoom)) {
+        const upper = queryRoom.toUpperCase();
+        useAppStore.getState().setActiveScrimRoom({
+          code: upper,
+          name: `Taktik Lobi ${upper}`,
+          created_by: 'peer-remote',
+          password: null,
+          max_participants: 5,
+          created_at: Date.now(),
+          ttl: 3 * 60 * 60 * 1000,
+        });
+        useAppStore.getState().setActiveVoiceChannel(`scrim-${upper}`);
+        return;
+      }
+
+      // 2. Check Serverless Hash (#meva=...)
       const invite = parseServerlessInviteHash(window.location.hash);
       if (!invite) return;
       useAppStore.getState().setActiveScrimRoom({
@@ -245,6 +280,7 @@ export default function MevaHUDApp() {
         setRadarContextTarget(null);
         useAppStore.getState().setShowScrimModal(false);
         useAppStore.getState().setShowFriendsModal(false);
+        useAppStore.getState().setShowLobbyGate(false);
         useAppStore.getState().setIsMobileSidebarOpen(false);
         useAppStore.getState().setIsMobileRadarOpen(false);
         useThemeStore.getState().setShowThemeModal(false);
@@ -450,13 +486,36 @@ export default function MevaHUDApp() {
       {showCommandSettingsModal && <MevaCommandSettingsModal />}
       {showStratBoard && <TacticalStratDrawer />}
       {showFriendsModal && <FriendsModal />}
+      {showLobbyGate && (
+        <LobbyGateModal
+          isOpen={showLobbyGate}
+          onClose={() => setShowLobbyGate(false)}
+          onJoinedRoom={(_code, name) => {
+            setUser((prev) => ({ ...prev, username: name }));
+          }}
+        />
+      )}
       {radarContextTarget && (
         <OperatorContextMenu
           target={radarContextTarget}
           onClose={() => setRadarContextTarget(null)}
           onOpenDspDrawer={(id) => {
-            const found = DEFAULT_MEMBERS.find((m) => m.id === id);
-            if (found) setSelectedPlayer(found);
+            const found =
+              id === 'usr-local'
+                ? user
+                : useAppStore
+                    .getState()
+                    .onlineMembers.find((m) => m.id === id);
+            setSelectedPlayer(
+              found ?? {
+                id,
+                username: id === 'usr-local' ? user.username : 'Operatör',
+                avatar_url: null,
+                status: 'in-game',
+                activity: 'ENTRY',
+                created_at: SEED_ISO,
+              },
+            );
           }}
           voiceControls={voiceControls}
         />

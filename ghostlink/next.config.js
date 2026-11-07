@@ -7,6 +7,10 @@ function buildConnectSrc() {
     "'self'",
     'https://*.supabase.co',
     'wss://*.supabase.co',
+    'wss://broker.emqx.io:8084',
+    'wss://broker.hivemq.com:8884',
+    'wss:',
+    'ws:',
   ]);
   if (!isProd) {
     sources.add('ws:');

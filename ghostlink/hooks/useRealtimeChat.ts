@@ -29,165 +29,9 @@ function inferCalloutCue(content: string): CalloutCueType | undefined {
 
 const BASE_PROFILE_ISO = '2026-11-06T19:00:00.000Z';
 
-export const INITIAL_TACTICAL_MESSAGES: Message[] = [
-  {
-    id: 'msg-tac-1',
-    channel_id: 'ch-2',
-    author_id: 'usr-local',
-    content:
-      '[ROUND 14 — ECO KARARI] Bu el tam eco, kredi koruyoruz (min 4100). Sadece Sheriff ile Mid-Market info alıyoruz; 15. roundda çift Operator + tam utility ile çıkacağız.',
-    created_at: '2026-11-06T19:42:10.000Z',
-    author: {
-      id: 'usr-local',
-      username: 'Operatör',
-      avatar_url: null,
-      status: 'online',
-      activity: 'IGL',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-  {
-    id: 'msg-tac-2',
-    channel_id: 'ch-2',
-    author_id: 'usr-5',
-    content:
-      '[SESLİ BRİFİNG · 0:08] Ascent B-Main retake zamanlaması: Killjoy ultisi kurulduğu an Sova recon oku arka duvara düşecek, 1.5 saniye sonra ikili flash ile giriş yapıyoruz.',
-    created_at: '2026-11-06T19:44:05.000Z',
-    author: {
-      id: 'usr-5',
-      username: 'AimCoach_Mert',
-      avatar_url: null,
-      status: 'online',
-      activity: 'COACH',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-  {
-    id: 'msg-tac-3',
-    channel_id: 'ch-2',
-    author_id: 'usr-1',
-    content:
-      '[TAKTİK ÇAĞRI: ROTATE B] A-Main tamamen temiz, Operator ile Mid-Cubby hattını kilitledim. 3 ayak sesi B-Lobby yönüne kaydı, hızlı rotasyon!',
-    created_at: '2026-11-06T19:45:42.000Z',
-    author: {
-      id: 'usr-1',
-      username: 'cNed',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'AWP',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-  {
-    id: 'msg-tac-4',
-    channel_id: 'ch-2',
-    author_id: 'usr-4',
-    content:
-      '[GİRİŞ KOORDİNASYONU] B-Main boğazına tek yön duman + çift flash hazır. Komutla birlikte 3-2-1 patlatıp site içine sızıyoruz, takaslara yakın durun.',
-    created_at: '2026-11-06T19:46:55.000Z',
-    author: {
-      id: 'usr-4',
-      username: 'XANTARES',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'ENTRY',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-  {
-    id: 'msg-tac-5',
-    channel_id: 'ch-2',
-    author_id: 'usr-2',
-    content:
-      '[CLUTCH RAPORU — 2v2] Spike B-Default konumuna kuruldu. CT-Spawn ve Market penceresini çapraz ateşe aldık, pozisyon bozmadan süreyi oynuyoruz.',
-    created_at: '2026-11-06T19:48:18.000Z',
-    author: {
-      id: 'usr-2',
-      username: 'woxic',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'LURKER',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-  {
-    id: 'msg-tac-6',
-    channel_id: 'ch-2',
-    author_id: 'usr-3',
-    content:
-      '[SAVUNMA KİLİDİ] Lockdown ultisi %100 hazır. Rakip retake denediği an B-Boathouse köşesinden cihazı aktif ediyorum, herkes geri çekilip süreyi eritsin.',
-    created_at: '2026-11-06T19:49:30.000Z',
-    author: {
-      id: 'usr-3',
-      username: 'Alfajer',
-      avatar_url: null,
-      status: 'in-game',
-      activity: 'COACH',
-      created_at: BASE_PROFILE_ISO,
-    },
-  },
-];
+export const INITIAL_TACTICAL_MESSAGES: Message[] = [];
 
-const SEED_BY_CHANNEL: Record<string, Message[]> = {
-  'ch-1': [
-    {
-      id: 'msg-ch1-1',
-      channel_id: 'ch-1',
-      author_id: 'usr-5',
-      content:
-        "[TURNUVA DUYURUSU] VCT EMEA Kapalı Eleme Scrim bloğu saat 20:00'de başlıyor. Tüm kadro Taktik Lobi #1 frekansında (96kbps Opus P2P) hazır bulunsun.",
-      created_at: '2026-11-06T19:38:00.000Z',
-      author: {
-        id: 'usr-5',
-        username: 'AimCoach_Mert',
-        avatar_url: null,
-        status: 'online',
-        activity: 'Baş Antrenör',
-        created_at: BASE_PROFILE_ISO,
-      },
-    },
-    ...INITIAL_TACTICAL_MESSAGES.slice(0, 4),
-  ],
-  'ch-2': INITIAL_TACTICAL_MESSAGES,
-  'ch-3': [
-    {
-      id: 'msg-ch3-1',
-      channel_id: 'ch-3',
-      author_id: 'usr-1',
-      content:
-        '[SCRIM ARAMA — BO3] Saat 21:00 için Ascent / Bind / Lotus BO3 antrenman maçı arıyoruz. Sunucu: Frankfurt / İstanbul P2P (11ms).',
-      created_at: '2026-11-06T19:40:15.000Z',
-      author: {
-        id: 'usr-1',
-        username: 'cNed',
-        avatar_url: null,
-        status: 'in-game',
-        activity: 'AWP',
-        created_at: BASE_PROFILE_ISO,
-      },
-    },
-    ...INITIAL_TACTICAL_MESSAGES.slice(2),
-  ],
-  'ch-vod': [
-    {
-      id: 'msg-vod-1',
-      channel_id: 'ch-vod',
-      author_id: 'usr-3',
-      content:
-        '[SESLİ BRİFİNG · 0:14] FUT vs Fnatic Lotus haritası C-Bend savunma dizilimi ve erken rotasyon zamanlamaları analiz kaydı.',
-      created_at: '2026-11-06T19:41:00.000Z',
-      author: {
-        id: 'usr-3',
-        username: 'Alfajer',
-        avatar_url: null,
-        status: 'in-game',
-        activity: 'ANCHOR · Analiz',
-        created_at: BASE_PROFILE_ISO,
-      },
-    },
-    ...INITIAL_TACTICAL_MESSAGES.slice(1, 5),
-  ],
-};
+const SEED_BY_CHANNEL: Record<string, Message[]> = {};
 
 export function useRealtimeChat(channelId: string | null) {
   const addMessage = useAppStore((s) => s.addMessage);
@@ -200,51 +44,19 @@ export function useRealtimeChat(channelId: string | null) {
 
   useEffect(() => {
     if (activeDMUserId) {
-      const currentFriends = useAppStore.getState().friends;
-      const targetFriend = currentFriends.find(
-        (f) => f.friend_id === activeDMUserId,
-      )?.friend;
-      const friendName = targetFriend?.username ?? 'Operatör';
-      setMessages([
-        {
-          id: `dm-seed-1-${activeDMUserId}`,
-          channel_id: effectiveTargetId,
-          author_id: activeDMUserId,
-          content:
-            '[DOĞRUDAN P2P HAT] Selam komutan, 1v1 şifreli ses ve metin hattı aktif (11ms). Maç öncesi taktik üzerinden geçelim mi?',
-          created_at: '2026-11-06T19:46:00.000Z',
-          author: targetFriend ?? {
-            id: activeDMUserId,
-            username: friendName,
-            avatar_url: null,
-            status: 'in-game',
-            activity: 'Doğrudan P2P Bağlantı',
-            created_at: BASE_PROFILE_ISO,
-          },
-        },
-        {
-          id: `dm-seed-2-${activeDMUserId}`,
-          channel_id: effectiveTargetId,
-          author_id: 'usr-local',
-          content:
-            '[ONAYLANDI] Taktik Lobi #1 frekansına geçiyorum, harita dizilimini orada netleştirelim.',
-          created_at: '2026-11-06T19:48:00.000Z',
-          author: {
-            id: 'usr-local',
-            username: 'Operatör',
-            avatar_url: null,
-            status: 'online',
-            activity: 'IGL · Taktik Komuta',
-            created_at: BASE_PROFILE_ISO,
-          },
-        },
-      ]);
+      setMessages([]);
+      let disposed = false;
+      void getMevaStorageEngine()
+        .loadChannelMessages(effectiveTargetId)
+        .then((persisted) => {
+          if (!disposed && persisted && persisted.length > 0) {
+            setMessages(persisted);
+          }
+        });
       return;
     }
 
-    const seeded =
-      SEED_BY_CHANNEL[effectiveTargetId] ?? INITIAL_TACTICAL_MESSAGES;
-    setMessages(seeded);
+    setMessages([]);
 
     let disposed = false;
     void getMevaStorageEngine()
