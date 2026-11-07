@@ -22,9 +22,15 @@ import {
   configureOpusSender,
   applyAdaptiveReceiverBuffer,
 } from '@/lib/opus-sdp';
-import { MevaSpatialAudioEngine } from '@/lib/spatial-audio-engine';
+import {
+  MevaSpatialAudioEngine,
+  getMevaAudioEngine,
+} from '@/lib/spatial-audio-engine';
+import { getMevaVadEngine } from '@/src/lib/vadEngine';
+import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
 import { useAppStore } from '@/lib/store';
 import { useHUDStore } from '@/store/useHUDStore';
+import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { SignalPayload, VoicePresence, NetGuardStats } from '@/types';
 
@@ -250,7 +256,7 @@ export function useWebRTC({
 
   const getAudioEngine = useCallback((): MevaSpatialAudioEngine => {
     if (!audioEngineRef.current) {
-      audioEngineRef.current = new MevaSpatialAudioEngine();
+      audioEngineRef.current = getMevaAudioEngine();
     }
     return audioEngineRef.current;
   }, []);
@@ -269,10 +275,10 @@ export function useWebRTC({
     }
   }, [playerGains, localMutes, spatialPans, isDeafened]);
 
-  // Dispose Web Audio context completely when hook unmounts
+  // Detach hook reference cleanly when unmounted without closing shared singleton AudioContext
   useEffect(() => {
     return () => {
-      audioEngineRef.current?.dispose();
+      audioEngineRef.current?.detachLocalMic();
       audioEngineRef.current = null;
     };
   }, []);
@@ -591,6 +597,8 @@ export function useWebRTC({
 
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    getMevaVadEngine().releaseStreamNodes();
+    getMevaWebRTCMesh().leaveRoom();
 
     stopVAD();
     stopNetGuard();
@@ -625,24 +633,21 @@ export function useWebRTC({
     setConnectionState('connecting');
 
     try {
-      if (
-        typeof navigator !== 'undefined' &&
-        navigator.mediaDevices?.getUserMedia
-      ) {
-        const stream =
-          await navigator.mediaDevices.getUserMedia(AUDIO_CONSTRAINTS);
-        // Guard against unmount or rapid channel switch while awaiting permission
-        if (currentGen !== joinGenRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        for (const track of stream.getAudioTracks()) {
-          track.enabled = !isMutedRef.current;
+      const preferredDevice = useVoiceSettingsStore.getState().inputDeviceId;
+      const gatedStream =
+        await getMevaVadEngine().acquireMicrophoneStream(preferredDevice);
+      if (currentGen !== joinGenRef.current) {
+        getMevaVadEngine().releaseStreamNodes();
+        return;
+      }
+      if (gatedStream) {
+        getMevaVadEngine().setHardMuted(isMutedRef.current);
+        for (const track of gatedStream.getAudioTracks()) {
           if ('contentHint' in track) {
             track.contentHint = 'speech';
           }
         }
-        localStreamRef.current = stream;
+        localStreamRef.current = gatedStream;
         startVAD();
       }
     } catch {
@@ -660,6 +665,14 @@ export function useWebRTC({
       is_deafened: isDeafenedRef.current,
       is_speaking: false,
     };
+
+    // Always engage serverless BroadcastChannel + Full-Mesh WebRTC core
+    getMevaWebRTCMesh().joinRoom(
+      safeChannelKey,
+      username,
+      useHUDStore.getState().operatorRoles['usr-local'] ?? 'IGL',
+      localStreamRef.current,
+    );
 
     syncParticipants([selfPresence, ...SQUAD_PEERS]);
     setConnectionState('connected');
@@ -856,6 +869,7 @@ export function useWebRTC({
   const toggleMute = useCallback(() => {
     const nextMuted = !isMuted;
     setIsMuted(nextMuted);
+    getMevaVadEngine().setHardMuted(nextMuted);
 
     if (localStreamRef.current) {
       for (const track of localStreamRef.current.getAudioTracks()) {

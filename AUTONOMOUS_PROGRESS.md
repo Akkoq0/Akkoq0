@@ -11,9 +11,9 @@
 | :--- | :--- | :---: | :---: | :---: |
 | **FAZ 0** | Codespaces Keep-Alive & `AUTONOMOUS_PROGRESS.md` | TAMAMLANDI | OK | OK |
 | **FAZ 1** | Profesyonel WebAudio DSP & 3D Konumsal Ses Motoru (`ghostlink/src/lib/audioEngine.ts`) | TAMAMLANDI | OK | `f80c1d2` |
-| **FAZ 2** | Akıllı Gürültü Engelleme (Noise Gate), VAD & PTT Motoru (`ghostlink/src/lib/vadEngine.ts`) | TAMAMLANDI | OK | Commit/Push |
-| **FAZ 3** | WebRTC Full-Mesh P2P Çekirdeği, Opus 48kHz SDP & Sunucusuz Sinyalizasyon (`ghostlink/src/lib/webrtcMesh.ts`) | DEVAM EDİYOR | - | - |
-| **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | BEKLİYOR | - | - |
+| **FAZ 2** | Akıllı Gürültü Engelleme (Noise Gate), VAD & PTT Motoru (`ghostlink/src/lib/vadEngine.ts`) | TAMAMLANDI | OK | `a03b1a0` |
+| **FAZ 3** | WebRTC Full-Mesh P2P Çekirdeği, Opus 48kHz SDP & Sunucusuz Sinyalizasyon (`ghostlink/src/lib/webrtcMesh.ts`) | TAMAMLANDI | OK | Commit/Push |
+| **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | DEVAM EDİYOR | - | - |
 | **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | BEKLİYOR | - | - |
 | **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | BEKLİYOR | - | - |
 | **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | BEKLİYOR | - | - |
@@ -24,6 +24,8 @@
 ## Tamamlanan Teknik Çıktılar
 - **FAZ 0:** Keep-alive arka plan döngüsü (`/tmp/keepalive.txt`) ve otonom checkpoint sistemi devreye alındı.
 - **FAZ 1 (`ghostlink/src/lib/audioEngine.ts`):** 48kHz WebAudio DSP hattı (`High-Pass 85Hz`, `Presence 3.5kHz`, `DynamicsCompressor` Auto-Leveler, `%0-%200` logaritmik `GainNode`, `%30 IGL Ducking`, `StereoPannerNode` `L:-1/C:0/R:+1`, `FFT 256` çift harmonik dalga) kuruldu.
-- **FAZ 2 (`ghostlink/src/lib/vadEngine.ts`, `ghostlink/store/useVoiceSettingsStore.ts`):**
-  - Mekanik klavye switch ve fan gürültüsünü kesen vokal-spektral oran filtreli gerçek **Noise Gate** (`thresholdDb`, `attackMs`, `holdMs`, `releaseMs`, histerezis) `MediaStreamAudioDestinationNode` üzerine kuruldu.
-  - **VAD** ve özelleştirilebilir tuş atamalı **PTT** (`KeyV` varsayılan + WebAudio sentezli akustik tetikleme mikro-bipi) gerçek `getUserMedia` akışına bağlandı.
+- **FAZ 2 (`ghostlink/src/lib/vadEngine.ts`):** Mekanik klavye ve fan seslerini kesen spektral oranlı **Noise Gate**, **VAD** ve akustik mikro-bipli **PTT** motoru kuruldu.
+- **FAZ 3 (`ghostlink/src/lib/webrtcMesh.ts`, `ghostlink/lib/opus-sdp.ts`):**
+  - Çoklu STUN havuzu (Google, Cloudflare, Twilio), RFC 8829 Perfect Negotiation, otomatik üstel geri çekilmeli `restartIce()` ve çift `RTCDataChannel` (`meva-e2ee-bus` sıralı + `meva-fast-udp` sırasız 0-tekrar) içeren 5-operatör Full-Mesh WebRTC çekirdeği kodlandı.
+  - `opus-sdp.ts` Opus **48kHz, Stereo (`stereo=1;sprop-stereo=1`), 96kbps, FEC=1, DTX=1, ptime=10ms** ve birincil payload önceliğine yükseltildi.
+  - Sunucusuz `BroadcastChannel` sinyalizasyonu + `#meva=...` URL Hash ve SVG QR kod davet üreteci `ScrimModal` ve `app/page.tsx` içine entegre edildi.

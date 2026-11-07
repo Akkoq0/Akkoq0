@@ -9,6 +9,7 @@ import { useAppStore } from '@/lib/store';
 import { useThemeStore, sanitizeWallpaperUrl } from '@/store/useThemeStore';
 import { useGameBoost } from '@/hooks/useGameBoost';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { parseServerlessInviteHash } from '@/src/lib/webrtcMesh';
 import { GhostNavbar } from '@/components/layout/GhostNavbar';
 import { TacticalSidebar } from '@/components/layout/TacticalSidebar';
 import { StreamChatArea } from '@/components/chat/StreamChatArea';
@@ -170,6 +171,28 @@ export default function MevaHUDApp() {
 
   useEffect(() => {
     useThemeStore.getState().applyCSSVariables();
+  }, []);
+
+  // Auto-join P2P room when opened via serverless URL Hash (#meva=...)
+  useEffect(() => {
+    const consumeHashInvite = () => {
+      if (typeof window === 'undefined') return;
+      const invite = parseServerlessInviteHash(window.location.hash);
+      if (!invite) return;
+      useAppStore.getState().setActiveScrimRoom({
+        code: invite.roomCode,
+        name: invite.roomName,
+        created_by: invite.hostPeerId,
+        password: null,
+        max_participants: 10,
+        created_at: invite.createdAt,
+        ttl: 2 * 60 * 60 * 1000,
+      });
+      useAppStore.getState().setActiveVoiceChannel(`scrim-${invite.roomCode}`);
+    };
+    consumeHashInvite();
+    window.addEventListener('hashchange', consumeHashInvite);
+    return () => window.removeEventListener('hashchange', consumeHashInvite);
   }, []);
 
   // Global ESC handler to dismiss active modals & drawers cleanly

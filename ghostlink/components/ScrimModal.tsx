@@ -4,12 +4,17 @@
 // Meva HUD — Ephemeral P2P Scrim Command Modal (CSPRNG)
 // ─────────────────────────────────────────────────────────
 
-import { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 import {
   generateSecureScrimCode,
   sanitizeScrimCode,
 } from '@/hooks/useScrimLink';
+import {
+  buildServerlessInviteLink,
+  generateTacticalQrMatrix,
+  getMevaWebRTCMesh,
+} from '@/src/lib/webrtcMesh';
 import { IconBolt, IconClose, IconShield } from '@/components/ui/MevaIcons';
 import type { ScrimRoom } from '@/types';
 
@@ -85,19 +90,36 @@ export const ScrimModal = memo(function ScrimModal() {
     setShowModal(false);
   }, [joinCode, setActiveScrimRoom, setActiveVoiceChannel, setShowModal]);
 
-  const handleCopyLink = useCallback(async () => {
-    if (!activeScrim) return;
+  const inviteUrl = useMemo(() => {
+    if (!activeScrim) return '';
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : 'https://meva.hud';
     const safeCode = sanitizeScrimCode(activeScrim.code);
-    const url = `${window.location.origin}/scrim/${encodeURIComponent(safeCode)}`;
+    return buildServerlessInviteLink(origin, {
+      roomCode: safeCode,
+      roomName: activeScrim.name,
+      hostPeerId: getMevaWebRTCMesh().getLocalPeerId(),
+      hostName: 'Operatör',
+      createdAt: activeScrim.created_at,
+    });
+  }, [activeScrim]);
+
+  const qrMatrix = useMemo(
+    () => (inviteUrl ? generateTacticalQrMatrix(inviteUrl, 21) : null),
+    [inviteUrl],
+  );
+
+  const handleCopyLink = useCallback(async () => {
+    if (!activeScrim || !inviteUrl) return;
     try {
-      await navigator.clipboard?.writeText(url);
+      await navigator.clipboard?.writeText(inviteUrl);
       setCopied(true);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       // Ignore clipboard permission rejection in restricted WebViews
     }
-  }, [activeScrim]);
+  }, [activeScrim, inviteUrl]);
 
   const handleDestroy = useCallback(() => {
     setActiveScrimRoom(null);
@@ -152,13 +174,46 @@ export const ScrimModal = memo(function ScrimModal() {
                 </span>
               </div>
 
-              <div className="rounded-xl py-3.5 text-center bg-[#090608] border border-[#881A26]/20">
-                <p className="text-[10px] font-semibold text-[#8E7F83] uppercase tracking-wider mb-1">
-                  Frekans Erişim Kodu
-                </p>
-                <p className="text-2xl font-mono font-extrabold tracking-[0.28em] text-[#F08C96]">
-                  {activeScrim.code}
-                </p>
+              <div className="rounded-xl p-3.5 bg-[#090608] border border-[#881A26]/20 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold text-[#8E7F83] uppercase tracking-wider mb-1">
+                    Frekans Erişim Kodu & QR Köprüsü
+                  </p>
+                  <p className="text-2xl font-mono font-extrabold tracking-[0.28em] text-[#F08C96]">
+                    {activeScrim.code}
+                  </p>
+                  <p className="text-[10px] text-[#8E7F83] truncate mt-1.5 font-mono">
+                    {inviteUrl}
+                  </p>
+                </div>
+
+                {qrMatrix && (
+                  <div
+                    className="rounded-lg p-1.5 bg-[#F4EFF0] border border-[#A61B29]/45 flex-shrink-0"
+                    title="Sunucusuz P2P Oda Davet Kodu"
+                  >
+                    <svg
+                      viewBox={`0 0 ${qrMatrix.length} ${qrMatrix.length}`}
+                      className="w-16 h-16 block"
+                      shapeRendering="crispEdges"
+                    >
+                      {qrMatrix.map((row, ry) =>
+                        row.map((cell, rx) =>
+                          cell ? (
+                            <rect
+                              key={`${rx}-${ry}`}
+                              x={rx}
+                              y={ry}
+                              width={1}
+                              height={1}
+                              fill="#0A0708"
+                            />
+                          ) : null,
+                        ),
+                      )}
+                    </svg>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between text-xs text-[#8E7F83]">

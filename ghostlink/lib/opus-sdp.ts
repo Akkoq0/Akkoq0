@@ -1,33 +1,46 @@
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Opus 48kHz Tactical SDP & RTP Transport Optimizer
+// Meva HUD — Opus 48kHz Stereo Low-Latency SDP Optimizer
 // ─────────────────────────────────────────────────────────
-// Enforces fullband 48kHz Opus @ 96kbps, 10ms low-latency packet
-// framing (ptime=10), In-Band Forward Error Correction (FEC), and
-// Discontinuous Transmission (DTX) with zero external dependencies.
+// Enforces fullband 48kHz Stereo Opus @ 96kbps, 10ms ultra-low-latency
+// framing (ptime=10, minptime=10), In-Band Forward Error Correction (FEC),
+// and Discontinuous Transmission (DTX) with SDP injection hardening.
 
 export const OPUS_TARGET_BITRATE = 96_000;
 export const OPUS_SAMPLE_RATE = 48_000;
 
-const OPUS_TACTICAL_PARAMS: Record<string, string> = {
-  minptime: '10',
-  useinbandfec: '1',
-  usedtx: '1',
-  maxaveragebitrate: String(OPUS_TARGET_BITRATE),
-  maxplaybackrate: String(OPUS_SAMPLE_RATE),
-  stereo: '0',
-  'sprop-stereo': '0',
-};
+export interface TuneOpusOptions {
+  stereo?: boolean;
+  bitrate?: number;
+  ptimeMs?: 10 | 20;
+}
 
 const SAFE_FMTP_KEY_RE = /^[a-z0-9-]+$/i;
 const SAFE_FMTP_VAL_RE = /^[A-Za-z0-9._-]+$/;
 
 /**
- * Rewrites SDP offer/answer to lock Opus 48kHz into ultra-low-latency
- * 10ms tactical framing with In-Band FEC & DTX enabled.
- * Sanitizes untrusted fmtp parameters to prevent SDP attribute/CRLF injection.
+ * Rewrites SDP offer/answer to lock Opus 48kHz Stereo @ 96kbps with
+ * FEC=1, DTX=1, and 10ms framing (ptime=10), promoting Opus to first
+ * codec priority on the m=audio media line.
  */
-export function tuneOpusSdp(sdp: string): string {
+export function tuneOpusSdp(sdp: string, options: TuneOpusOptions = {}): string {
   if (!sdp) return sdp;
+
+  const stereoFlag = options.stereo === false ? '0' : '1';
+  const bitrate = Math.max(
+    24_000,
+    Math.min(256_000, options.bitrate ?? OPUS_TARGET_BITRATE),
+  );
+  const ptime = options.ptimeMs ?? 10;
+
+  const tacticalParams: Record<string, string> = {
+    minptime: String(ptime),
+    useinbandfec: '1',
+    usedtx: '1',
+    stereo: stereoFlag,
+    'sprop-stereo': stereoFlag,
+    maxaveragebitrate: String(bitrate),
+    maxplaybackrate: String(OPUS_SAMPLE_RATE),
+  };
 
   const lines = sdp
     .replace(/[^\x20-\x7E\r\n]/g, '')
@@ -47,11 +60,26 @@ export function tuneOpusSdp(sdp: string): string {
   const fmtpPrefix = `a=fmtp:${opusPayloadType} `;
   let fmtpFound = false;
   let hasPtime = false;
+  let hasMaxPtime = false;
 
   const updated = lines.map((line) => {
+    // Promote Opus payload type to primary position on m=audio line
+    if (/^m=audio\s+/i.test(line) && opusPayloadType) {
+      const tokens = line.trim().split(/\s+/);
+      if (tokens.length > 4) {
+        const header = tokens.slice(0, 3);
+        const payloads = tokens.slice(3).filter((pt) => pt !== opusPayloadType);
+        return [...header, opusPayloadType, ...payloads].join(' ');
+      }
+    }
+
     if (/^a=ptime:/i.test(line)) {
       hasPtime = true;
-      return 'a=ptime:10';
+      return `a=ptime:${ptime}`;
+    }
+    if (/^a=maxptime:/i.test(line)) {
+      hasMaxPtime = true;
+      return 'a=maxptime:20';
     }
     if (line.startsWith(fmtpPrefix)) {
       fmtpFound = true;
@@ -63,11 +91,17 @@ export function tuneOpusSdp(sdp: string): string {
         if (eqIdx <= 0) continue;
         const k = pair.slice(0, eqIdx).trim().toLowerCase();
         const v = pair.slice(eqIdx + 1).trim();
-        if (SAFE_FMTP_KEY_RE.test(k) && SAFE_FMTP_VAL_RE.test(v)) {
+        if (
+          k !== '__proto__' &&
+          k !== 'constructor' &&
+          k !== 'prototype' &&
+          SAFE_FMTP_KEY_RE.test(k) &&
+          SAFE_FMTP_VAL_RE.test(v)
+        ) {
           paramMap.set(k, v);
         }
       }
-      for (const [k, v] of Object.entries(OPUS_TACTICAL_PARAMS)) {
+      for (const [k, v] of Object.entries(tacticalParams)) {
         paramMap.set(k, v);
       }
 
@@ -84,15 +118,19 @@ export function tuneOpusSdp(sdp: string): string {
     finalLines.push(line);
     if (line.startsWith(`a=rtpmap:${opusPayloadType} `)) {
       if (!fmtpFound) {
-        const serialized = Object.entries(OPUS_TACTICAL_PARAMS)
+        const serialized = Object.entries(tacticalParams)
           .map(([k, v]) => `${k}=${v}`)
           .join(';');
         finalLines.push(`${fmtpPrefix}${serialized}`);
         fmtpFound = true;
       }
       if (!hasPtime) {
-        finalLines.push('a=ptime:10');
+        finalLines.push(`a=ptime:${ptime}`);
         hasPtime = true;
+      }
+      if (!hasMaxPtime) {
+        finalLines.push('a=maxptime:20');
+        hasMaxPtime = true;
       }
     }
   }
@@ -101,7 +139,7 @@ export function tuneOpusSdp(sdp: string): string {
 }
 
 /**
- * Configures outgoing audio RTCRtpSender for 96kbps Opus & high QoS priority.
+ * Configures outgoing audio RTCRtpSender for 96kbps Opus & high DSCP QoS priority.
  */
 export async function configureOpusSender(pc: RTCPeerConnection): Promise<void> {
   for (const sender of pc.getSenders()) {
@@ -120,7 +158,7 @@ export async function configureOpusSender(pc: RTCPeerConnection): Promise<void> 
       enc.networkPriority = 'high';
       await sender.setParameters(params);
     } catch {
-      // Browser may not support DSCP priority hints; ignore safely
+      // Ignore DSCP priority errors on unsupported engines
     }
   }
 }
