@@ -327,6 +327,8 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
   ctx.restore();
 }
 
+let stratOpSeq = 0;
+
 export const TacticalStratDrawer = memo(function TacticalStratDrawer() {
   const open = useVoiceSettingsStore((s) => s.showStratBoard);
   const setOpen = useVoiceSettingsStore((s) => s.setShowStratBoard);
@@ -454,7 +456,7 @@ export const TacticalStratDrawer = memo(function TacticalStratDrawer() {
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     const pt = toLogicalCoords(e);
-    const opId = `st-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const opId = `st-${Date.now().toString(36)}-${(++stratOpSeq).toString(36)}`;
 
     if (tool === 'smoke') {
       const smokeOp: StratOperation = {
@@ -536,6 +538,8 @@ export const TacticalStratDrawer = memo(function TacticalStratDrawer() {
   };
 
   const currentMapCount = ops.filter((o) => o.mapId === mapId).length;
+
+  if (!open) return null;
 
   return (
     <div

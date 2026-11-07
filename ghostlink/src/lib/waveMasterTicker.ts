@@ -6,6 +6,7 @@
 // Non-speaking operators sleep with zero rAF cycles and static baseline path.
 
 import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import { getMevaVisibilityManager } from '@/src/lib/visibilityManager';
 
 interface RegisteredWaveItem {
   id: string;
@@ -29,15 +30,13 @@ export class MasterWaveTicker {
   private isPaused = false;
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      window.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          this.pause();
-        } else {
-          this.resume();
-        }
-      });
-    }
+    getMevaVisibilityManager().subscribe((hidden) => {
+      if (hidden) {
+        this.pause();
+      } else {
+        this.resume();
+      }
+    });
   }
 
   public register(

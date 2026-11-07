@@ -115,7 +115,6 @@ export class MevaStorageEngine {
   private boundUnsubscribers: Array<() => void> = [];
   private proReport: ProAnalyticsReport = createInitialProReport();
   private proListeners = new Set<(report: ProAnalyticsReport) => void>();
-  private analyticsTicker: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Opens or upgrades IndexedDB safely; resolves to null if IndexedDB is unavailable.
@@ -468,10 +467,6 @@ export class MevaStorageEngine {
       unsub();
     }
     this.boundUnsubscribers = [];
-    if (this.analyticsTicker !== null) {
-      clearInterval(this.analyticsTicker);
-      this.analyticsTicker = null;
-    }
   }
 }
 

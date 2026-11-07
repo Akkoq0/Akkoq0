@@ -9,6 +9,7 @@
 
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
+import { getMevaVisibilityManager } from '@/src/lib/visibilityManager';
 
 export interface NodeInspectTelemetry {
   nodeId: string;
@@ -81,6 +82,18 @@ export class MevaTelemetryEngine {
 
   constructor() {
     this.seedInitialNodes();
+    getMevaVisibilityManager().subscribe((hidden) => {
+      if (hidden) {
+        if (this.pollTimer) {
+          clearInterval(this.pollTimer);
+          this.pollTimer = null;
+        }
+      } else {
+        if (this.listeners.size > 0 && !this.pollTimer) {
+          this.start();
+        }
+      }
+    });
   }
 
   private seedInitialNodes(): void {
@@ -432,15 +445,17 @@ export class MevaTelemetryEngine {
           ? cryptoEngine.getLocalFingerprint()
           : cryptoEngine.getPeerFingerprint(def.id);
       if (!node.isLiveWebRtcPeer) {
-        node.packetsSent += this.stressActive ? 45 : 15;
-        node.packetsReceived += this.stressActive ? 45 : 15;
-        node.rttMs = this.stressActive
-          ? def.baseRtt + Math.round(this.rfcJitterMs * 2)
-          : def.baseRtt;
-        node.jitterMs = this.rfcJitterMs;
-        node.throughputKbps = this.stressActive
-          ? Math.round(this.measuredThroughputKbps / 5)
-          : 96;
+        if (this.stressActive) {
+          node.packetsSent += 45;
+          node.packetsReceived += 45;
+          node.rttMs = def.baseRtt + Math.round(this.rfcJitterMs * 2);
+          node.jitterMs = this.rfcJitterMs;
+          node.throughputKbps = Math.round(this.measuredThroughputKbps / 5);
+        } else {
+          node.rttMs = def.baseRtt;
+          node.jitterMs = 0.2;
+          node.throughputKbps = 96;
+        }
       }
     }
 

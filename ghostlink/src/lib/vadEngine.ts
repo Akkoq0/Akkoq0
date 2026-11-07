@@ -13,6 +13,7 @@
 // and customizable Push-To-Talk (PTT) with synthesized WebAudio micro-chirp.
 
 import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import { getMevaVisibilityManager } from '@/src/lib/visibilityManager';
 
 export type VoiceInputMode = 'vad' | 'ptt';
 
@@ -103,6 +104,18 @@ export class MevaVadEngine {
 
   constructor() {
     this.installGlobalPttListeners();
+    getMevaVisibilityManager().subscribe((hidden) => {
+      if (hidden) {
+        if (this.timerId) {
+          clearInterval(this.timerId);
+          this.timerId = null;
+        }
+      } else {
+        if (this.analyserNode && !this.timerId) {
+          this.startEnvelopeLoop();
+        }
+      }
+    });
   }
 
   public getConfig(): NoiseGateConfig {
@@ -490,9 +503,9 @@ export class MevaVadEngine {
       }
     };
 
-    window.addEventListener('keydown', this.keyDownHandler);
-    window.addEventListener('keyup', this.keyUpHandler);
-    window.addEventListener('blur', this.blurHandler);
+    window.addEventListener('keydown', this.keyDownHandler, { passive: true });
+    window.addEventListener('keyup', this.keyUpHandler, { passive: true });
+    window.addEventListener('blur', this.blurHandler, { passive: true });
   }
 
   private matchesPttKey(e: KeyboardEvent): boolean {

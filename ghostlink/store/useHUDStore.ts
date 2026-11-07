@@ -16,20 +16,6 @@ import type { Profile } from '@/types';
 export type SpatialPan = 'L' | 'C' | 'R';
 export type TacticalRole = 'IGL' | 'AWP' | 'ENTRY' | 'LURKER' | 'COACH';
 
-export interface TacticalMetrics {
-  ping: number;
-  jitter: number;
-  packetLoss: number;
-  inputBitrate: number;
-  micCodec: string;
-}
-
-export interface DualWaveLevel {
-  primary: number;
-  secondary: number;
-  rms: number;
-}
-
 interface HUDState {
   selectedPlayer: Profile | null;
   isOpen: boolean;
@@ -42,8 +28,6 @@ interface HUDState {
   iglDuckingEnabled: boolean;
   autoLevelerEnabled: boolean;
   acousticCuesEnabled: boolean;
-  peerSpectrums: Record<string, DualWaveLevel>;
-  metrics: TacticalMetrics;
 
   openHUD: (player: Profile) => void;
   closeHUD: () => void;
@@ -57,7 +41,6 @@ interface HUDState {
   setIglDuckingEnabled: (enabled: boolean) => void;
   setAutoLevelerEnabled: (enabled: boolean) => void;
   setAcousticCuesEnabled: (enabled: boolean) => void;
-  setPeerSpectrum: (playerId: string, spectrum: DualWaveLevel) => void;
   hydrateAudioPrefs: (prefs: Partial<{
     playerGains: Record<string, number>;
     localMutes: Record<string, boolean>;
@@ -71,7 +54,7 @@ interface HUDState {
   }>) => void;
 }
 
-export const useHUDStore = create<HUDState>((set, get) => ({
+export const useHUDStore = create<HUDState>((set) => ({
   selectedPlayer: null,
   isOpen: false,
   playerGains: {
@@ -109,26 +92,11 @@ export const useHUDStore = create<HUDState>((set, get) => ({
   iglDuckingEnabled: true,
   autoLevelerEnabled: true,
   acousticCuesEnabled: true,
-  peerSpectrums: {},
-  metrics: {
-    ping: 11,
-    jitter: 0.2,
-    packetLoss: 0.0,
-    inputBitrate: 96,
-    micCodec: 'Opus 48kHz (FEC+DTX)',
-  },
 
   openHUD: (player) =>
     set({
       selectedPlayer: player,
       isOpen: true,
-      metrics: {
-        ping: 11,
-        jitter: 0.2,
-        packetLoss: 0.0,
-        inputBitrate: 96,
-        micCodec: 'Opus 48kHz (FEC+DTX)',
-      },
     }),
 
   closeHUD: () => set({ isOpen: false, selectedPlayer: null }),
@@ -231,20 +199,6 @@ export const useHUDStore = create<HUDState>((set, get) => ({
   setAcousticCuesEnabled: (enabled) => {
     getMevaAudioEngine().setAcousticCuesEnabled(enabled);
     set({ acousticCuesEnabled: enabled });
-  },
-
-  setPeerSpectrum: (playerId, spectrum) => {
-    const prev = get().peerSpectrums[playerId];
-    if (
-      prev &&
-      Math.abs(prev.primary - spectrum.primary) < 0.025 &&
-      Math.abs(prev.secondary - spectrum.secondary) < 0.025
-    ) {
-      return;
-    }
-    set((s) => ({
-      peerSpectrums: { ...s.peerSpectrums, [playerId]: spectrum },
-    }));
   },
 
   hydrateAudioPrefs: (prefs) =>

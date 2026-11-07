@@ -219,7 +219,25 @@ export default function MevaHUDApp() {
     return () => window.removeEventListener('hashchange', consumeHashInvite);
   }, []);
 
-  // Global ESC & Tactical Keybind handler (ignores active text inputs)
+  const isScrimVoice = activeVoiceChannelId?.startsWith('scrim-') ?? false;
+
+  const {
+    isMuted,
+    isDeafened,
+    isSpeaking,
+    connectionState,
+    leaveVoice,
+    toggleMute,
+    toggleDeafen,
+  } = useWebRTC({
+    channelId: activeVoiceChannelId ?? '',
+    userId: user.id,
+    username: user.username,
+    avatarUrl: user.avatar_url,
+    isScrim: isScrimVoice,
+  });
+
+  // Consolidated Global Keyboard Delegate (Escape + Tactical Hotkeys)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -254,11 +272,16 @@ export default function MevaHUDApp() {
         vState.toggleStratBoard();
       } else if (e.code === vState.keybinds.miniHudKey) {
         vState.toggleMiniHud();
+      } else if (e.code === vState.keybinds.muteKey) {
+        toggleMute();
+      } else if (e.code === vState.keybinds.deafenKey) {
+        toggleDeafen();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+
+    window.addEventListener('keydown', handleKeyDown, { passive: true });
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [toggleMute, toggleDeafen]);
 
   useEffect(() => {
     setServers(DEFAULT_SERVERS);
@@ -292,24 +315,6 @@ export default function MevaHUDApp() {
     setActiveVoiceChannel,
   ]);
 
-  const isScrimVoice = activeVoiceChannelId?.startsWith('scrim-') ?? false;
-
-  const {
-    isMuted,
-    isDeafened,
-    isSpeaking,
-    connectionState,
-    leaveVoice,
-    toggleMute,
-    toggleDeafen,
-  } = useWebRTC({
-    channelId: activeVoiceChannelId ?? '',
-    userId: user.id,
-    username: user.username,
-    avatarUrl: user.avatar_url,
-    isScrim: isScrimVoice,
-  });
-
   const handleSelectPlayer = useCallback((member: Profile) => {
     setSelectedPlayer(member);
   }, []);
@@ -326,31 +331,7 @@ export default function MevaHUDApp() {
     [],
   );
 
-  // Bind global Mute & Deafen hotkeys to live WebRTC voice controls
-  useEffect(() => {
-    const onVoiceHotkey = (e: KeyboardEvent) => {
-      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      const vState = useVoiceSettingsStore.getState();
-      if (vState.showCommandSettingsModal) return;
-      if (e.code === vState.keybinds.muteKey) {
-        toggleMute();
-      } else if (e.code === vState.keybinds.deafenKey) {
-        toggleDeafen();
-      }
-    };
-    window.addEventListener('keydown', onVoiceHotkey);
-    return () => window.removeEventListener('keydown', onVoiceHotkey);
-  }, [toggleMute, toggleDeafen]);
+
 
   const voiceControls = useMemo<VoiceControls>(
     () => ({
