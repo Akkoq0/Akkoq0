@@ -91,6 +91,18 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
     setIceResetFeedback(false);
   }, [target?.id]);
 
+  useEffect(() => {
+    if (!target) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [target, onClose]);
+
   if (!target) return null;
 
   const isSelf = target.id === 'usr-local';
