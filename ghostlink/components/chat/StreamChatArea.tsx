@@ -15,7 +15,10 @@ import {
   useRealtimeChat,
   INITIAL_TACTICAL_MESSAGES,
 } from '@/hooks/useRealtimeChat';
-import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import {
+  getMevaAudioEngine,
+  type CalloutCueType,
+} from '@/src/lib/audioEngine';
 import { getMevaVadEngine } from '@/src/lib/vadEngine';
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import {
@@ -166,37 +169,47 @@ const ROLE_BADGE_STYLE: Record<SquadOperatorMeta['roleTone'], string> = {
 };
 
 const PAN_TITLE: Record<'L' | 'C' | 'R', string> = {
-  L: '3D Sahne: Sol (-0.78) · Değiştirmek için tıklayın',
+  L: '3D Sahne: Sol (-1.0) · Değiştirmek için tıklayın',
   C: '3D Sahne: Merkez (0.0) · Değiştirmek için tıklayın',
-  R: '3D Sahne: Sağ (+0.78) · Değiştirmek için tıklayın',
+  R: '3D Sahne: Sağ (+1.0) · Değiştirmek için tıklayın',
 };
 
-const CALLOUTS = [
+const CALLOUTS: ReadonlyArray<{
+  label: string;
+  cue: CalloutCueType;
+  text: string;
+}> = [
   {
     label: 'Hazır',
+    cue: 'ready',
     text: '[HAZIR] Ses frekansı ve ekipman kontrolü tamamlandı, lobi maça hazır.',
   },
   {
     label: 'Rotate B',
+    cue: 'rotate',
     text: '[TAKTİK ÇAĞRI: ROTATE B] B-Site yönüne hızlı rotasyon, Mid hattından 2 temas var.',
   },
   {
     label: 'Eco',
+    cue: 'eco',
     text: '[ROUND 14 — ECO KARARI] Bu el kredi koruyoruz (min 4100), sonraki tur tam teçhizat.',
   },
   {
     label: 'Drop AWP',
+    cue: 'drop',
     text: '[DROP AWP] cNed için birincil Operator / AWP drop gerekiyor, kredisi uygun olan atsın.',
   },
   {
     label: 'Force',
+    cue: 'force',
     text: '[FORCE BUY] Kritik tur! Tüm krediyle zırh, tüfek ve tam utility çekiyoruz.',
   },
   {
     label: 'GG WP',
+    cue: 'gg',
     text: '[GG WP] Kusursuz iletişim ve sıfır gecikme, elinize sağlık takım.',
   },
-] as const;
+];
 
 interface StreamChatAreaProps {
   userId: string;
@@ -439,7 +452,10 @@ export const StreamChatArea = memo(function StreamChatArea({
   }, []);
 
   const handleCallout = useCallback(
-    (text: string) => {
+    (text: string, cue?: CalloutCueType) => {
+      if (cue) {
+        getMevaAudioEngine().playCalloutCue(cue);
+      }
       sendMessage(text);
       triggerSelfSpeakingPulse();
     },
@@ -990,7 +1006,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 <button
                   key={c.label}
                   type="button"
-                  onClick={() => handleCallout(c.text)}
+                  onClick={() => handleCallout(c.text, c.cue)}
                   className="rounded-lg h-8 px-3 bg-[linear-gradient(160deg,#1E0B10_0%,#0E080A_100%)] active:scale-95 text-[#F4EFF0] border border-[#30151C] text-[11.5px] font-bold whitespace-nowrap flex-shrink-0"
                 >
                   {c.label}
@@ -1369,7 +1385,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 <button
                   key={c.label}
                   type="button"
-                  onClick={() => handleCallout(c.text)}
+                  onClick={() => handleCallout(c.text, c.cue)}
                   className="rounded-lg h-7 px-2.5 bg-[#140A0D] hover:bg-[#7A121D] text-[#F4EFF0] border border-[#2C141A] hover:border-[#C82333]/55 text-[11px] font-bold transition-all duration-150 active:scale-95 whitespace-nowrap"
                 >
                   {c.label}

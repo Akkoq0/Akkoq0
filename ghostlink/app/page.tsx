@@ -26,6 +26,7 @@ import {
 import { TacticalPlayerHUD } from '@/components/ui/TacticalPlayerHUD';
 import { FriendsModal } from '@/components/ui/FriendsModal';
 import { TacticalStratDrawer } from '@/components/tactical/TacticalStratDrawer';
+import { MiniHudOverlay } from '@/components/hud/MiniHudOverlay';
 import type {
   Profile,
   Server,
@@ -161,6 +162,7 @@ export default function MevaHUDApp() {
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const isMobileSidebarOpen = useAppStore((s) => s.isMobileSidebarOpen);
   const isMobileRadarOpen = useAppStore((s) => s.isMobileRadarOpen);
+  const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
 
   const setServers = useAppStore((s) => s.setServers);
   const setActiveServer = useAppStore((s) => s.setActiveServer);
@@ -376,71 +378,77 @@ export default function MevaHUDApp() {
       {/* 1. TOP INDUSTRIAL COMMAND DECK */}
       <GhostNavbar />
 
-      {/* 2. MAIN THREE-COLUMN WAR ROOM */}
-      <div className="relative z-10 flex-1 flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5">
-        {/* Desktop Left Channel & Voice Hub */}
-        <div className="hidden lg:flex h-full flex-shrink-0">
-          <TacticalSidebar
-            username={user.username}
-            voiceControls={voiceControls}
-          />
-        </div>
-
-        {/* Mobile & Tablet Left Drawer */}
-        {isMobileSidebarOpen && (
-          <div
-            className="fixed inset-0 z-40 lg:hidden exec-backdrop flex"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          >
-            <div
-              className="w-[86vw] max-w-[320px] h-full shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
+      {/* 2. MAIN THREE-COLUMN WAR ROOM OR COMPACT IN-GAME MINI HUD */}
+      {miniHudActive ? (
+        <MiniHudOverlay username={user.username} voiceControls={voiceControls} />
+      ) : (
+        <>
+          <div className="relative z-10 flex-1 flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5">
+            {/* Desktop Left Channel & Voice Hub */}
+            <div className="hidden lg:flex h-full flex-shrink-0">
               <TacticalSidebar
                 username={user.username}
                 voiceControls={voiceControls}
               />
             </div>
-          </div>
-        )}
 
-        {/* Center Tactical Bento Cockpit */}
-        <StreamChatArea
-          userId={user.id}
-          username={user.username}
-          onSelectPlayer={handleSelectPlayer}
-          voiceControls={voiceControls}
-        />
+            {/* Mobile & Tablet Left Drawer */}
+            {isMobileSidebarOpen && (
+              <div
+                className="fixed inset-0 z-40 lg:hidden exec-backdrop flex"
+                onClick={() => setIsMobileSidebarOpen(false)}
+              >
+                <div
+                  className="w-[86vw] max-w-[320px] h-full shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <TacticalSidebar
+                    username={user.username}
+                    voiceControls={voiceControls}
+                  />
+                </div>
+              </div>
+            )}
 
-        {/* Desktop Right Squad Roster */}
-        <div className="hidden lg:flex h-full flex-shrink-0">
-          <PlayerRadarHUD
-            onSelectPlayer={handleSelectPlayer}
-            onContextMenuPlayer={handleContextMenuPlayer}
-          />
-        </div>
+            {/* Center Tactical Bento Cockpit */}
+            <StreamChatArea
+              userId={user.id}
+              username={user.username}
+              onSelectPlayer={handleSelectPlayer}
+              voiceControls={voiceControls}
+            />
 
-        {/* Mobile & Tablet Right Drawer */}
-        {isMobileRadarOpen && (
-          <div
-            className="fixed inset-0 z-40 lg:hidden exec-backdrop flex justify-end"
-            onClick={() => setIsMobileRadarOpen(false)}
-          >
-            <div
-              className="w-[86vw] max-w-[320px] h-full shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
+            {/* Desktop Right Squad Roster */}
+            <div className="hidden lg:flex h-full flex-shrink-0">
               <PlayerRadarHUD
                 onSelectPlayer={handleSelectPlayer}
                 onContextMenuPlayer={handleContextMenuPlayer}
               />
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 3. MOBILE COMMAND DOCK */}
-      <MobileBottomNav />
+            {/* Mobile & Tablet Right Drawer */}
+            {isMobileRadarOpen && (
+              <div
+                className="fixed inset-0 z-40 lg:hidden exec-backdrop flex justify-end"
+                onClick={() => setIsMobileRadarOpen(false)}
+              >
+                <div
+                  className="w-[86vw] max-w-[320px] h-full shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <PlayerRadarHUD
+                    onSelectPlayer={handleSelectPlayer}
+                    onContextMenuPlayer={handleContextMenuPlayer}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 3. MOBILE COMMAND DOCK */}
+          <MobileBottomNav />
+        </>
+      )}
 
       {/* 4. MODALS & OVERLAYS */}
       <ScrimModal />

@@ -7,9 +7,24 @@
 import { useEffect, useCallback } from 'react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAppStore } from '@/lib/store';
+import {
+  getMevaAudioEngine,
+  type CalloutCueType,
+} from '@/src/lib/audioEngine';
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
 import type { Message } from '@/types';
+
+function inferCalloutCue(content: string): CalloutCueType | undefined {
+  const upper = content.toUpperCase();
+  if (upper.startsWith('[HAZIR')) return 'ready';
+  if (upper.includes('ROTATE')) return 'rotate';
+  if (upper.includes('ECO')) return 'eco';
+  if (upper.startsWith('[DROP')) return 'drop';
+  if (upper.startsWith('[FORCE')) return 'force';
+  if (upper.startsWith('[GG')) return 'gg';
+  return undefined;
+}
 
 const BASE_PROFILE_ISO = '2026-11-06T19:00:00.000Z';
 
@@ -256,8 +271,13 @@ export function useRealtimeChat(channelId: string | null) {
               createdAt: string;
               authorName: string;
               role?: string;
+              cue?: CalloutCueType;
             };
             if (wire.channelId !== effectiveTargetId) return;
+            if (envelope.kind === 'e2ee-callout') {
+              const cue = wire.cue ?? inferCalloutCue(wire.content);
+              if (cue) getMevaAudioEngine().playCalloutCue(cue);
+            }
             addMessage({
               id: wire.id,
               channel_id: wire.channelId,
@@ -368,6 +388,7 @@ export function useRealtimeChat(channelId: string | null) {
 
       // Encrypt with AES-256-GCM and transmit over WebRTC DataChannel / Mesh
       const isCallout = sanitized.startsWith('[');
+      const cue = isCallout ? inferCalloutCue(sanitized) : undefined;
       try {
         await getMevaCryptoEngine().sendEncryptedMeshPacket(
           isCallout ? 'e2ee-callout' : 'e2ee-chat',
@@ -378,6 +399,7 @@ export function useRealtimeChat(channelId: string | null) {
             createdAt: nowIso,
             authorName: 'Operatör',
             role: 'IGL',
+            cue,
           }),
         );
       } catch {

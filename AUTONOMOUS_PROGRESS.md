@@ -16,9 +16,9 @@
 | **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | TAMAMLANDI | OK | `2dd1e18` |
 | **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | TAMAMLANDI | OK | `c415de8` |
 | **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | TAMAMLANDI | OK | `33b2d34` |
-| **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | TAMAMLANDI | OK | Commit/Push |
-| **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | DEVAM EDİYOR | - | - |
-| **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | BEKLİYOR | - | - |
+| **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | TAMAMLANDI | OK | `059e5a6` |
+| **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | TAMAMLANDI | OK | Commit/Push |
+| **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | DEVAM EDİYOR | - | - |
 | **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | BEKLİYOR | - | - |
 
 ## Tamamlanan Teknik Çıktılar
@@ -35,3 +35,5 @@
   - Sağ tık ve dokunmatik `⋯` tetikleyicili **Taktiksel Komuta Menüsü** (Operatöre Özel EQ: *Keskin Tiz / Dengeli / Tok Bas*, 3D Pan, *%30 IGL Priority Ducking*, Rol Ataması, ICE Sıfırlama) ve sol alt ayar dişlisine bağlı **Meva Komuta Ayarları Modalı** (Cihaz seçimi, canlı dBFS mikrofon barı + Loopback, Noise Gate eşiği, kısayol atayıcı, *Deep Espresso & Burgundy* / *Tactical Stealth Carbon* / *Obsidian Gold* temaları) tamamlandı.
 - **FAZ 7 (`TacticalStratDrawer.tsx`):**
   - Çift katmanlı (`bgCanvas` statik harita şeması + `rAF` birleştirilmiş `fgCanvas` çizim katmanı) **Ascent, Bind, Mirage, Inferno** taktik tahtası, Duman/Flaş/Rotasyon Oku/Serbest Çizim araçları ve `strat-op` üzerinden AES-256-GCM gerçek zamanlı P2P senkronizasyon motoru tamamlandı.
+- **FAZ 8 (`MiniHudOverlay.tsx`, `useRealtimeChat.ts`):**
+  - İkinci ekran / oyun içi düşük CPU'lu **Kompakt Overlay Modu (Mini HUD)** (`O` kısayolu + üst komuta barı ikonu) ve yerel + uzak P2P operatörlerde WebAudio sentezli **Taktiksel Akustik Callout Bildirim Sesleri** (`Hazır`, `Rotate B`, `Eco`, `Drop AWP`, `Force`, `GG WP`) tamamlandı.
