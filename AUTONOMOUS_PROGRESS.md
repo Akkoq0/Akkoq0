@@ -13,9 +13,9 @@
 | **FAZ 1** | Profesyonel WebAudio DSP & 3D Konumsal Ses Motoru (`ghostlink/src/lib/audioEngine.ts`) | TAMAMLANDI | OK | `f80c1d2` |
 | **FAZ 2** | Akıllı Gürültü Engelleme (Noise Gate), VAD & PTT Motoru (`ghostlink/src/lib/vadEngine.ts`) | TAMAMLANDI | OK | `a03b1a0` |
 | **FAZ 3** | WebRTC Full-Mesh P2P Çekirdeği, Opus 48kHz SDP & Sunucusuz Sinyalizasyon (`ghostlink/src/lib/webrtcMesh.ts`) | TAMAMLANDI | OK | `17e5e94` |
-| **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | TAMAMLANDI | OK | Commit/Push |
-| **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | DEVAM EDİYOR | - | - |
-| **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | BEKLİYOR | - | - |
+| **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | TAMAMLANDI | OK | `2dd1e18` |
+| **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | TAMAMLANDI | OK | Commit/Push |
+| **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | DEVAM EDİYOR | - | - |
 | **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | BEKLİYOR | - | - |
 | **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | BEKLİYOR | - | - |
 | **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | BEKLİYOR | - | - |
@@ -29,3 +29,5 @@
 - **FAZ 4 (`ghostlink/src/lib/cryptoEngine.ts`, `E2eeFingerprintPopover.tsx`):**
   - WebCrypto (`SubtleCrypto`) tabanlı **ECDH (P-256)** ikili anahtar değişimi, **AES-256-GCM** (96-bit CSPRNG IV + 128-bit GCM etiket + AAD bağlama) şifreleme ve **SHA-256 Key Fingerprint** doğrulama motoru yazıldı.
   - Sohbet akışına mesaj arama, taktik etiket filtreleme/ekleme (`#ROTATE`, `#ECO`, `#INFO`, `#CLUTCH`), tek tıkla kopyalama ve kriptografik parmak izi doğrulama rozeti entegre edildi.
+- **FAZ 5 (`ghostlink/src/lib/telemetryEngine.ts`, `MeshNodeInspectModal.tsx`):**
+  - `RTCPeerConnection.getStats()` + RFC 3550 DataChannel Ping-Pong RTT/Jitter zamanlayıcısı, 50 pkt/sn AES-256-GCM 512B şifreli Ağ Stres Testi motoru ve 5-Operatör P2P Mesh düğüm inceleme modalı (`MeshNodeInspectModal`) entegre edildi.

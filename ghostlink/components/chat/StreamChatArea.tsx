@@ -15,8 +15,15 @@ import {
   useRealtimeChat,
   INITIAL_TACTICAL_MESSAGES,
 } from '@/hooks/useRealtimeChat';
+import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import { getMevaVadEngine } from '@/src/lib/vadEngine';
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
+import {
+  getMevaTelemetryEngine,
+  type MeshTelemetrySummary,
+} from '@/src/lib/telemetryEngine';
 import { E2eeFingerprintPopover } from '@/components/chat/E2eeFingerprintPopover';
+import { MeshNodeInspectModal } from '@/components/hud/MeshNodeInspectModal';
 import { cleanLabel } from '@/lib/format';
 import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
@@ -226,9 +233,14 @@ export const StreamChatArea = memo(function StreamChatArea({
   const gains = useHUDStore((s) => s.playerGains);
   const mutedPeers = useHUDStore((s) => s.localMutes);
   const spatialPans = useHUDStore((s) => s.spatialPans);
+  const operatorRoles = useHUDStore((s) => s.operatorRoles);
+  const prioritySpeakers = useHUDStore((s) => s.prioritySpeakers);
+  const iglDuckingEnabled = useHUDStore((s) => s.iglDuckingEnabled);
+  const peerSpectrums = useHUDStore((s) => s.peerSpectrums);
   const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
   const togglePeerMute = useHUDStore((s) => s.toggleLocalMute);
   const cycleSpatialPan = useHUDStore((s) => s.cycleSpatialPan);
+  const setPeerSpectrum = useHUDStore((s) => s.setPeerSpectrum);
 
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({
     'usr-1': true,
@@ -242,13 +254,17 @@ export const StreamChatArea = memo(function StreamChatArea({
   const [playingVoiceNoteId, setPlayingVoiceNoteId] = useState<string | null>(
     null,
   );
-  const [stressTestActive, setStressTestActive] = useState(false);
-  const [simMetrics, setSimMetrics] = useState({
-    rtt: 11,
-    jitter: 0.2,
-    cpu: 0.3,
-    stability: 99.8,
-  });
+  const [telemetry, setTelemetry] = useState<MeshTelemetrySummary>(() =>
+    getMevaTelemetryEngine().getSummary(),
+  );
+  const [inspectedNodeId, setInspectedNodeId] = useState<string | null>(null);
+  const stressTestActive = telemetry.stressActive;
+  const simMetrics = {
+    rtt: telemetry.rttMs,
+    jitter: telemetry.jitterMs,
+    cpu: telemetry.cpuPercent,
+    stability: telemetry.stabilityPercent,
+  };
 
   const [input, setInput] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -308,34 +324,56 @@ export const StreamChatArea = memo(function StreamChatArea({
     };
   }, []);
 
-  // Push-To-Talk keyboard shortcut (hold 'V' when not typing in an input)
+  // Bind real VAD/PTT engine + real WebRTC/Crypto Telemetry engine
   useEffect(() => {
-    const isEditable = (el: EventTarget | null) =>
-      el instanceof HTMLElement &&
-      (el.tagName === 'INPUT' ||
-        el.tagName === 'TEXTAREA' ||
-        el.isContentEditable);
+    const vad = getMevaVadEngine();
+    const unsubVad = vad.subscribe((snap) => {
+      setPttActive(snap.pttPressed);
+      if (snap.transmitting) {
+        setSpeakingPeers((prev) =>
+          prev['usr-local'] ? prev : { ...prev, 'usr-local': true },
+        );
+      }
+    });
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat || isEditable(e.target)) return;
-      if (e.key === 'v' || e.key === 'V') setPttActive(true);
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'v' || e.key === 'V') setPttActive(false);
-    };
+    const tel = getMevaTelemetryEngine();
+    tel.start();
+    const unsubTel = tel.subscribe(setTelemetry);
 
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      unsubVad();
+      unsubTel();
     };
   }, []);
 
-  // Voice activity & telemetry updates
+  // Real-time FFT 256 spectrum sampling + IGL Priority Ducking (-30%) + squad activity
   useEffect(() => {
     if (ecoActive) return;
-    const interval = setInterval(() => {
+    const audio = getMevaAudioEngine();
+
+    const fftTimer = setInterval(() => {
+      const micSpec = audio.sampleMicSpectrum();
+      if (micSpec.rmsLevel > 4) {
+        setPeerSpectrum('usr-local', {
+          primary: micSpec.primaryHarmonic,
+          secondary: micSpec.secondaryHarmonic,
+          rms: micSpec.rmsLevel,
+        });
+      }
+
+      for (const peerId of audio.getAttachedPeerIds()) {
+        const spec = audio.samplePeerSpectrum(peerId);
+        if (spec.rmsLevel > 2) {
+          setPeerSpectrum(peerId, {
+            primary: spec.primaryHarmonic,
+            secondary: spec.secondaryHarmonic,
+            rms: spec.rmsLevel,
+          });
+        }
+      }
+    }, 110);
+
+    const cadenceTimer = setInterval(() => {
       setSpeakingPeers((prev) => ({
         ...prev,
         'usr-1': Math.random() > 0.3,
@@ -343,26 +381,37 @@ export const StreamChatArea = memo(function StreamChatArea({
         'usr-2': Math.random() > 0.62,
         'usr-3': Math.random() > 0.72,
       }));
-
-      if (stressTestActive) {
-        setSimMetrics({
-          rtt: Math.floor(16 + Math.random() * 10),
-          jitter: Number((0.6 + Math.random() * 0.9).toFixed(1)),
-          cpu: Number((0.4 + Math.random() * 0.2).toFixed(1)),
-          stability: Number((98.4 + Math.random() * 1.1).toFixed(1)),
-        });
-      } else {
-        setSimMetrics({
-          rtt: 11,
-          jitter: 0.2,
-          cpu: 0.3,
-          stability: 99.8,
-        });
-      }
     }, 1800);
 
-    return () => clearInterval(interval);
-  }, [ecoActive, stressTestActive]);
+    return () => {
+      clearInterval(fftTimer);
+      clearInterval(cadenceTimer);
+    };
+  }, [ecoActive, setPeerSpectrum]);
+
+  // Apply IGL Priority Ducking (-30% on non-priority peers when IGL speaks)
+  useEffect(() => {
+    const prioSet = new Set(
+      Object.entries(prioritySpeakers)
+        .filter(([, active]) => active)
+        .map(([id]) => id),
+    );
+    const anyPrioSpeaking = Array.from(prioSet).some((id) =>
+      id === 'usr-local'
+        ? pttActive || Boolean(speakingPeers['usr-local'])
+        : Boolean(speakingPeers[id]),
+    );
+    getMevaAudioEngine().applyPriorityDucking(
+      anyPrioSpeaking,
+      prioSet,
+      iglDuckingEnabled,
+    );
+  }, [prioritySpeakers, speakingPeers, pttActive, iglDuckingEnabled]);
+
+  const handleToggleStressTest = useCallback(() => {
+    const tel = getMevaTelemetryEngine();
+    tel.setStressTest(!tel.getSummary().stressActive);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -451,8 +500,17 @@ export const StreamChatArea = memo(function StreamChatArea({
         (isSelf ? selfTransmitting : Boolean(speakingPeers[op.id]));
       const gainVal = isMuted ? 0 : (gains[op.id] ?? 100);
       const pan = spatialPans[op.id] ?? 'C';
+      const activeRole = operatorRoles[op.id] ?? op.role;
       const isBoosted = gainVal > 100;
-      const waveLevel = Math.min(1, Math.max(0.22, gainVal / 135));
+      const spec = peerSpectrums[op.id];
+      const baseWave = Math.min(1, Math.max(0.22, gainVal / 135));
+      const waveLevel = spec
+        ? Math.min(1, spec.primary * (gainVal / 100))
+        : baseWave;
+      const secondaryWaveLevel = spec
+        ? Math.min(1, spec.secondary * (gainVal / 100))
+        : baseWave * 0.84;
+      const livePing = telemetry.nodes[op.id]?.rttMs ?? op.pingMs;
 
       return (
         <div
@@ -522,7 +580,7 @@ export const StreamChatArea = memo(function StreamChatArea({
             <span
               className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wider border ${ROLE_BADGE_STYLE[op.roleTone]}`}
             >
-              {op.role}
+              {activeRole}
             </span>
 
             <div className="flex items-center gap-1.5">
@@ -552,7 +610,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                       : 'text-[#827376]'
                 }`}
               >
-                {isMuted ? 'Sessiz' : `${op.pingMs} ms`}
+                {isMuted ? 'Sessiz' : `${livePing} ms`}
               </span>
             </div>
           </div>
@@ -573,6 +631,7 @@ export const StreamChatArea = memo(function StreamChatArea({
           >
             <FluidWave
               level={waveLevel}
+              secondaryLevel={secondaryWaveLevel}
               active={isSpeaking && !ecoActive}
               muted={isMuted}
               speed={op.waveSpeed}
@@ -710,7 +769,7 @@ export const StreamChatArea = memo(function StreamChatArea({
           return (
             <g
               key={op.id}
-              onClick={() => handleInspectOperator(op)}
+              onClick={() => setInspectedNodeId(op.id)}
               className="cursor-pointer"
             >
               {nodeSpeaking && (
@@ -738,7 +797,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 textAnchor={node.anchor}
                 fill={nodeSpeaking ? '#F4EFF0' : '#B8AAAC'}
               >
-                {callsign} · {op.pingMs}ms
+                {callsign} · {telemetry.nodes[op.id]?.rttMs ?? op.pingMs}ms
               </text>
             </g>
           );
@@ -972,13 +1031,23 @@ export const StreamChatArea = memo(function StreamChatArea({
           <div className="pt-2 border-t border-[#241116] flex items-center gap-2 flex-shrink-0">
             <button
               type="button"
-              onPointerDown={() => setPttActive(true)}
+              onPointerDown={() => {
+                setPttActive(true);
+                getMevaVadEngine().setPttPressed(true);
+              }}
               onPointerUp={() => {
                 setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
                 triggerSelfSpeakingPulse();
               }}
-              onPointerLeave={() => setPttActive(false)}
-              onPointerCancel={() => setPttActive(false)}
+              onPointerLeave={() => {
+                setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
+              }}
+              onPointerCancel={() => {
+                setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
+              }}
               className={`flex-1 rounded-xl h-12 px-4 text-[13px] font-extrabold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
                 selfTransmitting
                   ? 'crimson-cta text-[#F4EFF0] ring-2 ring-[#C82333]/40'
@@ -1088,14 +1157,16 @@ export const StreamChatArea = memo(function StreamChatArea({
               </div>
               <button
                 type="button"
-                onClick={() => setStressTestActive((v) => !v)}
+                onClick={handleToggleStressTest}
                 className={`rounded-lg h-8 px-3 text-[11px] font-bold border transition-all ${
                   stressTestActive
                     ? 'crimson-cta text-[#F4EFF0]'
                     : 'bg-[#140A0D] text-[#B8AAAC] border-[#2E151C]'
                 }`}
               >
-                {stressTestActive ? 'Simülasyon Aktif' : 'Stres Testi'}
+                {stressTestActive
+                  ? `Test · ${telemetry.throughputKbps} kbps`
+                  : 'Ağ Stres Testi'}
               </button>
             </div>
 
@@ -1158,19 +1229,33 @@ export const StreamChatArea = memo(function StreamChatArea({
 
             <button
               type="button"
-              onPointerDown={() => setPttActive(true)}
+              onPointerDown={() => {
+                setPttActive(true);
+                getMevaVadEngine().setPttPressed(true);
+              }}
               onPointerUp={() => {
                 setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
                 triggerSelfSpeakingPulse();
               }}
-              onPointerLeave={() => setPttActive(false)}
-              onPointerCancel={() => setPttActive(false)}
+              onPointerLeave={() => {
+                setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
+              }}
+              onPointerCancel={() => {
+                setPttActive(false);
+                getMevaVadEngine().setPttPressed(false);
+              }}
               onKeyDown={(e) => {
-                if (e.key === ' ' || e.key === 'Enter') setPttActive(true);
+                if (e.key === ' ' || e.key === 'Enter') {
+                  setPttActive(true);
+                  getMevaVadEngine().setPttPressed(true);
+                }
               }}
               onKeyUp={(e) => {
                 if (e.key === ' ' || e.key === 'Enter') {
                   setPttActive(false);
+                  getMevaVadEngine().setPttPressed(false);
                   triggerSelfSpeakingPulse();
                 }
               }}
@@ -1354,14 +1439,16 @@ export const StreamChatArea = memo(function StreamChatArea({
             </div>
             <button
               type="button"
-              onClick={() => setStressTestActive((v) => !v)}
+              onClick={handleToggleStressTest}
               className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-all ${
                 stressTestActive
                   ? 'crimson-cta text-[#F4EFF0]'
                   : 'bg-[#140A0D] hover:bg-[#1E0C12] text-[#B8AAAC] hover:text-[#F4EFF0] border-[#2C141A] hover:border-[#8F1622]/55'
               }`}
             >
-              {stressTestActive ? 'Simülasyon Aktif' : 'Ağ Stres Testi'}
+              {stressTestActive
+                ? `Test Aktif · ${telemetry.throughputKbps} kbps`
+                : 'Ağ Stres Testi'}
             </button>
           </div>
 
@@ -1433,6 +1520,15 @@ export const StreamChatArea = memo(function StreamChatArea({
       <E2eeFingerprintPopover
         open={showFingerprintModal}
         onClose={() => setShowFingerprintModal(false)}
+      />
+
+      <MeshNodeInspectModal
+        node={inspectedNodeId ? (telemetry.nodes[inspectedNodeId] ?? null) : null}
+        onClose={() => setInspectedNodeId(null)}
+        onOpenDspDrawer={(id) => {
+          const op = SQUAD_OPERATORS.find((o) => o.id === id);
+          if (op) handleInspectOperator(op);
+        }}
       />
     </main>
   );

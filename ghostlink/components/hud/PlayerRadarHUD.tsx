@@ -4,14 +4,19 @@
 // Meva HUD — Right Squad Roster & Luminous Telemetry Module
 // ─────────────────────────────────────────────────────────
 
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import {
+  getMevaTelemetryEngine,
+  type MeshTelemetrySummary,
+} from '@/src/lib/telemetryEngine';
 import { OperatorAvatar } from '@/components/ui/HudPrimitives';
 import { IconRadar, IconClose } from '@/components/ui/MevaIcons';
 import type { Profile } from '@/types';
 
 interface PlayerRadarHUDProps {
   onSelectPlayer: (member: Profile) => void;
+  onContextMenuPlayer?: (member: Profile, x: number, y: number) => void;
 }
 
 const PING_MAP: Record<string, number> = {
@@ -23,12 +28,23 @@ const PING_MAP: Record<string, number> = {
 
 export const PlayerRadarHUD = memo(function PlayerRadarHUD({
   onSelectPlayer,
+  onContextMenuPlayer,
 }: PlayerRadarHUDProps) {
   const isRadarOpen = useAppStore((s) => s.isRadarOpen);
   const isMobileRadarOpen = useAppStore((s) => s.isMobileRadarOpen);
   const onlineMembers = useAppStore((s) => s.onlineMembers);
   const netGuard = useAppStore((s) => s.netGuard);
   const setIsMobileRadarOpen = useAppStore((s) => s.setIsMobileRadarOpen);
+
+  const [telemetry, setTelemetry] = useState<MeshTelemetrySummary>(() =>
+    getMevaTelemetryEngine().getSummary(),
+  );
+
+  useEffect(() => {
+    const engine = getMevaTelemetryEngine();
+    engine.start();
+    return engine.subscribe((summary) => setTelemetry(summary));
+  }, []);
 
   if (!isRadarOpen && !isMobileRadarOpen) return null;
 
@@ -110,6 +126,12 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
                       type="button"
                       key={m.id}
                       onClick={() => select(m)}
+                      onContextMenu={(e) => {
+                        if (onContextMenuPlayer) {
+                          e.preventDefault();
+                          onContextMenuPlayer(m, e.clientX, e.clientY);
+                        }
+                      }}
                       className="group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
                     >
                       <OperatorAvatar
@@ -128,7 +150,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
                         )}
                       </span>
                       <span className="rounded-md px-2 py-0.5 bg-[#0D080A] border border-[#2B1319] text-[10.5px] font-bold text-[#C9B8BB] tabular-nums">
-                        {PING_MAP[m.id] ?? 12}ms
+                        {telemetry.nodes[m.id]?.rttMs ?? PING_MAP[m.id] ?? 12}ms
                       </span>
                     </button>
                   ))}
@@ -147,13 +169,13 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
         <div className="rounded-xl py-1.5 px-1 bg-[#140A0D] border border-[#281318]">
           <span className="block text-[9px] text-[#827376]">Jitter</span>
           <span className="block text-[11px] font-bold text-[#F4EFF0] mt-0.5">
-            {netGuard.jitterMs}ms
+            {telemetry.jitterMs}ms
           </span>
         </div>
         <div className="rounded-xl py-1.5 px-1 bg-[#140A0D] border border-[#281318]">
           <span className="block text-[9px] text-[#827376]">Kayıp</span>
           <span className="block text-[11px] font-bold text-[#F4EFF0] mt-0.5">
-            {netGuard.packetLossPercent}%
+            {telemetry.packetLossPercent}%
           </span>
         </div>
         <div className="rounded-xl py-1.5 px-1 bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(14,9,11,0.85)_100%)] border border-[#7A121D]/45">
