@@ -50,16 +50,16 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <div className="flex h-[100dvh] w-screen items-center justify-center bg-[#06070A] font-sans">
-      <div className="titanium-module rounded-sm px-8 py-6 text-center space-y-3">
-        <div className="mx-auto w-10 h-10 rounded-sm bg-[#0C0E14] border border-white/[0.08] flex items-center justify-center text-[#EF4444]">
+    <div className="flex h-[100dvh] w-screen items-center justify-center ambient-shell font-sans">
+      <div className="exec-modal rounded-2xl px-8 py-6 text-center space-y-3.5">
+        <div className="mx-auto w-11 h-11 rounded-xl bg-gradient-to-br from-[#8F1622] to-[#1A080C] border border-[#B51D2C]/45 flex items-center justify-center text-[#F4EFF0]">
           <IconMevaMark size={20} />
         </div>
-        <p className="text-sm font-bold text-gl-text-bright">
+        <p className="text-sm font-bold text-[#F4EFF0]">
           Komuta Yetkisi Doğrulanıyor...
         </p>
-        <div className="mx-auto h-1 w-48 overflow-hidden rounded-full bg-white/[0.08]">
-          <div className="h-full w-1/2 animate-pulse rounded-full bg-[#EF4444]" />
+        <div className="mx-auto h-1.5 w-48 overflow-hidden rounded-full bg-[#180B10]">
+          <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-[#591019] to-[#C82333]" />
         </div>
       </div>
     </div>

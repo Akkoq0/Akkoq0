@@ -1,7 +1,7 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Right Squad Roster & Telemetry Module
+// Meva HUD — Right Squad Roster & Luminous Telemetry Module
 // ─────────────────────────────────────────────────────────
 
 import { memo } from 'react';
@@ -15,10 +15,10 @@ interface PlayerRadarHUDProps {
 }
 
 const PING_MAP: Record<string, number> = {
-  'usr-1': 12,
-  'usr-2': 18,
-  'usr-3': 24,
-  'usr-4': 15,
+  'usr-1': 11,
+  'usr-2': 14,
+  'usr-3': 13,
+  'usr-4': 12,
 };
 
 export const PlayerRadarHUD = memo(function PlayerRadarHUD({
@@ -40,20 +40,20 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
   const groups = [
     {
       key: 'in-game',
-      title: 'OPERASYONDA',
-      dot: 'bg-[#EF4444]',
+      title: 'Operasyonda',
+      dot: 'bg-[#C82333]',
       members: onlineMembers.filter((m) => m.status === 'in-game'),
     },
     {
       key: 'online',
-      title: 'HAZIR KITA',
-      dot: 'bg-[#F59E0B]',
+      title: 'Hazır Kıta',
+      dot: 'bg-[#E04856]',
       members: onlineMembers.filter((m) => m.status === 'online'),
     },
     {
       key: 'away',
-      title: 'BEKLEMEDE',
-      dot: 'bg-[#64748B]',
+      title: 'Beklemede',
+      dot: 'bg-[#7A6B6E]',
       members: onlineMembers.filter(
         (m) => m.status === 'idle' || m.status === 'dnd',
       ),
@@ -61,68 +61,74 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
   ];
 
   return (
-    <aside className="w-full md:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module md:rounded-sm font-sans">
+    <aside className="w-full lg:w-[256px] h-full flex flex-col overflow-hidden select-none titanium-module lg:rounded-xl font-sans tabular-nums">
       {/* ── Module Header ── */}
-      <div className="h-12 px-4 flex items-center justify-between border-b border-white/[0.06] flex-shrink-0">
+      <div className="relative h-12 px-4 flex items-center justify-between bg-[linear-gradient(90deg,rgba(128,18,30,0.14)_0%,transparent_70%)] flex-shrink-0">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-3 bottom-0 h-px horizon-divider opacity-80"
+        />
         <div className="flex items-center gap-2">
-          <IconRadar size={15} className="text-gl-accent" />
-          <h3 className="font-sans text-xs font-bold tracking-wider text-gl-text-bright uppercase">
+          <IconRadar size={15} className="text-[#D63344]" />
+          <h3 className="text-[13px] font-extrabold text-[#F4EFF0]">
             Kadro Radarı
           </h3>
+          <span className="rounded-md px-2 py-0.5 bg-[#1C0B10] border border-[#7A121D]/55 text-[11px] font-bold text-[#F08C96]">
+            {onlineMembers.length}
+          </span>
         </div>
-        <span className="rounded-sm px-1.5 py-0.5 bg-[#060709] border border-white/[0.06] font-mono text-[10px] font-bold text-gl-text-normal">
-          {onlineMembers.length}
-        </span>
         <button
+          type="button"
           onClick={() => setIsMobileRadarOpen(false)}
           aria-label="Kapat"
-          className="md:hidden rounded-sm w-8 h-8 flex items-center justify-center bg-[#060709] border border-white/[0.06] text-gl-text-normal hover:text-gl-text-bright"
+          className="lg:hidden rounded-xl w-9 h-9 flex items-center justify-center bg-[#180B10] border border-[#32151C] text-[#9E8E91] hover:text-[#F4EFF0]"
         >
-          <IconClose size={15} />
+          <IconClose size={16} />
         </button>
       </div>
 
       {/* ── Squad Roster ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3.5 space-y-4">
         {groups.map(
           (g) =>
             g.members.length > 0 && (
-              <section key={g.key} className="space-y-2">
-                <h4 className="px-1.5 flex items-center justify-between font-sans text-[11px] font-bold tracking-wider text-gl-text-muted">
+              <section key={g.key} className="space-y-1.5">
+                <h4 className="px-1.5 flex items-center justify-between text-[11px] font-semibold text-[#8E7E81]">
                   <span className="flex items-center gap-2">
                     <span
                       aria-hidden
-                      className={`w-1.5 h-1.5 rounded-[1px] ${g.dot}`}
+                      className={`w-1.5 h-1.5 rounded-full ${g.dot}`}
                     />
                     <span>{g.title}</span>
                   </span>
-                  <span className="font-mono">{g.members.length}</span>
+                  <span className="text-[#C82333]">{g.members.length}</span>
                 </h4>
 
                 <div className="space-y-1.5">
                   {g.members.map((m) => (
                     <button
+                      type="button"
                       key={m.id}
                       onClick={() => select(m)}
-                      className="group rounded-sm w-full min-h-[52px] px-3 py-2 flex items-center gap-3 text-left bg-[#060709]/70 hover:bg-[#14161D] border border-white/[0.05] hover:border-white/[0.12] transition-colors"
+                      className="group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
                     >
                       <OperatorAvatar
                         name={m.username}
                         status={m.status}
-                        size="md"
+                        size="sm"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-bold text-gl-text-bright group-hover:text-gl-accent transition-colors">
+                        <span className="block truncate text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F28C96] transition-colors">
                           {m.username}
                         </span>
                         {m.activity && (
-                          <span className="block truncate font-sans text-[11px] text-gl-text-muted mt-0.5">
+                          <span className="block truncate text-[11px] text-[#8E7E81] mt-0.5">
                             {m.activity}
                           </span>
                         )}
                       </span>
-                      <span className="font-mono text-[10px] font-bold text-[#F59E0B] tabular-nums">
-                        {PING_MAP[m.id] ?? 16}ms
+                      <span className="rounded-md px-2 py-0.5 bg-[#0D080A] border border-[#2B1319] text-[10.5px] font-bold text-[#C9B8BB] tabular-nums">
+                        {PING_MAP[m.id] ?? 12}ms
                       </span>
                     </button>
                   ))}
@@ -132,23 +138,27 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
         )}
       </div>
 
-      {/* ── Compact Industrial Telemetry Footer ── */}
-      <div className="p-3.5 bg-[#060709] border-t border-white/[0.06] grid grid-cols-3 gap-1.5 text-center font-mono">
-        <div className="rounded-sm py-2 px-1 bg-[#0D0E12] border border-white/[0.06]">
-          <span className="block text-[9px] text-gl-text-muted">JITTER</span>
-          <span className="block text-[11px] font-bold text-gl-text-bright mt-0.5">
+      {/* ── Compact Telemetry Footer ── */}
+      <div className="relative p-3 bg-[#0A0708]/85 grid grid-cols-3 gap-1.5 text-center">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-3 top-0 h-px horizon-divider opacity-70"
+        />
+        <div className="rounded-xl py-1.5 px-1 bg-[#140A0D] border border-[#281318]">
+          <span className="block text-[9px] text-[#827376]">Jitter</span>
+          <span className="block text-[11px] font-bold text-[#F4EFF0] mt-0.5">
             {netGuard.jitterMs}ms
           </span>
         </div>
-        <div className="rounded-sm py-2 px-1 bg-[#0D0E12] border border-white/[0.06]">
-          <span className="block text-[9px] text-gl-text-muted">KAYIP</span>
-          <span className="block text-[11px] font-bold text-gl-text-bright mt-0.5">
+        <div className="rounded-xl py-1.5 px-1 bg-[#140A0D] border border-[#281318]">
+          <span className="block text-[9px] text-[#827376]">Kayıp</span>
+          <span className="block text-[11px] font-bold text-[#F4EFF0] mt-0.5">
             {netGuard.packetLossPercent}%
           </span>
         </div>
-        <div className="rounded-sm py-2 px-1 bg-[#0D0E12] border border-white/[0.06]">
-          <span className="block text-[9px] text-gl-text-muted">BUFFER</span>
-          <span className="block text-[11px] font-bold text-[#F59E0B] mt-0.5">
+        <div className="rounded-xl py-1.5 px-1 bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(14,9,11,0.85)_100%)] border border-[#7A121D]/45">
+          <span className="block text-[9px] text-[#B8AAAC]">Buffer</span>
+          <span className="block text-[11px] font-bold text-[#F08C96] mt-0.5">
             {netGuard.bufferSizeMs}ms
           </span>
         </div>

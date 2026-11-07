@@ -108,31 +108,32 @@ export const ScrimModal = memo(function ScrimModal() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 font-sans"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center exec-backdrop p-0 sm:p-4 font-sans tabular-nums"
       onClick={() => setShowModal(false)}
     >
       <div
-        className="w-full max-w-md rounded-none sm:rounded-md bg-[#080A0E] border-t sm:border border-white/[0.08] p-5 sm:p-6 shadow-2xl"
+        className="w-full max-w-md rounded-t-2xl sm:rounded-2xl exec-modal p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-white/[0.06] pb-4 mb-5">
+        <div className="flex items-center justify-between border-b border-[#881A26]/20 pb-4 mb-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-sm w-9 h-9 bg-[#0C0E12] border border-white/[0.08] flex items-center justify-center text-gl-accent">
-              <IconBolt size={17} />
+            <div className="rounded-xl w-10 h-10 bg-gradient-to-br from-[#591019]/50 to-[#0C0809] border border-[#881A26]/40 flex items-center justify-center text-[#E35D6A]">
+              <IconBolt size={18} />
             </div>
             <div>
-              <h2 className="font-sans text-sm font-bold tracking-wide text-gl-text-bright">
+              <h2 className="text-sm font-bold tracking-tight text-[#F4EFF0]">
                 Geçici P2P Scrim Frekansı
               </h2>
-              <p className="text-xs text-gl-text-muted mt-0.5">
+              <p className="text-xs text-[#8E7F83] mt-0.5">
                 Kayıtsız · DTLS-SRTP Şifreli Ses Köprüsü
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => setShowModal(false)}
-            className="rounded-sm w-9 h-9 bg-[#0C0E12] border border-white/[0.06] flex items-center justify-center text-gl-text-normal hover:text-gl-text-bright"
+            className="rounded-xl w-9 h-9 bg-[#120A0D] hover:bg-[#1B0D12] border border-[#881A26]/25 flex items-center justify-center text-[#9E8F93] hover:text-[#F4EFF0] transition-colors"
             aria-label="Kapat"
           >
             <IconClose size={16} />
@@ -141,52 +142,52 @@ export const ScrimModal = memo(function ScrimModal() {
 
         {activeScrim ? (
           <div className="space-y-4">
-            <div className="rounded-sm p-4 bg-[#0C0E12] border border-white/[0.08] space-y-3">
+            <div className="rounded-2xl p-4 bg-[#11090C]/90 border border-[#881A26]/25 space-y-3.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gl-text-bright">
+                <span className="text-xs font-bold text-[#F4EFF0]">
                   {activeScrim.name}
                 </span>
-                <span className="rounded-sm text-[10px] font-bold px-2 py-0.5 bg-[#10B981]/20 text-[#10B981]">
-                  AKTİF
+                <span className="rounded-full text-[10px] font-bold px-2.5 py-0.5 bg-[#7A121D]/30 text-[#F08C96] border border-[#A61B29]/45">
+                  CANLI FREKANS
                 </span>
               </div>
 
-              <div className="rounded-sm py-3 text-center bg-[#050608] border border-white/[0.06]">
-                <p className="text-[10px] font-semibold text-gl-text-muted uppercase tracking-wider mb-1">
+              <div className="rounded-xl py-3.5 text-center bg-[#090608] border border-[#881A26]/20">
+                <p className="text-[10px] font-semibold text-[#8E7F83] uppercase tracking-wider mb-1">
                   Frekans Erişim Kodu
                 </p>
-                <p className="text-2xl font-mono font-extrabold tracking-[0.3em] text-[#F59E0B]">
+                <p className="text-2xl font-mono font-extrabold tracking-[0.28em] text-[#F08C96]">
                   {activeScrim.code}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-gl-text-muted">
+              <div className="flex items-center justify-between text-xs text-[#8E7F83]">
                 <span>
                   Kapasite:{' '}
-                  <strong className="font-mono text-gl-text-bright">
+                  <strong className="text-[#F4EFF0]">
                     {activeScrim.max_participants}
                   </strong>{' '}
                   Operatör
                 </span>
                 <span>
-                  Kalan:{' '}
-                  <strong className="font-mono text-gl-text-bright">
-                    {remainingMin} dk
-                  </strong>
+                  Otomatik İmha:{' '}
+                  <strong className="text-[#ED8793]">{remainingMin} dk</strong>
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={handleCopyLink}
-                className="rounded-sm min-h-[44px] bg-gl-accent hover:bg-gl-accent-hover text-white text-xs font-bold tracking-wide transition-colors"
+                className="rounded-xl min-h-[44px] crimson-cta text-xs font-bold tracking-wide transition-all"
               >
                 {copied ? 'Link Kopyalandı' : 'Davet Linkini Kopyala'}
               </button>
               <button
+                type="button"
                 onClick={handleDestroy}
-                className="rounded-sm min-h-[44px] bg-[#0C0E12] hover:bg-gl-danger/20 text-gl-danger border border-gl-danger/40 text-xs font-bold tracking-wide transition-colors"
+                className="rounded-xl min-h-[44px] bg-[#120A0D] hover:bg-[#7A121D]/25 text-[#F08C96] border border-[#881A26]/40 text-xs font-bold tracking-wide transition-colors"
               >
                 Frekansı Sonlandır
               </button>
@@ -194,23 +195,25 @@ export const ScrimModal = memo(function ScrimModal() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#0A0708] border border-[#881A26]/20">
               <button
+                type="button"
                 onClick={() => setMode('create')}
-                className={`rounded-sm min-h-[40px] text-xs font-bold uppercase border transition-colors ${
+                className={`rounded-lg min-h-[38px] text-xs font-bold transition-all ${
                   mode === 'create'
-                    ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
-                    : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
+                    ? 'bg-gradient-to-b from-[#2A0E15] to-[#13090C] text-[#F4EFF0] border border-[#881A26]/40'
+                    : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
                 }`}
               >
                 Frekans Aç
               </button>
               <button
+                type="button"
                 onClick={() => setMode('join')}
-                className={`rounded-sm min-h-[40px] text-xs font-bold uppercase border transition-colors ${
+                className={`rounded-lg min-h-[38px] text-xs font-bold transition-all ${
                   mode === 'join'
-                    ? 'bg-[#12151C] text-gl-text-bright border-gl-accent/60'
-                    : 'bg-[#0C0E12] text-gl-text-muted border-white/[0.05]'
+                    ? 'bg-gradient-to-b from-[#2A0E15] to-[#13090C] text-[#F4EFF0] border border-[#881A26]/40'
+                    : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
                 }`}
               >
                 Kod ile Gir
@@ -220,7 +223,7 @@ export const ScrimModal = memo(function ScrimModal() {
             {mode === 'create' ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gl-text-normal mb-2">
+                  <label className="block text-xs font-semibold text-[#C4B6BA] mb-2">
                     Karşılaşma / Antrenman Adı
                   </label>
                   <input
@@ -229,21 +232,22 @@ export const ScrimModal = memo(function ScrimModal() {
                     onChange={(e) => setTeamName(e.target.value)}
                     placeholder="Örn: FUT vs BBL — Ascent"
                     maxLength={40}
-                    className="rounded-sm w-full h-11 bg-[#050608] text-xs text-gl-text-bright px-3.5 border border-white/[0.08] focus:outline-none focus:border-gl-accent"
+                    className="rounded-xl w-full h-11 bg-[#0A0708] text-xs text-[#F4EFF0] placeholder:text-[#786A6E] px-3.5 border border-[#881A26]/25 focus:outline-none focus:border-[#B51D2C]/65 transition-colors"
                   />
                 </div>
 
-                <div className="rounded-sm p-3 bg-[#0C0E12] border border-white/[0.05] flex items-center gap-2 text-xs text-gl-text-normal">
+                <div className="rounded-xl p-3 bg-[#11090C]/90 border border-[#881A26]/20 flex items-center gap-2.5 text-xs text-[#C4B6BA]">
                   <IconShield
-                    size={14}
-                    className="text-[#10B981] flex-shrink-0"
+                    size={15}
+                    className="text-[#E35D6A] flex-shrink-0"
                   />
-                  <span>Opus 96kbps · 2 saat sonunda otomatik imha</span>
+                  <span>Opus 48kHz / 96kbps · 2 saat sonunda otomatik imha</span>
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleCreate}
-                  className="rounded-sm w-full min-h-[44px] bg-gl-accent hover:bg-gl-accent-hover text-white text-xs font-bold tracking-wide uppercase transition-colors"
+                  className="rounded-xl w-full min-h-[44px] crimson-cta text-xs font-bold tracking-wide transition-all"
                 >
                   Scrim Frekansı Üret
                 </button>
@@ -251,27 +255,26 @@ export const ScrimModal = memo(function ScrimModal() {
             ) : (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gl-text-normal mb-2">
-                    6 Haneli Erişim Kodu
+                  <label className="block text-xs font-semibold text-[#C4B6BA] mb-2">
+                    6 Haneli Scrim Erişim Kodu
                   </label>
                   <input
                     type="text"
                     value={joinCode}
                     onChange={(e) =>
-                      setJoinCode(
-                        e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
-                      )
+                      setJoinCode(sanitizeScrimCode(e.target.value).toUpperCase())
                     }
-                    placeholder="X7K9M2"
-                    maxLength={6}
-                    className="rounded-sm w-full h-11 bg-[#050608] text-base font-mono font-bold tracking-[0.3em] text-center text-gl-text-bright px-3.5 border border-white/[0.08] focus:outline-none focus:border-gl-accent uppercase"
+                    placeholder="ÖRN: A7K9X2"
+                    maxLength={8}
+                    className="rounded-xl w-full h-12 bg-[#0A0708] text-center font-mono text-lg font-bold tracking-[0.28em] text-[#F08C96] placeholder:text-[#6E5F63] placeholder:tracking-normal placeholder:text-xs px-3.5 border border-[#881A26]/25 focus:outline-none focus:border-[#B51D2C]/65 transition-colors"
                   />
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleJoin}
-                  disabled={joinCode.trim().length < 4}
-                  className="rounded-sm w-full min-h-[44px] bg-gl-accent hover:bg-gl-accent-hover disabled:opacity-40 text-white text-xs font-bold tracking-wide uppercase transition-colors"
+                  disabled={sanitizeScrimCode(joinCode).length < 4}
+                  className="rounded-xl w-full min-h-[44px] crimson-cta disabled:opacity-40 text-xs font-bold tracking-wide transition-all"
                 >
                   Frekansa Bağlan
                 </button>

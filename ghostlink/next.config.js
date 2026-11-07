@@ -1,10 +1,59 @@
 /** @type {import('next').NextConfig} */
 const isStaticExport = process.env.NEXT_EXPORT === 'true';
+const isProd = process.env.NODE_ENV === 'production';
+
+function buildConnectSrc() {
+  const sources = new Set([
+    "'self'",
+    'https://*.supabase.co',
+    'wss://*.supabase.co',
+  ]);
+  if (!isProd) {
+    sources.add('ws:');
+    sources.add('wss:');
+  }
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (rawUrl) {
+    try {
+      const parsed = new URL(rawUrl.trim());
+      if (
+        parsed.protocol === 'https:' &&
+        !/(placeholder|your-project|ornek-proje|example)/i.test(parsed.hostname)
+      ) {
+        sources.add(parsed.origin);
+        sources.add(`wss://${parsed.host}`);
+      }
+    } catch {
+      // Ignore invalid env URL
+    }
+  }
+  return `connect-src ${Array.from(sources).join(' ')}`;
+}
+
+const scriptSrc = isProd
+  ? "script-src 'self' 'unsafe-inline'"
+  : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
+const cspDirectives = [
+  "default-src 'self'",
+  scriptSrc,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob: mediastream:",
+  buildConnectSrc(),
+  "font-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  ...(isProd ? ["frame-ancestors 'none'"] : []),
+];
 
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
+  ...(isProd ? [{ key: 'X-Frame-Options', value: 'DENY' }] : []),
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
     key: 'Permissions-Policy',
@@ -16,19 +65,7 @@ const securityHeaders = [
   },
   {
     key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
-      "media-src 'self' blob: mediastream:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-      "font-src 'self' data:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ].join('; '),
+    value: cspDirectives.join('; '),
   },
 ];
 

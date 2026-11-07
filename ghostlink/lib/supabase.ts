@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Hardened Supabase Client & ICE Validator
+// Meva HUD — Hardened Supabase Client & Multi-STUN ICE Config
 // ─────────────────────────────────────────────────────────
 
 import { createBrowserClient } from '@supabase/ssr';
@@ -9,6 +9,7 @@ const FALLBACK_SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder.signature';
 
 const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
 ];
@@ -17,16 +18,24 @@ const SAFE_ICE_SCHEME_RE = /^(stuns?|turns?):[A-Za-z0-9._:?=&-]+$/i;
 
 let client: ReturnType<typeof createBrowserClient> | null = null;
 
+const PLACEHOLDER_HOST_RE =
+  /(placeholder|your-project|ornek-proje|ornek\.|example\.|dummy|localhost)/i;
+const VALID_SUPABASE_KEY_RE =
+  /^(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|sb_publishable_[A-Za-z0-9_-]{20,})$/;
+
 export function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  return Boolean(
-    url &&
-      key &&
-      url.startsWith('https://') &&
-      !url.includes('placeholder.supabase.co') &&
-      !url.includes('your-project-id'),
-  );
+  if (!url || !key || !VALID_SUPABASE_KEY_RE.test(key)) return false;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    if (PLACEHOLDER_HOST_RE.test(parsed.hostname)) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function getSupabase() {
@@ -59,7 +68,8 @@ export function getIceServers(): RTCIceServer[] {
       const rawUrls = candidate.urls;
       const urlList = Array.isArray(rawUrls)
         ? rawUrls.filter(
-            (u): u is string => typeof u === 'string' && SAFE_ICE_SCHEME_RE.test(u),
+            (u): u is string =>
+              typeof u === 'string' && SAFE_ICE_SCHEME_RE.test(u),
           )
         : typeof rawUrls === 'string' && SAFE_ICE_SCHEME_RE.test(rawUrls)
           ? [rawUrls]
@@ -81,4 +91,13 @@ export function getIceServers(): RTCIceServer[] {
   } catch {
     return DEFAULT_ICE_SERVERS;
   }
+}
+
+export function buildRtcConfig(): RTCConfiguration {
+  return {
+    iceServers: getIceServers(),
+    iceCandidatePoolSize: 2,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
+  };
 }

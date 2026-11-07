@@ -1,17 +1,12 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Tactical Bento Cockpit (StreamChatArea)
+// Meva HUD — Forged Oxblood & Titanium Executive Cockpit
 // ─────────────────────────────────────────────────────────
-//   • TOP STAGE: 5-Operator Live Squad Voice Matrix with
-//     24-micro-bar high-res audio spectrum, acoustic avatar ring,
-//     3D Spatial Audio (L/C/R) selector, non-truncated 2-line
-//     agent/loadout hierarchy, and 0-200% Gain slider.
-//   • BOTTOM-LEFT: Pre-populated Tactical Comms & Callout Stream
-//     with voice-note waveform player and instant callout cards.
-//   • BOTTOM-RIGHT: Visualized P2P Mesh & System Telemetry with
-//     sparklines, radial CPU gauge, and an interactive 5-vertex
-//     Pentagon P2P Mesh SVG with flowing data packets.
+//   • Desktop (>= 1024px): 100dvh zero-overflow 3-Module Bento War Room
+//   • Mobile / Tablet (< 1024px): Dedicated, spacious, thumb-ergonomic
+//     multi-view architecture (İletişim + Canlı Ses Şeridi | Ses Matrisi |
+//     P2P Ağ & Scrim) synchronized with MobileBottomNav.
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/lib/store';
@@ -21,24 +16,25 @@ import {
   INITIAL_TACTICAL_MESSAGES,
 } from '@/hooks/useRealtimeChat';
 import { cleanLabel } from '@/lib/format';
-import { OperatorAvatar } from '@/components/ui/HudPrimitives';
+import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
   IconVoiceWave,
   IconMic,
   IconMicOff,
   IconSend,
   IconShield,
+  IconBolt,
+  IconGauge,
 } from '@/components/ui/MevaIcons';
-import type { Profile, VoiceControls } from '@/types';
+import type { Message, Profile, VoiceControls } from '@/types';
 
 interface SquadOperatorMeta {
   id: string;
   username: string;
   role: 'IGL' | 'AWP' | 'ENTRY' | 'LURKER' | 'COACH';
-  roleBadgeCls: string;
+  roleTone: 'burgundy' | 'bronze' | 'neutral';
   pingMs: number;
-  jitterMs: number;
-  loadoutByServer: Record<string, { agent: string; detail: string }>;
+  waveSpeed: number;
 }
 
 const SQUAD_OPERATORS: SquadOperatorMeta[] = [
@@ -46,113 +42,147 @@ const SQUAD_OPERATORS: SquadOperatorMeta[] = [
     id: 'usr-local',
     username: 'Operatör',
     role: 'IGL',
-    roleBadgeCls: 'text-[#F59E0B] border-[#F59E0B]/40 bg-[#F59E0B]/10',
+    roleTone: 'bronze',
     pingMs: 9,
-    jitterMs: 0.1,
-    loadoutByServer: {
-      'srv-1': { agent: 'Omen • Taktik Komuta', detail: 'Radiant IGL · Lider' },
-      'srv-2': { agent: 'Taktik Kaptan • IGL', detail: 'Faceit 3200 ELO' },
-      'srv-3': { agent: 'Asıl Kadro • Komutan', detail: 'Turnuva Hattı' },
-    },
+    waveSpeed: 1.35,
   },
   {
     id: 'usr-1',
     username: 'cNed',
     role: 'AWP',
-    roleBadgeCls: 'text-[#EF4444] border-[#EF4444]/40 bg-[#EF4444]/10',
+    roleTone: 'burgundy',
     pingMs: 11,
-    jitterMs: 0.2,
-    loadoutByServer: {
-      'srv-1': { agent: 'Jett • Operator', detail: 'Radiant #14 · Keskin Nişancı' },
-      'srv-2': { agent: 'Birincil AWP • Mirage', detail: 'Faceit Lvl 10 · 1.42 K/D' },
-      'srv-3': { agent: 'Duelist • Operator', detail: 'VCT Şampiyonu' },
-    },
+    waveSpeed: 1.2,
   },
   {
     id: 'usr-4',
     username: 'XANTARES',
     role: 'ENTRY',
-    roleBadgeCls: 'text-[#10B981] border-[#10B981]/40 bg-[#10B981]/10',
+    roleTone: 'burgundy',
     pingMs: 12,
-    jitterMs: 0.2,
-    loadoutByServer: {
-      'srv-1': { agent: 'Raze • Entry Fragger', detail: 'Alan Açıcı · %64 HS' },
-      'srv-2': { agent: 'AK-47 • Space Creator', detail: '3140 ELO · FPL Yıldızı' },
-      'srv-3': { agent: 'Başlangıç Taarruz', detail: 'Agresif Giriş' },
-    },
+    waveSpeed: 1.15,
   },
   {
     id: 'usr-2',
     username: 'woxic',
     role: 'LURKER',
-    roleBadgeCls: 'text-[#F59E0B] border-[#F59E0B]/40 bg-[#F59E0B]/10',
+    roleTone: 'bronze',
     pingMs: 14,
-    jitterMs: 0.3,
-    loadoutByServer: {
-      'srv-1': { agent: 'Sova • Recon & Clutch', detail: 'Harita İstihbarat · Lvl 10' },
-      'srv-2': { agent: 'Hibrit AWP • Clutch', detail: 'Sol El Uzmanı · 3090 ELO' },
-      'srv-3': { agent: 'Arka Hat Sızma', detail: 'Geç Rotasyon Kontrolü' },
-    },
+    waveSpeed: 1.45,
   },
   {
     id: 'usr-3',
     username: 'Alfajer',
     role: 'COACH',
-    roleBadgeCls: 'text-gl-text-bright border-white/20 bg-white/[0.06]',
+    roleTone: 'neutral',
     pingMs: 13,
-    jitterMs: 0.2,
-    loadoutByServer: {
-      'srv-1': { agent: 'Killjoy • Site Anchor', detail: 'Savunma Kilidi & Analiz' },
-      'srv-2': { agent: 'B-Site Savunma • Analist', detail: 'Taktik Gözlem' },
-      'srv-3': { agent: 'Harita Koçu & VOD', detail: 'Canlı Strateji' },
-    },
+    waveSpeed: 1.55,
   },
 ];
+
+const MESH_NODES: Array<{
+  opIndex: number;
+  cx: number;
+  cy: number;
+  tx: number;
+  ty: number;
+  anchor: 'middle' | 'start' | 'end';
+  tone: 'ruby' | 'bronze';
+  r: number;
+}> = [
+  {
+    opIndex: 0,
+    cx: 160,
+    cy: 22,
+    tx: 160,
+    ty: 10,
+    anchor: 'middle',
+    tone: 'ruby',
+    r: 6,
+  },
+  {
+    opIndex: 1,
+    cx: 82,
+    cy: 66,
+    tx: 69,
+    ty: 69,
+    anchor: 'end',
+    tone: 'bronze',
+    r: 5.5,
+  },
+  {
+    opIndex: 2,
+    cx: 238,
+    cy: 66,
+    tx: 251,
+    ty: 69,
+    anchor: 'start',
+    tone: 'bronze',
+    r: 5.5,
+  },
+  {
+    opIndex: 3,
+    cx: 108,
+    cy: 142,
+    tx: 95,
+    ty: 146,
+    anchor: 'end',
+    tone: 'ruby',
+    r: 5.5,
+  },
+  {
+    opIndex: 4,
+    cx: 212,
+    cy: 142,
+    tx: 225,
+    ty: 146,
+    anchor: 'start',
+    tone: 'ruby',
+    r: 5.5,
+  },
+];
+
+const ROLE_BADGE_STYLE: Record<SquadOperatorMeta['roleTone'], string> = {
+  burgundy:
+    'bg-[#7A121D]/30 text-[#F29AA3] border-[#961826]/45',
+  bronze:
+    'bg-[#4A1118]/35 text-[#E0B0B6] border-[#6E1620]/45',
+  neutral:
+    'bg-[#170C10] text-[#B8AAAC] border-[#2E161D]',
+};
+
+const PAN_TITLE: Record<'L' | 'C' | 'R', string> = {
+  L: '3D Sahne: Sol (-0.78) · Değiştirmek için tıklayın',
+  C: '3D Sahne: Merkez (0.0) · Değiştirmek için tıklayın',
+  R: '3D Sahne: Sağ (+0.78) · Değiştirmek için tıklayın',
+};
 
 const CALLOUTS = [
   {
-    label: 'READY',
-    tag: 'HAZIRLIK ONAYI',
-    tone: 'emerald',
-    text: '[READY] Ses frekansı ve ekipman kontrolü tamamlandı. Lobi maça hazır!',
+    label: 'Hazır',
+    text: '[HAZIR] Ses frekansı ve ekipman kontrolü tamamlandı, lobi maça hazır.',
   },
   {
-    label: 'ROTATE B',
-    tag: 'ACİL ROTASYON',
-    tone: 'crimson',
-    text: '[TAKTİK ÇAĞRI: ROTATE B] B-Site yönüne hızlı rotasyon! Mid üzerinden 2 oyuncu sızıyor.',
+    label: 'Rotate B',
+    text: '[TAKTİK ÇAĞRI: ROTATE B] B-Site yönüne hızlı rotasyon, Mid hattından 2 temas var.',
   },
   {
-    label: 'ECO ROUND',
-    tag: 'EKONOMİ KARARI',
-    tone: 'amber',
-    text: '[ROUND 14 - ECO] Bu el tam eco, kredi koruyoruz (min 4100). Sonraki el tam teçhizat.',
+    label: 'Eco',
+    text: '[ROUND 14 — ECO KARARI] Bu el kredi koruyoruz (min 4100), sonraki tur tam teçhizat.',
   },
   {
-    label: 'DROP AWP',
-    tag: 'SİLAH TALEBİ',
-    tone: 'amber',
-    text: '[DROP AWP] cNed için Operator / AWP drop gerekiyor, kredisi uygun olan atsın.',
+    label: 'Drop AWP',
+    text: '[DROP AWP] cNed için birincil Operator / AWP drop gerekiyor, kredisi uygun olan atsın.',
   },
   {
-    label: 'FORCE BUY',
-    tag: 'KRİTİK TUR',
-    tone: 'crimson',
-    text: '[FORCE BUY] Kritik round! Tüm krediyle zırh + tüfek + tam utility çekiyoruz.',
+    label: 'Force',
+    text: '[FORCE BUY] Kritik tur! Tüm krediyle zırh, tüfek ve tam utility çekiyoruz.',
   },
   {
     label: 'GG WP',
-    tag: 'MAÇ SONU',
-    tone: 'emerald',
-    text: '[GG WP] Kusursuz iletişim ve sıfır gecikme. Elinize sağlık takım!',
+    text: '[GG WP] Kusursuz iletişim ve sıfır gecikme, elinize sağlık takım.',
   },
 ] as const;
-
-// 24 fine vertical micro-bars for high-resolution audio spectrum
-const SPECTRUM_PROFILE = [
-  24, 42, 68, 88, 54, 96, 74, 46, 82, 100, 64, 38, 76, 92, 58, 84, 98, 62, 44,
-  86, 72, 52, 66, 32,
-];
 
 interface StreamChatAreaProps {
   userId: string;
@@ -167,7 +197,6 @@ export const StreamChatArea = memo(function StreamChatArea({
   onSelectPlayer,
   voiceControls,
 }: StreamChatAreaProps) {
-  const activeServerId = useAppStore((s) => s.activeServerId) ?? 'srv-1';
   const activeChannelId = useAppStore((s) => s.activeChannelId);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const activeDMUserId = useAppStore((s) => s.activeDMUserId);
@@ -176,20 +205,25 @@ export const StreamChatArea = memo(function StreamChatArea({
   const onlineMembers = useAppStore((s) => s.onlineMembers);
   const storeMessages = useAppStore((s) => s.messages);
   const ecoActive = useAppStore((s) => s.ecoMode.isActive);
+  const ecoEnabled = useAppStore((s) => s.ecoMode.isEnabled);
+  const ecoCpu = useAppStore((s) => s.ecoMode.cpuEstimate);
+  const activeScrim = useAppStore((s) => s.activeScrimRoom);
+  const mobileTab = useAppStore((s) => s.mobileTab);
 
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
   const setActiveDMUser = useAppStore((s) => s.setActiveDMUser);
+  const setMobileTab = useAppStore((s) => s.setMobileTab);
+  const setShowScrimModal = useAppStore((s) => s.setShowScrimModal);
+  const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
 
   const { sendMessage } = useRealtimeChat(activeChannelId);
 
-  // Never allow the feed to render empty
   const messages =
     storeMessages.length > 0 ? storeMessages : INITIAL_TACTICAL_MESSAGES;
 
-  // Synchronized per-operator gain (0-200%), mute, and 3D spatial audio pan (L/C/R)
   const gains = useHUDStore((s) => s.playerGains);
   const mutedPeers = useHUDStore((s) => s.localMutes);
-  const spatialPan = useHUDStore((s) => s.spatialPans);
+  const spatialPans = useHUDStore((s) => s.spatialPans);
   const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
   const togglePeerMute = useHUDStore((s) => s.toggleLocalMute);
   const cycleSpatialPan = useHUDStore((s) => s.cycleSpatialPan);
@@ -211,9 +245,7 @@ export const StreamChatArea = memo(function StreamChatArea({
     rtt: 11,
     jitter: 0.2,
     cpu: 0.3,
-    ram: 14,
-    buffer: 12,
-    stability: 99.4,
+    stability: 99.8,
   });
 
   const [input, setInput] = useState('');
@@ -236,14 +268,10 @@ export const StreamChatArea = memo(function StreamChatArea({
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat || isEditable(e.target)) return;
-      if (e.key === 'v' || e.key === 'V') {
-        setPttActive(true);
-      }
+      if (e.key === 'v' || e.key === 'V') setPttActive(true);
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'v' || e.key === 'V') {
-        setPttActive(false);
-      }
+      if (e.key === 'v' || e.key === 'V') setPttActive(false);
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -254,38 +282,34 @@ export const StreamChatArea = memo(function StreamChatArea({
     };
   }, []);
 
-  // Live voice activity & telemetry simulation
+  // Voice activity & telemetry updates
   useEffect(() => {
     if (ecoActive) return;
     const interval = setInterval(() => {
       setSpeakingPeers((prev) => ({
         ...prev,
-        'usr-1': Math.random() > 0.32,
-        'usr-4': Math.random() > 0.42,
+        'usr-1': Math.random() > 0.3,
+        'usr-4': Math.random() > 0.4,
         'usr-2': Math.random() > 0.62,
         'usr-3': Math.random() > 0.72,
       }));
 
       if (stressTestActive) {
         setSimMetrics({
-          rtt: Math.floor(18 + Math.random() * 14),
-          jitter: Number((0.8 + Math.random() * 1.4).toFixed(1)),
-          cpu: Number((0.4 + Math.random() * 0.3).toFixed(1)),
-          ram: 15,
-          buffer: Math.floor(28 + Math.random() * 16),
-          stability: Number((94.2 + Math.random() * 3.5).toFixed(1)),
+          rtt: Math.floor(16 + Math.random() * 10),
+          jitter: Number((0.6 + Math.random() * 0.9).toFixed(1)),
+          cpu: Number((0.4 + Math.random() * 0.2).toFixed(1)),
+          stability: Number((98.4 + Math.random() * 1.1).toFixed(1)),
         });
       } else {
         setSimMetrics({
-          rtt: Math.floor(10 + Math.random() * 3),
-          jitter: Number((0.1 + Math.random() * 0.2).toFixed(1)),
+          rtt: 11,
+          jitter: 0.2,
           cpu: 0.3,
-          ram: 14,
-          buffer: 12,
-          stability: Number((99.1 + Math.random() * 0.8).toFixed(1)),
+          stability: 99.8,
         });
       }
-    }, 1600);
+    }, 1800);
 
     return () => clearInterval(interval);
   }, [ecoActive, stressTestActive]);
@@ -305,7 +329,7 @@ export const StreamChatArea = memo(function StreamChatArea({
     if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
     pulseTimerRef.current = setTimeout(() => {
       setSpeakingPeers((prev) => ({ ...prev, 'usr-local': false }));
-    }, 2200);
+    }, 2000);
   }, []);
 
   const handleCallout = useCallback(
@@ -331,34 +355,25 @@ export const StreamChatArea = memo(function StreamChatArea({
     (op: SquadOperatorMeta) => {
       if (!onSelectPlayer) return;
       const found = onlineMembers.find((m) => m.id === op.id);
-      const loadout = op.loadoutByServer[activeServerId] ?? {
-        agent: 'Taktik Operatör',
-        detail: 'Hazır Kıta',
-      };
       onSelectPlayer(
         found ?? {
           id: op.id,
           username: op.id === 'usr-local' ? username : op.username,
           avatar_url: null,
           status: 'in-game',
-          activity: `${loadout.agent} (${loadout.detail})`,
-          created_at: new Date().toISOString(),
+          activity: op.role,
+          created_at: '2026-11-06T19:00:00.000Z',
         },
       );
     },
-    [onlineMembers, onSelectPlayer, username, activeServerId],
-  );
-
-  const handleGainChange = useCallback(
-    (id: string, val: number) => {
-      setPlayerGain(id, val);
-    },
-    [setPlayerGain],
+    [onlineMembers, onSelectPlayer, username],
   );
 
   const activeRoomName = activeVoiceChannel
     ? cleanLabel(activeVoiceChannel.name)
-    : 'Taktik Lobi #1';
+    : activeVoiceChannelId?.startsWith('scrim-')
+      ? `Scrim #${activeVoiceChannelId.slice(6)}`
+      : 'Taktik Lobi #1';
 
   const chatTitle = dmFriend
     ? `@${dmFriend.username}`
@@ -366,32 +381,662 @@ export const StreamChatArea = memo(function StreamChatArea({
       ? `#${cleanLabel(activeTextChannel.name)}`
       : '#genel-sohbet';
 
-  return (
-    <main className="flex-1 h-full flex flex-col overflow-y-auto lg:overflow-hidden min-w-0 gap-2.5 p-2 md:p-0 font-sans">
-      {/* ═══════════════════════════════════════════════════════
-          1. TOP STAGE: 5-OPERATOR LIVE SQUAD VOICE MATRIX
-         ═══════════════════════════════════════════════════════ */}
-      <section className="titanium-module rounded-sm p-3.5 md:p-4 flex flex-col gap-3 flex-shrink-0">
-        {/* Matrix Header */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] pb-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981] animate-pulse flex-shrink-0" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-sans text-[13px] md:text-sm font-bold tracking-tight text-gl-text-bright">
-                  Canlı Operatör Ses Matrisi — {activeRoomName}
-                </h2>
-                <span className="rounded-sm px-2 py-0.5 bg-[#10B981]/12 border border-[#10B981]/35 font-mono text-[10px] font-bold text-[#10B981]">
-                  5/5 P2P MESH
+  const selfMuted =
+    (voiceControls?.isMuted ?? false) || Boolean(mutedPeers['usr-local']);
+  const selfTransmitting =
+    !selfMuted &&
+    (pttActive ||
+      Boolean(voiceControls?.isSpeaking) ||
+      Boolean(speakingPeers['usr-local']));
+
+  const renderOperatorCards = (mobileComfort: boolean) =>
+    SQUAD_OPERATORS.map((op) => {
+      const isSelf = op.id === 'usr-local';
+      const displayName = isSelf ? username : op.username;
+      const isMuted = isSelf
+        ? selfMuted
+        : Boolean(mutedPeers[op.id]) || (gains[op.id] ?? 100) === 0;
+      const isSpeaking =
+        !isMuted &&
+        (isSelf ? selfTransmitting : Boolean(speakingPeers[op.id]));
+      const gainVal = isMuted ? 0 : (gains[op.id] ?? 100);
+      const pan = spatialPans[op.id] ?? 'C';
+      const isBoosted = gainVal > 100;
+      const waveLevel = Math.min(1, Math.max(0.22, gainVal / 135));
+
+      return (
+        <div
+          key={op.id}
+          className={`cockpit-pod rounded-xl ${
+            mobileComfort ? 'p-3.5 gap-2.5' : 'p-3 gap-2'
+          } flex flex-col justify-between ${
+            isSpeaking
+              ? 'cockpit-pod-live'
+              : isMuted
+                ? 'cockpit-pod-muted opacity-85'
+                : ''
+          }`}
+        >
+          {/* Row 1: Avatar + Full Unclipped Name + Mute Button */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => handleInspectOperator(op)}
+              className="flex items-center gap-2.5 min-w-0 text-left group"
+            >
+              <OperatorAvatar
+                name={displayName}
+                status={isMuted ? 'dnd' : isSpeaking ? 'online' : 'in-game'}
+                size={mobileComfort ? 'md' : 'sm'}
+                speaking={isSpeaking}
+              />
+              <div className="min-w-0">
+                <span className="block text-[13.5px] lg:text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F29AA3] transition-colors whitespace-nowrap leading-tight">
+                  {displayName}
                 </span>
-                <span className="hidden sm:inline-block rounded-sm px-2 py-0.5 bg-[#F59E0B]/10 border border-[#F59E0B]/30 font-mono text-[10px] font-semibold text-[#F59E0B]">
-                  96kbps Opus · 48kHz
-                </span>
+                {mobileComfort && (
+                  <span className="block text-[11px] font-semibold text-[#827376] mt-0.5">
+                    {isMuted
+                      ? 'Mikrofon Kapalı'
+                      : isSpeaking
+                        ? 'Canlı İletimde'
+                        : 'Bağlı · Hazır'}
+                  </span>
+                )}
               </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                isSelf && voiceControls
+                  ? voiceControls.toggleMute()
+                  : togglePeerMute(op.id)
+              }
+              aria-label={isMuted ? 'Sesi aç' : 'Sustur'}
+              title={isMuted ? 'Sesi aç' : 'Operatörü sustur'}
+              className={`rounded-lg ${
+                mobileComfort ? 'w-9 h-9' : 'w-7 h-7'
+              } flex items-center justify-center border flex-shrink-0 transition-colors ${
+                isMuted
+                  ? 'bg-[#8F1622]/25 text-[#F08C96] border-[#C82333]/50'
+                  : 'bg-[#120A0D] text-[#9E8E91] hover:text-[#F4EFF0] border-[#281318] hover:border-[#4A1C26]'
+              }`}
+            >
+              {isMuted ? <IconMicOff size={14} /> : <IconMic size={14} />}
+            </button>
+          </div>
+
+          {/* Row 2: Single Role Badge + 3D Spatial Pan + Crisp Ping */}
+          <div className="flex items-center justify-between gap-1.5">
+            <span
+              className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wider border ${ROLE_BADGE_STYLE[op.roleTone]}`}
+            >
+              {op.role}
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              {!isSelf && (
+                <button
+                  type="button"
+                  onClick={() => cycleSpatialPan(op.id)}
+                  title={PAN_TITLE[pan]}
+                  aria-label={`${displayName} 3D ses yönü: ${pan}`}
+                  className={`rounded-md ${
+                    mobileComfort ? 'h-7 px-2.5 text-[11px]' : 'h-5 px-1.5 text-[10px]'
+                  } font-bold border transition-colors ${
+                    pan !== 'C'
+                      ? 'bg-[#8F1622]/25 text-[#F29AA3] border-[#961826]/50'
+                      : 'bg-[#120A0D] text-[#9E8E91] hover:text-[#F4EFF0] border-[#281318]'
+                  }`}
+                >
+                  {mobileComfort ? `3D · ${pan}` : pan}
+                </button>
+              )}
+              <span
+                className={`text-[11.5px] lg:text-[11px] font-bold tabular-nums ${
+                  isMuted
+                    ? 'text-[#D63344]'
+                    : isSpeaking
+                      ? 'text-[#F29AA3]'
+                      : 'text-[#827376]'
+                }`}
+              >
+                {isMuted ? 'Sessiz' : `${op.pingMs} ms`}
+              </span>
             </div>
           </div>
 
-          {/* Room Switcher Pills & Push-To-Talk */}
+          {/* Row 3: Smooth Fluid SVG Audio Wave */}
+          <div
+            onClick={() =>
+              setSpeakingPeers((p) => ({ ...p, [op.id]: !p[op.id] }))
+            }
+            title="Ses dalgasını test etmek için tıklayın"
+            className={`cursor-pointer rounded-lg ${
+              mobileComfort ? 'h-9' : 'h-8'
+            } px-2.5 border flex items-center transition-all duration-200 ${
+              isSpeaking
+                ? 'bg-[linear-gradient(90deg,#0E080A_0%,#260D14_50%,#0E080A_100%)] border-[#C82333]/45'
+                : 'bg-[#0B0709] border-[#221015]'
+            }`}
+          >
+            <FluidWave
+              level={waveLevel}
+              active={isSpeaking && !ecoActive}
+              muted={isMuted}
+              speed={op.waveSpeed}
+              className="w-full h-6"
+            />
+          </div>
+
+          {/* Row 4: High-Contrast Crimson/Bronze Gain Slider */}
+          <div className="flex items-center gap-2.5 pt-0.5">
+            <input
+              type="range"
+              min={0}
+              max={200}
+              step={5}
+              value={gainVal}
+              onChange={(e) => setPlayerGain(op.id, Number(e.target.value))}
+              onDoubleClick={() => setPlayerGain(op.id, 100)}
+              title="Çift tıklayarak %100 seviyesine sıfırlayın"
+              style={
+                {
+                  '--fill': `${Math.round((gainVal / 200) * 100)}%`,
+                } as React.CSSProperties
+              }
+              aria-label={`${displayName} ses seviyesi`}
+              className="exec-range flex-1"
+            />
+            <span
+              className={`text-[11.5px] lg:text-[11px] font-bold tabular-nums w-10 text-right ${
+                isBoosted ? 'text-[#F29AA3]' : 'text-[#B8AAAC]'
+              }`}
+            >
+              %{gainVal}
+            </span>
+          </div>
+        </div>
+      );
+    });
+
+  const renderMeshSvg = (maxHeightClass: string, idPrefix: string) => (
+    <svg
+      viewBox="0 0 320 164"
+      className={`w-full h-full ${maxHeightClass}`}
+      preserveAspectRatio="xMidYMid meet"
+      aria-label="5-Operatör P2P Mesh Ağ Topolojisi"
+    >
+      <defs>
+        <radialGradient id={`${idPrefix}-core`} cx="50%" cy="52%" r="50%">
+          <stop offset="0%" stopColor="#961826" stopOpacity="0.22" />
+          <stop offset="55%" stopColor="#4A0B12" stopOpacity="0.08" />
+          <stop offset="100%" stopColor="#070607" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${idPrefix}-edge`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#B81F2E" stopOpacity="0.65" />
+          <stop offset="50%" stopColor="#7A121D" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="#B81F2E" stopOpacity="0.65" />
+        </linearGradient>
+        <radialGradient id={`${idPrefix}-ruby`} cx="35%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="#E35D6A" />
+          <stop offset="55%" stopColor="#A61B29" />
+          <stop offset="100%" stopColor="#3B080E" />
+        </radialGradient>
+        <radialGradient id={`${idPrefix}-bronze`} cx="35%" cy="35%" r="65%">
+          <stop offset="0%" stopColor="#C98A92" />
+          <stop offset="55%" stopColor="#7A1824" />
+          <stop offset="100%" stopColor="#2B090E" />
+        </radialGradient>
+      </defs>
+
+      <ellipse cx="160" cy="86" rx="108" ry="70" fill={`url(#${idPrefix}-core)`} />
+
+      <circle
+        cx="160"
+        cy="86"
+        r="64"
+        fill="none"
+        stroke={`url(#${idPrefix}-edge)`}
+        strokeOpacity="0.30"
+        strokeWidth="1"
+      />
+      <circle
+        cx="160"
+        cy="86"
+        r="34"
+        fill="none"
+        stroke="#8F1622"
+        strokeOpacity="0.22"
+        strokeWidth="1"
+      />
+
+      <g stroke={`url(#${idPrefix}-edge)`} strokeWidth="1.3">
+        <line x1="160" y1="22" x2="82" y2="66" />
+        <line x1="160" y1="22" x2="238" y2="66" />
+        <line x1="160" y1="22" x2="108" y2="142" />
+        <line x1="160" y1="22" x2="212" y2="142" />
+        <line x1="82" y1="66" x2="238" y2="66" />
+        <line x1="82" y1="66" x2="108" y2="142" />
+        <line x1="82" y1="66" x2="212" y2="142" />
+        <line x1="238" y1="66" x2="108" y2="142" />
+        <line x1="238" y1="66" x2="212" y2="142" />
+        <line x1="108" y1="142" x2="212" y2="142" />
+      </g>
+
+      {!ecoActive && (
+        <>
+          <circle r="3" fill="#E35D6A">
+            <animateMotion
+              dur={stressTestActive ? '1.2s' : '2.2s'}
+              repeatCount="indefinite"
+              path="M160,22 L82,66 L108,142 L212,142 L238,66 Z"
+            />
+          </circle>
+          <circle r="3" fill="#B81F2E">
+            <animateMotion
+              dur={stressTestActive ? '1.5s' : '2.8s'}
+              repeatCount="indefinite"
+              path="M160,22 L212,142 L82,66 L238,66 L108,142 Z"
+            />
+          </circle>
+        </>
+      )}
+
+      <g fontSize="10" fontWeight="700" fill="#F4EFF0">
+        {MESH_NODES.map((node) => {
+          const op = SQUAD_OPERATORS[node.opIndex];
+          const isSelf = op.id === 'usr-local';
+          const callsign = isSelf ? username : op.username;
+          const nodeSpeaking = isSelf
+            ? selfTransmitting
+            : Boolean(speakingPeers[op.id]);
+          const sphereGrad =
+            node.tone === 'bronze'
+              ? `url(#${idPrefix}-bronze)`
+              : `url(#${idPrefix}-ruby)`;
+
+          return (
+            <g
+              key={op.id}
+              onClick={() => handleInspectOperator(op)}
+              className="cursor-pointer"
+            >
+              {nodeSpeaking && (
+                <circle
+                  cx={node.cx}
+                  cy={node.cy}
+                  r={node.r + 5.5}
+                  fill="rgba(196,30,46,0.16)"
+                  stroke="#D63344"
+                  strokeOpacity="0.75"
+                  strokeWidth="1.25"
+                />
+              )}
+              <circle
+                cx={node.cx}
+                cy={node.cy}
+                r={node.r + 0.5}
+                fill={sphereGrad}
+                stroke={nodeSpeaking ? '#F4EFF0' : '#090708'}
+                strokeWidth="1.4"
+              />
+              <text
+                x={node.tx}
+                y={node.ty}
+                textAnchor={node.anchor}
+                fill={nodeSpeaking ? '#F4EFF0' : '#B8AAAC'}
+              >
+                {callsign} · {op.pingMs}ms
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    </svg>
+  );
+
+  return (
+    <main className="flex-1 h-full min-h-0 flex flex-col overflow-hidden min-w-0 gap-2.5 p-2.5 lg:p-0 font-sans tabular-nums">
+      {/* ═══════════════════════════════════════════════════════
+          MOBILE / TABLET (< 1024px) DEDICATED BREATHABLE COCKPIT
+         ═══════════════════════════════════════════════════════ */}
+
+      {/* MOBILE VIEW 1: SPACIOUS TACTICAL CHAT + LIVE VOICE STRIP */}
+      {mobileTab === 'chat' && (
+        <div className="lg:hidden flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden">
+          {/* Breathable Compact Live Voice Banner */}
+          <div className="titanium-module rounded-xl px-3.5 py-2.5 flex items-center justify-between gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setMobileTab('voice')}
+              className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+            >
+              <span className="rounded-lg w-8 h-8 crimson-cta flex items-center justify-center text-[#F4EFF0] flex-shrink-0">
+                <IconVoiceWave size={15} />
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-[13px] font-extrabold text-[#F4EFF0]">
+                    {activeRoomName}
+                  </span>
+                  <span className="rounded px-1.5 py-0.5 bg-[#7A121D]/30 border border-[#961826]/45 text-[10px] font-bold text-[#F29AA3]">
+                    5/5
+                  </span>
+                </div>
+                <span className="block truncate text-[11px] font-medium text-[#827376]">
+                  Ses matrisini ve DSP ayarlarını açmak için dokun
+                </span>
+              </div>
+            </button>
+
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  voiceControls
+                    ? voiceControls.toggleMute()
+                    : togglePeerMute('usr-local')
+                }
+                aria-label={selfMuted ? 'Mikrofonu aç' : 'Mikrofonu sustur'}
+                className={`rounded-xl w-10 h-10 flex items-center justify-center border transition-all active:scale-95 ${
+                  selfMuted
+                    ? 'bg-[#8F1622]/25 text-[#F08C96] border-[#C82333]/50'
+                    : 'bg-[#120A0D] text-[#F4EFF0] border-[#2C141A]'
+                }`}
+              >
+                {selfMuted ? <IconMicOff size={16} /> : <IconMic size={16} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Spacious Full-Height Mobile Chat Card */}
+          <section className="titanium-module rounded-xl flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* Clean Uncluttered Mobile Chat Header */}
+            <div className="relative h-11 px-3.5 flex items-center justify-between gap-2 bg-[#0D080A]/70 flex-shrink-0">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-x-3 bottom-0 h-px horizon-divider opacity-80"
+              />
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-1.5 h-4 rounded-full bg-[#C82333]" />
+                <h3 className="text-[13.5px] font-extrabold text-[#F4EFF0] truncate">
+                  {chatTitle}
+                </h3>
+                {dmFriend && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveDMUser(null)}
+                    className="rounded-lg px-2.5 py-1 bg-[#180B10] border border-[#32151C] text-[11px] font-bold text-[#F29AA3]"
+                  >
+                    Genel Akış
+                  </button>
+                )}
+              </div>
+              <span className="text-[11px] font-bold text-[#D63344] flex-shrink-0">
+                E2EE Aktif
+              </span>
+            </div>
+
+            <TacticalMessageFeed
+              messages={messages}
+              userId={userId}
+              playingVoiceNoteId={playingVoiceNoteId}
+              onToggleVoiceNote={setPlayingVoiceNoteId}
+              ecoActive={ecoActive}
+              bottomRef={bottomRef}
+            />
+
+            {/* Breathable Dedicated Swipeable Callout Bar */}
+            <div className="px-3 py-2 bg-[#0A0708]/80 border-t border-[#221015] flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
+              {CALLOUTS.map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  onClick={() => handleCallout(c.text)}
+                  className="rounded-lg h-8 px-3 bg-[linear-gradient(160deg,#1E0B10_0%,#0E080A_100%)] active:scale-95 text-[#F4EFF0] border border-[#30151C] text-[11.5px] font-bold whitespace-nowrap flex-shrink-0"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Ergonomic Mobile Input */}
+            <form
+              onSubmit={handleSubmit}
+              className="p-2.5 bg-[#090608]/90 border-t border-[#221015] flex items-center gap-2 flex-shrink-0"
+            >
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`${chatTitle} kanalına mesaj yaz...`}
+                className="rounded-xl flex-1 min-w-0 h-11 px-3.5 bg-[#11090B] border border-[#2C141A] focus:border-[#C82333]/70 text-[13px] text-[#F4EFF0] placeholder:text-[#7D6E71] outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="crimson-cta rounded-xl h-11 px-4 text-[#F4EFF0] disabled:text-[#6E5F62] text-[12.5px] font-bold flex items-center gap-1.5 flex-shrink-0 active:scale-95"
+              >
+                <IconSend size={14} />
+                <span>Gönder</span>
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* MOBILE VIEW 2: SPACIOUS SCROLLABLE 5-OPERATOR VOICE MATRIX */}
+      {mobileTab === 'voice' && (
+        <section className="lg:hidden titanium-module rounded-xl flex-1 min-h-0 flex flex-col p-3.5 gap-3 overflow-hidden">
+          <div className="flex items-center justify-between gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-[#C82333]" />
+              <h2 className="text-[14px] font-extrabold text-[#F4EFF0] truncate">
+                Kadro Ses Matrisi
+              </h2>
+            </div>
+            <span className="rounded-md px-2.5 py-1 bg-[#1A0B10] border border-[#7A121D]/50 text-[11px] font-bold text-[#F08C96]">
+              Opus 48kHz · 5/5
+            </span>
+          </div>
+
+          {/* Swipeable Room Switcher Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0 pb-0.5">
+            {voiceChannels.map((vc) => {
+              const isSelected =
+                vc.id === (activeVoiceChannelId ?? activeVoiceChannel?.id);
+              return (
+                <button
+                  key={vc.id}
+                  type="button"
+                  onClick={() => setActiveVoiceChannel(vc.id)}
+                  className={`rounded-xl h-9 px-3.5 text-[12px] font-bold border flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all ${
+                    isSelected
+                      ? 'crimson-cta text-[#F4EFF0]'
+                      : 'bg-[#11090B] text-[#9E8E91] border-[#281318]'
+                  }`}
+                >
+                  <IconVoiceWave size={13} />
+                  <span>{cleanLabel(vc.name)}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Spacious Scrollable Operator DSP List */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-0.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 content-start">
+            {renderOperatorCards(true)}
+          </div>
+
+          {/* Pinned Ergonomic Mobile Push-To-Talk Bar */}
+          <div className="pt-2 border-t border-[#241116] flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onPointerDown={() => setPttActive(true)}
+              onPointerUp={() => {
+                setPttActive(false);
+                triggerSelfSpeakingPulse();
+              }}
+              onPointerLeave={() => setPttActive(false)}
+              onPointerCancel={() => setPttActive(false)}
+              className={`flex-1 rounded-xl h-12 px-4 text-[13px] font-extrabold flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                selfTransmitting
+                  ? 'crimson-cta text-[#F4EFF0] ring-2 ring-[#C82333]/40'
+                  : 'bg-[linear-gradient(160deg,#220C12_0%,#0E080A_100%)] text-[#F4EFF0] border border-[#7A121D]/55'
+              }`}
+            >
+              <IconMic size={16} />
+              <span>
+                {pttActive ? 'Canlı İletiliyor...' : 'Basılı Tut ve Konuş (PTT)'}
+              </span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* MOBILE VIEW 3: SPACIOUS P2P MESH, TELEMETRY & SCRIM HUB */}
+      {mobileTab === 'mesh' && (
+        <section className="lg:hidden titanium-module rounded-xl flex-1 min-h-0 flex flex-col p-3.5 gap-3 overflow-y-auto">
+          {/* Quick Mobile Action Cards: Scrim & Game-Boost */}
+          <div className="grid grid-cols-2 gap-2.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowScrimModal(true)}
+              className="crimson-cta rounded-xl p-3 text-left flex flex-col justify-between gap-1.5 active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <IconBolt size={16} className="text-[#F5B5BC]" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#F5B5BC]">
+                  Anında Oda
+                </span>
+              </div>
+              <span className="text-[13px] font-extrabold text-[#F4EFF0]">
+                {activeScrim ? `Scrim #${activeScrim.code}` : 'Scrim Odası Kur'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleEcoEnabled}
+              className={`rounded-xl p-3 text-left flex flex-col justify-between gap-1.5 border transition-all active:scale-[0.98] ${
+                ecoEnabled
+                  ? 'bg-[linear-gradient(160deg,rgba(128,18,30,0.24)_0%,rgba(12,8,10,0.85)_100%)] border-[#961826]/55 text-[#F4EFF0]'
+                  : 'bg-[#11090B] border-[#281318] text-[#9E8E91]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <IconGauge
+                  size={16}
+                  className={ecoEnabled ? 'text-[#E35D6A]' : 'text-[#827376]'}
+                />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#E35D6A]">
+                  {ecoEnabled ? 'Aktif' : 'Kapalı'}
+                </span>
+              </div>
+              <span className="text-[13px] font-extrabold text-[#F4EFF0]">
+                Game-Boost Modu
+              </span>
+            </button>
+          </div>
+
+          {/* 2x2 Breathable Mobile Telemetry Cards */}
+          <div className="grid grid-cols-2 gap-2 flex-shrink-0">
+            <div className="rounded-xl p-3 bg-[linear-gradient(160deg,#1A0B10_0%,#0B0809_100%)] border border-[#2A1319]">
+              <span className="block text-[10.5px] font-semibold text-[#827376]">
+                Ses Kodek Motoru
+              </span>
+              <span className="block text-[14px] font-extrabold text-[#F4EFF0] mt-0.5">
+                Opus 48kHz
+              </span>
+            </div>
+            <div className="rounded-xl p-3 bg-[linear-gradient(160deg,#1A0B10_0%,#0B0809_100%)] border border-[#2A1319]">
+              <span className="block text-[10.5px] font-semibold text-[#827376]">
+                Oyun Etkisi
+              </span>
+              <span className="block text-[14px] font-extrabold text-[#F08C96] mt-0.5">
+                0 FPS Kaybı
+              </span>
+            </div>
+            <div className="rounded-xl p-3 bg-[linear-gradient(160deg,#1A0B10_0%,#0B0809_100%)] border border-[#2A1319]">
+              <span className="block text-[10.5px] font-semibold text-[#827376]">
+                İşlemci Yükü
+              </span>
+              <span className="block text-[14px] font-extrabold text-[#F4EFF0] mt-0.5">
+                %{ecoCpu > 0 ? ecoCpu : simMetrics.cpu} CPU
+              </span>
+            </div>
+            <div className="rounded-xl p-3 bg-[linear-gradient(160deg,#1A0B10_0%,#0B0809_100%)] border border-[#2A1319]">
+              <span className="block text-[10.5px] font-semibold text-[#827376]">
+                Mesh Kararlılığı
+              </span>
+              <span className="block text-[14px] font-extrabold text-[#F08C96] mt-0.5">
+                %{simMetrics.stability} P2P
+              </span>
+            </div>
+          </div>
+
+          {/* Full-Size Mobile Pentagon P2P Mesh Card */}
+          <div className="flex-1 min-h-[250px] rounded-xl mesh-surface border border-[#2C141A] p-3.5 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <span className="block text-[12.5px] font-extrabold text-[#F4EFF0]">
+                  5-Operatör P2P Mesh Topolojisi
+                </span>
+                <span className="block text-[11px] font-bold text-[#E35D6A] mt-0.5">
+                  {simMetrics.rtt}ms RTT · {simMetrics.jitter}ms Jitter
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStressTestActive((v) => !v)}
+                className={`rounded-lg h-8 px-3 text-[11px] font-bold border transition-all ${
+                  stressTestActive
+                    ? 'crimson-cta text-[#F4EFF0]'
+                    : 'bg-[#140A0D] text-[#B8AAAC] border-[#2E151C]'
+                }`}
+              >
+                {stressTestActive ? 'Simülasyon Aktif' : 'Stres Testi'}
+              </button>
+            </div>
+
+            <div className="my-2 flex-1 flex items-center justify-center">
+              {renderMeshSvg('max-h-[210px]', 'm-mesh')}
+            </div>
+
+            <div className="pt-2 border-t border-[#241116] flex items-center justify-between text-[11px]">
+              <span className="text-[#827376] font-medium">
+                E2EE Kriptolu Doğrudan Ağ
+              </span>
+              <span className="font-extrabold text-[#E35D6A]">
+                Meva Secure Mesh Core
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          DESKTOP (>= 1024px) 100dvh BENTO WAR ROOM (ZERO CLIPPING)
+         ═══════════════════════════════════════════════════════ */}
+
+      {/* 1. DESKTOP TOP STAGE: 5-OPERATOR EXECUTIVE VOICE MATRIX */}
+      <section className="hidden lg:flex titanium-module rounded-xl px-4 py-3 flex-col gap-2.5 flex-shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-[#C82333] flex-shrink-0" />
+            <h2 className="text-[14px] font-extrabold tracking-tight text-[#F4EFF0]">
+              Canlı Kadro Ses Matrisi
+            </h2>
+            <span className="text-xs text-[#827376] font-semibold">
+              · {activeRoomName}
+            </span>
+            <span className="inline-flex items-center rounded-md px-2.5 py-0.5 bg-[#190B10] border border-[#7A121D]/45 text-[11px] font-bold text-[#F08C96]">
+              5/5 Aktif · 96 kbps Opus
+            </span>
+          </div>
+
           <div className="flex items-center gap-1.5 flex-wrap">
             {voiceChannels.map((vc) => {
               const isSelected =
@@ -399,11 +1044,12 @@ export const StreamChatArea = memo(function StreamChatArea({
               return (
                 <button
                   key={vc.id}
+                  type="button"
                   onClick={() => setActiveVoiceChannel(vc.id)}
-                  className={`rounded-sm h-7 px-2.5 font-sans text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                  className={`rounded-lg h-7 px-2.5 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-[#12151E] text-[#F59E0B] border-[#F59E0B]/50'
-                      : 'bg-[#06070A] text-gl-text-muted hover:text-gl-text-bright border-white/[0.06]'
+                      ? 'bg-[linear-gradient(160deg,rgba(138,20,32,0.34)_0%,rgba(16,9,11,0.85)_100%)] text-[#F4EFF0] border-[#961826]/55'
+                      : 'bg-[#11090B] text-[#8E7E81] hover:text-[#F4EFF0] border-[#281318] hover:border-[#451B24]'
                   }`}
                 >
                   <IconVoiceWave size={12} />
@@ -430,690 +1076,317 @@ export const StreamChatArea = memo(function StreamChatArea({
                   triggerSelfSpeakingPulse();
                 }
               }}
-              className={`rounded-sm h-7 px-3 font-sans text-xs font-bold border transition-all flex items-center gap-1.5 ${
-                pttActive || speakingPeers['usr-local']
-                  ? 'bg-[#10B981] text-[#06070A] border-[#10B981]'
-                  : 'bg-[#06070A] text-gl-text-bright hover:border-[#F59E0B]/50 border-white/[0.08]'
+              className={`rounded-lg h-7 px-3 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 ${
+                selfTransmitting
+                  ? 'crimson-cta text-[#F4EFF0]'
+                  : 'bg-[#150A0E] hover:bg-[#1E0C12] text-[#F4EFF0] hover:border-[#961826]/55 border-[#2E151C]'
               }`}
               title="Bas-Konuş (Basılı tutun veya V tuşunu kullanın)"
             >
               <IconMic size={12} />
-              <span>{pttActive ? 'İletiliyor...' : 'Bas-Konuş [V]'}</span>
+              <span>{pttActive ? 'İletiliyor...' : 'Bas-Konuş · V'}</span>
             </button>
           </div>
         </div>
 
-        {/* 5-Operator Squad Pods Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-          {SQUAD_OPERATORS.map((op) => {
-            const isSelf = op.id === 'usr-local';
-            const displayName = isSelf ? username : op.username;
-            const isMuted = isSelf
-              ? (voiceControls?.isMuted ?? false) ||
-                (mutedPeers[op.id] ?? false)
-              : (mutedPeers[op.id] ?? false) || (gains[op.id] ?? 100) === 0;
-            const isSpeaking =
-              !isMuted &&
-              (isSelf
-                ? pttActive || (speakingPeers[op.id] ?? false)
-                : (speakingPeers[op.id] ?? false));
-            const gainVal = isMuted ? 0 : (gains[op.id] ?? 100);
-            const pan = spatialPan[op.id] ?? 'C';
-            const loadout = op.loadoutByServer[activeServerId] ?? {
-              agent: 'Taktik Operatör',
-              detail: 'Hazır Kıta',
-            };
-
-            return (
-              <div
-                key={op.id}
-                className={`cockpit-pod hud-corners rounded-sm p-3 flex flex-col justify-between gap-2.5 transition-all duration-300 ${
-                  isSpeaking
-                    ? 'hud-corners-emerald border-[#10B981]/45 bg-[#0D1517]'
-                    : isMuted
-                      ? 'border-[#EF4444]/30 opacity-85'
-                      : 'hover:border-white/[0.14]'
-                }`}
-              >
-                {/* Pod Top: Avatar with Acoustic Ring + Callsign + Spatial & Mute Buttons */}
-                <div className="flex items-start justify-between gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleInspectOperator(op)}
-                    className="flex items-center gap-2.5 min-w-0 text-left group"
-                  >
-                    <div
-                      className={`relative rounded-sm transition-all duration-300 ${
-                        isSpeaking
-                          ? 'ring-2 ring-[#10B981]/70 shadow-[0_0_14px_rgba(16,185,129,0.35)]'
-                          : ''
-                      }`}
-                    >
-                      <OperatorAvatar
-                        name={displayName}
-                        status={
-                          isMuted ? 'dnd' : isSpeaking ? 'online' : 'in-game'
-                        }
-                        size="md"
-                        speaking={isSpeaking}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block font-sans text-[13px] font-bold text-gl-text-bright group-hover:text-[#F59E0B] transition-colors leading-tight">
-                        {displayName}
-                      </span>
-                      <span
-                        className={`inline-block mt-1 rounded-sm px-1.5 py-0.2 border font-sans text-[9px] font-bold tracking-wider ${op.roleBadgeCls}`}
-                      >
-                        {op.role}
-                      </span>
-                    </div>
-                  </button>
-
-                  {/* Top-Right Controls: 3D Spatial Audio (L/C/R) + Individual Mute */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => cycleSpatialPan(op.id)}
-                      title={`3D Konumsal Ses Yönü: ${
-                        pan === 'L' ? 'Sol' : pan === 'R' ? 'Sağ' : 'Merkez'
-                      } (Değiştirmek için tıklayın)`}
-                      className="rounded-sm h-6 px-1.5 bg-[#06070A] hover:bg-[#12151E] border border-white/[0.07] font-mono text-[9px] font-bold text-gl-text-normal hover:text-[#F59E0B] transition-colors"
-                    >
-                      3D:{pan}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        isSelf && voiceControls
-                          ? voiceControls.toggleMute()
-                          : togglePeerMute(op.id)
-                      }
-                      aria-label={isMuted ? 'Sesi Aç' : 'Sustur'}
-                      title={
-                        isMuted ? 'Operatör Sesini Aç' : 'Operatörü Bireysel Sustur'
-                      }
-                      className={`rounded-sm w-6 h-6 flex items-center justify-center border transition-colors ${
-                        isMuted
-                          ? 'bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/50'
-                          : 'bg-[#06070A] text-gl-text-muted hover:text-gl-text-bright border-white/[0.07]'
-                      }`}
-                    >
-                      {isMuted ? (
-                        <IconMicOff size={12} />
-                      ) : (
-                        <IconMic size={12} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Pod Middle: Non-Truncated 2-Line Loadout Hierarchy + P2P Badge */}
-                <div className="rounded-sm px-2.5 py-1.5 bg-[#06070A]/70 border border-white/[0.04] space-y-1">
-                  <div className="text-[11px] font-sans font-semibold text-gl-text-bright leading-snug">
-                    {loadout.agent}
-                  </div>
-                  <div className="flex items-center justify-between gap-1 text-[10px]">
-                    <span className="font-sans text-gl-text-muted leading-tight">
-                      {loadout.detail}
-                    </span>
-                    <span
-                      className={`font-mono font-bold tabular-nums flex-shrink-0 ${
-                        isMuted
-                          ? 'text-[#EF4444]'
-                          : isSpeaking
-                            ? 'text-[#10B981]'
-                            : 'text-[#F59E0B]'
-                      }`}
-                    >
-                      {isMuted ? 'SESSİZ' : `${op.pingMs}ms P2P`}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 24-Micro-Bar High-Resolution Audio Spectrum */}
-                <div
-                  onClick={() =>
-                    setSpeakingPeers((p) => ({ ...p, [op.id]: !p[op.id] }))
-                  }
-                  title="Akustik spektrumu test etmek için tıklayın"
-                  className="cursor-pointer rounded-sm h-8 px-2 py-1.5 bg-[#06070A] border border-white/[0.05] flex items-end justify-between gap-[2px]"
-                >
-                  {SPECTRUM_PROFILE.map((h, idx) => {
-                    const animClass =
-                      idx % 3 === 0
-                        ? 'eq-bar-1'
-                        : idx % 3 === 1
-                          ? 'eq-bar-2'
-                          : 'eq-bar-3';
-                    return (
-                      <span
-                        key={idx}
-                        className={`w-[2px] rounded-full transition-all duration-300 ${
-                          isMuted
-                            ? 'bg-[#EF4444]/40 h-[2px]'
-                            : isSpeaking
-                              ? idx % 4 === 0
-                                ? `bg-[#F59E0B] ${animClass}`
-                                : `bg-[#10B981] ${animClass}`
-                              : 'bg-white/[0.14] h-[3px]'
-                        }`}
-                        style={
-                          isSpeaking && !isMuted
-                            ? {
-                                height: `${Math.min(
-                                  100,
-                                  Math.max(18, Math.round((h * gainVal) / 115)),
-                                )}%`,
-                              }
-                            : undefined
-                        }
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* Pod Bottom: Interactive 0-200% Gain Slider */}
-                <div className="pt-1 border-t border-white/[0.05] space-y-1">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="font-sans font-medium text-gl-text-muted">
-                      Ses Kazancı ·{' '}
-                      <span className="font-mono">{op.jitterMs}ms</span>
-                    </span>
-                    <span className="font-mono font-bold text-gl-text-bright tabular-nums">
-                      %{gainVal}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={200}
-                    step={5}
-                    value={gainVal}
-                    onChange={(e) =>
-                      handleGainChange(op.id, Number(e.target.value))
-                    }
-                    aria-label={`${displayName} ses seviyesi`}
-                    className="w-full h-1.5 accent-[#F59E0B] bg-[#06070A] rounded-full cursor-pointer"
-                  />
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-5 gap-2.5">
+          {renderOperatorCards(false)}
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════
-          2. BOTTOM SPLIT DECK: TACTICAL STREAM (LEFT) + TELEMETRY (RIGHT)
-         ═══════════════════════════════════════════════════════ */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-2.5 min-h-[360px] lg:min-h-0 overflow-hidden">
-        {/* ── LEFT-BOTTOM MODULE (7 Cols): Tactical Comms & Callout Stream ── */}
-        <section className="lg:col-span-7 titanium-module rounded-sm flex flex-col overflow-hidden min-h-[320px] lg:min-h-0">
-          {/* Stream Header */}
-          <div className="h-10 px-4 flex items-center justify-between border-b border-white/[0.06] bg-[#080A0F] flex-shrink-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-1.5 h-3.5 rounded-[1px] bg-[#F59E0B]" />
-              <h3 className="font-sans text-xs font-bold tracking-wide text-gl-text-bright truncate">
-                Taktiksel İletişim & Callout Akışı —{' '}
-                <span className="text-[#F59E0B]">{chatTitle}</span>
+      {/* 2. DESKTOP BOTTOM SPLIT DECK */}
+      <div className="hidden lg:grid flex-1 min-h-0 grid-cols-12 gap-2.5 overflow-hidden">
+        {/* LEFT-BOTTOM (7 Cols): Unified Tactical Comms Stream */}
+        <section className="col-span-7 titanium-module rounded-xl flex flex-col overflow-hidden min-h-0">
+          <div className="relative min-h-[44px] px-3.5 py-1.5 flex items-center justify-between gap-2 bg-[#0C080A]/75 flex-shrink-0 overflow-x-auto no-scrollbar">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-3 bottom-0 h-px horizon-divider opacity-80"
+            />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="w-1.5 h-3.5 rounded-full bg-[#C82333]" />
+              <h3 className="text-[13px] font-extrabold text-[#F4EFF0] whitespace-nowrap">
+                Taktiksel İletişim
               </h3>
-            </div>
-
-            <div className="flex items-center gap-2">
+              <span className="rounded-md px-2 py-0.5 bg-[#180B10] border border-[#6E121D]/45 text-[11px] font-bold text-[#F08C96] whitespace-nowrap">
+                {chatTitle}
+              </span>
               {dmFriend && (
                 <button
+                  type="button"
                   onClick={() => setActiveDMUser(null)}
-                  className="rounded-sm px-2 py-0.5 bg-[#06070A] border border-white/[0.08] font-sans text-[10px] font-semibold text-[#F59E0B]"
+                  className="rounded-lg px-2 py-0.5 bg-[#180B10] hover:bg-[#220D13] border border-[#32151C] text-[11px] font-bold text-[#F08C96] transition-colors"
                 >
-                  Genel Akışa Dön
+                  Genel Akış
                 </button>
               )}
-              <span className="font-mono text-[10px] text-[#10B981] font-semibold">
-                {messages.length} Kayıt
-              </span>
+            </div>
+
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {CALLOUTS.map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  onClick={() => handleCallout(c.text)}
+                  className="rounded-lg h-7 px-2.5 bg-[#140A0D] hover:bg-[#7A121D] text-[#F4EFF0] border border-[#2C141A] hover:border-[#C82333]/55 text-[11px] font-bold transition-all duration-150 active:scale-95 whitespace-nowrap"
+                >
+                  {c.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* 1-Tap Instant Tactical Callout Bar */}
-          <div className="px-3.5 py-2 bg-[#06070A]/90 border-b border-white/[0.05] flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
-            <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-[#F59E0B] mr-1 flex-shrink-0">
-              Hızlı Çağrı:
-            </span>
-            {CALLOUTS.map((c) => (
-              <button
-                key={c.label}
-                type="button"
-                onClick={() => handleCallout(c.text)}
-                className="rounded-sm h-7 px-2.5 flex-shrink-0 bg-[#12151E] hover:bg-[#EF4444] text-gl-text-bright hover:text-white border border-white/[0.07] hover:border-[#EF4444] font-sans text-[11px] font-bold tracking-wide transition-all active:scale-95"
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+          <TacticalMessageFeed
+            messages={messages}
+            userId={userId}
+            playingVoiceNoteId={playingVoiceNoteId}
+            onToggleVoiceNote={setPlayingVoiceNoteId}
+            ecoActive={ecoActive}
+            bottomRef={bottomRef}
+          />
 
-          {/* Rich Pre-Populated Scrim & Match Message Feed */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {messages.map((msg) => {
-              const isOwn =
-                msg.author_id === userId || msg.author_id === 'usr-local';
-              const isVoiceNote = msg.content.includes('[SESLİ BRİFİNG');
-              const isCallout = msg.content.startsWith('[');
-              const isRotateOrForce =
-                msg.content.includes('ROTATE') || msg.content.includes('FORCE');
-              const authorName = msg.author?.username ?? 'Operatör';
-              const authorRole = msg.author?.activity ?? 'Taktik Kadro';
-              const time = new Date(msg.created_at).toLocaleTimeString('tr-TR', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              });
-              const isPlayingThis = playingVoiceNoteId === msg.id;
-
-              // Extract bracketed tag if present
-              const bracketEnd = msg.content.indexOf(']');
-              const tagText =
-                isCallout && bracketEnd > 1
-                  ? msg.content.slice(1, bracketEnd)
-                  : null;
-              const bodyText =
-                tagText && bracketEnd > 1
-                  ? msg.content.slice(bracketEnd + 1).trim()
-                  : msg.content;
-
-              return (
-                <div
-                  key={msg.id}
-                  className={`rounded-sm px-3.5 py-2.5 border transition-colors ${
-                    isRotateOrForce
-                      ? 'bg-[#EF4444]/[0.07] border-[#EF4444]/40'
-                      : isVoiceNote
-                        ? 'bg-[#10B981]/[0.06] border-[#10B981]/35'
-                        : isCallout
-                          ? 'bg-[#F59E0B]/[0.06] border-[#F59E0B]/35'
-                          : isOwn
-                            ? 'bg-[#12151E] border-white/[0.08]'
-                            : 'bg-[#06070A]/80 border-white/[0.05]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-sans text-xs font-bold text-gl-text-bright">
-                        {authorName}
-                      </span>
-                      <span className="font-sans text-[10px] font-medium text-gl-text-muted">
-                        {authorRole}
-                      </span>
-                      {tagText && (
-                        <span
-                          className={`rounded-sm px-1.5 py-0.2 font-sans text-[10px] font-bold ${
-                            isRotateOrForce
-                              ? 'bg-[#EF4444]/20 text-[#EF4444]'
-                              : isVoiceNote
-                                ? 'bg-[#10B981]/20 text-[#10B981]'
-                                : 'bg-[#F59E0B]/20 text-[#F59E0B]'
-                          }`}
-                        >
-                          {tagText}
-                        </span>
-                      )}
-                    </div>
-                    <time
-                      suppressHydrationWarning
-                      className="font-mono text-[10px] text-gl-text-muted tabular-nums flex-shrink-0"
-                    >
-                      {time}
-                    </time>
-                  </div>
-
-                  <p className="font-sans text-[13px] leading-relaxed text-gl-text-bright/95 break-words">
-                    {bodyText}
-                  </p>
-
-                  {/* Interactive Voice Briefing Waveform Preview */}
-                  {isVoiceNote && (
-                    <div className="mt-2 rounded-sm px-3 py-1.5 bg-[#06070A] border border-white/[0.06] flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPlayingVoiceNoteId(isPlayingThis ? null : msg.id)
-                        }
-                        className="rounded-sm px-2 py-1 bg-[#10B981] text-[#06070A] font-sans text-[10px] font-bold flex items-center gap-1 flex-shrink-0"
-                      >
-                        <span>{isPlayingThis ? '■ DURDUR' : '▶ DİNLE'}</span>
-                      </button>
-                      <div className="flex-1 h-5 flex items-center gap-[2px]">
-                        {SPECTRUM_PROFILE.map((v, i) => (
-                          <span
-                            key={i}
-                            className={`flex-1 rounded-full ${
-                              isPlayingThis
-                                ? 'bg-[#10B981] eq-bar-2'
-                                : 'bg-[#10B981]/50'
-                            }`}
-                            style={{ height: `${Math.max(22, v)}%` }}
-                          />
-                        ))}
-                      </div>
-                      <span className="font-mono text-[10px] text-[#10B981] flex-shrink-0">
-                        0:08 · 96kbps
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Command Input Form */}
           <form
             onSubmit={handleSubmit}
-            className="p-2.5 bg-[#06070A] border-t border-white/[0.06] flex items-center gap-2 flex-shrink-0"
+            className="relative p-2.5 bg-[#0A0708]/85 flex items-center gap-2 flex-shrink-0"
           >
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={`${chatTitle} kanalına taktik mesaj veya round notu yazın...`}
-              className="rounded-sm flex-1 min-w-0 h-10 px-3.5 bg-[#0C0E14] border border-white/[0.07] focus:border-[#F59E0B]/70 font-sans text-xs text-gl-text-bright placeholder:text-gl-text-muted outline-none transition-colors"
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-3 top-0 h-px horizon-divider opacity-75"
             />
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`${chatTitle} kanalına taktik mesaj yazın...`}
+                className="rounded-xl w-full h-9 pl-3.5 pr-9 bg-[#11090B] border border-[#2A1319] focus:border-[#C82333]/70 text-xs text-[#F4EFF0] placeholder:text-[#7D6E71] outline-none transition-colors"
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 bg-[#1B0C10] text-[10px] font-bold text-[#827376]"
+              >
+                ↵
+              </span>
+            </div>
             <button
               type="submit"
               disabled={!input.trim()}
-              className="rounded-sm h-10 px-4 bg-[#EF4444] hover:bg-[#F87171] disabled:bg-[#12151E] disabled:text-gl-text-muted text-white font-sans text-xs font-bold flex items-center gap-1.5 transition-colors"
+              className="crimson-cta rounded-xl h-9 px-4 text-[#F4EFF0] disabled:text-[#6E5F62] text-xs font-bold flex items-center gap-1.5 transition-all"
             >
-              <IconSend size={14} />
+              <IconSend size={13} />
               <span>Gönder</span>
             </button>
           </form>
         </section>
 
-        {/* ── RIGHT-BOTTOM MODULE (5 Cols): Visualized Telemetry & 5-Vertex P2P Mesh Topology ── */}
-        <section className="lg:col-span-5 titanium-module rounded-sm flex flex-col justify-between p-3.5 md:p-4 gap-3 overflow-y-auto">
-          {/* Header + Interactive Stress Test Trigger */}
-          <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+        {/* RIGHT-BOTTOM (5 Cols): 4-Metric Strip + Interactive P2P Mesh */}
+        <section className="col-span-5 titanium-module rounded-xl flex flex-col p-3.5 gap-2.5 overflow-hidden min-h-0">
+          <div className="flex items-center justify-between gap-2 flex-shrink-0">
             <div className="flex items-center gap-2">
-              <IconShield size={14} className="text-[#10B981]" />
-              <h3 className="font-sans text-xs font-bold tracking-wide text-gl-text-bright">
-                Meva P2P Mesh & Sistem Telemetrisi
+              <IconShield size={14} className="text-[#D63344]" />
+              <h3 className="text-[13px] font-extrabold text-[#F4EFF0]">
+                P2P Mesh & Sistem Telemetrisi
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setStressTestActive((v) => !v)}
-              className={`rounded-sm px-2.5 py-1 font-sans text-[10px] font-bold border transition-all ${
+              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border transition-all ${
                 stressTestActive
-                  ? 'bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/60 animate-pulse'
-                  : 'bg-[#06070A] text-gl-text-normal hover:text-gl-text-bright border-white/[0.08]'
+                  ? 'crimson-cta text-[#F4EFF0]'
+                  : 'bg-[#140A0D] hover:bg-[#1E0C12] text-[#B8AAAC] hover:text-[#F4EFF0] border-[#2C141A] hover:border-[#8F1622]/55'
               }`}
             >
-              {stressTestActive ? 'Simülasyon Aktif (Kapat)' : 'Ağ Stres Testi'}
+              {stressTestActive ? 'Simülasyon Aktif' : 'Ağ Stres Testi'}
             </button>
           </div>
 
-          {/* 4 KPI Cards with Embedded Live Mini-Charts */}
-          <div className="grid grid-cols-2 gap-2">
-            {/* Card 1: Audio Engine + Mini Sparkline Bars */}
-            <div className="rounded-sm p-2.5 bg-[#06070A] border border-white/[0.05] flex items-center justify-between gap-2">
-              <div>
-                <span className="font-sans text-[10px] font-medium text-gl-text-muted block">
-                  Ses Motoru
-                </span>
-                <span className="font-mono text-xs font-bold text-[#10B981] mt-0.5 block">
-                  Opus 48kHz
-                </span>
-                <span className="font-mono text-[10px] text-gl-text-muted">
-                  96kbps CBR
-                </span>
-              </div>
-              <div className="flex items-end gap-[2px] h-7">
-                {[55, 80, 95, 70, 100, 85, 90].map((v, i) => (
-                  <span
-                    key={i}
-                    className="w-[3px] rounded-full bg-[#10B981]/80 eq-bar-1"
-                    style={{ height: `${v}%` }}
-                  />
-                ))}
-              </div>
+          <div className="rounded-xl bg-[linear-gradient(90deg,#0D080A_0%,#190B10_50%,#0D080A_100%)] border border-[#2A1319] px-3 py-2 grid grid-cols-4 divide-x divide-[#241116] text-center flex-shrink-0">
+            <div className="px-1.5">
+              <span className="block text-[10px] font-medium text-[#827376]">
+                Kodek
+              </span>
+              <span className="block text-[12px] font-extrabold text-[#F4EFF0] mt-0.5 whitespace-nowrap">
+                Opus 48kHz
+              </span>
             </div>
-
-            {/* Card 2: In-Game FPS Impact + Flatline Sparkline SVG */}
-            <div className="rounded-sm p-2.5 bg-[#06070A] border border-white/[0.05] flex items-center justify-between gap-2">
-              <div>
-                <span className="font-sans text-[10px] font-medium text-gl-text-muted block">
-                  Oyun Etkisi
-                </span>
-                <span className="font-mono text-xs font-bold text-[#F59E0B] mt-0.5 block">
-                  0 FPS Kaybı
-                </span>
-                <span className="font-sans text-[10px] text-gl-text-muted">
-                  Game-Boost
-                </span>
-              </div>
-              <svg width="42" height="24" viewBox="0 0 42 24" className="flex-shrink-0">
-                <polyline
-                  fill="none"
-                  stroke="#F59E0B"
-                  strokeWidth="2"
-                  points="0,8 8,8 16,7 24,8 32,8 42,7"
-                />
-                <line
-                  x1="0"
-                  y1="20"
-                  x2="42"
-                  y2="20"
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth="1"
-                />
-              </svg>
+            <div className="px-1.5">
+              <span className="block text-[10px] font-medium text-[#827376]">
+                Performans
+              </span>
+              <span className="block text-[12px] font-extrabold text-[#F08C96] mt-0.5 whitespace-nowrap">
+                0 FPS Kaybı
+              </span>
             </div>
-
-            {/* Card 3: System Load + Circular Radial Gauge */}
-            <div className="rounded-sm p-2.5 bg-[#06070A] border border-white/[0.05] flex items-center justify-between gap-2">
-              <div>
-                <span className="font-sans text-[10px] font-medium text-gl-text-muted block">
-                  Sistem Yükü
-                </span>
-                <span className="font-mono text-xs font-bold text-gl-text-bright mt-0.5 block">
-                  %{simMetrics.cpu} CPU
-                </span>
-                <span className="font-mono text-[10px] text-[#10B981]">
-                  {simMetrics.ram}MB RAM
-                </span>
-              </div>
-              <svg width="32" height="32" viewBox="0 0 36 36" className="flex-shrink-0">
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.08)"
-                  strokeWidth="3.5"
-                />
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="14"
-                  fill="none"
-                  stroke="#10B981"
-                  strokeWidth="3.5"
-                  strokeDasharray="88"
-                  strokeDashoffset={stressTestActive ? '68' : '78'}
-                  strokeLinecap="round"
-                />
-              </svg>
+            <div className="px-1.5">
+              <span className="block text-[10px] font-medium text-[#827376]">
+                Yük
+              </span>
+              <span className="block text-[12px] font-extrabold text-[#F4EFF0] mt-0.5 whitespace-nowrap">
+                %{ecoCpu > 0 ? ecoCpu : simMetrics.cpu} CPU
+              </span>
             </div>
-
-            {/* Card 4: Net-Guard Adaptive Buffer & Stability */}
-            <div className="rounded-sm p-2.5 bg-[#06070A] border border-white/[0.05] flex items-center justify-between gap-2">
-              <div>
-                <span className="font-sans text-[10px] font-medium text-gl-text-muted block">
-                  Ağ İstikrarı
-                </span>
-                <span className="font-mono text-xs font-bold text-[#10B981] mt-0.5 block">
-                  %{simMetrics.stability}
-                </span>
-                <span className="font-mono text-[10px] text-gl-text-muted">
-                  Buffer: {simMetrics.buffer}ms
-                </span>
-              </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="font-mono text-[10px] font-bold text-[#F59E0B]">
-                  {simMetrics.rtt}ms
-                </span>
-                <div className="w-10 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      stressTestActive ? 'w-3/4 bg-[#F59E0B]' : 'w-full bg-[#10B981]'
-                    }`}
-                  />
-                </div>
-              </div>
+            <div className="px-1.5">
+              <span className="block text-[10px] font-medium text-[#827376]">
+                Bağlantı
+              </span>
+              <span className="block text-[12px] font-extrabold text-[#F08C96] mt-0.5 whitespace-nowrap">
+                %{simMetrics.stability} P2P
+              </span>
             </div>
           </div>
 
-          {/* Expanded 5-Vertex Pentagon P2P Mesh Topology Radar (Interactive SVG) */}
-          <div className="flex-1 rounded-sm p-3 bg-[#06070A] border border-white/[0.05] flex flex-col justify-between min-h-[155px]">
-            <div className="flex items-center justify-between">
-              <span className="font-sans text-[11px] font-bold text-gl-text-bright">
-                5-Köşeli Doğrudan P2P Mesh Topolojisi
+          <div className="flex-1 min-h-0 rounded-xl mesh-surface border border-[#2A1319] px-3.5 py-2.5 flex flex-col justify-between overflow-hidden">
+            <div className="flex items-center justify-between text-[11px] flex-shrink-0">
+              <span className="font-bold text-[#B8AAAC]">
+                5-Operatör P2P Mesh Topolojisi
               </span>
-              <span className="font-mono text-[10px] text-[#10B981] font-semibold">
-                10 Aktif Tünel · {simMetrics.jitter}ms Jitter
+              <span className="font-bold text-[#E35D6A] tabular-nums">
+                {simMetrics.rtt}ms RTT · {simMetrics.jitter}ms Jitter
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-3 my-auto py-1">
-              <svg
-                width="170"
-                height="126"
-                viewBox="0 0 180 132"
-                className="mx-auto flex-shrink-0"
-                aria-label="5-Köşeli P2P Mesh Ağ Topolojisi"
-              >
-                {/* Concentric Radar Rings */}
-                <circle
-                  cx="90"
-                  cy="68"
-                  r="52"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.04)"
-                  strokeDasharray="3 3"
-                />
-                <circle
-                  cx="90"
-                  cy="68"
-                  r="28"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.04)"
-                />
+            <div className="flex-1 min-h-0 flex items-center justify-center">
+              {renderMeshSvg('max-h-[180px]', 'd-mesh')}
+            </div>
 
-                {/* All 10 Pentagon Full-Mesh Connections */}
-                <g
-                  stroke={
-                    stressTestActive
-                      ? 'rgba(245, 158, 11, 0.45)'
-                      : 'rgba(16, 185, 129, 0.32)'
-                  }
-                  strokeWidth="1.2"
-                >
-                  <line id="p1" x1="90" y1="14" x2="34" y2="52" />
-                  <line id="p2" x1="90" y1="14" x2="146" y2="52" />
-                  <line id="p3" x1="90" y1="14" x2="54" y2="116" />
-                  <line id="p4" x1="90" y1="14" x2="126" y2="116" />
-                  <line id="p5" x1="34" y1="52" x2="146" y2="52" />
-                  <line x1="34" y1="52" x2="54" y2="116" />
-                  <line x1="34" y1="52" x2="126" y2="116" />
-                  <line x1="146" y1="52" x2="54" y2="116" />
-                  <line x1="146" y1="52" x2="126" y2="116" />
-                  <line x1="54" y1="116" x2="126" y2="116" />
-                </g>
-
-                {/* Flowing Live P2P Audio Data Packets (paused in Game-Boost Eco Mode) */}
-                {!ecoActive && (
-                  <>
-                    <circle r="2.5" fill="#10B981">
-                      <animateMotion
-                        dur={stressTestActive ? '0.9s' : '1.6s'}
-                        repeatCount="indefinite"
-                        path="M90,14 L34,52 L54,116 L126,116 L146,52 Z"
-                      />
-                    </circle>
-                    <circle r="2.5" fill="#F59E0B">
-                      <animateMotion
-                        dur={stressTestActive ? '1.1s' : '2.1s'}
-                        repeatCount="indefinite"
-                        path="M90,14 L126,116 L34,52 L146,52 L54,116 Z"
-                      />
-                    </circle>
-                  </>
-                )}
-
-                {/* 5 Operator Vertices + Callsign Labels */}
-                <g className="font-sans" fontSize="9" fontWeight="700" fill="#F3F4F6">
-                  {/* Top: Operatör */}
-                  <circle cx="90" cy="14" r="5.5" fill="#F59E0B" />
-                  <text x="90" y="7" textAnchor="middle">
-                    SEN (9ms)
-                  </text>
-
-                  {/* Left: cNed */}
-                  <circle cx="34" cy="52" r="5" fill="#10B981" />
-                  <text x="24" y="46" textAnchor="end">
-                    cNed
-                  </text>
-
-                  {/* Right: XANTARES */}
-                  <circle cx="146" cy="52" r="5" fill="#10B981" />
-                  <text x="154" y="46" textAnchor="start">
-                    XANTARES
-                  </text>
-
-                  {/* Bottom-Left: woxic */}
-                  <circle cx="54" cy="116" r="5" fill="#F59E0B" />
-                  <text x="46" y="128" textAnchor="end">
-                    woxic
-                  </text>
-
-                  {/* Bottom-Right: Alfajer */}
-                  <circle cx="126" cy="116" r="5" fill="#EF4444" />
-                  <text x="134" y="128" textAnchor="start">
-                    Alfajer
-                  </text>
-                </g>
-              </svg>
-
-              <div className="hidden sm:flex flex-col justify-center space-y-1.5 text-[11px] border-l border-white/[0.05] pl-3">
-                <div>
-                  <span className="text-gl-text-muted block text-[10px]">
-                    Mimari
-                  </span>
-                  <span className="font-semibold text-gl-text-bright">
-                    Tam Örgü (Full-Mesh)
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gl-text-muted block text-[10px]">
-                    Şifreleme
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-[#10B981]">
-                    DTLS-SRTP
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gl-text-muted block text-[10px]">
-                    Sunucu Maliyeti
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-[#F59E0B]">
-                    $0.00 / Ay
-                  </span>
-                </div>
-              </div>
+            <div className="relative flex items-center justify-between text-[10.5px] text-[#827376] pt-2 flex-shrink-0">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 h-px horizon-divider opacity-75"
+              />
+              <span className="font-medium">
+                E2EE Kriptolu Doğrudan Eşler Arası Ağ
+              </span>
+              <span className="font-extrabold text-[#E35D6A]">
+                Meva Secure Mesh Core
+              </span>
             </div>
           </div>
         </section>
       </div>
     </main>
+  );
+});
+
+interface TacticalMessageFeedProps {
+  messages: Message[];
+  userId: string;
+  playingVoiceNoteId: string | null;
+  onToggleVoiceNote: (id: string | null) => void;
+  ecoActive: boolean;
+  bottomRef: React.RefObject<HTMLDivElement>;
+}
+
+const TacticalMessageFeed = memo(function TacticalMessageFeed({
+  messages,
+  userId,
+  playingVoiceNoteId,
+  onToggleVoiceNote,
+  ecoActive,
+  bottomRef,
+}: TacticalMessageFeedProps) {
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto px-3.5 py-3 lg:py-2.5 space-y-2.5 lg:space-y-2">
+      {messages.map((msg) => {
+        const isOwn =
+          msg.author_id === userId || msg.author_id === 'usr-local';
+        const isVoiceNote = msg.content.includes('[SESLİ BRİFİNG');
+        const isCallout = msg.content.startsWith('[');
+        const isUrgent =
+          msg.content.includes('ROTATE') || msg.content.includes('FORCE');
+        const authorName = msg.author?.username ?? 'Operatör';
+        const time = new Date(msg.created_at).toLocaleTimeString('tr-TR', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const isPlayingThis = playingVoiceNoteId === msg.id;
+
+        const bracketEnd = msg.content.indexOf(']');
+        const tagText =
+          isCallout && bracketEnd > 1 ? msg.content.slice(1, bracketEnd) : null;
+        const bodyText =
+          tagText && bracketEnd > 1
+            ? msg.content.slice(bracketEnd + 1).trim()
+            : msg.content;
+
+        return (
+          <div
+            key={msg.id}
+            className={`relative rounded-xl px-3.5 py-2.5 lg:py-2 border transition-colors ${
+              isUrgent
+                ? 'bg-[linear-gradient(95deg,rgba(138,20,32,0.22)_0%,rgba(14,9,11,0.78)_75%)] border-[#961826]/45'
+                : isVoiceNote
+                  ? 'bg-[linear-gradient(95deg,rgba(104,18,28,0.20)_0%,rgba(14,9,11,0.78)_75%)] border-[#7A121D]/45'
+                  : isOwn
+                    ? 'bg-[linear-gradient(160deg,rgba(36,12,18,0.62)_0%,rgba(11,8,10,0.80)_100%)] border-[#32151C]'
+                    : 'bg-[linear-gradient(160deg,rgba(24,10,14,0.55)_0%,rgba(10,8,9,0.78)_100%)] border-[#241116] hover:border-[#3A1820]'
+            }`}
+          >
+            {(isUrgent || isVoiceNote) && (
+              <span
+                aria-hidden
+                className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full ${
+                  isUrgent ? 'bg-[#C82333]' : 'bg-[#8F1622]'
+                }`}
+              />
+            )}
+            <div className="flex items-center justify-between gap-2 mb-1 lg:mb-0.5">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                <OperatorAvatar name={authorName} size="xs" />
+                <span className="text-[12.5px] lg:text-[12px] font-extrabold text-[#F4EFF0]">
+                  {authorName}
+                </span>
+                {tagText && (
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                      isUrgent
+                        ? 'bg-[#8F1622]/30 text-[#F5A8B0] border border-[#C82333]/40'
+                        : 'bg-[#5E0E17]/35 text-[#E8ABB2] border border-[#8F1622]/40'
+                    }`}
+                  >
+                    {tagText}
+                  </span>
+                )}
+              </div>
+              <time
+                suppressHydrationWarning
+                className="text-[11px] font-semibold text-[#827376] tabular-nums flex-shrink-0"
+              >
+                {time}
+              </time>
+            </div>
+
+            <p className="text-[13px] lg:text-[12.5px] leading-relaxed lg:leading-snug text-[#F4EFF0]/95 break-words pl-7">
+              {bodyText}
+            </p>
+
+            {isVoiceNote && (
+              <div className="mt-2 lg:mt-1.5 ml-7 rounded-xl px-3 py-2 lg:py-1.5 bg-[#0C080A] border border-[#2E151C] flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onToggleVoiceNote(isPlayingThis ? null : msg.id)
+                  }
+                  className="crimson-cta rounded-lg px-2.5 py-1 text-[#F4EFF0] text-[10.5px] font-bold flex-shrink-0"
+                >
+                  {isPlayingThis ? 'Durdur' : 'Dinle · 0:08'}
+                </button>
+                <FluidWave
+                  level={0.85}
+                  active={isPlayingThis && !ecoActive}
+                  speed={1.2}
+                  className="flex-1 h-5"
+                />
+                <span className="hidden sm:inline text-[10px] font-bold text-[#E35D6A] flex-shrink-0">
+                  Opus 48kHz
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div ref={bottomRef} />
+    </div>
   );
 });

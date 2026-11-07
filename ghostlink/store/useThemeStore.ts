@@ -7,7 +7,11 @@
 
 import { create } from 'zustand';
 
-export type ThemePreset = 'ghost-cyberpunk' | 'ares-crimson' | 'oled-stealth';
+export type ThemePreset =
+  | 'ghost-cyberpunk'
+  | 'velvet-copper'
+  | 'ares-crimson'
+  | 'oled-stealth';
 
 export interface ThemeColors {
   name: string;
@@ -20,64 +24,91 @@ export interface ThemeColors {
   bgActive: string;
   accent: string;
   accentHover: string;
+  secondaryAccent: string;
   border: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
   glowColor: string;
+  secondaryGlow: string;
 }
 
 export const THEME_PRESETS: Record<ThemePreset, ThemeColors> = {
   'ghost-cyberpunk': {
-    name: 'Crimson Spec-Ops',
-    tagline: 'Fırçalanmış Koyu Titanyum (#06070A) & Mat Kan Kırmızısı (#EF4444)',
-    bgDarkest: '#06070A',
-    bgDark: '#0C0E14',
-    bgMid: '#12151E',
-    bgPanel: 'rgba(12, 14, 20, 0.95)',
-    bgHover: 'rgba(239, 68, 68, 0.07)',
-    bgActive: 'rgba(239, 68, 68, 0.12)',
-    accent: '#EF4444',
-    accentHover: '#F87171',
-    border: 'rgba(255, 255, 255, 0.06)',
-    textPrimary: '#F3F4F6',
-    textSecondary: '#9CA3AF',
-    textMuted: '#64748B',
-    glowColor: 'rgba(239, 68, 68, 0.16)',
+    name: 'Obsidian & Deep Burgundy',
+    tagline: 'Saf siyah zemin üzerinde hafif ve dengeli koyu bordo geçiş',
+    bgDarkest: '#070607',
+    bgDark: '#0D090B',
+    bgMid: '#1C0B10',
+    bgPanel: 'rgba(14, 9, 11, 0.82)',
+    bgHover: 'rgba(148, 22, 36, 0.12)',
+    bgActive: 'rgba(148, 22, 36, 0.20)',
+    accent: '#C82333',
+    accentHover: '#DC3545',
+    secondaryAccent: '#8F1622',
+    border: 'rgba(136, 26, 38, 0.24)',
+    textPrimary: '#F4EFF0',
+    textSecondary: '#B8AAAC',
+    textMuted: '#827376',
+    glowColor: 'rgba(128, 18, 30, 0.22)',
+    secondaryGlow: 'rgba(84, 12, 20, 0.14)',
+  },
+  'velvet-copper': {
+    name: 'Midnight & Bordeaux',
+    tagline: 'Gece siyahı ile yumuşak şarap bordosu ton geçişi',
+    bgDarkest: '#080608',
+    bgDark: '#100A0D',
+    bgMid: '#210C14',
+    bgPanel: 'rgba(16, 10, 13, 0.82)',
+    bgHover: 'rgba(156, 24, 44, 0.12)',
+    bgActive: 'rgba(156, 24, 44, 0.20)',
+    accent: '#C9263E',
+    accentHover: '#DE3B53',
+    secondaryAccent: '#8A1729',
+    border: 'rgba(142, 28, 46, 0.24)',
+    textPrimary: '#F5EFF1',
+    textSecondary: '#BBA9AF',
+    textMuted: '#857379',
+    glowColor: 'rgba(132, 20, 38, 0.22)',
+    secondaryGlow: 'rgba(88, 14, 26, 0.14)',
   },
   'ares-crimson': {
-    name: 'Amber Ordinance',
-    tagline: 'Mat Espor Grisi (#07080B) & Taktiksel Kehribar (#F59E0B)',
-    bgDarkest: '#07080B',
-    bgDark: '#0E1015',
-    bgMid: '#151820',
-    bgPanel: 'rgba(14, 16, 21, 0.95)',
-    bgHover: 'rgba(245, 158, 11, 0.07)',
-    bgActive: 'rgba(245, 158, 11, 0.12)',
-    accent: '#F59E0B',
-    accentHover: '#FBBF24',
-    border: 'rgba(255, 255, 255, 0.06)',
-    textPrimary: '#F4F4F5',
-    textSecondary: '#A1A1AA',
-    textMuted: '#71717A',
-    glowColor: 'rgba(245, 158, 11, 0.16)',
+    name: 'Charcoal & Dark Crimson',
+    tagline: 'Koyu antrasit siyah ve hafif kızıl-bordo derinlik',
+    bgDarkest: '#090708',
+    bgDark: '#110B0D',
+    bgMid: '#230D12',
+    bgPanel: 'rgba(17, 11, 13, 0.82)',
+    bgHover: 'rgba(168, 26, 38, 0.12)',
+    bgActive: 'rgba(168, 26, 38, 0.20)',
+    accent: '#D12838',
+    accentHover: '#E33E4E',
+    secondaryAccent: '#961A26',
+    border: 'rgba(148, 30, 42, 0.25)',
+    textPrimary: '#F5F0F1',
+    textSecondary: '#BCADAF',
+    textMuted: '#867779',
+    glowColor: 'rgba(142, 22, 34, 0.24)',
+    secondaryGlow: 'rgba(92, 14, 22, 0.15)',
   },
   'oled-stealth': {
-    name: 'Carbon Monolith',
-    tagline: 'Derin Karbon (#040507) & Otoriter Kırmızı (#DC2626)',
-    bgDarkest: '#040507',
-    bgDark: '#0A0B0F',
-    bgMid: '#111319',
-    bgPanel: 'rgba(10, 11, 15, 0.97)',
-    bgHover: 'rgba(220, 38, 38, 0.07)',
-    bgActive: 'rgba(220, 38, 38, 0.12)',
-    accent: '#DC2626',
-    accentHover: '#EF4444',
-    border: 'rgba(255, 255, 255, 0.06)',
-    textPrimary: '#E5E7EB',
-    textSecondary: '#9CA3AF',
-    textMuted: '#6B7280',
-    glowColor: 'rgba(220, 38, 38, 0.16)',
+    name: 'Pure Black & Subtle Oxblood',
+    tagline: 'Tam siyah zemin ve çok hafif bordo gölge geçişi',
+    bgDarkest: '#040405',
+    bgDark: '#0A0708',
+    bgMid: '#16090D',
+    bgPanel: 'rgba(10, 7, 8, 0.86)',
+    bgHover: 'rgba(136, 20, 32, 0.12)',
+    bgActive: 'rgba(136, 20, 32, 0.18)',
+    accent: '#B81F2E',
+    accentHover: '#CC2E3D',
+    secondaryAccent: '#7D131E',
+    border: 'rgba(118, 22, 32, 0.22)',
+    textPrimary: '#F2EDEE',
+    textSecondary: '#B2A4A6',
+    textMuted: '#7A6C6F',
+    glowColor: 'rgba(110, 16, 26, 0.18)',
+    secondaryGlow: 'rgba(68, 10, 16, 0.12)',
   },
 };
 
@@ -149,8 +180,8 @@ function applyThemeToDOM(
 
   const root = document.documentElement;
   const theme = THEME_PRESETS[preset] ?? THEME_PRESETS['ghost-cyberpunk'];
-  const safeOpacity = clamp(opacity, 0.5, 1, 0.96);
-  const safeBlur = clamp(blur, 0, 24, 6);
+  const safeOpacity = clamp(opacity, 0.45, 0.96, 0.82);
+  const safeBlur = clamp(blur, 0, 28, 16);
   const safeWallpaper = sanitizeWallpaperUrl(wallpaper);
 
   root.style.setProperty('--ghost-bg-darkest', theme.bgDarkest);
@@ -162,11 +193,13 @@ function applyThemeToDOM(
   root.style.setProperty('--ghost-accent', theme.accent);
   root.style.setProperty('--ghost-accent-rgb', hexToRgbChannels(theme.accent));
   root.style.setProperty('--ghost-accent-hover', theme.accentHover);
+  root.style.setProperty('--ghost-bronze', theme.secondaryAccent);
   root.style.setProperty('--ghost-border', theme.border);
   root.style.setProperty('--ghost-text-primary', theme.textPrimary);
   root.style.setProperty('--ghost-text-secondary', theme.textSecondary);
   root.style.setProperty('--ghost-text-muted', theme.textMuted);
   root.style.setProperty('--ghost-glow', theme.glowColor);
+  root.style.setProperty('--ghost-glow-secondary', theme.secondaryGlow);
   root.style.setProperty('--ghost-glass-opacity', safeOpacity.toString());
   root.style.setProperty('--ghost-glass-blur', `${safeBlur}px`);
 
@@ -182,8 +215,8 @@ function applyThemeToDOM(
 export const useThemeStore = create<ThemeState>((set, get) => ({
   currentTheme: 'ghost-cyberpunk',
   customWallpaper: null,
-  glassOpacity: 0.96,
-  blurIntensity: 6,
+  glassOpacity: 0.82,
+  blurIntensity: 16,
   showThemeModal: false,
 
   setTheme: (preset) => {
@@ -220,22 +253,22 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   },
 
   setGlassOpacity: (opacity) => {
-    const safeOpacity = clamp(opacity, 0.5, 1, 0.96);
+    const safeOpacity = clamp(opacity, 0.45, 0.96, 0.82);
     set({ glassOpacity: safeOpacity });
     const { currentTheme, blurIntensity, customWallpaper } = get();
     applyThemeToDOM(currentTheme, safeOpacity, blurIntensity, customWallpaper);
     try {
-      localStorage.setItem('ghost_opacity', safeOpacity.toString());
+      localStorage.setItem('ghost_opacity_v3', safeOpacity.toString());
     } catch {}
   },
 
   setBlurIntensity: (blur) => {
-    const safeBlur = clamp(blur, 0, 24, 6);
+    const safeBlur = clamp(blur, 0, 28, 16);
     set({ blurIntensity: safeBlur });
     const { currentTheme, glassOpacity, customWallpaper } = get();
     applyThemeToDOM(currentTheme, glassOpacity, safeBlur, customWallpaper);
     try {
-      localStorage.setItem('ghost_blur', safeBlur.toString());
+      localStorage.setItem('ghost_blur_v3', safeBlur.toString());
     } catch {}
   },
 
@@ -247,16 +280,16 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (typeof window !== 'undefined') {
       try {
         const storedTheme = localStorage.getItem('ghost_theme');
-        const storedOpacity = localStorage.getItem('ghost_opacity');
-        const storedBlur = localStorage.getItem('ghost_blur');
+        const storedOpacity = localStorage.getItem('ghost_opacity_v3');
+        const storedBlur = localStorage.getItem('ghost_blur_v3');
         const storedWallpaper = localStorage.getItem('ghost_wallpaper');
 
         if (isThemePreset(storedTheme)) currentTheme = storedTheme;
         if (storedOpacity !== null) {
-          glassOpacity = clamp(parseFloat(storedOpacity), 0.5, 1, 0.96);
+          glassOpacity = clamp(parseFloat(storedOpacity), 0.45, 0.96, 0.82);
         }
         if (storedBlur !== null) {
-          blurIntensity = clamp(parseFloat(storedBlur), 0, 24, 6);
+          blurIntensity = clamp(parseFloat(storedBlur), 0, 28, 16);
         }
         customWallpaper = sanitizeWallpaperUrl(storedWallpaper);
 

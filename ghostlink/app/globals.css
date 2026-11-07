@@ -3,33 +3,32 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────
-   Meva HUD — Tactical Industrial Luxury & Bento Cockpit
+   Meva HUD — Subtle Matte Black & Deep Burgundy Glass System
    ───────────────────────────────────────────────────────── */
 :root {
-  --ghost-bg-darkest: #06070A;
-  --ghost-bg-dark: #0C0E14;
-  --ghost-bg-mid: #12151E;
-  --ghost-bg-panel: rgba(12, 14, 20, 0.95);
-  --ghost-bg-hover: rgba(245, 158, 11, 0.07);
-  --ghost-bg-active: rgba(239, 68, 68, 0.12);
+  --ghost-bg-darkest: #070607;
+  --ghost-bg-dark: #0D090B;
+  --ghost-bg-mid: #1C0B10;
+  --ghost-bg-panel: rgba(14, 9, 11, 0.82);
+  --ghost-bg-hover: rgba(148, 22, 36, 0.12);
+  --ghost-bg-active: rgba(148, 22, 36, 0.20);
 
-  /* Tactical LED Accents: Crimson (#EF4444), Amber (#F59E0B), Emerald (#10B981) */
-  --ghost-accent: #EF4444;
-  --ghost-accent-rgb: 239 68 68;
-  --ghost-accent-hover: #F87171;
-  --ghost-amber: #F59E0B;
-  --ghost-emerald: #10B981;
-  --ghost-border: rgba(255, 255, 255, 0.06);
-  --ghost-border-subtle: rgba(255, 255, 255, 0.04);
+  --ghost-accent: #C82333;
+  --ghost-accent-rgb: 200 35 51;
+  --ghost-accent-hover: #DC3545;
+  --ghost-wine: #7A121D;
+  --ghost-bronze: #8F1622;
+  --ghost-border: rgba(136, 26, 38, 0.24);
+  --ghost-border-subtle: rgba(110, 22, 32, 0.15);
 
-  /* Crisp Titanium Typography */
-  --ghost-text-primary: #F3F4F6;
-  --ghost-text-secondary: #9CA3AF;
-  --ghost-text-muted: #64748B;
+  --ghost-text-primary: #F4EFF0;
+  --ghost-text-secondary: #B8AAAC;
+  --ghost-text-muted: #827376;
 
-  --ghost-glow: rgba(239, 68, 68, 0.16);
-  --ghost-glass-blur: 8px;
-  --ghost-glass-opacity: 0.95;
+  --ghost-glow: rgba(128, 18, 30, 0.22);
+  --ghost-glow-secondary: rgba(84, 12, 20, 0.14);
+  --ghost-glass-blur: 16px;
+  --ghost-glass-opacity: 0.82;
 }
 
 /* ── Global Resets & Mobile WebView Optimizations ── */
@@ -47,6 +46,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'cv11' 1, 'ss01' 1;
   background-color: var(--ghost-bg-darkest);
   color: var(--ghost-text-primary);
   overflow: hidden;
@@ -79,96 +80,247 @@ select {
   display: none;
 }
 
-/* ── Brushed Titanium & Carbon Bento Surfaces ── */
-.titanium-module {
-  background: linear-gradient(
-    180deg,
-    var(--ghost-bg-mid, #12151E) 0%,
-    var(--ghost-bg-dark, #0C0E14) 100%
-  );
-  opacity: var(--ghost-glass-opacity, 0.96);
-  border: 1px solid var(--ghost-border, rgba(255, 255, 255, 0.06));
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+/* ── Subtle Black-to-Burgundy Ambient Backdrop ── */
+.ambient-shell {
+  background-color: var(--ghost-bg-darkest);
+  background-image:
+    radial-gradient(68% 50% at 50% -8%, var(--ghost-glow) 0%, transparent 72%),
+    radial-gradient(55% 45% at 100% 100%, var(--ghost-glow-secondary) 0%, transparent 70%),
+    linear-gradient(180deg, #0D0709 0%, #070607 60%, #0A0608 100%);
 }
 
-.cockpit-pod {
+/* ── Subtle Black ↔ Burgundy Smoked Glass Modules ── */
+.titanium-module {
+  position: relative;
+  border: 1px solid var(--ghost-border, rgba(136, 26, 38, 0.24));
+  backdrop-filter: blur(var(--ghost-glass-blur, 16px));
+  -webkit-backdrop-filter: blur(var(--ghost-glass-blur, 16px));
   background: linear-gradient(
     165deg,
-    var(--ghost-bg-mid, #12151E) 0%,
-    var(--ghost-bg-darkest, #06070A) 100%
+    color-mix(
+        in srgb,
+        var(--ghost-bg-mid) calc(var(--ghost-glass-opacity, 0.82) * 90%),
+        transparent
+      )
+      0%,
+    color-mix(
+        in srgb,
+        var(--ghost-bg-dark) calc(var(--ghost-glass-opacity, 0.82) * 100%),
+        transparent
+      )
+      58%,
+    color-mix(
+        in srgb,
+        #070607 calc(var(--ghost-glass-opacity, 0.82) * 104%),
+        transparent
+      )
+      100%
   );
-  border: 1px solid var(--ghost-border, rgba(255, 255, 255, 0.06));
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.035),
+    0 16px 36px -20px rgba(0, 0, 0, 0.85);
+}
+
+body.eco-active .titanium-module {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Operator Voice Pods (Subtle Black-Burgundy Idle + Clean Speaking Highlight) ── */
+.cockpit-pod {
   position: relative;
+  border: 1px solid rgba(128, 24, 36, 0.20);
+  background: linear-gradient(
+    160deg,
+    rgba(32, 11, 16, 0.62) 0%,
+    rgba(11, 8, 10, 0.78) 100%
+  );
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
 }
 
-/* Subtle Technical HUD Corner Brackets */
-.hud-corners {
-  position: relative;
-}
-.hud-corners::before,
-.hud-corners::after {
-  content: '';
-  position: absolute;
-  width: 7px;
-  height: 7px;
-  pointer-events: none;
-  transition: border-color 0.25s ease;
-}
-.hud-corners::before {
-  top: -1px;
-  left: -1px;
-  border-top: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-left: 1.5px solid rgba(255, 255, 255, 0.18);
-}
-.hud-corners::after {
-  bottom: -1px;
-  right: -1px;
-  border-bottom: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-right: 1.5px solid rgba(255, 255, 255, 0.18);
+.cockpit-pod:hover {
+  border-color: rgba(168, 30, 44, 0.36);
+  background: linear-gradient(
+    160deg,
+    rgba(44, 14, 21, 0.68) 0%,
+    rgba(13, 9, 11, 0.82) 100%
+  );
 }
 
-.hud-corners-emerald::before,
-.hud-corners-emerald::after {
-  border-color: #10B981;
+.cockpit-pod-live {
+  border: 1px solid rgba(208, 36, 52, 0.52);
+  background: linear-gradient(
+    145deg,
+    rgba(148, 22, 36, 0.28) 0%,
+    rgba(42, 12, 18, 0.62) 48%,
+    rgba(12, 8, 10, 0.84) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 220, 224, 0.10),
+    0 0 24px -10px rgba(196, 30, 46, 0.45);
 }
 
-.hud-corners-amber::before,
-.hud-corners-amber::after {
-  border-color: #F59E0B;
+.cockpit-pod-muted {
+  border-color: rgba(148, 24, 36, 0.28);
+  background: linear-gradient(
+    160deg,
+    rgba(28, 10, 14, 0.55) 0%,
+    rgba(9, 7, 8, 0.80) 100%
+  );
 }
 
-/* ── Live Voice Equalizer Keyframes (GPU-Accelerated scaleY) ── */
-@keyframes eqPulse1 {
-  0%, 100% { transform: scaleY(0.22); }
-  50% { transform: scaleY(0.95); }
+/* ── Refined Burgundy-to-Black Primary Button ── */
+.crimson-cta {
+  background: linear-gradient(180deg, #961826 0%, #5E0E17 100%);
+  border: 1px solid rgba(212, 52, 68, 0.36);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 6px 16px -6px rgba(148, 22, 36, 0.5);
+  transition: filter 160ms ease, transform 140ms ease;
 }
-@keyframes eqPulse2 {
-  0%, 100% { transform: scaleY(0.65); }
-  35% { transform: scaleY(0.2); }
-  75% { transform: scaleY(1); }
+.crimson-cta:hover:not(:disabled) {
+  filter: brightness(1.1);
 }
-@keyframes eqPulse3 {
-  0%, 100% { transform: scaleY(0.35); }
-  40% { transform: scaleY(0.9); }
-  80% { transform: scaleY(0.25); }
+.crimson-cta:disabled {
+  background: rgba(24, 12, 16, 0.65);
+  border-color: rgba(120, 24, 34, 0.18);
+  box-shadow: none;
 }
 
-.eq-bar-1 {
-  animation: eqPulse1 0.65s ease-in-out infinite;
-  transform-origin: bottom;
+.mesh-surface {
+  background:
+    radial-gradient(52% 60% at 50% 52%, rgba(138, 20, 32, 0.18) 0%, transparent 74%),
+    linear-gradient(165deg, rgba(24, 10, 14, 0.65) 0%, rgba(9, 7, 8, 0.82) 100%);
 }
-.eq-bar-2 {
-  animation: eqPulse2 0.52s ease-in-out infinite;
-  transform-origin: bottom;
+
+/* ── Subtle Burgundy Divider Hairline ── */
+.horizon-divider {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(148, 24, 38, 0.34) 50%,
+    transparent 100%
+  );
 }
-.eq-bar-3 {
-  animation: eqPulse3 0.78s ease-in-out infinite;
-  transform-origin: bottom;
+
+/* ── Unified Executive Modals & Drawers ── */
+@keyframes modalRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawerSlideIn {
+  from {
+    opacity: 0.7;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.exec-backdrop {
+  background-color: rgba(5, 4, 5, 0.74);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.exec-modal {
+  border: 1px solid rgba(148, 26, 38, 0.30);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: linear-gradient(168deg, rgba(28, 11, 16, 0.90) 0%, rgba(10, 8, 9, 0.94) 100%);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 28px 60px -18px rgba(0, 0, 0, 0.9);
+  animation: modalRise 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.exec-drawer {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: linear-gradient(180deg, rgba(26, 10, 15, 0.90) 0%, rgba(9, 7, 8, 0.94) 100%);
+  border-left: 1px solid rgba(148, 26, 38, 0.28);
+  box-shadow: -24px 0 56px -15px rgba(0, 0, 0, 0.88);
+  animation: drawerSlideIn 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Subtle Burgundy-to-Crimson Range Slider ── */
+.exec-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    #6E111B 0%,
+    #C82333 var(--fill, 50%),
+    #1F1216 var(--fill, 50%),
+    #1F1216 100%
+  );
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+  outline: none;
+}
+.exec-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #F4EFF0;
+  border: 2.5px solid #C82333;
+  box-shadow:
+    0 0 0 2px rgba(7, 6, 7, 0.9),
+    0 2px 8px rgba(0, 0, 0, 0.8);
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+.exec-range:hover::-webkit-slider-thumb {
+  border-color: #E35D6A;
+}
+@media (pointer: coarse) {
+  .exec-range {
+    height: 6px;
+  }
+  .exec-range::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+  }
+}
+.exec-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.exec-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #F4EFF0;
+  border: 2.5px solid #C82333;
+  box-shadow:
+    0 0 0 2px rgba(7, 6, 7, 0.9),
+    0 2px 8px rgba(0, 0, 0, 0.65);
+}
+.exec-range::-moz-range-track {
+  background: transparent;
+}
+.exec-range:focus-visible {
+  box-shadow: 0 0 0 3px rgba(212, 149, 106, 0.28);
 }
 
 ::selection {
-  background-color: var(--ghost-accent);
-  color: #FFFFFF;
+  background-color: rgba(178, 34, 48, 0.85);
+  color: #F7EEE9;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -179,13 +331,13 @@ body.eco-active *::before,
 body.eco-active *::after {
   animation: none !important;
   transition: none !important;
-  box-shadow: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .eq-bar-1,
-  .eq-bar-2,
-  .eq-bar-3 {
-    animation: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
   }
 }

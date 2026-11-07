@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#050608',
+  themeColor: '#0B0708',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -28,7 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" className="dark">
-      <body className="font-sans antialiased bg-[#050608] text-[#F3F4F6] selection:bg-gl-accent selection:text-white overflow-hidden">
+      <body className="font-sans antialiased bg-[#0B0708] text-[#F5EBE6] overflow-hidden">
         <div className="flex h-[100dvh] w-screen overflow-hidden">
           {children}
         </div>

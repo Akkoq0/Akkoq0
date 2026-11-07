@@ -104,33 +104,33 @@ const DEFAULT_CHANNELS: Record<string, Channel[]> = {
     { id: 'ch-2', server_id: 'srv-1', category_id: 'cat-1', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
     { id: 'ch-3', server_id: 'srv-1', category_id: 'cat-1', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
     { id: 'ch-vod', server_id: 'srv-1', category_id: 'cat-1', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
-    { id: 'ch-1', server_id: 'srv-1', category_id: 'cat-1', name: 'turnuva-duyuru', type: 'text', position: 3, created_at: SEED_ISO },
-    { id: 'ch-4', server_id: 'srv-1', category_id: 'cat-2', name: 'Taktik Lobi #1', type: 'voice', position: 4, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-1', category_id: 'cat-2', name: 'Scrim Odası Alpha', type: 'voice', position: 5, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-1', category_id: 'cat-2', name: 'Koç & Analiz Odası', type: 'voice', position: 6, created_at: SEED_ISO },
+    { id: 'ch-4', server_id: 'srv-1', category_id: 'cat-2', name: 'Taktik Lobi #1', type: 'voice', position: 3, created_at: SEED_ISO },
+    { id: 'ch-5', server_id: 'srv-1', category_id: 'cat-2', name: 'Scrim Odası', type: 'voice', position: 5, created_at: SEED_ISO },
+    { id: 'ch-6', server_id: 'srv-1', category_id: 'cat-2', name: 'Analiz Odası', type: 'voice', position: 6, created_at: SEED_ISO },
   ],
   'srv-2': [
     { id: 'ch-7', server_id: 'srv-2', category_id: 'cat-3', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
     { id: 'ch-3', server_id: 'srv-2', category_id: 'cat-3', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
     { id: 'ch-vod', server_id: 'srv-2', category_id: 'cat-3', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
     { id: 'ch-8', server_id: 'srv-2', category_id: 'cat-4', name: 'Taktik Lobi #1', type: 'voice', position: 3, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-2', category_id: 'cat-4', name: 'Scrim Odası Alpha', type: 'voice', position: 4, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-2', category_id: 'cat-4', name: 'Koç & Analiz Odası', type: 'voice', position: 5, created_at: SEED_ISO },
+    { id: 'ch-5', server_id: 'srv-2', category_id: 'cat-4', name: 'Scrim Odası', type: 'voice', position: 4, created_at: SEED_ISO },
+    { id: 'ch-6', server_id: 'srv-2', category_id: 'cat-4', name: 'Analiz Odası', type: 'voice', position: 5, created_at: SEED_ISO },
   ],
   'srv-3': [
     { id: 'ch-9', server_id: 'srv-3', category_id: 'cat-5', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
     { id: 'ch-3', server_id: 'srv-3', category_id: 'cat-5', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
+    { id: 'ch-vod', server_id: 'srv-3', category_id: 'cat-5', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
     { id: 'ch-10', server_id: 'srv-3', category_id: 'cat-5', name: 'Taktik Lobi #1', type: 'voice', position: 2, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-3', category_id: 'cat-5', name: 'Scrim Odası Alpha', type: 'voice', position: 3, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-3', category_id: 'cat-5', name: 'Koç & Analiz Odası', type: 'voice', position: 4, created_at: SEED_ISO },
+    { id: 'ch-5', server_id: 'srv-3', category_id: 'cat-5', name: 'Scrim Odası', type: 'voice', position: 3, created_at: SEED_ISO },
+    { id: 'ch-6', server_id: 'srv-3', category_id: 'cat-5', name: 'Analiz Odası', type: 'voice', position: 4, created_at: SEED_ISO },
   ],
 };
 
 const DEFAULT_MEMBERS: Profile[] = [
-  { id: 'usr-1', username: 'cNed', avatar_url: null, status: 'in-game', activity: 'Valorant — Radiant #14', created_at: SEED_ISO },
-  { id: 'usr-2', username: 'woxic', avatar_url: null, status: 'in-game', activity: 'CS2 — Faceit Lvl 10', created_at: SEED_ISO },
-  { id: 'usr-4', username: 'XANTARES', avatar_url: null, status: 'online', activity: 'Aim Botz Warmup', created_at: SEED_ISO },
-  { id: 'usr-3', username: 'Alfajer', avatar_url: null, status: 'idle', activity: 'VOD İnceleme', created_at: SEED_ISO },
+  { id: 'usr-1', username: 'cNed', avatar_url: null, status: 'in-game', activity: 'AWP', created_at: SEED_ISO },
+  { id: 'usr-2', username: 'woxic', avatar_url: null, status: 'in-game', activity: 'LURKER', created_at: SEED_ISO },
+  { id: 'usr-4', username: 'XANTARES', avatar_url: null, status: 'online', activity: 'ENTRY', created_at: SEED_ISO },
+  { id: 'usr-3', username: 'Alfajer', avatar_url: null, status: 'idle', activity: 'COACH', created_at: SEED_ISO },
 ];
 
 export default function MevaHUDApp() {
@@ -224,6 +224,7 @@ export default function MevaHUDApp() {
   const {
     isMuted,
     isDeafened,
+    isSpeaking,
     connectionState,
     leaveVoice,
     toggleMute,
@@ -244,17 +245,28 @@ export default function MevaHUDApp() {
     () => ({
       isMuted,
       isDeafened,
+      isSpeaking,
       connectionState,
       toggleMute,
       toggleDeafen,
       leaveVoice,
     }),
-    [isMuted, isDeafened, connectionState, toggleMute, toggleDeafen, leaveVoice],
+    [
+      isMuted,
+      isDeafened,
+      isSpeaking,
+      connectionState,
+      toggleMute,
+      toggleDeafen,
+      leaveVoice,
+    ],
   );
 
   return (
     <div
-      className="relative h-[100dvh] w-screen overflow-hidden select-none bg-gl-bg-darkest text-gl-text-normal flex flex-col"
+      className={`relative h-[100dvh] w-screen overflow-hidden select-none text-gl-text-normal flex flex-col ${
+        safeWallpaper ? 'bg-gl-bg-darkest' : 'ambient-shell'
+      }`}
       style={
         safeWallpaper
           ? {
@@ -269,19 +281,19 @@ export default function MevaHUDApp() {
       <GhostNavbar />
 
       {/* 2. MAIN THREE-COLUMN WAR ROOM */}
-      <div className="relative z-10 flex-1 flex overflow-hidden min-h-0 md:p-2.5 md:gap-2.5">
+      <div className="relative z-10 flex-1 flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5">
         {/* Desktop Left Channel & Voice Hub */}
-        <div className="hidden md:flex h-full flex-shrink-0">
+        <div className="hidden lg:flex h-full flex-shrink-0">
           <TacticalSidebar
             username={user.username}
             voiceControls={voiceControls}
           />
         </div>
 
-        {/* Mobile Left Drawer */}
+        {/* Mobile & Tablet Left Drawer */}
         {isMobileSidebarOpen && (
           <div
-            className="fixed inset-0 z-40 md:hidden bg-black/80 flex"
+            className="fixed inset-0 z-40 lg:hidden exec-backdrop flex"
             onClick={() => setIsMobileSidebarOpen(false)}
           >
             <div
@@ -305,14 +317,14 @@ export default function MevaHUDApp() {
         />
 
         {/* Desktop Right Squad Roster */}
-        <div className="hidden md:flex h-full flex-shrink-0">
+        <div className="hidden lg:flex h-full flex-shrink-0">
           <PlayerRadarHUD onSelectPlayer={handleSelectPlayer} />
         </div>
 
-        {/* Mobile Right Drawer */}
+        {/* Mobile & Tablet Right Drawer */}
         {isMobileRadarOpen && (
           <div
-            className="fixed inset-0 z-40 md:hidden bg-black/75 flex justify-end"
+            className="fixed inset-0 z-40 lg:hidden exec-backdrop flex justify-end"
             onClick={() => setIsMobileRadarOpen(false)}
           >
             <div

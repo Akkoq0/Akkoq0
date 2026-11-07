@@ -18,7 +18,8 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Profiles: authenticated read"
   ON public.profiles FOR SELECT
-  USING (true);
+  TO authenticated
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Profiles: owner update"
   ON public.profiles FOR UPDATE
@@ -64,6 +65,9 @@ CREATE TABLE IF NOT EXISTS public.friendships (
   CONSTRAINT friendships_no_self_friend CHECK (user_id <> friend_id),
   UNIQUE(user_id, friend_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_friendships_lookup
+  ON public.friendships (friend_id, status);
 
 ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 

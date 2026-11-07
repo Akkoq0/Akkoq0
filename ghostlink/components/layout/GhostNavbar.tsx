@@ -1,11 +1,8 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Top Industrial Command Bar (GhostNavbar)
+// Meva HUD — Luminous Executive Command Bar (GhostNavbar)
 // ─────────────────────────────────────────────────────────
-// Tactical Brutalism: #050608 titanium deck, 1px hairline
-// borders (border-white/[0.05]), sharp rounded-sm modules,
-// and pinpoint Crimson/Amber active indicators.
 
 import { memo, type ReactNode } from 'react';
 import { useAppStore } from '@/lib/store';
@@ -40,19 +37,20 @@ function CommandButton({
 }: CommandButtonProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
       title={label}
-      className={`relative rounded-sm w-10 h-10 md:w-9 md:h-9 flex items-center justify-center border transition-colors active:scale-[0.98] ${
+      className={`relative rounded-xl w-9 h-9 flex items-center justify-center border transition-all duration-150 active:scale-[0.95] ${
         active
-          ? 'bg-[#12151C] text-gl-accent border-gl-accent/60'
-          : 'bg-[#0C0E12] text-gl-text-normal hover:text-gl-text-bright border-white/[0.05] hover:border-white/[0.12]'
+          ? 'bg-[linear-gradient(160deg,rgba(148,22,36,0.34)_0%,rgba(22,10,14,0.85)_100%)] text-[#F4EFF0] border-[#C82333]/50'
+          : 'bg-[#120A0D]/80 hover:bg-[#1C0D12] text-[#9E8E91] hover:text-[#F4EFF0] border-[#2A1319] hover:border-[#4A1C26]'
       } ${className}`}
     >
       {children}
       {badge > 0 && (
-        <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 rounded-sm bg-gl-accent text-white text-[9px] font-mono font-bold flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-gradient-to-br from-[#F25762] to-[#9E1B24] text-[#F7EEE9] text-[10px] font-bold tabular-nums flex items-center justify-center ring-2 ring-[#0A0608]">
           {badge}
         </span>
       )}
@@ -76,6 +74,8 @@ export const GhostNavbar = memo(function GhostNavbar() {
     (s) => s.friends.reduce((n, f) => n + (f.status === 'pending' ? 1 : 0), 0),
   );
   const qualityScore = useAppStore((s) => s.netGuard.qualityScore);
+  const jitterMs = useAppStore((s) => s.netGuard.jitterMs);
+  const activeScrim = useAppStore((s) => s.activeScrimRoom);
   const ecoEnabled = useAppStore((s) => s.ecoMode.isEnabled);
   const isRadarOpen = useAppStore((s) => s.isRadarOpen);
 
@@ -91,128 +91,145 @@ export const GhostNavbar = memo(function GhostNavbar() {
     ? `@${activeDMName}`
     : activeChannelName
       ? `#${cleanLabel(activeChannelName)}`
-      : 'KOMUTA';
+      : 'Komuta';
 
   return (
-    <header className="relative z-30 h-14 px-3.5 md:px-5 flex items-center justify-between gap-4 flex-shrink-0 select-none bg-[#050608] border-b border-white/[0.05]">
-      {/* ── LEFT: Brand Monolith + Server Selector Modules ── */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+    <header className="relative z-30 h-[52px] lg:h-12 px-3.5 lg:px-4 flex items-center justify-between gap-3 flex-shrink-0 select-none bg-[linear-gradient(90deg,rgba(9,7,8,0.90)_0%,rgba(24,10,14,0.86)_50%,rgba(9,7,8,0.90)_100%)] backdrop-blur-xl font-sans">
+      {/* Subtle Bottom Horizon Hairline */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px horizon-divider"
+      />
+
+      {/* ── LEFT: Brand + Server Tabs ── */}
+      <div className="flex items-center gap-2.5 lg:gap-3 min-w-0 flex-1">
         <button
+          type="button"
           onClick={() => setIsMobileSidebarOpen(true)}
-          aria-label="Kanal Dizinini Aç"
-          className="rounded-sm w-9 h-9 flex items-center justify-center bg-[#0C0E12] border border-white/[0.08] text-gl-accent flex-shrink-0 md:pointer-events-none"
+          aria-label="Kanal dizinini aç"
+          className="crimson-cta rounded-xl w-9 h-9 lg:w-8 lg:h-8 flex items-center justify-center text-[#F4EFF0] flex-shrink-0 lg:pointer-events-none active:scale-95"
         >
-          <IconMevaMark size={18} />
+          <IconMevaMark size={16} />
         </button>
 
-        {/* Mobile Context Trigger */}
+        {/* Mobile context (spacious & unclipped) */}
         <button
+          type="button"
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="md:hidden flex flex-col items-start justify-center min-w-0 min-h-[44px]"
+          className="lg:hidden flex flex-col items-start justify-center min-w-0 py-0.5"
         >
           {activeServerName && (
-            <span className="text-[10px] font-mono font-bold tracking-[0.2em] text-gl-text-muted uppercase">
-              {serverCode(activeServerName)}
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#C82333] leading-none">
+              {activeServerName}
             </span>
           )}
-          <span className="text-sm font-bold uppercase tracking-wider text-gl-text-bright truncate max-w-[46vw]">
+          <span className="text-[14px] font-bold text-[#F4EFF0] truncate max-w-[48vw] leading-tight mt-0.5">
             {mobileTitle}
           </span>
         </button>
 
-        {/* Desktop Brand Plate */}
-        <div className="hidden md:flex items-center gap-2.5 flex-shrink-0">
-          <span className="font-sans font-extrabold text-sm tracking-wider text-gl-text-bright">
-            MEVA <span className="text-[#F59E0B] font-semibold">HUD</span>
+        {/* Desktop brand */}
+        <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
+          <span className="text-[14px] font-extrabold tracking-tight text-[#F4EFF0]">
+            Meva
           </span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+          <span className="rounded-md px-1.5 py-0.5 bg-[#240C12] border border-[#7A121D]/60 text-[10px] font-bold tracking-wider text-[#E35D6A]">
+            HUD
+          </span>
         </div>
 
-        <span aria-hidden className="hidden md:block w-px h-5 bg-white/[0.06]" />
+        <span aria-hidden className="hidden lg:block w-px h-5 bg-[#261217]" />
 
-        {/* Desktop Server Tabs (Crisp Sans-Serif Typography) */}
+        {/* Desktop server tabs */}
         <nav
-          aria-label="Operasyon Sunucuları"
-          className="hidden md:flex items-center gap-1.5 overflow-x-auto no-scrollbar"
+          aria-label="Sunucular"
+          className="hidden lg:flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0"
         >
           {servers.map((server) => {
             const isActive = server.id === activeServerId;
             return (
               <button
+                type="button"
                 key={server.id}
                 onClick={() => setActiveServer(server.id)}
                 aria-current={isActive ? 'true' : undefined}
-                title={server.name}
-                className={`relative rounded-sm h-9 px-3.5 flex items-center gap-2 flex-shrink-0 font-sans text-xs font-semibold border transition-colors ${
+                className={`relative rounded-xl h-8 pl-1.5 pr-3 flex items-center gap-2 flex-shrink-0 text-[12px] font-semibold border transition-all duration-150 ${
                   isActive
-                    ? 'bg-[#0C0E14] text-gl-text-bright border-white/[0.1]'
-                    : 'bg-transparent text-gl-text-muted hover:text-gl-text-bright border-transparent hover:bg-[#0C0E14]/60'
+                    ? 'bg-[linear-gradient(160deg,rgba(128,18,30,0.24)_0%,rgba(14,9,11,0.85)_100%)] text-[#F4EFF0] border-[#961826]/55'
+                    : 'bg-transparent text-[#8F8083] hover:text-[#F4EFF0] border-transparent hover:bg-[#170B0F]'
                 }`}
               >
-                {isActive && (
-                  <span
-                    aria-hidden
-                    className="absolute inset-x-0 top-0 h-[2px] bg-gl-accent"
-                  />
-                )}
-                <span className={`font-mono text-[10px] font-bold ${isActive ? 'text-[#F59E0B]' : 'text-gl-text-muted'}`}>
+                <span
+                  className={`rounded-lg w-5 h-5 flex items-center justify-center text-[9px] font-bold ${
+                    isActive
+                      ? 'crimson-cta text-[#F4EFF0]'
+                      : 'bg-[#170B0F] text-[#9E8E91] border border-[#2A1319]'
+                  }`}
+                >
                   {serverCode(server.name)}
                 </span>
-                <span className="text-xs font-semibold">
-                  {server.name}
-                </span>
+                <span className="whitespace-nowrap">{server.name}</span>
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* ── RIGHT: Telemetry Readout & Heavy-Duty Controls ── */}
+      {/* ── RIGHT: Decluttered Mobile + Full Desktop Command Controls ── */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <div className="rounded-sm h-9 px-2.5 bg-[#0C0E14] border border-white/[0.06] flex items-center gap-2 font-mono text-[11px] font-bold text-gl-text-bright">
+        <div
+          title={`Ağ Kalitesi: %${qualityScore} · DTLS-SRTP P2P`}
+          className="rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 border border-[#2A1319] flex items-center gap-1.5 lg:gap-2 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0]"
+        >
           <SignalBars score={qualityScore} />
-          <span className="hidden sm:inline tabular-nums text-[#10B981]">
-            11<span className="text-gl-text-muted ml-0.5">ms</span>
+          <span className="tabular-nums">
+            {Math.max(9, Math.round(11 + jitterMs))}
+            <span className="text-[#827376] font-semibold ml-0.5">ms</span>
           </span>
         </div>
 
         <button
+          type="button"
           onClick={() => setShowScrimModal(true)}
-          className="hidden md:flex rounded-sm h-9 px-3.5 items-center gap-2 bg-[#0C0E14] hover:bg-[#12151E] text-gl-text-bright border border-white/[0.08] hover:border-gl-accent/60 font-sans text-xs font-bold tracking-wide transition-colors active:scale-[0.98]"
+          className={`hidden lg:flex rounded-xl h-9 px-3.5 items-center gap-2 text-[#F4EFF0] text-[12px] font-bold transition-all active:scale-[0.97] ${
+            activeScrim
+              ? 'bg-[#2A0E16] border border-[#C82333]/55'
+              : 'crimson-cta'
+          }`}
         >
-          <IconBolt size={14} className="text-gl-accent" />
-          <span>Scrim Odası</span>
+          <IconBolt size={14} className="text-[#F5B5BC]" />
+          <span>{activeScrim ? `Scrim #${activeScrim.code}` : 'Scrim Odası'}</span>
         </button>
 
         <CommandButton
-          label="Game-Boost Güç Koruması"
+          label="Game-Boost güç koruması"
           onClick={toggleEcoEnabled}
           active={ecoEnabled}
+          className="hidden lg:flex"
         >
-          <IconGauge size={17} />
+          <IconGauge size={16} />
         </CommandButton>
 
         <CommandButton
-          label="Operatör Ağı ve 1v1"
+          label="Operatör ağı ve 1v1"
           onClick={() => setShowFriendsModal(true)}
           badge={pendingCount}
-          className="hidden md:flex"
         >
           <IconUsers size={16} />
         </CommandButton>
 
         <CommandButton
-          label="Yüzey & Vurgu Ayarları"
+          label="Görünüm ayarları"
           onClick={() => setShowThemeModal(true)}
         >
           <IconSliders size={16} />
         </CommandButton>
 
         <CommandButton
-          label="Kadro & Telemetri Paneli"
+          label="Kadro paneli"
           onClick={toggleRadar}
           active={isRadarOpen}
-          className="hidden md:flex"
+          className="hidden lg:flex"
         >
           <IconRadar size={16} />
         </CommandButton>

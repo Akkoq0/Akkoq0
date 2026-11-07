@@ -24,7 +24,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'Operatör',
       avatar_url: null,
       status: 'online',
-      activity: 'IGL · Taktik Komuta',
+      activity: 'IGL',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -40,7 +40,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'AimCoach_Mert',
       avatar_url: null,
       status: 'online',
-      activity: 'Baş Antrenör · Analist',
+      activity: 'COACH',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -56,7 +56,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'cNed',
       avatar_url: null,
       status: 'in-game',
-      activity: 'AWP · Jett (Radiant #14)',
+      activity: 'AWP',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -72,7 +72,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'XANTARES',
       avatar_url: null,
       status: 'in-game',
-      activity: 'ENTRY · Raze / AK-47',
+      activity: 'ENTRY',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -88,7 +88,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'woxic',
       avatar_url: null,
       status: 'in-game',
-      activity: 'LURKER · Sova (Faceit Lvl 10)',
+      activity: 'LURKER',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -104,7 +104,7 @@ export const INITIAL_TACTICAL_MESSAGES: Message[] = [
       username: 'Alfajer',
       avatar_url: null,
       status: 'in-game',
-      activity: 'ANCHOR · Killjoy',
+      activity: 'COACH',
       created_at: BASE_PROFILE_ISO,
     },
   },
@@ -144,7 +144,7 @@ const SEED_BY_CHANNEL: Record<string, Message[]> = {
         username: 'cNed',
         avatar_url: null,
         status: 'in-game',
-        activity: 'AWP · Radiant #14',
+        activity: 'AWP',
         created_at: BASE_PROFILE_ISO,
       },
     },
@@ -175,7 +175,6 @@ export function useRealtimeChat(channelId: string | null) {
   const addMessage = useAppStore((s) => s.addMessage);
   const setMessages = useAppStore((s) => s.setMessages);
   const activeDMUserId = useAppStore((s) => s.activeDMUserId);
-  const friends = useAppStore((s) => s.friends);
 
   const effectiveTargetId = activeDMUserId
     ? `dm:${activeDMUserId}`
@@ -183,7 +182,8 @@ export function useRealtimeChat(channelId: string | null) {
 
   useEffect(() => {
     if (activeDMUserId) {
-      const targetFriend = friends.find(
+      const currentFriends = useAppStore.getState().friends;
+      const targetFriend = currentFriends.find(
         (f) => f.friend_id === activeDMUserId,
       )?.friend;
       const friendName = targetFriend?.username ?? 'Operatör';
@@ -227,7 +227,58 @@ export function useRealtimeChat(channelId: string | null) {
     const seeded =
       SEED_BY_CHANNEL[effectiveTargetId] ?? INITIAL_TACTICAL_MESSAGES;
     setMessages(seeded);
-  }, [effectiveTargetId, activeDMUserId, friends, setMessages]);
+
+    if (!isSupabaseConfigured()) return;
+
+    const safeChan = effectiveTargetId.replace(/[^A-Za-z0-9_:-]/g, '');
+    if (!safeChan) return;
+
+    let cancelled = false;
+    const supabase = getSupabase();
+
+    supabase
+      .from('messages')
+      .select('*, author:profiles(*)')
+      .eq('channel_id', safeChan)
+      .order('created_at', { ascending: true })
+      .limit(100)
+      .then(
+        ({ data }) => {
+          if (!cancelled && Array.isArray(data) && data.length > 0) {
+            setMessages(data as Message[]);
+          }
+        },
+        () => {},
+      );
+
+    const rtSub = supabase
+      .channel(`chat:${safeChan}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${safeChan}`,
+        },
+        (payload) => {
+          if (cancelled || !payload.new) return;
+          const incoming = payload.new as Message;
+          if (
+            typeof incoming.id === 'string' &&
+            typeof incoming.content === 'string'
+          ) {
+            addMessage(incoming);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(rtSub);
+    };
+  }, [effectiveTargetId, activeDMUserId, setMessages, addMessage]);
 
   const sendMessage = useCallback(
     async (content: string) => {

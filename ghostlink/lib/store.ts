@@ -24,7 +24,7 @@ const DEFAULT_FRIENDS: Friendship[] = [
       username: 'cNed',
       avatar_url: null,
       status: 'in-game',
-      activity: 'Valorant — Radiant #14',
+      activity: 'AWP',
       created_at: SEED_ISO,
     },
     created_at: SEED_ISO,
@@ -39,7 +39,7 @@ const DEFAULT_FRIENDS: Friendship[] = [
       username: 'woxic',
       avatar_url: null,
       status: 'in-game',
-      activity: 'CS2 — Faceit Lvl 10',
+      activity: 'LURKER',
       created_at: SEED_ISO,
     },
     created_at: SEED_ISO,
@@ -54,7 +54,7 @@ const DEFAULT_FRIENDS: Friendship[] = [
       username: 'XANTARES',
       avatar_url: null,
       status: 'in-game',
-      activity: 'CS2 — 3140 ELO Entry',
+      activity: 'ENTRY',
       created_at: SEED_ISO,
     },
     created_at: SEED_ISO,
@@ -69,7 +69,7 @@ const DEFAULT_FRIENDS: Friendship[] = [
       username: 'Alfajer',
       avatar_url: null,
       status: 'online',
-      activity: 'Valorant — Sentinel / Analiz',
+      activity: 'COACH',
       created_at: SEED_ISO,
     },
     created_at: SEED_ISO,
@@ -114,6 +114,7 @@ export const useAppStore = create<AppState>((set) => ({
   isRadarOpen: false,
   isMobileSidebarOpen: false,
   isMobileRadarOpen: false,
+  mobileTab: 'chat',
 
   setActiveServer: (id) =>
     set({
@@ -132,6 +133,7 @@ export const useAppStore = create<AppState>((set) => ({
       activeDMUserId: null,
       messages: [],
       isMobileSidebarOpen: false,
+      mobileTab: 'chat',
     }),
 
   setActiveVoiceChannel: (id) =>
@@ -143,6 +145,8 @@ export const useAppStore = create<AppState>((set) => ({
       activeChannelId: null,
       messages: [],
       isMobileSidebarOpen: false,
+      showFriendsModal: false,
+      mobileTab: 'chat',
     }),
 
   setServers: (servers) => set({ servers }),
@@ -152,9 +156,12 @@ export const useAppStore = create<AppState>((set) => ({
   setChannels: (channels) => set({ channels }),
 
   addMessage: (message: Message) =>
-    set((s) => ({
-      messages: [...s.messages.slice(-99), message],
-    })),
+    set((s) => {
+      if (s.messages.some((m) => m.id === message.id)) return s;
+      return {
+        messages: [...s.messages.slice(-99), message],
+      };
+    }),
 
   setMessages: (messages) => set({ messages }),
 
@@ -247,4 +254,13 @@ export const useAppStore = create<AppState>((set) => ({
   setIsMobileSidebarOpen: (open) => set({ isMobileSidebarOpen: open }),
 
   setIsMobileRadarOpen: (open) => set({ isMobileRadarOpen: open }),
+
+  setMobileTab: (tab) =>
+    set({
+      mobileTab: tab,
+      isMobileSidebarOpen: false,
+      isMobileRadarOpen: false,
+      showFriendsModal: false,
+      showScrimModal: false,
+    }),
 }));

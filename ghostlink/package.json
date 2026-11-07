@@ -2,7 +2,7 @@
   "name": "ghostlink",
   "version": "0.1.0",
   "private": true,
-  "description": "Ultra-lightweight P2P voice & text chat for competitive gamers — $0 server cost",
+  "description": "Meva HUD — Ultra-lightweight P2P voice & tactical command platform for competitive esports",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

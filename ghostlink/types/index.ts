@@ -155,6 +155,7 @@ export interface ScrimRoom {
 export interface VoiceControls {
   isMuted: boolean;
   isDeafened: boolean;
+  isSpeaking?: boolean;
   connectionState: 'idle' | 'connecting' | 'connected' | 'error';
   toggleMute: () => void;
   toggleDeafen: () => void;
@@ -177,6 +178,8 @@ export interface NetGuardStats {
 }
 
 // ─── Global Store ──────────────────────────────────────
+
+export type MobileCockpitTab = 'chat' | 'voice' | 'mesh';
 
 export interface AppState {
   // ── Current Selections ──
@@ -211,6 +214,7 @@ export interface AppState {
   isRadarOpen: boolean;
   isMobileSidebarOpen: boolean;
   isMobileRadarOpen: boolean;
+  mobileTab: MobileCockpitTab;
 
   // ── Actions — Navigation ──
   setActiveServer: (id: string) => void;
@@ -249,4 +253,5 @@ export interface AppState {
   toggleRadar: () => void;
   setIsMobileSidebarOpen: (open: boolean) => void;
   setIsMobileRadarOpen: (open: boolean) => void;
+  setMobileTab: (tab: MobileCockpitTab) => void;
 }
