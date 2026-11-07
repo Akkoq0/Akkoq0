@@ -14,7 +14,35 @@ import {
 import type { Profile } from '@/types';
 
 export type SpatialPan = 'L' | 'C' | 'R';
-export type TacticalRole = 'IGL' | 'AWP' | 'ENTRY' | 'LURKER' | 'COACH';
+export type TacticalRole =
+  | 'IGL'
+  | 'AWP'
+  | 'ENTRY'
+  | 'LURKER'
+  | 'COACH'
+  | 'JUNGLE'
+  | 'MID'
+  | 'TOP'
+  | 'ADC'
+  | 'SUPPORT'
+  | 'FILL'
+  | 'DUELIST'
+  | 'INITIATOR'
+  | 'CONTROLLER'
+  | 'SENTINEL'
+  | 'FLEX'
+  | 'POS 1 (CARRY)'
+  | 'POS 2 (MID)'
+  | 'POS 3 (OFFLANE)'
+  | 'POS 4 (ROAMER)'
+  | 'POS 5 (HARD SUPP)'
+  | 'FRAGGER'
+  | 'SNIPER / DMR'
+  | 'SCOUT'
+  | 'SHOTCALLER'
+  | 'CAPTAIN'
+  | 'CHILL'
+  | (string & {});
 
 interface HUDState {
   selectedPlayer: Profile | null;

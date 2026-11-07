@@ -19,6 +19,7 @@ import {
   IconGauge,
   IconMapBoard,
   IconMiniOverlay,
+  IconShield,
 } from '@/components/ui/MevaIcons';
 
 interface CommandButtonProps {
@@ -86,6 +87,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
   const setShowScrimModal = useAppStore((s) => s.setShowScrimModal);
   const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
+  const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
   const setShowFriendsModal = useAppStore((s) => s.setShowFriendsModal);
   const toggleRadar = useAppStore((s) => s.toggleRadar);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
@@ -234,6 +236,13 @@ export const GhostNavbar = memo(function GhostNavbar() {
           className="hidden lg:flex"
         >
           <IconGauge size={16} />
+        </CommandButton>
+
+        <CommandButton
+          label="18 Oyunlu Operatör Profili & Dinamik Roller"
+          onClick={() => setShowOnboardingModal(true)}
+        >
+          <IconShield size={16} />
         </CommandButton>
 
         <CommandButton

@@ -7,7 +7,14 @@
 // 3D Spatial Pan, Local Mute, IGL Priority Speaker (-30% Ducking),
 // Role Assignment (IGL / AWP / ENTRY / LURKER / COACH), and ICE Connection Reset.
 
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useMemo } from 'react';
+import { useAppStore } from '@/lib/store';
+import {
+  detectGameFromChannel,
+  getGameById,
+  SUPPORTED_GAMES,
+  type GameRoleDef,
+} from '@/src/lib/gameRegistry';
 import {
   useHUDStore,
   type SpatialPan,
@@ -84,6 +91,20 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
   const togglePrioritySpeaker = useHUDStore((s) => s.togglePrioritySpeaker);
   const setOperatorRole = useHUDStore((s) => s.setOperatorRole);
   const setIglDuckingEnabled = useHUDStore((s) => s.setIglDuckingEnabled);
+
+  const channels = useAppStore((s) => s.channels);
+  const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
+  const activeVoiceChannel = channels.find((c) => c.id === activeVoiceChannelId);
+  const activeGame = useMemo(() => {
+    if (activeVoiceChannel) {
+      return activeVoiceChannel.game_id
+        ? getGameById(activeVoiceChannel.game_id)
+        : detectGameFromChannel(activeVoiceChannel.name, activeVoiceChannel.tags);
+    }
+    return SUPPORTED_GAMES.cs2;
+  }, [activeVoiceChannel]);
+
+  const dynamicRoles = activeGame.roles;
 
   const [iceResetFeedback, setIceResetFeedback] = useState(false);
 
@@ -286,24 +307,34 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
 
         {/* 4. Tactical Role Switcher */}
         <div className="space-y-1.5">
-          <span className="block text-[10.5px] font-bold text-[#B8AAAC]">
-            Taktik Rol Ataması
-          </span>
-          <div className="grid grid-cols-5 gap-1">
-            {ROLES.map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => setOperatorRole(target.id, role)}
-                className={`rounded-lg py-1 text-[10px] font-extrabold border transition-all ${
-                  activeRole === role
-                    ? 'bg-[#8F1622]/35 text-[#F4EFF0] border-[#C82333]/60'
-                    : 'bg-[#11090B] text-[#8E7F83] hover:text-[#F4EFF0] border-[#261217]'
-                }`}
-              >
-                {role}
-              </button>
-            ))}
+          <div className="flex items-center justify-between text-[10.5px]">
+            <span className="font-bold text-[#B8AAAC]">
+              Taktik Rol Ataması
+            </span>
+            <span className="text-[10px] font-semibold text-[#ED8793]">
+              {activeGame.shortName}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+            {dynamicRoles.map((r: GameRoleDef) => {
+              const roleKey = r.shortLabel;
+              const isSelected = activeRole === roleKey || activeRole === r.key;
+              return (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setOperatorRole(target.id, roleKey)}
+                  title={r.label}
+                  className={`rounded-lg py-1 px-1 text-[9.5px] font-extrabold border transition-all truncate ${
+                    isSelected
+                      ? 'bg-[#8F1622]/45 text-[#F4EFF0] border-[#C82333]'
+                      : 'bg-[#11090B] text-[#8E7F83] hover:text-[#F4EFF0] border-[#261217]'
+                  }`}
+                >
+                  {roleKey}
+                </button>
+              );
+            })}
           </div>
         </div>
 

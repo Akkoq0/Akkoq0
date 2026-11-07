@@ -49,6 +49,9 @@ export interface Channel {
   type: ChannelType;
   position: number;
   created_at: string;
+  game_id?: string;
+  max_participants?: number;
+  tags?: string[];
 }
 
 // ─── Messages ──────────────────────────────────────────
@@ -204,6 +207,15 @@ export interface AppState {
   activeScrimRoom: ScrimRoom | null;
   showScrimModal: boolean;
   showLobbyGate: boolean;
+  showChannelBuilderModal: boolean;
+  showOnboardingModal: boolean;
+
+  // ── Multi-Game Hub & Tag Filter ──
+  selectedGameFilter: string; // 'all' | 'lol' | 'cs2' | 'valorant' | 'dota2' | 'chill'
+  userPrimaryGame: string;
+  userFavoriteGames: string[];
+  userGameRoles: Record<string, string>;
+  userCommunityTags: string[];
 
   // ── Net-Guard ──
   netGuard: NetGuardStats;
@@ -227,6 +239,8 @@ export interface AppState {
   setServers: (servers: Server[]) => void;
   setCategories: (categories: ChannelCategory[]) => void;
   setChannels: (channels: Channel[]) => void;
+  addChannel: (channel: Channel) => void;
+  addCategory: (category: ChannelCategory) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
   setVoiceParticipants: (participants: VoicePresence[]) => void;
@@ -240,10 +254,17 @@ export interface AppState {
   setEcoMode: (update: Partial<EcoModeState>) => void;
   toggleEcoEnabled: () => void;
 
-  // ── Actions — Scrim & Lobby ──
+  // ── Actions — Scrim & Lobby & Multi-Game ──
   setActiveScrimRoom: (room: ScrimRoom | null) => void;
   setShowScrimModal: (show: boolean) => void;
   setShowLobbyGate: (show: boolean) => void;
+  setShowChannelBuilderModal: (show: boolean) => void;
+  setShowOnboardingModal: (show: boolean) => void;
+  setSelectedGameFilter: (filter: string) => void;
+  setUserPrimaryGame: (gameId: string) => void;
+  setUserFavoriteGames: (games: string[]) => void;
+  setUserGameRole: (gameId: string, role: string) => void;
+  setUserCommunityTags: (tags: string[]) => void;
 
   // ── Actions — Net-Guard ──
   setNetGuard: (stats: Partial<NetGuardStats>) => void;

@@ -32,6 +32,12 @@ import {
   type OperatorContextTarget,
 } from '@/components/ui/OperatorContextMenu';
 import { cleanLabel } from '@/lib/format';
+import {
+  detectGameFromChannel,
+  getGameById,
+  SUPPORTED_GAMES,
+  type GameRoleDef,
+} from '@/src/lib/gameRegistry';
 import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
   IconVoiceWave,
@@ -48,7 +54,7 @@ import type { Message, Profile, VoiceControls } from '@/types';
 interface SquadOperatorMeta {
   id: string;
   username: string;
-  role: 'IGL' | 'AWP' | 'ENTRY' | 'LURKER' | 'COACH';
+  role: string;
   roleTone: 'burgundy' | 'bronze' | 'neutral';
   pingMs: number;
   waveSpeed: number;
@@ -204,6 +210,28 @@ export const StreamChatArea = memo(function StreamChatArea({
 
   const { sendMessage } = useRealtimeChat(activeChannelId);
 
+  const activeVoiceChannel = useMemo(
+    () => channels.find((c) => c.id === activeVoiceChannelId),
+    [channels, activeVoiceChannelId],
+  );
+
+  const activeGame = useMemo(() => {
+    if (activeVoiceChannel) {
+      return activeVoiceChannel.game_id
+        ? getGameById(activeVoiceChannel.game_id)
+        : detectGameFromChannel(activeVoiceChannel.name, activeVoiceChannel.tags);
+    }
+    return SUPPORTED_GAMES.cs2;
+  }, [activeVoiceChannel]);
+
+  const dynamicCallouts = useMemo(() => {
+    return activeGame.callouts.map((label: string) => ({
+      label,
+      cue: 'rotate' as CalloutCueType,
+      text: `[${activeGame.shortName.toUpperCase()} TAKTİK]: ${label}`,
+    }));
+  }, [activeGame]);
+
   const messages =
     storeMessages.length > 0 ? storeMessages : INITIAL_TACTICAL_MESSAGES;
 
@@ -352,8 +380,6 @@ export const StreamChatArea = memo(function StreamChatArea({
   }, [messages.length, activeChannelId, activeDMUserId]);
 
   const voiceChannels = channels.filter((c) => c.type === 'voice');
-  const activeVoiceChannel =
-    channels.find((c) => c.id === activeVoiceChannelId) ?? voiceChannels[0];
   const activeTextChannel = channels.find((c) => c.id === activeChannelId);
   const dmFriend = friends.find((f) => f.friend_id === activeDMUserId)?.friend;
 
@@ -436,7 +462,10 @@ export const StreamChatArea = memo(function StreamChatArea({
       {
         id: 'usr-local',
         username: username || 'Operatör',
-        role: operatorRoles['usr-local'] ?? 'IGL',
+        role:
+          operatorRoles['usr-local'] ??
+          activeGame.roles[0]?.shortLabel ??
+          'IGL',
         roleTone: 'burgundy',
         pingMs: 9,
         waveSpeed: 1.35,
@@ -445,15 +474,18 @@ export const StreamChatArea = memo(function StreamChatArea({
 
     for (let i = 0; i < activePeers.length && list.length < 5; i++) {
       const p = activePeers[i];
-      const role = operatorRoles[p.user_id] ?? 'ENTRY';
+      const fallbackRole =
+        activeGame.roles[(i + 1) % activeGame.roles.length]?.shortLabel ??
+        'ENTRY';
+      const role = operatorRoles[p.user_id] ?? fallbackRole;
       list.push({
         id: p.user_id,
         username: p.username || `Operatör #${i + 2}`,
         role,
         roleTone:
-          role === 'IGL'
+          role.includes('IGL') || role.includes('MID') || role.includes('JUNGLE')
             ? 'burgundy'
-            : role === 'AWP'
+            : role.includes('AWP') || role.includes('ADC') || role.includes('CARRY')
               ? 'bronze'
               : 'neutral',
         pingMs: telemetry.nodes[p.user_id]?.rttMs ?? 11,
@@ -462,7 +494,7 @@ export const StreamChatArea = memo(function StreamChatArea({
     }
 
     return list;
-  }, [username, operatorRoles, activePeers, telemetry.nodes]);
+  }, [username, operatorRoles, activePeers, telemetry.nodes, activeGame]);
 
   const renderOperatorCards = (mobileComfort: boolean) => {
     const cards = activeSquadOperators.map((op) => {
@@ -578,7 +610,11 @@ export const StreamChatArea = memo(function StreamChatArea({
           {/* Row 2: Single Role Badge + 3D Spatial Pan + Crisp Ping */}
           <div className="flex items-center justify-between gap-1.5">
             <span
-              className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wider border ${ROLE_BADGE_STYLE[op.roleTone]}`}
+              className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold tracking-wider border ${
+                activeGame.roles.find(
+                  (r: GameRoleDef) => r.key === activeRole || r.shortLabel === activeRole,
+                )?.badgeClass ?? ROLE_BADGE_STYLE[op.roleTone]
+              }`}
             >
               {activeRole}
             </span>
@@ -1399,7 +1435,7 @@ export const StreamChatArea = memo(function StreamChatArea({
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
-              {CALLOUTS.map((c) => (
+              {dynamicCallouts.map((c: { label: string; cue: CalloutCueType; text: string }) => (
                 <button
                   key={c.label}
                   type="button"

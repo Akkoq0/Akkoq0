@@ -58,6 +58,7 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
   const spatialPans = useHUDStore((s) => s.spatialPans);
   const eqProfiles = useHUDStore((s) => s.eqProfiles);
   const prioritySpeakers = useHUDStore((s) => s.prioritySpeakers);
+  const operatorRoles = useHUDStore((s) => s.operatorRoles);
   const setPlayerGain = useHUDStore((s) => s.setPlayerGain);
   const toggleLocalMute = useHUDStore((s) => s.toggleLocalMute);
   const setSpatialPan = useHUDStore((s) => s.setSpatialPan);
@@ -113,9 +114,14 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
               <h3 className="text-base font-bold text-[#F4EFF0] truncate">
                 {player.username}
               </h3>
-              <p className="text-xs text-[#ED8793] font-semibold mt-0.5">
-                {player.activity ?? 'Hazır Kıta'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-extrabold bg-[#590C15]/40 text-[#F08C96] border border-[#881A26]/40">
+                  {operatorRoles[player.id] ?? player.activity ?? 'IGL'}
+                </span>
+                <span className="text-[11px] text-[#A5908A] font-medium truncate">
+                  Taktik Operatör
+                </span>
+              </div>
             </div>
           </div>
 

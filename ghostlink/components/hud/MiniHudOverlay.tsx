@@ -26,6 +26,11 @@ import {
   getMevaTelemetryEngine,
   type MeshTelemetrySummary,
 } from '@/src/lib/telemetryEngine';
+import {
+  detectGameFromChannel,
+  getGameById,
+  SUPPORTED_GAMES,
+} from '@/src/lib/gameRegistry';
 import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
   IconMevaMark,
@@ -85,10 +90,34 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
   voiceControls,
 }: MiniHudOverlayProps) {
   const activeChannelId = useAppStore((s) => s.activeChannelId);
+  const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
+  const channels = useAppStore((s) => s.channels);
   const storeMessages = useAppStore((s) => s.messages);
   const ecoActive = useAppStore((s) => s.ecoMode.isActive);
   const voiceParticipants = useAppStore((s) => s.voiceParticipants);
   const { sendMessage } = useRealtimeChat(activeChannelId);
+
+  const activeVoiceChannel = useMemo(
+    () => channels.find((c) => c.id === activeVoiceChannelId),
+    [channels, activeVoiceChannelId],
+  );
+
+  const activeGame = useMemo(() => {
+    if (activeVoiceChannel) {
+      return activeVoiceChannel.game_id
+        ? getGameById(activeVoiceChannel.game_id)
+        : detectGameFromChannel(activeVoiceChannel.name, activeVoiceChannel.tags);
+    }
+    return SUPPORTED_GAMES.cs2;
+  }, [activeVoiceChannel]);
+
+  const dynamicCallouts = useMemo(() => {
+    return activeGame.callouts.map((label: string) => ({
+      label,
+      cue: 'rotate' as CalloutCueType,
+      text: `[${activeGame.shortName.toUpperCase()} TAKTİK]: ${label}`,
+    }));
+  }, [activeGame]);
 
   const localMutes = useHUDStore((s) => s.localMutes);
   const spatialPans = useHUDStore((s) => s.spatialPans);
@@ -169,23 +198,29 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
       {
         id: 'usr-local',
         name: username || 'Operatör',
-        defaultRole: operatorRoles['usr-local'] ?? 'IGL',
+        defaultRole:
+          operatorRoles['usr-local'] ??
+          activeGame.roles[0]?.shortLabel ??
+          'IGL',
         fallbackPing: 9,
       },
     ];
 
     for (let i = 0; i < activePeers.length && list.length < 5; i++) {
       const p = activePeers[i];
+      const fallbackRole =
+        activeGame.roles[(i + 1) % activeGame.roles.length]?.shortLabel ??
+        'ENTRY';
       list.push({
         id: p.user_id,
         name: p.username || `Operatör #${i + 2}`,
-        defaultRole: operatorRoles[p.user_id] ?? 'ENTRY',
+        defaultRole: operatorRoles[p.user_id] ?? fallbackRole,
         fallbackPing: 11,
       });
     }
 
     return list;
-  }, [username, operatorRoles, activePeers]);
+  }, [username, operatorRoles, activePeers, activeGame]);
 
   const lastMsg = storeMessages[storeMessages.length - 1];
 
@@ -432,7 +467,7 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
         <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#8E7F83] flex-shrink-0 mr-1">
           Taktik Çağrı:
         </span>
-        {MINI_CALLOUTS.map((c) => (
+        {dynamicCallouts.map((c: { label: string; cue: CalloutCueType; text: string }) => (
           <button
             key={c.label}
             type="button"

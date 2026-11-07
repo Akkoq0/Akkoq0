@@ -18,13 +18,25 @@ import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import {
+  detectGameFromChannel,
+  getGameById,
+  SUPPORTED_GAMES,
+} from '@/src/lib/gameRegistry';
+import {
   IconClose,
   IconMapBoard,
   IconSend,
   IconShield,
 } from '@/components/ui/MevaIcons';
 
-export type TacticalMapId = 'ascent' | 'bind' | 'mirage' | 'inferno';
+export type TacticalMapId =
+  | 'ascent'
+  | 'bind'
+  | 'mirage'
+  | 'inferno'
+  | 'rift'
+  | 'dota'
+  | 'erangel';
 export type StratTool = 'arrow' | 'smoke' | 'flash' | 'pen';
 
 export interface StratPoint {
@@ -125,6 +137,43 @@ const MAP_BLUEPRINTS: Record<
       { label: 'A SITE', x: 560, y: 245, w: 185, h: 125, isSite: true },
       { label: 'APARTMENTS / PIT', x: 615, y: 380, w: 155, h: 65 },
       { label: 'T RAMP', x: 125, y: 365, w: 185, h: 72 },
+    ],
+  },
+  rift: {
+    title: 'Sihirdar Vadisi',
+    game: 'VALORANT', // shared tactical renderer
+    zones: [
+      { label: 'BARON PIT', x: 260, y: 140, w: 110, h: 80, isSite: true },
+      { label: 'EJDER ÇUKURU', x: 470, y: 260, w: 110, h: 80, isSite: true },
+      { label: 'ÜST KORİDOR (TOP)', x: 120, y: 70, w: 200, h: 55 },
+      { label: 'ORTA KORİDOR (MID)', x: 330, y: 195, w: 180, h: 85 },
+      { label: 'ALT KORİDOR (BOT)', x: 520, y: 350, w: 200, h: 55 },
+      { label: 'MAVİ GÜÇLENDIRME', x: 240, y: 250, w: 90, h: 60 },
+      { label: 'KIRMIZI GÜÇLENDIRME', x: 510, y: 170, w: 90, h: 60 },
+    ],
+  },
+  dota: {
+    title: 'Dota 2',
+    game: 'CS2',
+    zones: [
+      { label: 'ROSHAN PIT (ÜST)', x: 170, y: 110, w: 110, h: 70, isSite: true },
+      { label: 'ROSHAN PIT (ALT)', x: 560, y: 300, w: 110, h: 70, isSite: true },
+      { label: 'RADIANT SAFE', x: 530, y: 350, w: 180, h: 60 },
+      { label: 'DIRE SAFE', x: 130, y: 70, w: 180, h: 60 },
+      { label: 'MID RIVER', x: 340, y: 205, w: 160, h: 70 },
+      { label: 'TORMENTOR', x: 650, y: 220, w: 90, h: 60 },
+    ],
+  },
+  erangel: {
+    title: 'Erangel',
+    game: 'CS2',
+    zones: [
+      { label: 'POCHINKI', x: 350, y: 210, w: 140, h: 90, isSite: true },
+      { label: 'MILITARY BASE', x: 340, y: 370, w: 160, h: 80, isSite: true },
+      { label: 'SCHOOL / APTS', x: 420, y: 150, w: 120, h: 75 },
+      { label: 'ROZHOK', x: 340, y: 130, w: 110, h: 65 },
+      { label: 'YASNAYA POLYANA', x: 540, y: 110, w: 150, h: 85 },
+      { label: 'GEORGOPOOL', x: 140, y: 90, w: 150, h: 85 },
     ],
   },
 };
@@ -333,10 +382,32 @@ export const TacticalStratDrawer = memo(function TacticalStratDrawer() {
   const open = useVoiceSettingsStore((s) => s.showStratBoard);
   const setOpen = useVoiceSettingsStore((s) => s.setShowStratBoard);
   const activeChannelId = useAppStore((s) => s.activeChannelId);
+  const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
+  const channels = useAppStore((s) => s.channels);
   const { sendMessage } = useRealtimeChat(activeChannelId);
 
   const [mapId, setMapId] = useState<TacticalMapId>('ascent');
   const [tool, setTool] = useState<StratTool>('arrow');
+
+  // Auto-switch blueprint based on active voice channel game
+  useEffect(() => {
+    const ch = channels.find((c) => c.id === activeVoiceChannelId);
+    if (!ch) return;
+    const g = ch.game_id
+      ? getGameById(ch.game_id)
+      : detectGameFromChannel(ch.name, ch.tags);
+    if (g.id === 'lol' || g.id === 'wildrift' || g.id === 'mlbb') {
+      setMapId('rift');
+    } else if (g.id === 'dota2') {
+      setMapId('dota');
+    } else if (g.id === 'cs2' || g.id === 'standoff2' || g.id === 'r6') {
+      setMapId('mirage');
+    } else if (g.id === 'pubg' || g.id === 'pubgm' || g.id === 'apex' || g.id === 'warzone') {
+      setMapId('erangel');
+    } else if (g.id === 'valorant') {
+      setMapId('ascent');
+    }
+  }, [channels, activeVoiceChannelId]);
   const [inkColor, setInkColor] = useState<string>('#C82333');
   const [ops, setOps] = useState<StratOperation[]>([]);
   const [syncedPackets, setSyncedPackets] = useState(0);

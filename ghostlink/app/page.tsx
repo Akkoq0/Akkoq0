@@ -29,6 +29,8 @@ import { FriendsModal } from '@/components/ui/FriendsModal';
 import { TacticalStratDrawer } from '@/components/tactical/TacticalStratDrawer';
 import { MiniHudOverlay } from '@/components/hud/MiniHudOverlay';
 import { LobbyGateModal } from '@/components/lobby/LobbyGateModal';
+import { QuickChannelBuilderModal } from '@/components/modal/QuickChannelBuilderModal';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
@@ -44,98 +46,72 @@ const SEED_ISO = '2026-11-06T19:00:00.000Z';
 const DEFAULT_SERVERS: Server[] = [
   {
     id: 'srv-1',
-    name: 'Valorant TR Pro',
+    name: '🎥 Yayıncı Topluluk Hub’ı',
     icon_url: null,
     owner_id: 'usr-1',
-    invite_code: 'VALTR',
+    invite_code: 'STREAM',
     created_at: SEED_ISO,
   },
   {
     id: 'srv-2',
-    name: 'CS2 Faceit Hub',
+    name: '🏆 Espor Scrim & Klan Hub',
     icon_url: null,
     owner_id: 'usr-1',
-    invite_code: 'CS2TR',
+    invite_code: 'ESPOR',
     created_at: SEED_ISO,
   },
   {
     id: 'srv-3',
-    name: 'Eternals Scrim',
+    name: '⚡ Hızlı Arkadaş Grubu',
     icon_url: null,
     owner_id: 'usr-1',
-    invite_code: 'ETRNL',
+    invite_code: 'SQUAD',
     created_at: SEED_ISO,
   },
 ];
 
 const DEFAULT_CATEGORIES: Record<string, ChannelCategory[]> = {
   'srv-1': [
-    {
-      id: 'cat-1',
-      server_id: 'srv-1',
-      name: 'METİN KANALLARI',
-      position: 0,
-      is_collapsed: false,
-    },
-    {
-      id: 'cat-2',
-      server_id: 'srv-1',
-      name: 'SES FREKANSLARI',
-      position: 1,
-      is_collapsed: false,
-    },
+    { id: 'cat-1-lobby', server_id: 'srv-1', name: '📌 LOBİ & SOHBET', position: 0, is_collapsed: false },
+    { id: 'cat-1-moba', server_id: 'srv-1', name: '⚔️ MOBA [LoL / Dota / MLBB]', position: 1, is_collapsed: false },
+    { id: 'cat-1-fps', server_id: 'srv-1', name: '🎯 TAKTİK FPS [CS2 / Valo]', position: 2, is_collapsed: false },
+    { id: 'cat-1-br', server_id: 'srv-1', name: '🪂 BATTLE ROYALE [PUBG / Apex]', position: 3, is_collapsed: false },
+    { id: 'cat-1-chill', server_id: 'srv-1', name: '☕ CHILL & MÜZİK', position: 4, is_collapsed: false },
   ],
   'srv-2': [
-    {
-      id: 'cat-3',
-      server_id: 'srv-2',
-      name: 'FACEIT LOBİ',
-      position: 0,
-      is_collapsed: false,
-    },
-    {
-      id: 'cat-4',
-      server_id: 'srv-2',
-      name: 'TAKIM SES',
-      position: 1,
-      is_collapsed: false,
-    },
+    { id: 'cat-2-match', server_id: 'srv-2', name: '🏆 MAÇ & TURNUVA ODALARI', position: 0, is_collapsed: false },
+    { id: 'cat-2-coach', server_id: 'srv-2', name: '🧠 TAKTİK & KOÇLUK', position: 1, is_collapsed: false },
+    { id: 'cat-2-warmup', server_id: 'srv-2', name: '⚡ YEDEK LOBİ & ISINMA', position: 2, is_collapsed: false },
   ],
   'srv-3': [
-    {
-      id: 'cat-5',
-      server_id: 'srv-3',
-      name: 'SCRIM KOORDİNASYON',
-      position: 0,
-      is_collapsed: false,
-    },
+    { id: 'cat-3-chill', server_id: 'srv-3', name: '☕ CHILL / MUHABBET', position: 0, is_collapsed: false },
+    { id: 'cat-3-play', server_id: 'srv-3', name: '🎮 ANA OYUN ODALARI', position: 1, is_collapsed: false },
   ],
 };
 
 const DEFAULT_CHANNELS: Record<string, Channel[]> = {
   'srv-1': [
-    { id: 'ch-2', server_id: 'srv-1', category_id: 'cat-1', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
-    { id: 'ch-3', server_id: 'srv-1', category_id: 'cat-1', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
-    { id: 'ch-vod', server_id: 'srv-1', category_id: 'cat-1', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
-    { id: 'ch-4', server_id: 'srv-1', category_id: 'cat-2', name: 'Taktik Lobi #1', type: 'voice', position: 3, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-1', category_id: 'cat-2', name: 'Scrim Odası', type: 'voice', position: 5, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-1', category_id: 'cat-2', name: 'Analiz Odası', type: 'voice', position: 6, created_at: SEED_ISO },
+    { id: 'ch-genel', server_id: 'srv-1', category_id: 'cat-1-lobby', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Genel', '#Sohbet'] },
+    { id: 'ch-yayin', server_id: 'srv-1', category_id: 'cat-1-lobby', name: 'yayin-bildirim', type: 'text', position: 1, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Yayın'] },
+    { id: 'ch-lol-5v5', server_id: 'srv-1', category_id: 'cat-1-moba', name: 'lol-dereceli-5v5', type: 'voice', position: 2, created_at: SEED_ISO, game_id: 'lol', max_participants: 5, tags: ['#LoL', '#Dereceli-5v5'] },
+    { id: 'ch-dota-5v5', server_id: 'srv-1', category_id: 'cat-1-moba', name: 'dota2-ranked', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'dota2', max_participants: 5, tags: ['#Dota2', '#Ranked'] },
+    { id: 'ch-cs2-premier', server_id: 'srv-1', category_id: 'cat-1-fps', name: 'cs2-premier', type: 'voice', position: 4, created_at: SEED_ISO, game_id: 'cs2', max_participants: 5, tags: ['#CS2', '#Premier'] },
+    { id: 'ch-valo-5stack', server_id: 'srv-1', category_id: 'cat-1-fps', name: 'valorant-5stack', type: 'voice', position: 5, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Valorant', '#5Stack'] },
+    { id: 'ch-pubg-squad', server_id: 'srv-1', category_id: 'cat-1-br', name: 'pubg-squad-erangel', type: 'voice', position: 6, created_at: SEED_ISO, game_id: 'pubg', max_participants: 4, tags: ['#PUBG', '#Squad'] },
+    { id: 'ch-chill-music', server_id: 'srv-1', category_id: 'cat-1-chill', name: 'kahve-muhabbet', type: 'voice', position: 7, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Chill', '#Müzik'] },
   ],
   'srv-2': [
-    { id: 'ch-7', server_id: 'srv-2', category_id: 'cat-3', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
-    { id: 'ch-3', server_id: 'srv-2', category_id: 'cat-3', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
-    { id: 'ch-vod', server_id: 'srv-2', category_id: 'cat-3', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
-    { id: 'ch-8', server_id: 'srv-2', category_id: 'cat-4', name: 'Taktik Lobi #1', type: 'voice', position: 3, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-2', category_id: 'cat-4', name: 'Scrim Odası', type: 'voice', position: 4, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-2', category_id: 'cat-4', name: 'Analiz Odası', type: 'voice', position: 5, created_at: SEED_ISO },
+    { id: 'ch-scrim-1', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-oda-1-cs2', type: 'voice', position: 0, created_at: SEED_ISO, game_id: 'cs2', max_participants: 5, tags: ['#Scrim', '#CS2'] },
+    { id: 'ch-scrim-2', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-oda-2-valo', type: 'voice', position: 1, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Scrim', '#Valo'] },
+    { id: 'ch-scrim-txt', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-chat', type: 'text', position: 2, created_at: SEED_ISO, game_id: 'cs2', max_participants: 0, tags: ['#Scrim'] },
+    { id: 'ch-coach', server_id: 'srv-2', category_id: 'cat-2-coach', name: 'taktik-analiz-koc', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'cs2', max_participants: 10, tags: ['#Koç'] },
+    { id: 'ch-isinma', server_id: 'srv-2', category_id: 'cat-2-warmup', name: 'isinma-dm', type: 'voice', position: 4, created_at: SEED_ISO, game_id: 'cs2', max_participants: 10, tags: ['#Isınma'] },
   ],
   'srv-3': [
-    { id: 'ch-9', server_id: 'srv-3', category_id: 'cat-5', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO },
-    { id: 'ch-3', server_id: 'srv-3', category_id: 'cat-5', name: 'scrim-arama', type: 'text', position: 1, created_at: SEED_ISO },
-    { id: 'ch-vod', server_id: 'srv-3', category_id: 'cat-5', name: 'vod-notları', type: 'text', position: 2, created_at: SEED_ISO },
-    { id: 'ch-10', server_id: 'srv-3', category_id: 'cat-5', name: 'Taktik Lobi #1', type: 'voice', position: 2, created_at: SEED_ISO },
-    { id: 'ch-5', server_id: 'srv-3', category_id: 'cat-5', name: 'Scrim Odası', type: 'voice', position: 3, created_at: SEED_ISO },
-    { id: 'ch-6', server_id: 'srv-3', category_id: 'cat-5', name: 'Analiz Odası', type: 'voice', position: 4, created_at: SEED_ISO },
+    { id: 'ch-s3-chill', server_id: 'srv-3', category_id: 'cat-3-chill', name: 'kahve-muhabbet', type: 'voice', position: 0, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Chill'] },
+    { id: 'ch-s3-txt', server_id: 'srv-3', category_id: 'cat-3-chill', name: 'sohbet', type: 'text', position: 1, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Sohbet'] },
+    { id: 'ch-s3-valo', server_id: 'srv-3', category_id: 'cat-3-play', name: 'oyun-odasi-valo', type: 'voice', position: 2, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Valorant'] },
+    { id: 'ch-s3-lol', server_id: 'srv-3', category_id: 'cat-3-play', name: 'oyun-odasi-lol', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'lol', max_participants: 5, tags: ['#LoL'] },
   ],
 };
 
@@ -165,6 +141,12 @@ export default function MevaHUDApp() {
   const showFriendsModal = useAppStore((s) => s.showFriendsModal);
   const showLobbyGate = useAppStore((s) => s.showLobbyGate);
   const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
+  const showChannelBuilderModal = useAppStore((s) => s.showChannelBuilderModal);
+  const setShowChannelBuilderModal = useAppStore(
+    (s) => s.setShowChannelBuilderModal,
+  );
+  const showOnboardingModal = useAppStore((s) => s.showOnboardingModal);
+  const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -281,6 +263,8 @@ export default function MevaHUDApp() {
         useAppStore.getState().setShowScrimModal(false);
         useAppStore.getState().setShowFriendsModal(false);
         useAppStore.getState().setShowLobbyGate(false);
+        useAppStore.getState().setShowChannelBuilderModal(false);
+        useAppStore.getState().setShowOnboardingModal(false);
         useAppStore.getState().setIsMobileSidebarOpen(false);
         useAppStore.getState().setIsMobileRadarOpen(false);
         useThemeStore.getState().setShowThemeModal(false);
@@ -492,6 +476,21 @@ export default function MevaHUDApp() {
           onClose={() => setShowLobbyGate(false)}
           onJoinedRoom={(_code, name) => {
             setUser((prev) => ({ ...prev, username: name }));
+          }}
+        />
+      )}
+      {showChannelBuilderModal && (
+        <QuickChannelBuilderModal
+          isOpen={showChannelBuilderModal}
+          onClose={() => setShowChannelBuilderModal(false)}
+        />
+      )}
+      {showOnboardingModal && (
+        <OnboardingModal
+          isOpen={showOnboardingModal}
+          onClose={() => setShowOnboardingModal(false)}
+          onCompleted={(callsign) => {
+            setUser((prev) => ({ ...prev, username: callsign }));
           }}
         />
       )}

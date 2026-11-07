@@ -39,6 +39,14 @@ export const useAppStore = create<AppState>((set) => ({
   activeScrimRoom: null,
   showScrimModal: false,
   showLobbyGate: false,
+  showChannelBuilderModal: false,
+  showOnboardingModal: false,
+
+  selectedGameFilter: 'all',
+  userPrimaryGame: 'cs2',
+  userFavoriteGames: ['cs2', 'valorant', 'lol'],
+  userGameRoles: { cs2: 'IGL', valorant: 'DUELIST', lol: 'JUNGLE' },
+  userCommunityTags: ['#Tryhard-Dereceli', '#Scrim-Turnuva'],
 
   netGuard: {
     jitterMs: 0.2,
@@ -94,6 +102,18 @@ export const useAppStore = create<AppState>((set) => ({
   setCategories: (categories) => set({ categories }),
 
   setChannels: (channels) => set({ channels }),
+
+  addChannel: (channel) =>
+    set((s) => {
+      if (s.channels.some((c) => c.id === channel.id)) return s;
+      return { channels: [...s.channels, channel] };
+    }),
+
+  addCategory: (category) =>
+    set((s) => {
+      if (s.categories.some((c) => c.id === category.id)) return s;
+      return { categories: [...s.categories, category] };
+    }),
 
   addMessage: (message: Message) =>
     set((s) => {
@@ -175,6 +195,23 @@ export const useAppStore = create<AppState>((set) => ({
   setShowScrimModal: (show) => set({ showScrimModal: show }),
 
   setShowLobbyGate: (show) => set({ showLobbyGate: show }),
+
+  setShowChannelBuilderModal: (show) => set({ showChannelBuilderModal: show }),
+
+  setShowOnboardingModal: (show) => set({ showOnboardingModal: show }),
+
+  setSelectedGameFilter: (filter) => set({ selectedGameFilter: filter }),
+
+  setUserPrimaryGame: (gameId) => set({ userPrimaryGame: gameId }),
+
+  setUserFavoriteGames: (games) => set({ userFavoriteGames: games }),
+
+  setUserGameRole: (gameId, role) =>
+    set((s) => ({
+      userGameRoles: { ...s.userGameRoles, [gameId]: role },
+    })),
+
+  setUserCommunityTags: (tags) => set({ userCommunityTags: tags }),
 
   setNetGuard: (stats: Partial<NetGuardStats>) =>
     set((s) => ({ netGuard: { ...s.netGuard, ...stats } })),
