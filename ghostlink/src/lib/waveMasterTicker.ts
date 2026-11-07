@@ -1,16 +1,15 @@
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Master RAF Audio Wave Ticker (Zero-Re-Render)
+// Meva HUD — Master RAF Audio Wave Ticker (Zero-Re-Render SVG Path Engine)
 // ─────────────────────────────────────────────────────────
-// Single centralized animation loop with smart idle sleeping and
-// 45–60 FPS rate-limiting. Bypasses React state & Zustand entirely:
-// mutates Canvas 2D contexts directly without triggering re-renders.
+// Single centralized animation loop with 30 FPS frame-limiter (33.3ms delta).
+// Mutates SVG <path ref={pathRef}> ('d' attribute) directly via DOM mutation.
+// Non-speaking operators sleep with zero rAF cycles and static baseline path.
 
 import { getMevaAudioEngine } from '@/src/lib/audioEngine';
 
 interface RegisteredWaveItem {
   id: string;
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
+  path: SVGPathElement;
   peerId?: string;
   active: boolean;
   muted: boolean;
@@ -19,10 +18,8 @@ interface RegisteredWaveItem {
   isSleeping: boolean;
 }
 
-const LOGICAL_W = 240;
-const LOGICAL_H = 64;
-const MID_Y = 32;
-const FPS_INTERVAL_MS = 1000 / 50; // ~50 FPS limiter (silky smooth, zero heat)
+const STATIC_PATH = 'M 0 12 L 200 12';
+const FPS_INTERVAL_MS = 1000 / 30; // 33.3ms for strict 30 FPS rate-limiter
 
 export class MasterWaveTicker {
   private items = new Map<string, RegisteredWaveItem>();
@@ -45,7 +42,7 @@ export class MasterWaveTicker {
 
   public register(
     id: string,
-    canvas: HTMLCanvasElement,
+    path: SVGPathElement,
     options: {
       peerId?: string;
       active: boolean;
@@ -53,33 +50,25 @@ export class MasterWaveTicker {
       speed?: number;
     },
   ): void {
-    const ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) return;
-
-    // Fixed internal resolution for crisp retina rendering
-    canvas.width = LOGICAL_W;
-    canvas.height = LOGICAL_H;
-
     const item: RegisteredWaveItem = {
       id,
-      canvas,
-      ctx,
+      path,
       peerId: options.peerId,
       active: options.active,
       muted: options.muted ?? false,
       speed: options.speed ?? 1.4,
-      phase: Math.random() * Math.PI * 2,
-      isSleeping: false,
+      phase: 0,
+      isSleeping: true,
     };
 
     this.items.set(id, item);
 
-    // Initial render (idle/muted or live)
-    this.drawItem(item, 0.016);
-
     if (item.active && !item.muted) {
+      item.isSleeping = false;
       this.activeCount++;
       this.ensureRunning();
+    } else {
+      path.setAttribute('d', STATIC_PATH);
     }
   }
 
@@ -106,10 +95,12 @@ export class MasterWaveTicker {
         this.ensureRunning();
       } else {
         this.activeCount = Math.max(0, this.activeCount - 1);
-        // Force immediate render to static baseline line and sleep
-        item.isSleeping = false;
-        this.drawItem(item, 0.016);
         item.isSleeping = true;
+        item.path.setAttribute('d', STATIC_PATH);
+        if (this.activeCount === 0 && this.rafId !== null) {
+          cancelAnimationFrame(this.rafId);
+          this.rafId = null;
+        }
       }
     }
   }
@@ -168,116 +159,37 @@ export class MasterWaveTicker {
   };
 
   private drawItem(item: RegisteredWaveItem, dt: number): void {
-    const { ctx, canvas } = item;
-    const w = canvas.width;
-    const h = canvas.height;
-
-    ctx.clearRect(0, 0, w, h);
-
-    // Baseline horizontal line
-    ctx.beginPath();
-    ctx.moveTo(0, MID_Y);
-    ctx.lineTo(w, MID_Y);
-    ctx.lineWidth = 1;
-
-    if (item.muted) {
-      ctx.strokeStyle = '#B3222C';
-      ctx.globalAlpha = 0.72;
-      ctx.stroke();
-      ctx.globalAlpha = 1.0;
+    if (item.muted || !item.active) {
+      item.path.setAttribute('d', STATIC_PATH);
       item.isSleeping = true;
       return;
     }
 
-    if (!item.active) {
-      ctx.strokeStyle = '#3B242B';
-      ctx.globalAlpha = 0.85;
-      ctx.stroke();
-      ctx.globalAlpha = 1.0;
-      item.isSleeping = true;
-      return;
-    }
+    item.phase += dt * (item.speed * 4.2);
 
-    // Dynamic wave synthesis directly from WebAudio DSP harmonics
-    let primary = 0.55;
-    let secondary = 0.42;
-
+    let primaryHarmonic = 0.55;
     try {
       const audio = getMevaAudioEngine();
       if (item.peerId === 'usr-local') {
         const mic = audio.sampleMicSpectrum();
-        if (mic.rmsLevel > 2) {
-          primary = mic.primaryHarmonic;
-          secondary = mic.secondaryHarmonic;
-        }
+        if (mic.rmsLevel > 2) primaryHarmonic = mic.primaryHarmonic;
       } else if (item.peerId) {
         const spec = audio.samplePeerSpectrum(item.peerId);
-        if (spec.rmsLevel > 1) {
-          primary = spec.primaryHarmonic;
-          secondary = spec.secondaryHarmonic;
-        }
+        if (spec.rmsLevel > 1) primaryHarmonic = spec.primaryHarmonic;
       }
     } catch {}
 
-    item.phase += dt * (item.speed * 3.6);
+    const amp = Math.max(3, Math.min(10, primaryHarmonic * 11));
+    const p = item.phase;
+    const y1 = (12 + Math.sin(p) * amp).toFixed(1);
+    const y2 = (12 - Math.sin(p + 1.2) * (amp * 0.8)).toFixed(1);
+    const y3 = (12 + Math.sin(p + 2.4) * (amp * 0.9)).toFixed(1);
+    const y4 = (12 - Math.sin(p + 3.6) * (amp * 0.6)).toFixed(1);
 
-    const primaryAmp = Math.max(3.5, Math.min(22, primary * 25));
-    const secondaryAmp = Math.max(2.5, Math.min(14, secondary * 17));
-
-    // Secondary Wave (Delicate Silk Harmonic: presence 2kHz–6kHz)
-    ctx.beginPath();
-    for (let x = 0; x <= w; x += 4) {
-      const env = Math.sin((x / w) * Math.PI); // Window envelope drops smoothly to 0 at edges
-      const y =
-        MID_Y +
-        secondaryAmp *
-          env *
-          Math.sin((x / 34) * Math.PI * 2 + item.phase * 1.35 + 1.2);
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = 'rgba(240, 140, 150, 0.42)';
-    ctx.lineWidth = 1.25;
-    ctx.stroke();
-
-    // Primary Wave Area Gradient (Ribbon Glow)
-    const areaGrad = ctx.createLinearGradient(0, 0, 0, h);
-    areaGrad.addColorStop(0, 'rgba(200, 35, 51, 0.26)');
-    areaGrad.addColorStop(0.65, 'rgba(110, 17, 27, 0.08)');
-    areaGrad.addColorStop(1, 'rgba(9, 7, 8, 0)');
-
-    ctx.beginPath();
-    ctx.moveTo(0, MID_Y);
-    for (let x = 0; x <= w; x += 3) {
-      const env = Math.sin((x / w) * Math.PI);
-      const y =
-        MID_Y +
-        primaryAmp * env * Math.sin((x / 42) * Math.PI * 2 + item.phase);
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(w, MID_Y);
-    ctx.closePath();
-    ctx.fillStyle = areaGrad;
-    ctx.fill();
-
-    // Primary Wave Stroke (Vocal Fundamental Band 180Hz–1.8kHz)
-    const strokeGrad = ctx.createLinearGradient(0, 0, w, 0);
-    strokeGrad.addColorStop(0, '#7A121D');
-    strokeGrad.addColorStop(0.5, '#C82333');
-    strokeGrad.addColorStop(1, '#E34B5A');
-
-    ctx.beginPath();
-    for (let x = 0; x <= w; x += 3) {
-      const env = Math.sin((x / w) * Math.PI);
-      const y =
-        MID_Y +
-        primaryAmp * env * Math.sin((x / 42) * Math.PI * 2 + item.phase);
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = strokeGrad;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
+    item.path.setAttribute(
+      'd',
+      `M 0 12 C 30 ${y1}, 60 ${y2}, 100 12 C 140 ${y3}, 170 ${y4}, 200 12`,
+    );
   }
 }
 

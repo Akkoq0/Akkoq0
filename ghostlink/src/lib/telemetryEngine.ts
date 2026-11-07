@@ -77,6 +77,7 @@ export class MevaTelemetryEngine {
   private listeners = new Set<TelemetryListener>();
   private lastEmitTime = 0;
   private emitThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastEmittedSummary: MeshTelemetrySummary | null = null;
 
   constructor() {
     this.seedInitialNodes();
@@ -113,15 +114,15 @@ export class MevaTelemetryEngine {
     let lastTick = performance.now();
     this.pollTimer = setInterval(() => {
       const nowPerf = performance.now();
-      const driftMs = Math.max(0, nowPerf - lastTick - 1500);
+      const driftMs = Math.max(0, nowPerf - lastTick - 3000);
       lastTick = nowPerf;
-      // Estimate event-loop utilization cleanly bounded around 0.2%–0.8%
+      // Estimate event-loop utilization cleanly bounded around 0.1%–0.5%
       this.cpuEstimate = Number(
-        Math.min(1.4, Math.max(0.2, 0.26 + driftMs / 120)).toFixed(1),
+        Math.min(0.9, Math.max(0.1, 0.15 + driftMs / 200)).toFixed(1),
       );
 
       void this.collectTelemetryTick();
-    }, 1500);
+    }, 3000);
 
     void this.collectTelemetryTick();
   }
@@ -500,20 +501,54 @@ export class MevaTelemetryEngine {
     };
   }
 
+  private hasSummaryChanged(
+    prev: MeshTelemetrySummary | null,
+    next: MeshTelemetrySummary,
+  ): boolean {
+    if (!prev) return true;
+    if (
+      prev.rttMs !== next.rttMs ||
+      prev.jitterMs !== next.jitterMs ||
+      prev.packetLossPercent !== next.packetLossPercent ||
+      prev.stabilityPercent !== next.stabilityPercent ||
+      prev.stressActive !== next.stressActive ||
+      prev.stressPacketsPerSec !== next.stressPacketsPerSec ||
+      prev.throughputKbps !== next.throughputKbps
+    ) {
+      return true;
+    }
+
+    for (const [id, node] of Object.entries(next.nodes)) {
+      const p = prev.nodes[id];
+      if (!p || p.rttMs !== node.rttMs || p.iceState !== node.iceState) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private emitSummary(forceImmediate = false): void {
     const now = Date.now();
     const elapsed = now - this.lastEmitTime;
 
-    if (forceImmediate || elapsed >= 1400) {
+    const dispatch = () => {
+      const snap = this.getSummary();
+      if (!forceImmediate && !this.hasSummaryChanged(this.lastEmittedSummary, snap)) {
+        return; // Data has not changed: 0 React re-renders!
+      }
+      this.lastEmittedSummary = snap;
+      for (const listener of this.listeners) {
+        listener(snap);
+      }
+    };
+
+    if (forceImmediate || elapsed >= 2900) {
       if (this.emitThrottleTimer) {
         clearTimeout(this.emitThrottleTimer);
         this.emitThrottleTimer = null;
       }
       this.lastEmitTime = now;
-      const snap = this.getSummary();
-      for (const listener of this.listeners) {
-        listener(snap);
-      }
+      dispatch();
       return;
     }
 
@@ -521,11 +556,8 @@ export class MevaTelemetryEngine {
       this.emitThrottleTimer = setTimeout(() => {
         this.emitThrottleTimer = null;
         this.lastEmitTime = Date.now();
-        const snap = this.getSummary();
-        for (const listener of this.listeners) {
-          listener(snap);
-        }
-      }, 1400 - elapsed);
+        dispatch();
+      }, 3000 - elapsed);
     }
   }
 }

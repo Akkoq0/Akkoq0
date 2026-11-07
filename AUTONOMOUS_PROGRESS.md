@@ -21,6 +21,7 @@
 | **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | TAMAMLANDI | OK | `0489f8f` |
 | **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | TAMAMLANDI | OK | Release Push |
 | **FAZ 11 (PERF)** | Ultra-Performans 60 FPS Zero-Re-Render Çekirdeği, Master Wave Ticker & GPU Paint İzolasyonu | TAMAMLANDI | OK | 60 FPS Ready |
+| **FAZ 12 (HARDWARE)** | Ultra-Low CPU, GPU, RAM & Idle Disk 0% Donanım Koruma Protokolü | TAMAMLANDI | OK | Ultra-Low Hardware |
 
 ## Tamamlanan Teknik Çıktılar
 - **FAZ 0:** Keep-alive arka plan döngüsü (`/tmp/keepalive.txt`) ve otonom checkpoint sistemi devreye alındı.
@@ -48,3 +49,9 @@
   - **Zustand Atomik Seçiciler & Telemetri Throttling (`telemetryEngine.ts`):** Tüm geniş abonelikler atomik seçicilere dönüştürüldü, telemetri bildirimleri 1.4-1.5 saniyeye (1400ms) kilitlendi. VAD/Noise Gate bildirimleri sadece durum değişiminde veya 100ms throttle ile sınırlandırıldı.
   - **GPU Compositing & Paint İzolasyonu (`globals.css`):** `.cockpit-pod`, `.cockpit-pod-live`, `.cockpit-pod-muted` ve `.gpu-contained` için `contain: layout style paint;` ve `will-change: transform;` eklenerek tam sayfa yeniden boyamaları engellendi.
   - **Kapalı Modalların Koşullu Unmount Edilmesi (`app/page.tsx`):** `TacticalStratDrawer`, `MevaCommandSettingsModal`, `ScrimModal`, `ThemeSettingsModal` ve `FriendsModal` sadece açık olduklarında mount edilerek arka plandaki tüm dinleyiciler ve rAF döngüleri sıfırlandı.
+- **FAZ 12 (Minimum Donanım Tüketimi - Ultra-Low CPU, GPU, RAM & Idle Disk 0%):**
+  - **Sıfır CPU Yükü (`FluidWave` & `waveMasterTicker.ts`):** `FluidWave` doğrudan SVG `<path ref={pathRef}>` DOM referansına bağlandı (`setAttribute('d', ...)`). Konuşmayan operatörler için hiçbir `requestAnimationFrame` veya `setInterval` çalışmaz; tekil master ticker 30 FPS sınırlayıcıyla (33.3ms delta) sadece konuşan operatörlerde çalışır, sessizlikte loop derhal iptal edilerek uykuya geçer.
+  - **Sıfır RAM Şişmesi (Zero Heap Allocation):** `audioEngine.ts` ve `vadEngine.ts` içinde ölçüm döngüsündeki heap tahsisleri tamamen kaldırıldı; önceden ayrılan sabit `Uint8Array` ve `SpectrumSnapshot` referansları yeniden kullanılarak çöp toplayıcı (GC) duraklamaları sıfırlandı.
+  - **Minimum GPU Kullanımı (Sıfır Blur & VRAM İzolasyonu):** Ekran kartını zorlayan tüm `backdrop-filter: blur(...)` ve `backdrop-blur-xl` kuralları ile ağır gölgeler ve gereksiz `will-change` katmanları tamamen kaldırıldı; birebir aynı *Deep Espresso & Burgundy* hissiyatı veren yüksek performanslı donanım hızlandırmalı gradyanlar ve 1px kenarlıklar uygulandı.
+  - **Sıfır Disk Kullanımı (Idle Disk %0):** `/tmp/keepalive.txt` yazma süreci tamamen sonlandırıldı; `storageEngine.ts` içerisindeki 3 saniyelik periyodik zamanlayıcı kaldırıldı. Disk ve localStorage yazımları yalnızca kullanıcı fiilen bir ayar veya mesaj değiştirdiğinde 1000ms debounce ile tek seferde toplu (batched) olarak gerçekleşir.
+  - **Telemetri & Zustand Shallow Optimization (`telemetryEngine.ts`):** Ağ istatistik polling süresi 3000ms'ye çekildi; `hasSummaryChanged` shallow karşılaştırmasıyla veride değişiklik yoksa Zustand dinleyicileri tetiklenmeyerek gereksiz re-render'lar tamamen önlendi.

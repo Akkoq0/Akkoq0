@@ -133,14 +133,14 @@ export const FluidWave = memo(function FluidWave({
   className = '',
   speed = 1.4,
 }: FluidWaveProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const pathRef = useRef<SVGPathElement | null>(null);
   const waveId = useId();
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const path = pathRef.current;
+    if (!path) return;
     const ticker = getMasterWaveTicker();
-    ticker.register(waveId, canvas, { peerId, active, muted, speed });
+    ticker.register(waveId, path, { peerId, active, muted, speed });
 
     return () => {
       ticker.unregister(waveId);
@@ -153,11 +153,21 @@ export const FluidWave = memo(function FluidWave({
   }, [waveId, active, muted, peerId]);
 
   return (
-    <canvas
-      ref={canvasRef}
+    <svg
+      viewBox="0 0 200 24"
+      preserveAspectRatio="none"
       className={`block w-full h-full ${className}`}
-      style={{ contain: 'strict' }}
       aria-hidden
-    />
+    >
+      <path
+        ref={pathRef}
+        d="M 0 12 L 200 12"
+        fill="none"
+        stroke={muted ? '#8F1622' : active ? '#E35D6A' : '#3B1B22'}
+        strokeWidth={active && !muted ? 1.6 : 1}
+        strokeLinecap="round"
+        opacity={muted ? 0.6 : active ? 0.95 : 0.4}
+      />
+    </svg>
   );
 });

@@ -101,7 +101,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
       : 'Komuta';
 
   return (
-    <header className="relative z-30 h-[52px] lg:h-12 px-3.5 lg:px-4 flex items-center justify-between gap-3 flex-shrink-0 select-none bg-[linear-gradient(90deg,rgba(9,7,8,0.90)_0%,rgba(24,10,14,0.86)_50%,rgba(9,7,8,0.90)_100%)] backdrop-blur-xl font-sans">
+    <header className="relative z-30 h-[52px] lg:h-12 px-3.5 lg:px-4 flex items-center justify-between gap-3 flex-shrink-0 select-none bg-[linear-gradient(90deg,rgba(9,7,8,0.96)_0%,rgba(24,10,14,0.93)_50%,rgba(9,7,8,0.96)_100%)] font-sans">
       {/* Subtle Bottom Horizon Hairline */}
       <span
         aria-hidden

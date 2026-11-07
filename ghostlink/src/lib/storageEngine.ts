@@ -30,7 +30,7 @@ const STORE_PREFS = 'kv_prefs';
 const STORE_CHAT = 'chat_history';
 const STORE_PRO = 'pro_analytics';
 const LS_PREFIX = 'meva_kv_v1:';
-const BATCH_FLUSH_MS = 280;
+const BATCH_FLUSH_MS = 1000; // 1000ms debounced disk flush
 const MAX_MESSAGES_PER_CHANNEL = 100;
 
 export interface PersistedHudAudioPrefs {
@@ -215,7 +215,6 @@ export class MevaStorageEngine {
   ): void {
     const composite = `${store}:${key}`;
     this.pendingWrites.set(composite, { store, key, value });
-    this.writeLocalFallback(composite, value);
 
     if (this.flushTimer !== null) return;
     this.flushTimer = setTimeout(() => {
@@ -228,6 +227,11 @@ export class MevaStorageEngine {
     if (this.pendingWrites.size === 0) return;
     const batch = Array.from(this.pendingWrites.values());
     this.pendingWrites.clear();
+
+    // Debounced localStorage sync (zero synchronous disk I/O)
+    for (const item of batch) {
+      this.writeLocalFallback(`${item.store}:${item.key}`, item.value);
+    }
 
     const db = await this.openDatabase();
     if (!db) return;
@@ -264,6 +268,7 @@ export class MevaStorageEngine {
   // ── Meva Pro Post-Match Acoustic & Comms Analytics ──
 
   public getProReport(): ProAnalyticsReport {
+    this.refreshProAnalyticsSnapshot();
     return this.proReport;
   }
 
@@ -429,52 +434,33 @@ export class MevaStorageEngine {
     });
 
     this.boundUnsubscribers.push(unsubHud, unsubVoice, unsubApp);
+  }
 
-    // Lightweight 3-second Meva Pro acoustic session sampler (pauses during Game-Boost ecoActive)
-    this.analyticsTicker = setInterval(() => {
-      if (!useVoiceSettingsStore.getState().proAnalyticsEnabled) return;
-      if (useAppStore.getState().ecoMode.isActive) return;
+  public refreshProAnalyticsSnapshot(): void {
+    if (!useVoiceSettingsStore.getState().proAnalyticsEnabled) return;
+    const tel = getMevaTelemetryEngine().getSummary();
+    const avgRtt = Math.round(this.proReport.avgRttMs * 0.8 + tel.rttMs * 0.2);
+    const avgJitter =
+      Math.round((this.proReport.avgJitterMs * 0.8 + tel.jitterMs * 0.2) * 10) /
+      10;
+    const clarity = Math.max(
+      82,
+      Math.min(
+        99.9,
+        Math.round((100 - avgJitter * 1.4 - tel.packetLossPercent * 3.5) * 10) /
+          10,
+      ),
+    );
 
-      const hud = useHUDStore.getState();
-      const tel = getMevaTelemetryEngine().getSummary();
-      const talkSec = { ...this.proReport.operatorTalkSeconds };
-      let peakBump = 0;
-
-      for (const [peerId, spec] of Object.entries(hud.peerSpectrums)) {
-        if (spec.rms > 0.08 && !hud.localMutes[peerId]) {
-          talkSec[peerId] = (talkSec[peerId] ?? 0) + 3;
-        }
-        if (spec.rms > 0.82 && hud.autoLevelerEnabled) {
-          peakBump += 1;
-        }
-      }
-
-      const avgRtt = Math.round(this.proReport.avgRttMs * 0.8 + tel.rttMs * 0.2);
-      const avgJitter =
-        Math.round((this.proReport.avgJitterMs * 0.8 + tel.jitterMs * 0.2) * 10) /
-        10;
-      const clarity = Math.max(
-        82,
-        Math.min(
-          99.9,
-          Math.round(
-            (100 - avgJitter * 1.4 - tel.packetLossPercent * 3.5) * 10,
-          ) / 10,
-        ),
-      );
-
-      this.proReport = {
-        ...this.proReport,
-        updatedAt: Date.now(),
-        operatorTalkSeconds: talkSec,
-        peakLimiterSaves: this.proReport.peakLimiterSaves + peakBump,
-        avgRttMs: avgRtt,
-        avgJitterMs: avgJitter,
-        meshStabilityPercent: tel.stabilityPercent,
-        clarityScore: clarity,
-      };
-      this.emitProReport();
-    }, 3000);
+    this.proReport = {
+      ...this.proReport,
+      updatedAt: Date.now(),
+      avgRttMs: avgRtt,
+      avgJitterMs: avgJitter,
+      meshStabilityPercent: tel.stabilityPercent,
+      clarityScore: clarity,
+    };
+    this.emitProReport();
   }
 
   public disposeBindings(): void {

@@ -419,31 +419,27 @@ export class MevaVadEngine {
         ? this.pttPressed && (this.gateOpen || inputDb > -62)
         : this.gateOpen);
 
-    const snapshot: VadTelemetrySnapshot = {
-      inputDb: Math.round(inputDb * 10) / 10,
-      inputPercent,
-      gateOpen: this.gateOpen,
-      transmitting,
-      vocalRatio,
-      mode: this.mode,
-      pttPressed: this.pttPressed,
-    };
-
+    const roundedInputDb = Math.round(inputDb * 10) / 10;
     const stateChanged =
-      this.lastSnapshot.gateOpen !== snapshot.gateOpen ||
-      this.lastSnapshot.transmitting !== snapshot.transmitting ||
-      this.lastSnapshot.mode !== snapshot.mode ||
-      this.lastSnapshot.pttPressed !== snapshot.pttPressed;
+      this.lastSnapshot.gateOpen !== this.gateOpen ||
+      this.lastSnapshot.transmitting !== transmitting ||
+      this.lastSnapshot.mode !== this.mode ||
+      this.lastSnapshot.pttPressed !== this.pttPressed;
+
+    this.lastSnapshot.inputDb = roundedInputDb;
+    this.lastSnapshot.inputPercent = inputPercent;
+    this.lastSnapshot.gateOpen = this.gateOpen;
+    this.lastSnapshot.transmitting = transmitting;
+    this.lastSnapshot.vocalRatio = vocalRatio;
+    this.lastSnapshot.mode = this.mode;
+    this.lastSnapshot.pttPressed = this.pttPressed;
 
     const now = Date.now();
     if (stateChanged || now - this.lastEmitTime >= 100) {
       this.lastEmitTime = now;
-      this.lastSnapshot = snapshot;
       for (const listener of this.listeners) {
-        listener(snapshot);
+        listener(this.lastSnapshot);
       }
-    } else {
-      this.lastSnapshot = snapshot;
     }
   }
 

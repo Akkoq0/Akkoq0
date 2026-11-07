@@ -87,7 +87,7 @@ export const MobileBottomNav = memo(function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobil Komuta Barı"
-      className="lg:hidden relative z-30 flex-shrink-0 select-none bg-[linear-gradient(180deg,rgba(18,9,12,0.88)_0%,rgba(7,6,7,0.94)_100%)] backdrop-blur-xl font-sans px-1.5"
+      className="lg:hidden relative z-30 flex-shrink-0 select-none bg-[linear-gradient(180deg,rgba(18,9,12,0.96)_0%,rgba(7,6,7,0.98)_100%)] font-sans px-1.5"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="horizon-divider h-px w-full" aria-hidden />

@@ -154,6 +154,13 @@ export class MevaAudioEngine {
   private acousticCuesEnabled = true;
   private selectedOutputDeviceId: string = 'default';
   private unlockBound: (() => void) | null = null;
+  private reusedSnapshot: SpectrumSnapshot = {
+    rmsLevel: 0,
+    primaryHarmonic: 0.1,
+    secondaryHarmonic: 0.1,
+    peakDb: -96,
+    limiterReductionDb: 0,
+  };
 
   /**
    * Lazily initializes or resumes the 48kHz interactive WebAudio context.
@@ -644,13 +651,13 @@ export class MevaAudioEngine {
       ? Math.abs(Math.min(0, compressor.reduction))
       : 0;
 
-    return {
-      rmsLevel,
-      primaryHarmonic,
-      secondaryHarmonic,
-      peakDb,
-      limiterReductionDb,
-    };
+    this.reusedSnapshot.rmsLevel = rmsLevel;
+    this.reusedSnapshot.primaryHarmonic = primaryHarmonic;
+    this.reusedSnapshot.secondaryHarmonic = secondaryHarmonic;
+    this.reusedSnapshot.peakDb = peakDb;
+    this.reusedSnapshot.limiterReductionDb = limiterReductionDb;
+
+    return this.reusedSnapshot;
   }
 
   public samplePeerSpectrum(peerId: string): SpectrumSnapshot {
