@@ -14,9 +14,9 @@
 | **FAZ 2** | Akıllı Gürültü Engelleme (Noise Gate), VAD & PTT Motoru (`ghostlink/src/lib/vadEngine.ts`) | TAMAMLANDI | OK | `a03b1a0` |
 | **FAZ 3** | WebRTC Full-Mesh P2P Çekirdeği, Opus 48kHz SDP & Sunucusuz Sinyalizasyon (`ghostlink/src/lib/webrtcMesh.ts`) | TAMAMLANDI | OK | `17e5e94` |
 | **FAZ 4** | Uçtan Uca Şifreli (E2EE) ECDH P-256 + AES-256-GCM Veri Kanalı & Taktik Sohbet (`ghostlink/src/lib/cryptoEngine.ts`) | TAMAMLANDI | OK | `2dd1e18` |
-| **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | TAMAMLANDI | OK | Commit/Push |
-| **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | DEVAM EDİYOR | - | - |
-| **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | BEKLİYOR | - | - |
+| **FAZ 5** | Gerçek Zamanlı Telemetri, Ping/Jitter Ölçer, Ağ Stres Testi & Düğüm İnceleme (`ghostlink/src/lib/telemetryEngine.ts`) | TAMAMLANDI | OK | `c415de8` |
+| **FAZ 6** | Sağ Tık Taktiksel Komuta Menüsü (EQ, IGL Ducking, Rol) & Gelişmiş Komuta Ayarları Modalı | TAMAMLANDI | OK | Commit/Push |
+| **FAZ 7** | İnteraktif Taktik Tahtası (Tactical Strat Canvas) & P2P Gerçek Zamanlı Çizim Senkronizasyonu | DEVAM EDİYOR | - | - |
 | **FAZ 8** | Oyun İçi Kompakt Overlay Modu (Mini HUD) & Taktiksel Akustik Callout Sentezleyici | BEKLİYOR | - | - |
 | **FAZ 9** | IndexedDB + LocalStorage Kalıcılık Katmanı & Meva Pro Maç Sonu İletişim Analitiği (`ghostlink/src/lib/storageEngine.ts`) | BEKLİYOR | - | - |
 | **FAZ 10** | Kapsamlı Doğrulama (`tsc`, `lint`, `build`, birim testleri), Performans Optimizasyonu & Final Push | BEKLİYOR | - | - |
@@ -31,3 +31,5 @@
   - Sohbet akışına mesaj arama, taktik etiket filtreleme/ekleme (`#ROTATE`, `#ECO`, `#INFO`, `#CLUTCH`), tek tıkla kopyalama ve kriptografik parmak izi doğrulama rozeti entegre edildi.
 - **FAZ 5 (`ghostlink/src/lib/telemetryEngine.ts`, `MeshNodeInspectModal.tsx`):**
   - `RTCPeerConnection.getStats()` + RFC 3550 DataChannel Ping-Pong RTT/Jitter zamanlayıcısı, 50 pkt/sn AES-256-GCM 512B şifreli Ağ Stres Testi motoru ve 5-Operatör P2P Mesh düğüm inceleme modalı (`MeshNodeInspectModal`) entegre edildi.
+- **FAZ 6 (`OperatorContextMenu.tsx`, `MevaCommandSettingsModal.tsx`):**
+  - Sağ tık ve dokunmatik `⋯` tetikleyicili **Taktiksel Komuta Menüsü** (Operatöre Özel EQ: *Keskin Tiz / Dengeli / Tok Bas*, 3D Pan, *%30 IGL Priority Ducking*, Rol Ataması, ICE Sıfırlama) ve sol alt ayar dişlisine bağlı **Meva Komuta Ayarları Modalı** (Cihaz seçimi, canlı dBFS mikrofon barı + Loopback, Noise Gate eşiği, kısayol atayıcı, *Deep Espresso & Burgundy* / *Tactical Stealth Carbon* / *Obsidian Gold* temaları) tamamlandı.

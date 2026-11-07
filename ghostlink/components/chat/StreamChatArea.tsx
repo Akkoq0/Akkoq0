@@ -24,6 +24,10 @@ import {
 } from '@/src/lib/telemetryEngine';
 import { E2eeFingerprintPopover } from '@/components/chat/E2eeFingerprintPopover';
 import { MeshNodeInspectModal } from '@/components/hud/MeshNodeInspectModal';
+import {
+  OperatorContextMenu,
+  type OperatorContextTarget,
+} from '@/components/ui/OperatorContextMenu';
 import { cleanLabel } from '@/lib/format';
 import { OperatorAvatar, FluidWave } from '@/components/ui/HudPrimitives';
 import {
@@ -34,6 +38,7 @@ import {
   IconShield,
   IconBolt,
   IconGauge,
+  IconMoreDots,
 } from '@/components/ui/MevaIcons';
 import type { Message, Profile, VoiceControls } from '@/types';
 
@@ -258,6 +263,8 @@ export const StreamChatArea = memo(function StreamChatArea({
     getMevaTelemetryEngine().getSummary(),
   );
   const [inspectedNodeId, setInspectedNodeId] = useState<string | null>(null);
+  const [contextTarget, setContextTarget] =
+    useState<OperatorContextTarget | null>(null);
   const stressTestActive = telemetry.stressActive;
   const simMetrics = {
     rtt: telemetry.rttMs,
@@ -515,6 +522,16 @@ export const StreamChatArea = memo(function StreamChatArea({
       return (
         <div
           key={op.id}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextTarget({
+              id: op.id,
+              username: displayName,
+              x: e.clientX,
+              y: e.clientY,
+              pingMs: livePing,
+            });
+          }}
           className={`cockpit-pod rounded-xl ${
             mobileComfort ? 'p-3.5 gap-2.5' : 'p-3 gap-2'
           } flex flex-col justify-between ${
@@ -525,8 +542,8 @@ export const StreamChatArea = memo(function StreamChatArea({
                 : ''
           }`}
         >
-          {/* Row 1: Avatar + Full Unclipped Name + Mute Button */}
-          <div className="flex items-center justify-between gap-2">
+          {/* Row 1: Avatar + Full Unclipped Name + Mute + Tactical Menu */}
+          <div className="flex items-center justify-between gap-1.5">
             <button
               type="button"
               onClick={() => handleInspectOperator(op)}
@@ -554,25 +571,47 @@ export const StreamChatArea = memo(function StreamChatArea({
               </div>
             </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                isSelf && voiceControls
-                  ? voiceControls.toggleMute()
-                  : togglePeerMute(op.id)
-              }
-              aria-label={isMuted ? 'Sesi aç' : 'Sustur'}
-              title={isMuted ? 'Sesi aç' : 'Operatörü sustur'}
-              className={`rounded-lg ${
-                mobileComfort ? 'w-9 h-9' : 'w-7 h-7'
-              } flex items-center justify-center border flex-shrink-0 transition-colors ${
-                isMuted
-                  ? 'bg-[#8F1622]/25 text-[#F08C96] border-[#C82333]/50'
-                  : 'bg-[#120A0D] text-[#9E8E91] hover:text-[#F4EFF0] border-[#281318] hover:border-[#4A1C26]'
-              }`}
-            >
-              {isMuted ? <IconMicOff size={14} /> : <IconMic size={14} />}
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  isSelf && voiceControls
+                    ? voiceControls.toggleMute()
+                    : togglePeerMute(op.id)
+                }
+                aria-label={isMuted ? 'Sesi aç' : 'Sustur'}
+                title={isMuted ? 'Sesi aç' : 'Operatörü sustur'}
+                className={`rounded-lg ${
+                  mobileComfort ? 'w-9 h-9' : 'w-7 h-7'
+                } flex items-center justify-center border flex-shrink-0 transition-colors ${
+                  isMuted
+                    ? 'bg-[#8F1622]/25 text-[#F08C96] border-[#C82333]/50'
+                    : 'bg-[#120A0D] text-[#9E8E91] hover:text-[#F4EFF0] border-[#281318] hover:border-[#4A1C26]'
+                }`}
+              >
+                {isMuted ? <IconMicOff size={14} /> : <IconMic size={14} />}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setContextTarget({
+                    id: op.id,
+                    username: displayName,
+                    x: rect.left,
+                    y: rect.bottom + 6,
+                    pingMs: livePing,
+                  });
+                }}
+                aria-label={`${displayName} taktik komuta menüsü`}
+                title="Taktik Komuta Menüsü (Sağ Tık)"
+                className={`rounded-lg ${
+                  mobileComfort ? 'w-9 h-9' : 'w-6 h-7'
+                } flex items-center justify-center bg-[#120A0D] text-[#8E7E81] hover:text-[#F4EFF0] border border-[#281318] hover:border-[#4A1C26] transition-colors`}
+              >
+                <IconMoreDots size={13} />
+              </button>
+            </div>
           </div>
 
           {/* Row 2: Single Role Badge + 3D Spatial Pan + Crisp Ping */}
@@ -1529,6 +1568,16 @@ export const StreamChatArea = memo(function StreamChatArea({
           const op = SQUAD_OPERATORS.find((o) => o.id === id);
           if (op) handleInspectOperator(op);
         }}
+      />
+
+      <OperatorContextMenu
+        target={contextTarget}
+        onClose={() => setContextTarget(null)}
+        onOpenDspDrawer={(id) => {
+          const op = SQUAD_OPERATORS.find((o) => o.id === id);
+          if (op) handleInspectOperator(op);
+        }}
+        voiceControls={voiceControls}
       />
     </main>
   );

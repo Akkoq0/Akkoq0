@@ -6,6 +6,7 @@
 
 import { memo } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { cleanLabel } from '@/lib/format';
 import { OperatorAvatar, SignalBars } from '@/components/ui/HudPrimitives';
 import {
@@ -17,6 +18,8 @@ import {
   IconHeadphones,
   IconDeafen,
   IconDisconnect,
+  IconSettingsGear,
+  IconMapBoard,
 } from '@/components/ui/MevaIcons';
 import type { VoiceControls, VoicePresence } from '@/types';
 
@@ -72,6 +75,10 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
+  const setShowCommandSettingsModal = useVoiceSettingsStore(
+    (s) => s.setShowCommandSettingsModal,
+  );
+  const setShowStratBoard = useVoiceSettingsStore((s) => s.setShowStratBoard);
 
   const activeServer = servers.find((s) => s.id === activeServerId);
   const voiceChannels = channels.filter((c) => c.type === 'voice');
@@ -194,12 +201,28 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                   </button>
 
                   {isActive && voiceParticipants.length > 0 && (
-                    <ul className="px-2.5 pb-2.5 space-y-0.5">
+                    <ul className="px-2.5 pb-2 space-y-0.5">
                       {voiceParticipants.map((vp) => (
                         <VoiceParticipantRow key={vp.user_id} participant={vp} />
                       ))}
                     </ul>
                   )}
+
+                  {isActive &&
+                    (channel.id === 'ch-5' ||
+                      channel.id === 'ch-6' ||
+                      channel.id.startsWith('scrim-')) && (
+                      <div className="px-2.5 pb-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowStratBoard(true)}
+                          className="rounded-lg w-full h-7 px-2.5 bg-[#190B10] hover:bg-[#7A121D]/35 border border-[#7A121D]/45 text-[11px] font-bold text-[#F08C96] flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <IconMapBoard size={12} />
+                          <span>Taktik Harita & Çizim Tahtası</span>
+                        </button>
+                      </div>
+                    )}
                 </div>
               );
             })}
@@ -266,37 +289,51 @@ export const TacticalSidebar = memo(function TacticalSidebar({
           </div>
         </div>
 
-        {voiceControls && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <StripButton
-              label={voiceControls.isMuted ? 'Mikrofonu aç' : 'Mikrofonu sustur'}
-              danger={voiceControls.isMuted}
-              onClick={voiceControls.toggleMute}
-            >
-              {voiceControls.isMuted ? <IconMicOff size={14} /> : <IconMic size={14} />}
-            </StripButton>
-            <StripButton
-              label={voiceControls.isDeafened ? 'Kulaklığı aç' : 'Kulaklığı kapat'}
-              danger={voiceControls.isDeafened}
-              onClick={voiceControls.toggleDeafen}
-            >
-              {voiceControls.isDeafened ? (
-                <IconDeafen size={14} />
-              ) : (
-                <IconHeadphones size={14} />
-              )}
-            </StripButton>
-            {activeVoiceChannelId && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {voiceControls && (
+            <>
               <StripButton
-                label="Ses odasından ayrıl"
-                danger
-                onClick={voiceControls.leaveVoice}
+                label={voiceControls.isMuted ? 'Mikrofonu aç' : 'Mikrofonu sustur'}
+                danger={voiceControls.isMuted}
+                onClick={voiceControls.toggleMute}
               >
-                <IconDisconnect size={14} />
+                {voiceControls.isMuted ? (
+                  <IconMicOff size={14} />
+                ) : (
+                  <IconMic size={14} />
+                )}
               </StripButton>
-            )}
-          </div>
-        )}
+              <StripButton
+                label={
+                  voiceControls.isDeafened ? 'Kulaklığı aç' : 'Kulaklığı kapat'
+                }
+                danger={voiceControls.isDeafened}
+                onClick={voiceControls.toggleDeafen}
+              >
+                {voiceControls.isDeafened ? (
+                  <IconDeafen size={14} />
+                ) : (
+                  <IconHeadphones size={14} />
+                )}
+              </StripButton>
+              {activeVoiceChannelId && (
+                <StripButton
+                  label="Ses odasından ayrıl"
+                  danger
+                  onClick={voiceControls.leaveVoice}
+                >
+                  <IconDisconnect size={14} />
+                </StripButton>
+              )}
+            </>
+          )}
+          <StripButton
+            label="Meva Komuta & DSP Ayarları"
+            onClick={() => setShowCommandSettingsModal(true)}
+          >
+            <IconSettingsGear size={14} />
+          </StripButton>
+        </div>
       </div>
     </aside>
   );

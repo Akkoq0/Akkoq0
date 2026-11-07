@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useThemeStore, sanitizeWallpaperUrl } from '@/store/useThemeStore';
+import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { useGameBoost } from '@/hooks/useGameBoost';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { parseServerlessInviteHash } from '@/src/lib/webrtcMesh';
@@ -17,6 +18,11 @@ import { PlayerRadarHUD } from '@/components/hud/PlayerRadarHUD';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { ScrimModal } from '@/components/ScrimModal';
 import { ThemeSettingsModal } from '@/components/ui/ThemeSettingsModal';
+import { MevaCommandSettingsModal } from '@/components/ui/MevaCommandSettingsModal';
+import {
+  OperatorContextMenu,
+  type OperatorContextTarget,
+} from '@/components/ui/OperatorContextMenu';
 import { TacticalPlayerHUD } from '@/components/ui/TacticalPlayerHUD';
 import { FriendsModal } from '@/components/ui/FriendsModal';
 import type {
@@ -147,6 +153,8 @@ export default function MevaHUDApp() {
   });
 
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
+  const [radarContextTarget, setRadarContextTarget] =
+    useState<OperatorContextTarget | null>(null);
 
   const activeServerId = useAppStore((s) => s.activeServerId);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
@@ -195,16 +203,42 @@ export default function MevaHUDApp() {
     return () => window.removeEventListener('hashchange', consumeHashInvite);
   }, []);
 
-  // Global ESC handler to dismiss active modals & drawers cleanly
+  // Global ESC & Tactical Keybind handler (ignores active text inputs)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      setSelectedPlayer(null);
-      useAppStore.getState().setShowScrimModal(false);
-      useAppStore.getState().setShowFriendsModal(false);
-      useAppStore.getState().setIsMobileSidebarOpen(false);
-      useAppStore.getState().setIsMobileRadarOpen(false);
-      useThemeStore.getState().setShowThemeModal(false);
+      if (e.key === 'Escape') {
+        setSelectedPlayer(null);
+        setRadarContextTarget(null);
+        useAppStore.getState().setShowScrimModal(false);
+        useAppStore.getState().setShowFriendsModal(false);
+        useAppStore.getState().setIsMobileSidebarOpen(false);
+        useAppStore.getState().setIsMobileRadarOpen(false);
+        useThemeStore.getState().setShowThemeModal(false);
+        useVoiceSettingsStore.getState().setShowCommandSettingsModal(false);
+        useVoiceSettingsStore.getState().setShowStratBoard(false);
+        return;
+      }
+
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const vState = useVoiceSettingsStore.getState();
+      if (vState.showCommandSettingsModal) return;
+
+      if (e.code === vState.keybinds.stratBoardKey) {
+        vState.toggleStratBoard();
+      } else if (e.code === vState.keybinds.miniHudKey) {
+        vState.toggleMiniHud();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -263,6 +297,44 @@ export default function MevaHUDApp() {
   const handleSelectPlayer = useCallback((member: Profile) => {
     setSelectedPlayer(member);
   }, []);
+
+  const handleContextMenuPlayer = useCallback(
+    (member: Profile, x: number, y: number) => {
+      setRadarContextTarget({
+        id: member.id,
+        username: member.username,
+        x,
+        y,
+      });
+    },
+    [],
+  );
+
+  // Bind global Mute & Deafen hotkeys to live WebRTC voice controls
+  useEffect(() => {
+    const onVoiceHotkey = (e: KeyboardEvent) => {
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const vState = useVoiceSettingsStore.getState();
+      if (vState.showCommandSettingsModal) return;
+      if (e.code === vState.keybinds.muteKey) {
+        toggleMute();
+      } else if (e.code === vState.keybinds.deafenKey) {
+        toggleDeafen();
+      }
+    };
+    window.addEventListener('keydown', onVoiceHotkey);
+    return () => window.removeEventListener('keydown', onVoiceHotkey);
+  }, [toggleMute, toggleDeafen]);
 
   const voiceControls = useMemo<VoiceControls>(
     () => ({
@@ -341,7 +413,10 @@ export default function MevaHUDApp() {
 
         {/* Desktop Right Squad Roster */}
         <div className="hidden lg:flex h-full flex-shrink-0">
-          <PlayerRadarHUD onSelectPlayer={handleSelectPlayer} />
+          <PlayerRadarHUD
+            onSelectPlayer={handleSelectPlayer}
+            onContextMenuPlayer={handleContextMenuPlayer}
+          />
         </div>
 
         {/* Mobile & Tablet Right Drawer */}
@@ -354,7 +429,10 @@ export default function MevaHUDApp() {
               className="w-[86vw] max-w-[320px] h-full shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <PlayerRadarHUD onSelectPlayer={handleSelectPlayer} />
+              <PlayerRadarHUD
+                onSelectPlayer={handleSelectPlayer}
+                onContextMenuPlayer={handleContextMenuPlayer}
+              />
             </div>
           </div>
         )}
@@ -366,7 +444,17 @@ export default function MevaHUDApp() {
       {/* 4. MODALS & OVERLAYS */}
       <ScrimModal />
       <ThemeSettingsModal />
+      <MevaCommandSettingsModal />
       <FriendsModal />
+      <OperatorContextMenu
+        target={radarContextTarget}
+        onClose={() => setRadarContextTarget(null)}
+        onOpenDspDrawer={(id) => {
+          const found = DEFAULT_MEMBERS.find((m) => m.id === id);
+          if (found) setSelectedPlayer(found);
+        }}
+        voiceControls={voiceControls}
+      />
       <TacticalPlayerHUD
         player={selectedPlayer}
         onClose={() => setSelectedPlayer(null)}
