@@ -36,6 +36,7 @@ import { BroadcastSoundboardModal } from '@/components/audio/BroadcastSoundboard
 import { RadialCommandWheel } from '@/components/tactical/RadialCommandWheel';
 import { VoiceClipBufferModal } from '@/components/audio/VoiceClipBufferModal';
 import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
+import { ShortcutsHelpModal } from '@/components/modal/ShortcutsHelpModal';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
@@ -91,6 +92,8 @@ export default function MevaHUDApp() {
   const setShowVoiceClipBufferModal = useAppStore((s) => s.setShowVoiceClipBufferModal);
   const showScrimScheduleModal = useAppStore((s) => s.showScrimScheduleModal);
   const setShowScrimScheduleModal = useAppStore((s) => s.setShowScrimScheduleModal);
+  const showShortcutsHelpModal = useAppStore((s) => s.showShortcutsHelpModal);
+  const setShowShortcutsHelpModal = useAppStore((s) => s.setShowShortcutsHelpModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -133,6 +136,13 @@ export default function MevaHUDApp() {
           setShowOnboardingModal(true);
         }
       });
+
+    // PWA Offline Service Worker Registration
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        void navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
 
     return () => {
       storage.disposeBindings();
@@ -216,6 +226,7 @@ export default function MevaHUDApp() {
         useAppStore.getState().setShowRadialCommandWheel(false);
         useAppStore.getState().setShowVoiceClipBufferModal(false);
         useAppStore.getState().setShowScrimScheduleModal(false);
+        useAppStore.getState().setShowShortcutsHelpModal(false);
         useAppStore.getState().setIsMobileSidebarOpen(false);
         useAppStore.getState().setIsMobileRadarOpen(false);
         useThemeStore.getState().setShowThemeModal(false);
@@ -242,6 +253,13 @@ export default function MevaHUDApp() {
       if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.altKey && !e.metaKey) {
         const cur = useAppStore.getState().showRadialCommandWheel;
         useAppStore.getState().setShowRadialCommandWheel(!cur);
+        return;
+      }
+
+      if ((e.key === '?' || e.code === 'F1') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        const cur = useAppStore.getState().showShortcutsHelpModal;
+        useAppStore.getState().setShowShortcutsHelpModal(!cur);
         return;
       }
 
@@ -502,6 +520,12 @@ export default function MevaHUDApp() {
           isOpen={showScrimScheduleModal}
           onClose={() => setShowScrimScheduleModal(false)}
           onLaunchVeto={() => useVoiceSettingsStore.getState().toggleStratBoard()}
+        />
+      )}
+      {showShortcutsHelpModal && (
+        <ShortcutsHelpModal
+          isOpen={showShortcutsHelpModal}
+          onClose={() => setShowShortcutsHelpModal(false)}
         />
       )}
       {radarContextTarget && (

@@ -230,6 +230,7 @@ export interface AppState {
   showRadialCommandWheel: boolean;
   showVoiceClipBufferModal: boolean;
   showScrimScheduleModal: boolean;
+  showShortcutsHelpModal: boolean;
 
   // ── Multi-Game Hub & Tag Filter ──
   selectedGameFilter: string; // 'all' | 'lol' | 'cs2' | 'valorant' | 'dota2' | 'chill'
@@ -295,6 +296,7 @@ export interface AppState {
   setShowRadialCommandWheel: (show: boolean) => void;
   setShowVoiceClipBufferModal: (show: boolean) => void;
   setShowScrimScheduleModal: (show: boolean) => void;
+  setShowShortcutsHelpModal: (show: boolean) => void;
   setSelectedGameFilter: (filter: string) => void;
   setUserPrimaryGame: (gameId: string) => void;
   setUserFavoriteGames: (games: string[]) => void;

@@ -50,6 +50,7 @@ export const useAppStore = create<AppState>((set) => ({
   showRadialCommandWheel: false,
   showVoiceClipBufferModal: false,
   showScrimScheduleModal: false,
+  showShortcutsHelpModal: false,
 
   selectedGameFilter: 'all',
   userPrimaryGame: 'cs2',
@@ -278,6 +279,8 @@ export const useAppStore = create<AppState>((set) => ({
   setShowVoiceClipBufferModal: (show) => set({ showVoiceClipBufferModal: show }),
 
   setShowScrimScheduleModal: (show) => set({ showScrimScheduleModal: show }),
+
+  setShowShortcutsHelpModal: (show) => set({ showShortcutsHelpModal: show }),
 
   setSelectedGameFilter: (filter) => set({ selectedGameFilter: filter }),
 
