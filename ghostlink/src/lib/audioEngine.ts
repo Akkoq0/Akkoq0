@@ -103,10 +103,10 @@ interface SinkCapableAudioContext extends AudioContext {
   setSinkId?: (sinkId: string) => Promise<void>;
 }
 
-const SMOOTH_TAU_SEC = 0.022;
-const DUCK_ATTACK_TAU_SEC = 0.018;
-const DUCK_RELEASE_TAU_SEC = 0.095;
-const IGL_DUCK_FACTOR = 0.7; // 30% volume reduction when priority speaker talks
+export const SMOOTH_TAU_SEC = 0.022;
+export const DUCK_ATTACK_TAU_SEC = 0.018;
+export const DUCK_RELEASE_TAU_SEC = 0.095;
+export const IGL_DUCK_FACTOR = 0.7; // 30% volume reduction when priority speaker talks
 
 /**
  * Converts UI slider 0%–200% into a smooth perceptual logarithmic linear amplitude.
