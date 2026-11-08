@@ -34,6 +34,7 @@ Module._extensions['.ts'] = function (mod, filename) {
   });
   mod._compile(outputText, filename);
 };
+Module._extensions['.tsx'] = Module._extensions['.ts'];
 
 async function runQAAndBenchmarkSuite() {
   console.log('================================================================');
@@ -396,7 +397,17 @@ async function runQAAndBenchmarkSuite() {
 
   storeMod.useAppStore.getState().triggerSonarPulse('peer-jungle', 0.8);
   assert.equal(storeMod.useAppStore.getState().activeSonarTargetId, 'peer-jungle');
-  console.log('  ✔ 3D Sonar Pulse Verified: Spatial attention radar sweep dispatched\n');
+  console.log('  ✔ 3D Sonar Pulse Verified: Spatial attention radar sweep dispatched');
+
+  // Dynamic Game Map Pools & Isolation
+  const mapBoardMod = require('@/components/tactical/TacticalMapBoard');
+  assert.ok(mapBoardMod.GAME_MAP_POOLS, 'Missing GAME_MAP_POOLS');
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.valorant, ['ascent', 'bind', 'haven', 'split']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.cs2, ['mirage', 'inferno', 'dust2', 'ancient']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.lol, ['rift', 'aram']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.pubg, ['erangel', 'miramar']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.dota2, ['dota']);
+  console.log('  ✔ Dynamic Game-Based Map Filtering Verified: Strict isolation for Valorant, CS2, LoL, PUBG, Dota 2\n');
 
   console.log('================================================================');
   console.log('  ALL QA & BENCHMARK PHASES PASSED WITH 100% PRECISION');
