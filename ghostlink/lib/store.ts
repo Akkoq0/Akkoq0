@@ -19,9 +19,9 @@ const SEED_ISO = '2026-11-06T19:00:00.000Z';
 const DEFAULT_FRIENDS: Friendship[] = [];
 
 export const useAppStore = create<AppState>((set) => ({
-  activeServerId: 'srv-1',
-  activeChannelId: 'ch-2',
-  activeVoiceChannelId: 'ch-4',
+  activeServerId: null,
+  activeChannelId: null,
+  activeVoiceChannelId: null,
   activeDMUserId: null,
 
   servers: [],
@@ -44,6 +44,7 @@ export const useAppStore = create<AppState>((set) => ({
   showLobbyGate: false,
   showChannelBuilderModal: false,
   showOnboardingModal: false,
+  showTourModal: false,
 
   selectedGameFilter: 'all',
   userPrimaryGame: 'cs2',
@@ -116,7 +117,33 @@ export const useAppStore = create<AppState>((set) => ({
 
   setServers: (servers) => set({ servers }),
 
+  removeServer: (serverId) =>
+    set((s) => {
+      const remainingServers = s.servers.filter((srv) => srv.id !== serverId);
+      const remainingCategories = s.categories.filter((cat) => cat.server_id !== serverId);
+      const remainingChannels = s.channels.filter((chan) => chan.server_id !== serverId);
+      const nextActiveServer = remainingServers[0]?.id ?? null;
+      const nextActiveChannel =
+        remainingChannels.find((c) => c.server_id === nextActiveServer && c.type === 'text')?.id ?? null;
+      const nextActiveVoice =
+        remainingChannels.find((c) => c.server_id === nextActiveServer && c.type === 'voice')?.id ?? null;
+      return {
+        servers: remainingServers,
+        categories: remainingCategories,
+        channels: remainingChannels,
+        activeServerId: nextActiveServer,
+        activeChannelId: nextActiveChannel,
+        activeVoiceChannelId: nextActiveVoice,
+      };
+    }),
+
   setCategories: (categories) => set({ categories }),
+
+  removeCategory: (categoryId) =>
+    set((s) => ({
+      categories: s.categories.filter((cat) => cat.id !== categoryId),
+      channels: s.channels.filter((chan) => chan.category_id !== categoryId),
+    })),
 
   setChannels: (channels) => set({ channels }),
 
@@ -124,6 +151,24 @@ export const useAppStore = create<AppState>((set) => ({
     set((s) => {
       if (s.channels.some((c) => c.id === channel.id)) return s;
       return { channels: [...s.channels, channel] };
+    }),
+
+  removeChannel: (channelId) =>
+    set((s) => {
+      const remaining = s.channels.filter((chan) => chan.id !== channelId);
+      const nextVoice =
+        s.activeVoiceChannelId === channelId
+          ? remaining.find((c) => c.server_id === s.activeServerId && c.type === 'voice')?.id ?? null
+          : s.activeVoiceChannelId;
+      const nextText =
+        s.activeChannelId === channelId
+          ? remaining.find((c) => c.server_id === s.activeServerId && c.type === 'text')?.id ?? null
+          : s.activeChannelId;
+      return {
+        channels: remaining,
+        activeVoiceChannelId: nextVoice,
+        activeChannelId: nextText,
+      };
     }),
 
   addCategory: (category) =>
@@ -216,6 +261,8 @@ export const useAppStore = create<AppState>((set) => ({
   setShowChannelBuilderModal: (show) => set({ showChannelBuilderModal: show }),
 
   setShowOnboardingModal: (show) => set({ showOnboardingModal: show }),
+
+  setShowTourModal: (show) => set({ showTourModal: show }),
 
   setSelectedGameFilter: (filter) => set({ selectedGameFilter: filter }),
 

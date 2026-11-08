@@ -20,6 +20,8 @@ import {
   IconMapBoard,
   IconMiniOverlay,
   IconShield,
+  IconHelp,
+  IconPlus,
 } from '@/components/ui/MevaIcons';
 
 interface CommandButtonProps {
@@ -87,6 +89,8 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
   const setShowScrimModal = useAppStore((s) => s.setShowScrimModal);
   const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
+  const setShowChannelBuilderModal = useAppStore((s) => s.setShowChannelBuilderModal);
+  const setShowTourModal = useAppStore((s) => s.setShowTourModal);
   const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
   const setShowFriendsModal = useAppStore((s) => s.setShowFriendsModal);
   const toggleRadar = useAppStore((s) => s.toggleRadar);
@@ -182,11 +186,31 @@ export const GhostNavbar = memo(function GhostNavbar() {
               </button>
             );
           })}
+
+          <button
+            type="button"
+            onClick={() => setShowChannelBuilderModal(true)}
+            title="Kendi Özgün Sunucunu Kur"
+            className="rounded-xl h-8 px-2.5 flex items-center gap-1.5 text-[11.5px] font-extrabold text-[#F4EFF0] bg-[#1F0B11] hover:bg-[#2F0F1A] border border-[#C82333]/60 hover:border-[#DC3545] shadow-[0_0_12px_rgba(200,35,51,0.35)] transition-all flex-shrink-0 animate-pulse"
+          >
+            <IconPlus size={13} className="text-[#F5B5BC]" />
+            <span>[+] Kendi Sunucunu Kur</span>
+          </button>
         </nav>
       </div>
 
       {/* ── RIGHT: Decluttered Mobile + Full Desktop Command Controls ── */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setShowTourModal(true)}
+          title="Meva İnteraktif Rehber & Tur"
+          className="rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex items-center gap-1.5 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0] transition-colors"
+        >
+          <IconHelp size={15} className="text-[#C82333]" />
+          <span className="hidden sm:inline">Meva Rehberi</span>
+        </button>
+
         <div
           title={`Ağ Kalitesi: %${qualityScore} · DTLS-SRTP P2P`}
           className="rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 border border-[#2A1319] flex items-center gap-1.5 lg:gap-2 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0]"

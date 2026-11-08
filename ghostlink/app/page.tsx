@@ -11,7 +11,6 @@ import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { useGameBoost } from '@/hooks/useGameBoost';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { parseServerlessInviteHash } from '@/src/lib/webrtcMesh';
-import { getMevaStorageEngine } from '@/src/lib/storageEngine';
 import { GhostNavbar } from '@/components/layout/GhostNavbar';
 import { TacticalSidebar } from '@/components/layout/TacticalSidebar';
 import { StreamChatArea } from '@/components/chat/StreamChatArea';
@@ -31,8 +30,9 @@ import { MiniHudOverlay } from '@/components/hud/MiniHudOverlay';
 import { LobbyGateModal } from '@/components/lobby/LobbyGateModal';
 import { QuickChannelBuilderModal } from '@/components/modal/QuickChannelBuilderModal';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { InteractiveTourModal } from '@/components/modal/InteractiveTourModal';
 import { type TacticalRole } from '@/store/useHUDStore';
-import { STORE_PREFS } from '@/src/lib/storageEngine';
+import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
   Profile,
   Server,
@@ -42,79 +42,6 @@ import type {
 } from '@/types';
 
 const SEED_ISO = '2026-11-06T19:00:00.000Z';
-
-const DEFAULT_SERVERS: Server[] = [
-  {
-    id: 'srv-1',
-    name: '🎥 Yayıncı Topluluk Hub’ı',
-    icon_url: null,
-    owner_id: 'usr-1',
-    invite_code: 'STREAM',
-    created_at: SEED_ISO,
-  },
-  {
-    id: 'srv-2',
-    name: '🏆 Espor Scrim & Klan Hub',
-    icon_url: null,
-    owner_id: 'usr-1',
-    invite_code: 'ESPOR',
-    created_at: SEED_ISO,
-  },
-  {
-    id: 'srv-3',
-    name: '⚡ Hızlı Arkadaş Grubu',
-    icon_url: null,
-    owner_id: 'usr-1',
-    invite_code: 'SQUAD',
-    created_at: SEED_ISO,
-  },
-];
-
-const DEFAULT_CATEGORIES: Record<string, ChannelCategory[]> = {
-  'srv-1': [
-    { id: 'cat-1-lobby', server_id: 'srv-1', name: '📌 LOBİ & SOHBET', position: 0, is_collapsed: false },
-    { id: 'cat-1-moba', server_id: 'srv-1', name: '⚔️ MOBA [LoL / Dota / MLBB]', position: 1, is_collapsed: false },
-    { id: 'cat-1-fps', server_id: 'srv-1', name: '🎯 TAKTİK FPS [CS2 / Valo]', position: 2, is_collapsed: false },
-    { id: 'cat-1-br', server_id: 'srv-1', name: '🪂 BATTLE ROYALE [PUBG / Apex]', position: 3, is_collapsed: false },
-    { id: 'cat-1-chill', server_id: 'srv-1', name: '☕ CHILL & MÜZİK', position: 4, is_collapsed: false },
-  ],
-  'srv-2': [
-    { id: 'cat-2-match', server_id: 'srv-2', name: '🏆 MAÇ & TURNUVA ODALARI', position: 0, is_collapsed: false },
-    { id: 'cat-2-coach', server_id: 'srv-2', name: '🧠 TAKTİK & KOÇLUK', position: 1, is_collapsed: false },
-    { id: 'cat-2-warmup', server_id: 'srv-2', name: '⚡ YEDEK LOBİ & ISINMA', position: 2, is_collapsed: false },
-  ],
-  'srv-3': [
-    { id: 'cat-3-chill', server_id: 'srv-3', name: '☕ CHILL / MUHABBET', position: 0, is_collapsed: false },
-    { id: 'cat-3-play', server_id: 'srv-3', name: '🎮 ANA OYUN ODALARI', position: 1, is_collapsed: false },
-  ],
-};
-
-const DEFAULT_CHANNELS: Record<string, Channel[]> = {
-  'srv-1': [
-    { id: 'ch-genel', server_id: 'srv-1', category_id: 'cat-1-lobby', name: 'genel-sohbet', type: 'text', position: 0, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Genel', '#Sohbet'] },
-    { id: 'ch-yayin', server_id: 'srv-1', category_id: 'cat-1-lobby', name: 'yayin-bildirim', type: 'text', position: 1, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Yayın'] },
-    { id: 'ch-lol-5v5', server_id: 'srv-1', category_id: 'cat-1-moba', name: 'lol-dereceli-5v5', type: 'voice', position: 2, created_at: SEED_ISO, game_id: 'lol', max_participants: 5, tags: ['#LoL', '#Dereceli-5v5'] },
-    { id: 'ch-dota-5v5', server_id: 'srv-1', category_id: 'cat-1-moba', name: 'dota2-ranked', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'dota2', max_participants: 5, tags: ['#Dota2', '#Ranked'] },
-    { id: 'ch-cs2-premier', server_id: 'srv-1', category_id: 'cat-1-fps', name: 'cs2-premier', type: 'voice', position: 4, created_at: SEED_ISO, game_id: 'cs2', max_participants: 5, tags: ['#CS2', '#Premier'] },
-    { id: 'ch-valo-5stack', server_id: 'srv-1', category_id: 'cat-1-fps', name: 'valorant-5stack', type: 'voice', position: 5, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Valorant', '#5Stack'] },
-    { id: 'ch-pubg-squad', server_id: 'srv-1', category_id: 'cat-1-br', name: 'pubg-squad-erangel', type: 'voice', position: 6, created_at: SEED_ISO, game_id: 'pubg', max_participants: 4, tags: ['#PUBG', '#Squad'] },
-    { id: 'ch-chill-music', server_id: 'srv-1', category_id: 'cat-1-chill', name: 'kahve-muhabbet', type: 'voice', position: 7, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Chill', '#Müzik'] },
-  ],
-  'srv-2': [
-    { id: 'ch-scrim-1', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-oda-1-cs2', type: 'voice', position: 0, created_at: SEED_ISO, game_id: 'cs2', max_participants: 5, tags: ['#Scrim', '#CS2'] },
-    { id: 'ch-scrim-2', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-oda-2-valo', type: 'voice', position: 1, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Scrim', '#Valo'] },
-    { id: 'ch-scrim-txt', server_id: 'srv-2', category_id: 'cat-2-match', name: 'scrim-chat', type: 'text', position: 2, created_at: SEED_ISO, game_id: 'cs2', max_participants: 0, tags: ['#Scrim'] },
-    { id: 'ch-coach', server_id: 'srv-2', category_id: 'cat-2-coach', name: 'taktik-analiz-koc', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'cs2', max_participants: 10, tags: ['#Koç'] },
-    { id: 'ch-isinma', server_id: 'srv-2', category_id: 'cat-2-warmup', name: 'isinma-dm', type: 'voice', position: 4, created_at: SEED_ISO, game_id: 'cs2', max_participants: 10, tags: ['#Isınma'] },
-  ],
-  'srv-3': [
-    { id: 'ch-s3-chill', server_id: 'srv-3', category_id: 'cat-3-chill', name: 'kahve-muhabbet', type: 'voice', position: 0, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Chill'] },
-    { id: 'ch-s3-txt', server_id: 'srv-3', category_id: 'cat-3-chill', name: 'sohbet', type: 'text', position: 1, created_at: SEED_ISO, game_id: 'chill', max_participants: 0, tags: ['#Sohbet'] },
-    { id: 'ch-s3-valo', server_id: 'srv-3', category_id: 'cat-3-play', name: 'oyun-odasi-valo', type: 'voice', position: 2, created_at: SEED_ISO, game_id: 'valorant', max_participants: 5, tags: ['#Valorant'] },
-    { id: 'ch-s3-lol', server_id: 'srv-3', category_id: 'cat-3-play', name: 'oyun-odasi-lol', type: 'voice', position: 3, created_at: SEED_ISO, game_id: 'lol', max_participants: 5, tags: ['#LoL'] },
-  ],
-};
-
 const DEFAULT_MEMBERS: Profile[] = [];
 
 export default function MevaHUDApp() {
@@ -147,6 +74,8 @@ export default function MevaHUDApp() {
   );
   const showOnboardingModal = useAppStore((s) => s.showOnboardingModal);
   const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
+  const showTourModal = useAppStore((s) => s.showTourModal);
+  const setShowTourModal = useAppStore((s) => s.setShowTourModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -304,36 +233,51 @@ export default function MevaHUDApp() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleMute, toggleDeafen]);
 
+  // Load clean state from IndexedDB (Zero mock data policy)
   useEffect(() => {
-    setServers(DEFAULT_SERVERS);
-    setActiveServer(DEFAULT_SERVERS[0].id);
-    setOnlineMembers(DEFAULT_MEMBERS);
-  }, [setServers, setActiveServer, setOnlineMembers]);
+    let isCancelled = false;
+    const storage = getMevaStorageEngine();
 
-  useEffect(() => {
-    const serverKey =
-      activeServerId && DEFAULT_CHANNELS[activeServerId]
-        ? activeServerId
-        : 'srv-1';
-    const fallbackCats =
-      DEFAULT_CATEGORIES[serverKey] ?? DEFAULT_CATEGORIES['srv-1'];
-    const fallbackChans =
-      DEFAULT_CHANNELS[serverKey] ?? DEFAULT_CHANNELS['srv-1'];
+    Promise.all([
+      storage.getRecord<Server[]>(STORE_PREFS, 'custom_servers'),
+      storage.getRecord<ChannelCategory[]>(STORE_PREFS, 'custom_categories'),
+      storage.getRecord<Channel[]>(STORE_PREFS, 'custom_channels'),
+    ]).then(([savedServers, savedCats, savedChans]) => {
+      if (isCancelled) return;
+      if (savedServers && savedServers.length > 0) {
+        setServers(savedServers);
+        setActiveServer(savedServers[0].id);
 
-    setCategories(fallbackCats);
-    setChannels(fallbackChans);
+        if (savedCats && savedCats.length > 0) {
+          setCategories(savedCats);
+        }
+        if (savedChans && savedChans.length > 0) {
+          setChannels(savedChans);
+          const firstText = savedChans.find((c) => c.type === 'text');
+          if (firstText) setActiveChannel(firstText.id);
+          const firstVoice = savedChans.find((c) => c.type === 'voice');
+          if (firstVoice) setActiveVoiceChannel(firstVoice.id);
+        }
+      } else {
+        // Purge mock data: leave state empty so [+] Kendi Sunucunu Kur button is shown
+        setServers([]);
+        setCategories([]);
+        setChannels([]);
+      }
+      setOnlineMembers(DEFAULT_MEMBERS);
+    });
 
-    const firstText = fallbackChans.find((c) => c.type === 'text');
-    if (firstText) setActiveChannel(firstText.id);
-
-    const firstVoice = fallbackChans.find((c) => c.type === 'voice');
-    if (firstVoice) setActiveVoiceChannel(firstVoice.id);
+    return () => {
+      isCancelled = true;
+    };
   }, [
-    activeServerId,
+    setServers,
+    setActiveServer,
     setCategories,
     setChannels,
     setActiveChannel,
     setActiveVoiceChannel,
+    setOnlineMembers,
   ]);
 
   const handleSelectPlayer = useCallback((member: Profile) => {
@@ -493,6 +437,13 @@ export default function MevaHUDApp() {
           onCompleted={(callsign) => {
             setUser((prev) => ({ ...prev, username: callsign }));
           }}
+        />
+      )}
+      {showTourModal && (
+        <InteractiveTourModal
+          isOpen={showTourModal}
+          onClose={() => setShowTourModal(false)}
+          onOpenServerBuilder={() => setShowChannelBuilderModal(true)}
         />
       )}
       {radarContextTarget && (

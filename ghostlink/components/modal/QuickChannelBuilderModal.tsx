@@ -129,6 +129,16 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
         tags: newChan.tags,
         createdAt: Date.now(),
       });
+      storage.scheduleWrite(
+        STORE_PREFS,
+        'custom_channels',
+        useAppStore.getState().channels,
+      );
+      storage.scheduleWrite(
+        STORE_PREFS,
+        'custom_categories',
+        useAppStore.getState().categories,
+      );
       void storage.flushPendingWrites();
     } catch {}
 
@@ -210,6 +220,16 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
         tags: newChan.tags,
         createdAt: Date.now(),
       });
+      storage.scheduleWrite(
+        STORE_PREFS,
+        'custom_channels',
+        useAppStore.getState().channels,
+      );
+      storage.scheduleWrite(
+        STORE_PREFS,
+        'custom_categories',
+        useAppStore.getState().categories,
+      );
       void storage.flushPendingWrites();
     } catch {}
 
@@ -259,10 +279,19 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
       });
     });
 
-    setServers([...servers, newServer]);
+    const updatedServers = [...servers, newServer];
+    setServers(updatedServers);
     setActiveServer(srvId);
     setCategories(newCats);
     setChannels(newChans);
+
+    try {
+      const storage = getMevaStorageEngine();
+      storage.scheduleWrite(STORE_PREFS, 'custom_servers', updatedServers);
+      storage.scheduleWrite(STORE_PREFS, 'custom_categories', newCats);
+      storage.scheduleWrite(STORE_PREFS, 'custom_channels', newChans);
+      void storage.flushPendingWrites();
+    } catch {}
 
     const firstVoice = newChans.find((c) => c.type === 'voice');
     if (firstVoice) setActiveVoiceChannel(firstVoice.id);

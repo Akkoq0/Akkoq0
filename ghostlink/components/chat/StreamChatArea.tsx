@@ -48,6 +48,8 @@ import {
   IconBolt,
   IconGauge,
   IconMoreDots,
+  IconMevaMark,
+  IconPlus,
 } from '@/components/ui/MevaIcons';
 import type { Message, Profile, VoiceControls } from '@/types';
 
@@ -190,6 +192,7 @@ export const StreamChatArea = memo(function StreamChatArea({
   const activeChannelId = useAppStore((s) => s.activeChannelId);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const activeDMUserId = useAppStore((s) => s.activeDMUserId);
+  const servers = useAppStore((s) => s.servers);
   const channels = useAppStore((s) => s.channels);
   const friends = useAppStore((s) => s.friends);
   const onlineMembers = useAppStore((s) => s.onlineMembers);
@@ -214,6 +217,9 @@ export const StreamChatArea = memo(function StreamChatArea({
   const setActiveDMUser = useAppStore((s) => s.setActiveDMUser);
   const setMobileTab = useAppStore((s) => s.setMobileTab);
   const setShowScrimModal = useAppStore((s) => s.setShowScrimModal);
+  const setShowChannelBuilderModal = useAppStore((s) => s.setShowChannelBuilderModal);
+  const setShowTourModal = useAppStore((s) => s.setShowTourModal);
+  const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
   const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
 
   const { sendMessage } = useRealtimeChat(activeChannelId);
@@ -1089,6 +1095,92 @@ export const StreamChatArea = memo(function StreamChatArea({
       </g>
     </svg>
   );
+
+  if (servers.length === 0) {
+    return (
+      <main className="flex-1 h-full min-h-0 flex flex-col items-center justify-center overflow-hidden min-w-0 p-6 select-none bg-[radial-gradient(ellipse_at_center,rgba(143,22,34,0.14)_0%,rgba(7,6,7,0.98)_70%)] font-sans">
+        <div className="max-w-lg w-full flex flex-col items-center text-center space-y-6">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-3xl bg-[#1C0B10] border-2 border-[#8F1622] shadow-[0_0_40px_rgba(200,35,51,0.35)] flex items-center justify-center text-[#C82333]">
+              <IconMevaMark size={40} />
+            </div>
+            <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#C82333] text-[#FAF2EE] shadow-sm">
+              PROD
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1C0B10] border border-[#8F1622]/40 text-[#F08C96] text-[11px] font-extrabold tracking-wide uppercase">
+              <IconBolt size={12} className="text-[#C82333]" />
+              <span>SIFIR SAHTE VERİ · ÖZGÜN NATIVE MATRİS</span>
+            </div>
+            <h1 className="text-2xl font-black text-[#F4EFF0] tracking-tight sm:text-3xl">
+              MEVA KOMUTA KOKPİTİ
+            </h1>
+            <p className="text-xs sm:text-sm text-[#A8989B] leading-relaxed max-w-md mx-auto">
+              Discord veya TeamSpeak kopyası değil; %100 özgün Taktiksel Ses Matrisi, Slot Beacon, Duo-Link ve Doğrudan P2P WebRTC mimarisi.
+            </p>
+          </div>
+
+          <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowChannelBuilderModal(true)}
+              className="p-4 rounded-xl bg-gradient-to-b from-[#2A0E16] to-[#12070A] hover:from-[#3B141F] hover:to-[#1C0B10] border border-[#8F1622]/70 hover:border-[#C82333] shadow-[0_4px_20px_rgba(200,35,51,0.25)] flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#4A0D18] text-[#FAF2EE] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
+                ➕
+              </div>
+              <div>
+                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-[#FF5A6B]">
+                  Sunucu Kur
+                </span>
+                <span className="block text-[10px] text-[#827376] mt-0.5">
+                  YouTuber / Scrim
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowTourModal(true)}
+              className="p-4 rounded-xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#1C0B10] text-[#C82333] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
+                ❓
+              </div>
+              <div>
+                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-[#F08C96]">
+                  İnteraktif Tur
+                </span>
+                <span className="block text-[10px] text-[#827376] mt-0.5">
+                  Meva Rehberi
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowLobbyGate(true)}
+              className="p-4 rounded-xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#1C0B10] text-amber-400 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
+                ⚡
+              </div>
+              <div>
+                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-amber-300">
+                  Taktik Lobi
+                </span>
+                <span className="block text-[10px] text-[#827376] mt-0.5">
+                  Oda Kodu / Katıl
+                </span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 h-full min-h-0 flex flex-col overflow-hidden min-w-0 gap-2.5 p-2.5 lg:p-0 font-sans tabular-nums">

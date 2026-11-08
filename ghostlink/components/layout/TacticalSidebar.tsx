@@ -40,7 +40,10 @@ import {
   IconMapBoard,
   IconBolt,
   IconPlus,
+  IconTrash,
+  IconHelp,
 } from '@/components/ui/MevaIcons';
+import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type { VoiceControls, VoicePresence, Channel } from '@/types';
 
 interface TacticalSidebarProps {
@@ -132,6 +135,9 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const setShowChannelBuilderModal = useAppStore(
     (s) => s.setShowChannelBuilderModal,
   );
+  const setShowTourModal = useAppStore((s) => s.setShowTourModal);
+  const removeServer = useAppStore((s) => s.removeServer);
+  const removeChannel = useAppStore((s) => s.removeChannel);
   const setShowCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.setShowCommandSettingsModal,
   );
@@ -253,6 +259,44 @@ export const TacticalSidebar = memo(function TacticalSidebar({
     useHUDStore.getState().setOperatorRole('usr-local', targetRole);
   };
 
+  if (servers.length === 0 || !activeServer) {
+    return (
+      <aside className="w-full lg:w-[264px] h-full flex flex-col justify-between overflow-hidden select-none titanium-module lg:rounded-xl font-sans p-4">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-3">
+          <div className="w-14 h-14 rounded-2xl bg-[#1C0B10] border border-[#8F1622]/50 flex items-center justify-center text-[#C82333] mb-3 shadow-[0_0_24px_rgba(200,35,51,0.3)] animate-pulse">
+            <IconBolt size={26} />
+          </div>
+          <h3 className="text-sm font-extrabold text-[#F4EFF0] tracking-wide mb-1.5">
+            Aktif Sunucu Yok
+          </h3>
+          <p className="text-[11.5px] text-[#A8989B] leading-relaxed mb-5">
+            Taktiksel ses ve kanal altyapınızı kurmak için aşağıdaki butondan hazır şablonla veya sıfırdan sunucunuzu oluşturun.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setShowChannelBuilderModal(true)}
+            className="w-full py-2.5 px-4 rounded-xl crimson-cta text-xs font-black text-[#F4EFF0] flex items-center justify-center gap-2 shadow-[0_0_18px_rgba(200,35,51,0.45)] transition-all active:scale-95"
+          >
+            <IconPlus size={15} />
+            <span>[+] Kendi Sunucunu Kur</span>
+          </button>
+        </div>
+
+        <div className="pt-3 border-t border-[#2A1319]">
+          <button
+            type="button"
+            onClick={() => setShowTourModal(true)}
+            className="w-full py-2 px-3 rounded-lg bg-[#140A0D] hover:bg-[#1E0D13] border border-[#2A1319] text-[#9E8E91] hover:text-[#F4EFF0] text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <IconHelp size={13} className="text-[#C82333]" />
+            <span>Meva İnteraktif Rehber</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-full lg:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module lg:rounded-xl font-sans">
       {/* ── Top Header ── */}
@@ -279,6 +323,24 @@ export const TacticalSidebar = memo(function TacticalSidebar({
             >
               <IconPlus size={12} />
               <span>Ekle</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(`"${activeServer.name}" sunucusunu ve tüm kanallarını silmek istediğinize emin misiniz?`)) {
+                  removeServer(activeServer.id);
+                  try {
+                    const storage = getMevaStorageEngine();
+                    const remaining = servers.filter((s) => s.id !== activeServer.id);
+                    storage.scheduleWrite(STORE_PREFS, 'custom_servers', remaining);
+                    void storage.flushPendingWrites();
+                  } catch {}
+                }
+              }}
+              className="rounded-lg h-7 px-1.5 bg-[#1C0F14] hover:bg-[#3B141C] border border-[#2E1218] text-[#8E7E81] hover:text-[#FF4655] flex items-center justify-center transition-colors"
+              title="Sunucuyu Güvenle Sil (Delete Hub)"
+            >
+              <IconTrash size={12} />
             </button>
             <button
               type="button"
@@ -479,6 +541,25 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                             </span>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`"${cleanLabel(channel.name)}" kanalını silmek istediğinize emin misiniz?`)) {
+                              removeChannel(channel.id);
+                              try {
+                                const storage = getMevaStorageEngine();
+                                const remaining = channels.filter((c) => c.id !== channel.id);
+                                storage.scheduleWrite(STORE_PREFS, 'custom_channels', remaining);
+                                void storage.flushPendingWrites();
+                              } catch {}
+                            }
+                          }}
+                          className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-[#827376] hover:text-[#FF4655] hover:bg-[#2A0E16] transition-all ml-0.5 flex-shrink-0"
+                          title="Kanalı Sil"
+                        >
+                          <IconTrash size={11} />
+                        </button>
                       </div>
                     </button>
 

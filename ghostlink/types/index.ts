@@ -224,6 +224,7 @@ export interface AppState {
   showLobbyGate: boolean;
   showChannelBuilderModal: boolean;
   showOnboardingModal: boolean;
+  showTourModal: boolean;
 
   // ── Multi-Game Hub & Tag Filter ──
   selectedGameFilter: string; // 'all' | 'lol' | 'cs2' | 'valorant' | 'dota2' | 'chill'
@@ -257,9 +258,12 @@ export interface AppState {
 
   // ── Actions — Data ──
   setServers: (servers: Server[]) => void;
+  removeServer: (serverId: string) => void;
   setCategories: (categories: ChannelCategory[]) => void;
+  removeCategory: (categoryId: string) => void;
   setChannels: (channels: Channel[]) => void;
   addChannel: (channel: Channel) => void;
+  removeChannel: (channelId: string) => void;
   addCategory: (category: ChannelCategory) => void;
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
@@ -280,6 +284,7 @@ export interface AppState {
   setShowLobbyGate: (show: boolean) => void;
   setShowChannelBuilderModal: (show: boolean) => void;
   setShowOnboardingModal: (show: boolean) => void;
+  setShowTourModal: (show: boolean) => void;
   setSelectedGameFilter: (filter: string) => void;
   setUserPrimaryGame: (gameId: string) => void;
   setUserFavoriteGames: (games: string[]) => void;

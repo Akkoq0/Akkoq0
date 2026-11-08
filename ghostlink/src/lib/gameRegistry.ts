@@ -520,10 +520,10 @@ export interface ServerTemplate {
 export const COMMUNITY_SERVER_TEMPLATES: ReadonlyArray<ServerTemplate> = [
   {
     id: 'streamer-hub',
-    title: '🎥 YouTuber / Yayıncı Topluluk Hub’ı',
+    title: '🎥 YouTuber Hub',
     subtitle: 'MOBA, FPS, Battle Royale ve Chill kanallarını aynı anda barındıran komple topluluk merkezi',
     icon: '🎥',
-    serverName: 'Yayıncı Topluluk Hub’ı',
+    serverName: 'YouTuber Hub',
     categories: [
       {
         name: '📌 LOBİ & SOHBET',
@@ -566,16 +566,16 @@ export const COMMUNITY_SERVER_TEMPLATES: ReadonlyArray<ServerTemplate> = [
   },
   {
     id: 'scrim-clan',
-    title: '🏆 Espor Scrim & Klan Sunucusu',
+    title: '🏆 Espor Scrim Karargahı',
     subtitle: 'Resmi maç odaları, taktik analiz & koçluk ve yedek bekleme lobileri',
     icon: '🏆',
-    serverName: 'Eternals Scrim & Klan Hub',
+    serverName: 'Espor Scrim Karargahı',
     categories: [
       {
         name: '🏆 MAÇ & TURNUVA ODALARI',
         channels: [
-          { name: 'scrim-oda-1', type: 'voice', gameId: 'cs2', maxParticipants: 5, tags: ['#Scrim', '#CS2'] },
-          { name: 'scrim-oda-2', type: 'voice', gameId: 'valorant', maxParticipants: 5, tags: ['#Scrim', '#Valo'] },
+          { name: 'scrim-oda-1-cs2', type: 'voice', gameId: 'cs2', maxParticipants: 5, tags: ['#Scrim', '#CS2'] },
+          { name: 'scrim-oda-2-valo', type: 'voice', gameId: 'valorant', maxParticipants: 5, tags: ['#Scrim', '#Valo'] },
           { name: 'scrim-chat', type: 'text', gameId: 'cs2', maxParticipants: 0, tags: ['#Scrim', '#Skorlar'] },
         ],
       },
@@ -597,10 +597,10 @@ export const COMMUNITY_SERVER_TEMPLATES: ReadonlyArray<ServerTemplate> = [
   },
   {
     id: 'fast-squad',
-    title: '⚡ Hızlı Arkadaş Grubu',
+    title: '⚡ Serbest Agalar',
     subtitle: 'Sade ve anında hazır: 1 genel sohbet ve doğrudan oyun odaları',
     icon: '⚡',
-    serverName: 'Dostlar Kulübü',
+    serverName: 'Serbest Agalar',
     categories: [
       {
         name: '☕ CHILL / MUHABBET',

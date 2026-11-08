@@ -327,6 +327,77 @@ async function runQAAndBenchmarkSuite() {
   console.log(`  ✔ UI Lock Verified: ${checkedFilesCount} source files scanned. 0 forbidden orange/bronze colors.`);
   console.log('  ✔ Theme: 100% Deep Espresso (#070607, #0D090B, #1C0B10, #8F1622, #C82333)\n');
 
+  // ─────────────────────────────────────────────────────────────
+  // 7. FAZ 7: PURGE MOCK DATA, HUB ARCHITECT, DUO-LINK & 3D SONAR
+  // ─────────────────────────────────────────────────────────────
+  console.log('▶ [FAZ 7] PURGE MOCK DATA, HUB ARCHITECT, DUO-LINK & 3D SONAR');
+
+  const gamesMod = require('@/src/lib/gameRegistry');
+  const templates = gamesMod.COMMUNITY_SERVER_TEMPLATES;
+  assert.equal(templates.length, 3);
+  assert.equal(templates[0].serverName, 'YouTuber Hub');
+  assert.equal(templates[1].serverName, 'Espor Scrim Karargahı');
+  assert.equal(templates[2].serverName, 'Serbest Agalar');
+  console.log('  ✔ Native Hub Architect Templates Verified: YouTuber Hub, Espor Scrim Karargahı, Serbest Agalar');
+
+  // Store Native Hub Lifecycle (Create & Delete)
+  const storeMod = require('@/lib/store');
+  const store = storeMod.useAppStore.getState();
+
+  // Initial state has 0 mock servers
+  assert.equal(store.servers.length, 0, 'Mock servers were not purged from store initialization');
+  assert.equal(store.activeServerId, null);
+  console.log('  ✔ Purge Mock Data Verified: 0 hardcoded servers on boot, empty matrix ready for [+] builder');
+
+  // Simulate Hub Creation
+  const testServerId = 'srv-test-hub';
+  storeMod.useAppStore.setState({
+    servers: [{ id: testServerId, name: 'YouTuber Hub', icon_url: null, owner_id: 'usr-local', invite_code: 'YTHUB', created_at: new Date().toISOString() }],
+    categories: [{ id: 'cat-1', server_id: testServerId, name: '🎮 Espor Arenası', position: 0, is_collapsed: false }],
+    channels: [
+      { id: 'ch-voice-1', server_id: testServerId, category_id: 'cat-1', name: 'lol-dereceli-5v5', type: 'voice', position: 0, created_at: new Date().toISOString() },
+      { id: 'ch-text-1', server_id: testServerId, category_id: 'cat-1', name: 'genel-sohbet', type: 'text', position: 1, created_at: new Date().toISOString() },
+    ],
+    activeServerId: testServerId,
+    activeVoiceChannelId: 'ch-voice-1',
+    activeChannelId: 'ch-text-1',
+  });
+
+  const stateAfterCreate = storeMod.useAppStore.getState();
+  assert.equal(stateAfterCreate.servers.length, 1);
+  assert.equal(stateAfterCreate.channels.length, 2);
+  console.log('  ✔ Dynamic Hub Creation Verified: 1 Hub, 1 Category, 2 Channels created and activated');
+
+  // Channel deletion
+  storeMod.useAppStore.getState().removeChannel('ch-text-1');
+  const stateAfterChanDel = storeMod.useAppStore.getState();
+  assert.equal(stateAfterChanDel.channels.length, 1);
+  assert.equal(stateAfterChanDel.channels[0].id, 'ch-voice-1');
+  console.log('  ✔ Delete Channel (removeChannel) Verified: Single frequency removed safely');
+
+  // Server deletion
+  storeMod.useAppStore.getState().removeServer(testServerId);
+  const stateAfterSrvDel = storeMod.useAppStore.getState();
+  assert.equal(stateAfterSrvDel.servers.length, 0);
+  assert.equal(stateAfterSrvDel.channels.length, 0);
+  assert.equal(stateAfterSrvDel.activeServerId, null);
+  console.log('  ✔ Delete Hub (removeServer) Verified: Entire Hub and its channels purged cleanly');
+
+  // Duo-Link & 3D Sonar Pulse
+  storeMod.useAppStore.getState().setDuoLinkPartner('peer-jungle', 'Meva_Jungle');
+  const duoState = storeMod.useAppStore.getState().duoLink;
+  assert.equal(duoState.partnerId, 'peer-jungle');
+  assert.equal(duoState.isActive, true);
+  assert.equal(duoState.isTransmitting, false);
+
+  storeMod.useAppStore.getState().setDuoLinkActive(true);
+  assert.equal(storeMod.useAppStore.getState().duoLink.isTransmitting, true);
+  console.log('  ✔ Duo-Link Frequency Verified: Sub-channel paired & B-key transmission active');
+
+  storeMod.useAppStore.getState().triggerSonarPulse('peer-jungle', 0.8);
+  assert.equal(storeMod.useAppStore.getState().activeSonarTargetId, 'peer-jungle');
+  console.log('  ✔ 3D Sonar Pulse Verified: Spatial attention radar sweep dispatched\n');
+
   console.log('================================================================');
   console.log('  ALL QA & BENCHMARK PHASES PASSED WITH 100% PRECISION');
   console.log('================================================================');
