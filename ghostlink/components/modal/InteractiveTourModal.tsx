@@ -89,10 +89,15 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
                 </span>
               </div>
               <h2 className="text-base font-extrabold text-[#F4EFF0] tracking-tight">
-                {step === 1 && '1. Taktiksel Ses Matrisi & Slot Beacon'}
-                {step === 2 && '2. P2P Mesh Ağı & Sıfır Şirket Sunucusu'}
-                {step === 3 && '3. Özgün Sunucu ve Frekans Kanalları Mimarı'}
+                {step === 1 && '1. Canlı Kadro Ses Matrisi & Akıllı Slot Beacon'}
+                {step === 2 && '2. Uçtan Uca Doğrudan P2P Ağ Yapısı'}
+                {step === 3 && '3. Komuta Mimarisi'}
               </h2>
+              <p className="text-[11px] text-[#A8989B] font-medium mt-0.5">
+                {step === 1 && '5\'li taktik kadronuzu kurun, eksik roller için sinyal bırakın.'}
+                {step === 2 && 'Arada merkezi sunucu yok; gecikmesiz, güvenli ve şifreli ses iletişimi.'}
+                {step === 3 && 'Kendi özel frekanslarınızı ve kanallarınızı saniyeler içinde inşa edin.'}
+              </p>
             </div>
           </div>
 
@@ -115,7 +120,7 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
                   <span>60 FPS ZERO-RE-RENDER SES MATRİSİ</span>
                 </div>
                 <p className="text-xs text-[#D8CBCE] leading-relaxed">
-                  Discord veya TeamSpeak gibi hantal uygulamaların aksine, Meva HUD oyun oynarken bilgisayarınıza sıfır donanım yükü bindirir. Ses dalgaları ve dBFS göstergeleri doğrudan DOM seviyesinde akar (0% CPU/GPU spike).
+                  Meva HUD, oyun oynarken bilgisayarınıza sıfır donanım yükü bindirir. Ses dalgaları ve dBFS göstergeleri doğrudan DOM seviyesinde akar (%0 CPU/GPU dalgalanması).
                 </p>
               </div>
 
@@ -156,7 +161,7 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
                     <span>3D Akustik Sonar (Pulse)</span>
                   </div>
                   <p className="text-[11.5px] text-[#A8989B] leading-normal">
-                    Klasik dürtme yerine, oyuncunun kulaklığında soldan sağa süzülen 3D bir radar sinyali çalar ve kartını taktiksel bordo renkle titretir.
+                    Klasik bildirimler yerine, oyuncunun kulaklığında soldan sağa süzülen 3D bir radar sinyali çalar ve kartını taktiksel bordo ışıkla titretir.
                   </p>
                 </div>
               </div>
@@ -168,10 +173,10 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
               <div className="p-4 rounded-xl bg-[#1C0B10]/50 border border-[#8F1622]/35 space-y-2">
                 <div className="flex items-center gap-2 text-[#C82333] font-bold text-xs">
                   <IconShield size={16} />
-                  <span>ARADA ŞİRKET SUNUCUSU YOK (DIRECT P2P WEBRTC MESH)</span>
+                  <span>UÇTAN UCA DOĞRUDAN P2P WEBRTC AĞI</span>
                 </div>
                 <p className="text-xs text-[#D8CBCE] leading-relaxed">
-                  Meva&apos;da sesiniz üçüncü taraf merkezi bir veri merkezine gitmez. Katılımcılar doğrudan uçtan uca (WebRTC DTLS-SRTP Mesh) birbirlerine bağlanır. Ping değeriniz 9–14ms ultra-düşük espor seviyesindedir.
+                  Meva&apos;da sesiniz üçüncü taraf merkezi bir sunucuya gitmez. Katılımcılar doğrudan uçtan uca (WebRTC DTLS-SRTP Mesh) birbirlerine bağlanır. Ping değeriniz 9–14ms ultra-düşük espor seviyesindedir.
                 </p>
               </div>
 
@@ -189,9 +194,9 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
                 <div className="p-3 rounded-xl bg-[#120A0D] border border-[#2A1319] flex items-start gap-3">
                   <span className="text-cyan-400 font-bold text-sm">🌐</span>
                   <div>
-                    <h4 className="text-xs font-bold text-[#F4EFF0]">CGNAT & Güvenlik Duvarı Bypass (TURN Relay)</h4>
+                    <h4 className="text-xs font-bold text-[#F4EFF0]">CGNAT & Güvenlik Duvarı Geçişi (TURN Relay)</h4>
                     <p className="text-[11.5px] text-[#A8989B] mt-0.5">
-                      Yurt, okul veya katı servis sağlayıcı güvenlik duvarları arkasında olsanız bile Multi-STUN ve TLS 443 TURN geçiş yolları odayı düşürmez.
+                      Katı servis sağlayıcı veya kurumsal güvenlik duvarları arkasında olsanız bile Multi-STUN ve TLS 443 TURN yolları bağlantıyı kesintisiz korur.
                     </p>
                   </div>
                 </div>
@@ -204,10 +209,10 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
               <div className="p-4 rounded-xl bg-[#1C0B10]/50 border border-[#8F1622]/35 space-y-2">
                 <div className="flex items-center gap-2 text-[#C82333] font-bold text-xs">
                   <IconPlus size={16} />
-                  <span>ÖZGÜN SUNUCU VE FREKANS MİMARI (HUB ARCHITECT)</span>
+                  <span>ÖZGÜN KOMUTA FREKANSLARI MİMARI (HUB ARCHITECT)</span>
                 </div>
                 <p className="text-xs text-[#D8CBCE] leading-relaxed">
-                  Artık sahte veya kalıcı demo sunucular yok! Tek tıkla kendi topluluğunuzu veya espor klanınızı kurabilir, oyun kanalları ekleyebilir ve dilediğiniz zaman tek tıkla söküp atabilirsiniz.
+                  Sıfırdan kendi komuta merkezinizi kurun, dilediğiniz frekansları ekleyin ve yönetin. Hazır espor şablonları veya özel kanallarla takımınızı saniyeler içinde organize edin.
                 </p>
               </div>
 

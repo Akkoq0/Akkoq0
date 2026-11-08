@@ -1112,13 +1112,13 @@ export const StreamChatArea = memo(function StreamChatArea({
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1C0B10] border border-[#8F1622]/40 text-[#F08C96] text-[11px] font-extrabold tracking-wide uppercase">
               <IconBolt size={12} className="text-[#C82333]" />
-              <span>SIFIR SAHTE VERİ · ÖZGÜN NATIVE MATRİS</span>
+              <span>PROFESYONEL ESPOR İLETİŞİMİ · ÖZGÜN KOMUTA MATRİSİ</span>
             </div>
             <h1 className="text-2xl font-black text-[#F4EFF0] tracking-tight sm:text-3xl">
               MEVA KOMUTA KOKPİTİ
             </h1>
             <p className="text-xs sm:text-sm text-[#A8989B] leading-relaxed max-w-md mx-auto">
-              Discord veya TeamSpeak kopyası değil; %100 özgün Taktiksel Ses Matrisi, Slot Beacon, Duo-Link ve Doğrudan P2P WebRTC mimarisi.
+              Taktiksel Ses Matrisi, Slot Beacon, Duo-Link ve Doğrudan P2P WebRTC mimarisiyle sıfır donanım yükü ve gecikmesiz espor iletişimi.
             </p>
           </div>
 
