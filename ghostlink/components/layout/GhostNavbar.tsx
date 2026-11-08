@@ -298,23 +298,14 @@ export const GhostNavbar = memo(function GhostNavbar() {
         </CommandButton>
 
         <CommandButton
-          label="Game-Boost güç koruması"
-          onClick={toggleEcoEnabled}
-          active={ecoEnabled}
-          className="hidden lg:flex"
-        >
-          <IconGauge size={16} />
-        </CommandButton>
-
-        <CommandButton
-          label="18 Oyunlu Operatör Profili & Dinamik Roller"
+          label="Operatör Profili & Oyun Tercihleri"
           onClick={() => setShowOnboardingModal(true)}
         >
           <IconShield size={16} />
         </CommandButton>
 
         <CommandButton
-          label="Operatör ağı ve 1v1"
+          label="Operatör Ağı & 1v1 (Arkadaşlar)"
           onClick={() => setShowFriendsModal(true)}
           badge={pendingCount}
         >
@@ -322,19 +313,10 @@ export const GhostNavbar = memo(function GhostNavbar() {
         </CommandButton>
 
         <CommandButton
-          label="Görünüm ayarları"
+          label="Görünüm ve Tema Ayarları"
           onClick={() => setShowThemeModal(true)}
         >
           <IconSliders size={16} />
-        </CommandButton>
-
-        <CommandButton
-          label="Kadro paneli"
-          onClick={toggleRadar}
-          active={isRadarOpen}
-          className="hidden lg:flex"
-        >
-          <IconRadar size={16} />
         </CommandButton>
       </div>
     </header>

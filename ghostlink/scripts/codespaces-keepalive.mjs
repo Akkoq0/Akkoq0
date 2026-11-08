@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 
 const HEARTBEAT_FILE = '/workspaces/Akkoq0/.codespaces-heartbeat';
-const HEALTH_URL = 'http://127.0.0.1:3000/api/health';
+const HEALTH_URL = 'http://127.0.0.1:3000/';
 const INTERVAL_MS = 40_000; // 40 seconds
 
 let beatCount = 0;
