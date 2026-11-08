@@ -211,7 +211,9 @@ export const StreamChatArea = memo(function StreamChatArea({
   const setDuoLinkActive = useAppStore((s) => s.setDuoLinkActive);
   const activeSonarTargetId = useAppStore((s) => s.activeSonarTargetId);
   const triggerSonarPulse = useAppStore((s) => s.triggerSonarPulse);
+  const setSelectedGameFilter = useAppStore((s) => s.setSelectedGameFilter);
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [beaconToast, setBeaconToast] = useState<string | null>(null);
 
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
   const setActiveDMUser = useAppStore((s) => s.setActiveDMUser);
@@ -628,50 +630,6 @@ export const StreamChatArea = memo(function StreamChatArea({
             </button>
 
             <div className="flex items-center gap-1 flex-shrink-0">
-              {!isSelf && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isDuoPartner) {
-                        setDuoLinkPartner(null);
-                      } else {
-                        setDuoLinkPartner(op.id, displayName);
-                      }
-                    }}
-                    title={
-                      isDuoPartner
-                        ? 'Duo-Link Bağlantısını Kes'
-                        : `${displayName} ile Özel Taktiksel Duo-Link Bağla (Kısayol: B)`
-                    }
-                    className={`rounded-lg ${
-                      mobileComfort ? 'h-8 px-2 text-[10.5px]' : 'h-7 px-1.5 text-[10px]'
-                    } font-extrabold border transition-all flex items-center gap-1 ${
-                      isDuoPartner
-                        ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]'
-                        : 'bg-[#120A0D] text-[#8E7E81] hover:text-cyan-400 border-[#281318] hover:border-cyan-800/60'
-                    }`}
-                  >
-                    <span>🔗</span>
-                    <span>{isDuoPartner ? 'Duo' : 'Duo'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      triggerSonarPulse(
-                        op.id,
-                        pan === 'L' ? -0.8 : pan === 'R' ? 0.8 : 0,
-                      )
-                    }
-                    title={`${displayName} kulaklığına 3D Akustik Sonar Darbesi gönder`}
-                    className={`rounded-lg ${
-                      mobileComfort ? 'w-8 h-8' : 'w-7 h-7'
-                    } flex items-center justify-center bg-[#120A0D] text-[#8E7E81] hover:text-[#FF4655] border border-[#281318] hover:border-[#8F1622] transition-all active:scale-90`}
-                  >
-                    <span className="text-[11px]">📡</span>
-                  </button>
-                </>
-              )}
               <button
                 type="button"
                 onClick={() =>
@@ -704,9 +662,9 @@ export const StreamChatArea = memo(function StreamChatArea({
                   });
                 }}
                 aria-label={`${displayName} taktik komuta menüsü`}
-                title="Taktik Komuta Menüsü (Sağ Tık)"
+                title="Taktik Komuta Menüsü (Duo-Link, Sonar, 3D Ses)"
                 className={`rounded-lg ${
-                  mobileComfort ? 'w-9 h-9' : 'w-6 h-7'
+                  mobileComfort ? 'w-9 h-9' : 'w-7 h-7'
                 } flex items-center justify-center bg-[#120A0D] text-[#8E7E81] hover:text-[#F4EFF0] border border-[#281318] hover:border-[#4A1C26] transition-colors`}
               >
                 <IconMoreDots size={13} />
@@ -813,123 +771,131 @@ export const StreamChatArea = memo(function StreamChatArea({
       );
     });
 
-    // Render empty slots up to 5 with Meva-native Slot Beacons
+    // Multi-Purpose Slot Beacon Handlers: Single click leaves beacon/copies link, double click triggers discovery & lobby match
+    const handleBeaconSlotClick = (slotIdx: number) => {
+      const beacon = slotBeacons[slotIdx];
+      const code =
+        activeScrim?.code ??
+        activeVoiceChannelId?.replace(/^scrim-/, '') ??
+        'MEVA-8492';
+
+      if (beacon) {
+        const link =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/?room=${code}&role=${beacon.targetRole}`
+            : code;
+        void navigator.clipboard.writeText(link);
+        setInviteCopied(true);
+        setBeaconToast(`🔗 ${beacon.targetRole} çağrı linki panoya kopyalandı!`);
+        setTimeout(() => {
+          setInviteCopied(false);
+          setBeaconToast(null);
+        }, 2500);
+      } else {
+        const assignedRoles = new Set(
+          Object.values(slotBeacons)
+            .map((b) => b?.targetRole)
+            .filter(Boolean),
+        );
+        const candidateRole =
+          activeGame.roles.find((r: GameRoleDef) => !assignedRoles.has(r.shortLabel))?.shortLabel ??
+          activeGame.roles[slotIdx % activeGame.roles.length]?.shortLabel ??
+          'PRO';
+
+        setSlotBeacon(slotIdx, candidateRole);
+
+        const link =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/?room=${code}&role=${candidateRole}`
+            : code;
+        void navigator.clipboard.writeText(link);
+        setInviteCopied(true);
+        setBeaconToast(`⚡ [${candidateRole}] Slot Beacon sinyali bırakıldı & link kopyalandı!`);
+        setTimeout(() => {
+          setInviteCopied(false);
+          setBeaconToast(null);
+        }, 2500);
+      }
+    };
+
+    const handleBeaconSlotDoubleClick = (slotIdx: number) => {
+      setSelectedGameFilter(activeGame.id);
+      setShowLobbyGate(true);
+      setBeaconToast(`🎯 ${activeGame.name} hızlı lobi eşleşmesi başlatıldı!`);
+      setTimeout(() => setBeaconToast(null), 2500);
+    };
+
+    // Render empty slots up to 5 with Multi-Purpose Meva-native Slot Beacons
     for (let i = activeSquadOperators.length; i < 5; i++) {
       const beacon = slotBeacons[i];
 
-      if (beacon) {
-        cards.push(
-          <div
-            key={`slot-beacon-${i}`}
-            className={`cockpit-pod rounded-xl border-2 border-[#C82333] shadow-[0_0_22px_rgba(200,35,51,0.38)] bg-gradient-to-b from-[#2B0A13]/90 to-[#0F0609]/95 animate-pulse ${
-              mobileComfort
-                ? 'p-3.5 gap-2.5 min-h-[140px]'
-                : 'p-3 gap-2 min-h-[130px]'
-            } flex flex-col justify-between items-center text-center`}
-          >
-            <div className="w-full flex items-center justify-between">
-              <span className="text-[9.5px] font-extrabold tracking-wider text-[#FF5A6B] bg-[#590C15]/70 px-2 py-0.5 rounded border border-[#C82333]/60">
-                ⚡ SLOT BEACON #{i + 1}
-              </span>
+      cards.push(
+        <div
+          key={`slot-${i}`}
+          onClick={() => handleBeaconSlotClick(i)}
+          onDoubleClick={() => handleBeaconSlotDoubleClick(i)}
+          title="Tek Tık: Beacon Sinyali Bırak / Davet Linki Kopyala · Çift Tık: Oyun Filtresi & Hızlı Eşleşme Ara"
+          className={`cockpit-pod rounded-xl cursor-pointer select-none transition-all duration-200 group ${
+            beacon
+              ? 'border-2 border-[#C82333] shadow-[0_0_24px_rgba(200,35,51,0.38)] bg-gradient-to-b from-[#2B0A13]/90 to-[#0F0609]/95 animate-pulse'
+              : 'border border-dashed border-[#3D1A22] bg-[#0E0709]/60 hover:border-[#8F1622]/80 hover:bg-[#160B0F]/80'
+          } ${
+            mobileComfort
+              ? 'p-3.5 gap-2.5 min-h-[140px]'
+              : 'p-3 gap-2 min-h-[130px]'
+          } flex flex-col justify-between items-center text-center`}
+        >
+          <div className="w-full flex items-center justify-between">
+            <span
+              className={`text-[9.5px] font-extrabold tracking-wider px-2 py-0.5 rounded border ${
+                beacon
+                  ? 'text-[#FF5A6B] bg-[#590C15]/70 border-[#C82333]/60'
+                  : 'text-[#A8989B] bg-[#160B0F] border-[#2A1319]'
+              }`}
+            >
+              ⚡ SLOT #{i + 1} {beacon ? 'BEACON' : 'BOŞ'}
+            </span>
+            {beacon ? (
               <button
                 type="button"
-                onClick={() => clearSlotBeacon(i)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearSlotBeacon(i);
+                }}
                 className="text-[#9E8E91] hover:text-[#FAF2EE] text-xs font-bold px-1"
                 title="Çağrıyı Kaldır"
               >
                 ✕
               </button>
-            </div>
-
-            <div className="my-1">
-              <span className="text-[13px] font-extrabold text-[#FAF2EE] tracking-wide block">
-                [ ⚡ {beacon.targetRole} BEKLENİYOR ]
+            ) : (
+              <span className="text-[10px] text-[#A8989B] group-hover:text-[#FF5A6B] transition-colors">
+                +
               </span>
-              <span className="text-[10px] text-[#E07A86] font-medium mt-0.5 block">
-                {activeGame.name} · Otomatik Kenetlenme Aktif
-              </span>
-            </div>
+            )}
+          </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                const code =
-                  activeScrim?.code ??
-                  activeVoiceChannelId?.replace(/^scrim-/, '') ??
-                  'MEVA-8492';
-                const link =
-                  typeof window !== 'undefined'
-                    ? `${window.location.origin}/?room=${code}&role=${beacon.targetRole}`
-                    : code;
-                void navigator.clipboard.writeText(link);
-                setInviteCopied(true);
-                setTimeout(() => setInviteCopied(false), 2000);
-              }}
-              className="w-full h-7 rounded-lg text-[10.5px] font-extrabold border border-[#C82333] bg-[#8F1622] hover:bg-[#B31D2C] text-[#FAF2EE] transition-all flex items-center justify-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(200,35,51,0.3)]"
-            >
-              {inviteCopied ? 'Link Kopyalandı ✓' : `+ ${beacon.targetRole} Çağrı Linki`}
-            </button>
-          </div>,
-        );
-      } else {
-        cards.push(
-          <div
-            key={`empty-slot-${i}`}
-            className={`cockpit-pod rounded-xl border border-dashed border-[#3D1A22] bg-[#0E0709]/60 hover:border-[#8F1622]/60 transition-all ${
-              mobileComfort
-                ? 'p-3.5 gap-2.5 min-h-[140px]'
-                : 'p-3 gap-2 min-h-[130px]'
-            } flex flex-col justify-between items-center text-center`}
-          >
-            <div className="flex flex-col items-center gap-1 pt-1 w-full">
-              <div className="w-7 h-7 rounded-full border border-dashed border-[#591C27] bg-[#1A0B10]/70 flex items-center justify-center text-[#B87A85]">
-                <span className="text-sm font-bold">+</span>
-              </div>
-              <span className="text-[11.5px] font-bold text-[#F4EFF0]">
-                Slot #{i + 1} (Boş Koltuk)
-              </span>
-              <span className="text-[9.5px] font-semibold text-[#8E7E81]">
-                Slot Beacon Çağrısı Başlat:
-              </span>
+          <div className="my-1">
+            <span className="text-[13px] font-extrabold text-[#FAF2EE] tracking-wide block">
+              {beacon ? `[ ⚡ ${beacon.targetRole} BEKLENİYOR ]` : '[ ⚡ BOŞ KOLTUK ]'}
+            </span>
+            <span className="text-[10px] text-[#E07A86] font-semibold mt-0.5 block">
+              {beacon
+                ? `${activeGame.name} · Otomatik Kenetlenme Aktif`
+                : `${activeGame.name} · Tıkla Sinyal Bırak`}
+            </span>
+          </div>
 
-              {/* 1-Tap Quick Role Beacon Chips */}
-              <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5 max-w-full">
-                {activeGame.roles.slice(0, 4).map((r: GameRoleDef) => (
-                  <button
-                    key={r.key}
-                    type="button"
-                    onClick={() => setSlotBeacon(i, r.shortLabel)}
-                    className="rounded px-1.5 py-0.5 text-[9px] font-extrabold bg-[#1A0B10] hover:bg-[#8F1622]/60 text-[#D68C96] hover:text-[#FAF2EE] border border-[#3D1A22] transition-colors"
-                    title={`${r.label} için çağrı başlat`}
-                  >
-                    +{r.shortLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                const code =
-                  activeScrim?.code ??
-                  activeVoiceChannelId?.replace(/^scrim-/, '') ??
-                  'MEVA-8492';
-                const link =
-                  typeof window !== 'undefined'
-                    ? `${window.location.origin}/?room=${code}`
-                    : code;
-                void navigator.clipboard.writeText(link);
-                setInviteCopied(true);
-                setTimeout(() => setInviteCopied(false), 2000);
-              }}
-              className="w-full h-7 rounded-lg text-[10px] font-extrabold border border-[#3D1A22] bg-[#1A0B10]/80 hover:bg-[#2A0E18] text-[#D65D6E] transition-all flex items-center justify-center gap-1 active:scale-95"
-            >
-              {inviteCopied ? 'Kopyalandı!' : 'Davet Et (+)'}
-            </button>
-          </div>,
-        );
-      }
+          <div className="w-full py-1.5 px-2 rounded-lg bg-[#140A0D] border border-[#2A1319] text-[10px] font-bold text-[#E08C96] group-hover:border-[#C82333]/60 group-hover:text-[#FAF2EE] transition-all flex items-center justify-center gap-1">
+            <span>
+              {beacon
+                ? inviteCopied
+                  ? '✓ Link Kopyalandı'
+                  : 'Tek Tık: Link · Çift Tık: Eşleş'
+                : 'Tek Tık: Beacon · Çift Tık: Eşleş'}
+            </span>
+          </div>
+        </div>,
+      );
     }
 
     return cards;
@@ -1647,6 +1613,13 @@ export const StreamChatArea = memo(function StreamChatArea({
             </button>
           </div>
         </div>
+
+        {beaconToast && (
+          <div className="py-1 px-3 rounded-lg bg-[#590C15]/70 border border-[#C82333]/80 text-[#FAF2EE] text-[11px] font-extrabold flex items-center justify-between shadow-[0_0_16px_rgba(200,35,51,0.35)] animate-in fade-in duration-150">
+            <span>{beaconToast}</span>
+            <span className="text-[10px] text-[#FF5A6B]">P2P Link Hazır ✓</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-5 gap-2.5">
           {renderOperatorCards(false)}

@@ -349,6 +349,13 @@ const INK_SWATCHES = [
   { hex: '#F4EFF0', label: 'Komuta' },
 ] as const;
 
+export const TOOLS_META: Record<StratTool, { label: string; icon: string; next: StratTool }> = {
+  arrow: { label: 'Rotasyon Oku', icon: '➡️', next: 'smoke' },
+  smoke: { label: 'Duman (Smoke)', icon: '⭕', next: 'flash' },
+  flash: { label: 'Flaş (Pop-Flash)', icon: '⚡', next: 'pen' },
+  pen: { label: 'Serbest Çizim', icon: '✏️', next: 'arrow' },
+};
+
 function resolveGameCategory(
   gameId?: string,
   channelName?: string,
@@ -765,7 +772,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
 
   opsRef.current = ops;
 
-  // Hydrate custom map from IndexedDB on initial mount
+  // Hydrate custom map & tactical map drawings cache from IndexedDB on initial mount
   useEffect(() => {
     try {
       const storage = getMevaStorageEngine();
@@ -780,8 +787,50 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
             if (saved.name) setCustomMapName(saved.name);
           }
         });
+
+      void storage
+        .getRecord<Record<string, StratOperation[]>>(
+          STORE_PREFS,
+          'tactical_map_drawings_cache',
+        )
+        .then((cached) => {
+          if (cached && typeof cached === 'object') {
+            const allOps: StratOperation[] = [];
+            Object.values(cached).forEach((list) => {
+              if (Array.isArray(list)) allOps.push(...list);
+            });
+            if (allOps.length > 0) {
+              setOps((prev) => {
+                const seen = new Set(prev.map((o) => o.id));
+                const toAdd = allOps.filter((o) => !seen.has(o.id));
+                return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+              });
+            }
+          }
+        });
     } catch {}
   }, []);
+
+  // Persist tactical drawings to IndexedDB per map
+  useEffect(() => {
+    if (ops.length === 0) return;
+    try {
+      const storage = getMevaStorageEngine();
+      void storage
+        .getRecord<Record<string, StratOperation[]>>(
+          STORE_PREFS,
+          'tactical_map_drawings_cache',
+        )
+        .then((cached) => {
+          const updated = {
+            ...(cached || {}),
+            [mapId]: ops.filter((o) => o.mapId === mapId),
+          };
+          storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
+          void storage.flushPendingWrites();
+        });
+    } catch {}
+  }, [ops, mapId]);
 
   // Preload custom image object whenever customMapUrl changes
   useEffect(() => {
@@ -1001,13 +1050,34 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     void broadcastStratPacket({ action: 'clear', mapId });
   };
 
-  // Instant Map Switcher — 0ms delay
+  // Instant Map Switcher — 0ms delay with automatic cached drawing recall
   const handleSwitchMap = (next: TacticalMapId, e?: React.SyntheticEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     setMapId(next);
+
+    // Retrieve and restore saved tactical drawings for this map from IndexedDB
+    try {
+      const storage = getMevaStorageEngine();
+      void storage
+        .getRecord<Record<string, StratOperation[]>>(
+          STORE_PREFS,
+          'tactical_map_drawings_cache',
+        )
+        .then((cached) => {
+          if (cached && cached[next] && Array.isArray(cached[next])) {
+            const saved = cached[next];
+            setOps((prev) => {
+              const seen = new Set(prev.map((o) => o.id));
+              const toAdd = saved.filter((o) => !seen.has(o.id));
+              return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+            });
+          }
+        });
+    } catch {}
+
     void broadcastStratPacket({ action: 'switch-map', mapId: next });
   };
 
@@ -1130,18 +1200,25 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
               const spec = MAP_BLUEPRINTS[mKey as Exclude<TacticalMapId, 'custom'>];
               if (!spec) return null;
               const isActive = mapId === mKey;
+              const mapOpsCount = ops.filter((o) => o.mapId === mKey).length;
               return (
                 <button
                   key={mKey}
                   type="button"
                   onClick={(e) => handleSwitchMap(mKey, e)}
-                  className={`rounded-lg h-7 px-2.5 text-[11px] font-extrabold border transition-all ${
+                  title={`${spec.title} haritasına geç ve taktik çizimlerini yükle`}
+                  className={`rounded-lg h-7 px-2.5 text-[11px] font-extrabold border transition-all flex items-center gap-1 ${
                     isActive
                       ? 'crimson-cta text-[#F4EFF0] shadow-[0_0_12px_rgba(200,35,51,0.4)]'
                       : 'bg-[#120A0D] hover:bg-[#1C0D12] text-[#B8AAAC] hover:text-[#FAF2EE] border-[#2A1319]'
                   }`}
                 >
-                  {spec.title}
+                  <span>{spec.title}</span>
+                  {mapOpsCount > 0 && (
+                    <span className="text-[9.5px] px-1 py-0.2 rounded bg-black/40 text-[#FAF2EE] tabular-nums font-mono">
+                      {mapOpsCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -1190,58 +1267,68 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
           </div>
         </div>
 
-        {/* ── Tactical Tool Strip ── */}
+        {/* ── Multi-Purpose Context-Aware Tool Strip ── */}
         <div className="px-4 py-2 bg-[#0B0709]/95 border-b border-[#241116] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(
-              [
-                { id: 'arrow', label: 'Rotasyon Oku' },
-                { id: 'smoke', label: 'Duman (Smoke)' },
-                { id: 'flash', label: 'Flaş (Pop-Flash)' },
-                { id: 'pen', label: 'Serbest Çizim' },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setTool(t.id);
-                }}
-                className={`rounded-lg h-7 px-3 text-[11px] font-bold border transition-all ${
-                  tool === t.id
-                    ? 'bg-[#8F1622]/50 text-[#F4EFF0] border-[#C82333]/80 shadow-[0_0_10px_rgba(200,35,51,0.35)]'
-                    : 'bg-[#120A0D] hover:bg-[#1B0C11] text-[#B8AAAC] border-[#2A1319]'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Multi-Purpose Smart Tool: Click cycles to next tool */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setTool(TOOLS_META[tool].next);
+              }}
+              title="Tıkla: Sıradaki Taktik Çizim Aracına Geç (Döngüsel)"
+              className="rounded-lg h-7 px-2.5 bg-[#8F1622]/45 hover:bg-[#8F1622] border border-[#C82333]/70 text-[#FAF2EE] text-[11px] font-extrabold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+            >
+              <span>{TOOLS_META[tool].icon}</span>
+              <span>{TOOLS_META[tool].label}</span>
+              <span className="text-[9px] text-[#FF5A6B]">▾</span>
+            </button>
 
-            <span className="w-px h-5 bg-[#2A1319] mx-1" />
+            {/* Compact Tool Icon Segmented Pill */}
+            <div className="flex items-center gap-0.5 bg-[#120A0D] p-0.5 rounded-lg border border-[#2A1319]">
+              {(['arrow', 'smoke', 'flash', 'pen'] as const).map((tId) => (
+                <button
+                  key={tId}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setTool(tId);
+                  }}
+                  title={TOOLS_META[tId].label}
+                  className={`w-6 h-6 rounded flex items-center justify-center text-xs transition-colors ${
+                    tool === tId
+                      ? 'bg-[#8F1622] text-white shadow-xs'
+                      : 'text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#200A11]'
+                  }`}
+                >
+                  {TOOLS_META[tId].icon}
+                </button>
+              ))}
+            </div>
 
-            {INK_SWATCHES.map((sw) => (
-              <button
-                key={sw.hex}
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setInkColor(sw.hex);
-                }}
-                title={sw.label}
-                className={`rounded-lg h-7 px-2 flex items-center gap-1.5 border text-[10.5px] font-bold ${
-                  inkColor === sw.hex
-                    ? 'bg-[#1C0C11] border-[#C82333]/80 text-[#F4EFF0]'
-                    : 'bg-[#11090B] border-[#261217] text-[#8E7F83]'
-                }`}
-              >
-                <span
+            <span className="w-px h-5 bg-[#2A1319] mx-0.5" />
+
+            {/* Minimalist Ink Swatches */}
+            <div className="flex items-center gap-1.5 bg-[#120A0D] px-2 py-1 rounded-lg border border-[#2A1319]">
+              {INK_SWATCHES.map((sw) => (
+                <button
+                  key={sw.hex}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setInkColor(sw.hex);
+                  }}
+                  title={`${sw.label} Rengi`}
+                  className={`w-4 h-4 rounded-full transition-transform flex items-center justify-center ${
+                    inkColor === sw.hex
+                      ? 'ring-2 ring-[#C82333] scale-110'
+                      : 'hover:scale-105 opacity-80 hover:opacity-100'
+                  }`}
                   style={{ background: sw.hex }}
-                  className="w-2.5 h-2.5 rounded-full"
                 />
-                <span>{sw.label}</span>
-              </button>
-            ))}
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -1252,9 +1339,10 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
                 handleUndo();
               }}
               disabled={currentMapCount === 0}
-              className="rounded-lg h-7 px-2.5 bg-[#120A0D] hover:bg-[#1B0C11] disabled:opacity-40 border border-[#2A1319] text-[11px] font-bold text-[#B8AAAC]"
+              title="Son çizimi geri al"
+              className="rounded-lg h-7 px-2.5 bg-[#120A0D] hover:bg-[#1B0C11] disabled:opacity-40 border border-[#2A1319] text-[11px] font-bold text-[#B8AAAC] transition-colors"
             >
-              Geri Al
+              ↶ Geri Al
             </button>
             <button
               type="button"
@@ -1263,9 +1351,10 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
                 handleClear();
               }}
               disabled={currentMapCount === 0}
-              className="rounded-lg h-7 px-2.5 bg-[#190B10] hover:bg-[#7A121D]/40 disabled:opacity-40 border border-[#7A121D]/55 text-[11px] font-bold text-[#F08C96]"
+              title="Bu haritadaki tüm çizimleri temizle"
+              className="rounded-lg h-7 px-2.5 bg-[#190B10] hover:bg-[#7A121D]/40 disabled:opacity-40 border border-[#7A121D]/55 text-[11px] font-bold text-[#F08C96] transition-colors"
             >
-              Temizle ({currentMapCount})
+              ✕ Temizle ({currentMapCount})
             </button>
             <button
               type="button"

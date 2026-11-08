@@ -10,7 +10,7 @@
 //   • 1-Click Channel / Server Builder trigger (+ Ekle)
 //   • 0ms Context-Aware Channel Switching & Zero-Re-Render design
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useHUDStore } from '@/store/useHUDStore';
 import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
@@ -42,6 +42,9 @@ import {
   IconPlus,
   IconTrash,
   IconHelp,
+  IconMoreDots,
+  IconCheck,
+  IconShield,
 } from '@/components/ui/MevaIcons';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type { VoiceControls, VoicePresence, Channel } from '@/types';
@@ -150,6 +153,33 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const squadCount = voiceParticipants.length;
 
   const slotBeacons = useAppStore((s) => s.slotBeacons);
+
+  const [channelMenu, setChannelMenu] = useState<{
+    channel: Channel;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [copiedChannelId, setCopiedChannelId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef(false);
+
+  const handleChannelPointerDown = (ch: Channel, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    isLongPressRef.current = false;
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setChannelMenu({ channel: ch, x: clientX, y: clientY });
+    }, 500);
+  };
+
+  const handleChannelPointerUp = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   const userProfile: UserTacticalProfile = useMemo(
     () => ({
@@ -373,18 +403,6 @@ export const TacticalSidebar = memo(function TacticalSidebar({
             );
           })}
         </div>
-
-        {/* 1-Tap Pod Spawner */}
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => setShowChannelBuilderModal(true)}
-            className="w-full h-7 rounded-lg bg-[#200A11] hover:bg-[#380E1B] border border-[#591421] hover:border-[#C82333] text-[#FAF2EE] text-[10.5px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
-          >
-            <IconPlus size={12} className="text-[#FF4655]" />
-            <span>+ Yeni Frekans Aç (Live Squad Pod)</span>
-          </button>
-        </div>
       </div>
 
       {/* ── Scrollable Directory ── */}
@@ -455,25 +473,41 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                     key={channel.id}
                     className={`rounded-xl border transition-all duration-150 ${
                       isActive
-                        ? 'bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(11,8,10,0.78)_100%)] border-[#961826]/45'
+                        ? 'bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(11,8,10,0.78)_100%)] border-[#961826]/45 shadow-sm'
                         : 'border-transparent hover:bg-[#170B0F]/70 hover:border-[#2C141A]'
                     }`}
                   >
                     <button
                       type="button"
-                      onClick={() =>
-                        isVoice
-                          ? handleSelectVoiceChannel(channel)
-                          : setActiveChannel(channel.id)
-                      }
-                      className="w-full min-h-[40px] px-2.5 py-1.5 flex items-center justify-between gap-1.5 text-left"
+                      onPointerDown={(e) => handleChannelPointerDown(channel, e)}
+                      onPointerUp={handleChannelPointerUp}
+                      onPointerCancel={handleChannelPointerUp}
+                      onPointerLeave={handleChannelPointerUp}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setChannelMenu({ channel, x: e.clientX, y: e.clientY });
+                      }}
+                      onClick={() => {
+                        if (isLongPressRef.current) {
+                          isLongPressRef.current = false;
+                          return;
+                        }
+                        if (isVoice) {
+                          handleSelectVoiceChannel(channel);
+                        } else {
+                          setActiveChannel(channel.id);
+                        }
+                      }}
+                      title={`${cleanLabel(channel.name)} · Tıkla: Bağlan · Sağ Tık / Uzun Bas: Taktik Menü`}
+                      className="w-full min-h-[38px] px-2.5 py-1.5 flex items-center justify-between gap-1.5 text-left group"
                     >
                       <span className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`rounded-lg w-6 h-6 flex items-center justify-center flex-shrink-0 ${
+                          className={`rounded-lg w-6 h-6 flex items-center justify-center flex-shrink-0 transition-colors ${
                             isActive
                               ? 'crimson-cta text-[#F4EFF0]'
-                              : 'bg-[#140A0D] text-[#8E7E81] border border-[#281318]'
+                              : 'bg-[#140A0D] text-[#8E7E81] border border-[#281318] group-hover:text-[#F4EFF0]'
                           }`}
                         >
                           {isVoice ? (
@@ -487,7 +521,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                             className={`truncate block text-[12.5px] ${
                               isActive
                                 ? 'font-bold text-[#F4EFF0]'
-                                : 'font-medium text-[#B8AAAC]'
+                                : 'font-medium text-[#B8AAAC] group-hover:text-[#E8DCD8]'
                             }`}
                           >
                             {cleanLabel(channel.name)}
@@ -498,7 +532,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {game && (
                           <span
-                            className="text-[9.5px] font-extrabold px-1 py-0.2 rounded border"
+                            className="text-[9.5px] font-extrabold px-1.5 py-0.2 rounded border"
                             style={{
                               backgroundColor: game.badgeBg,
                               borderColor: `${game.color}55`,
@@ -541,25 +575,6 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                             </span>
                           </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`"${cleanLabel(channel.name)}" kanalını silmek istediğinize emin misiniz?`)) {
-                              removeChannel(channel.id);
-                              try {
-                                const storage = getMevaStorageEngine();
-                                const remaining = channels.filter((c) => c.id !== channel.id);
-                                storage.scheduleWrite(STORE_PREFS, 'custom_channels', remaining);
-                                void storage.flushPendingWrites();
-                              } catch {}
-                            }
-                          }}
-                          className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-[#827376] hover:text-[#FF4655] hover:bg-[#2A0E16] transition-all ml-0.5 flex-shrink-0"
-                          title="Kanalı Sil"
-                        >
-                          <IconTrash size={11} />
-                        </button>
                       </div>
                     </button>
 
@@ -567,7 +582,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                     {isVoice &&
                       isActive &&
                       Object.values(slotBeacons).some(Boolean) && (
-                        <div className="px-2.5 pb-1">
+                        <div className="px-2.5 pb-1.5">
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#4A0D18] text-[#FF5A6B] border border-[#C82333]/50 animate-pulse flex items-center gap-1">
                             <span>⚡ BEACON:</span>
                             <span>
@@ -581,62 +596,13 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                         </div>
                       )}
 
-                    {/* Affinity Score & 1-Tap Join Action */}
-                    {isVoice &&
-                      (() => {
-                        const recMatch = recommendedPods.find(
-                          (r) => r.channelId === channel.id,
-                        );
-                        if (
-                          !recMatch ||
-                          (selectedGameFilter !== 'for-you' &&
-                            recMatch.score < 70)
-                        ) {
-                          return null;
-                        }
-                        return (
-                          <div className="px-2.5 pb-2 pt-0.5 flex items-center justify-between gap-1.5 border-t border-[#261217]/60">
-                            <span className="text-[9.5px] font-extrabold text-[#FF5A6B] truncate">
-                              {recMatch.badgeText}
-                            </span>
-                            {!isActive && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectVoiceChannel(channel);
-                                }}
-                                className="rounded-lg px-2 py-0.5 bg-[#8F1622] hover:bg-[#C82333] text-[9.5px] font-black text-[#FAF2EE] whitespace-nowrap active:scale-95 transition-all shadow-sm flex items-center gap-0.5"
-                              >
-                                <span>Hemen Katıl</span>
-                                <span>→</span>
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })()}
-
                     {/* Active Voice Participants list */}
                     {isVoice && isActive && voiceParticipants.length > 0 && (
-                      <ul className="px-2.5 pb-2 space-y-0.5">
+                      <ul className="px-2.5 pb-2 space-y-0.5 border-t border-[#261217]/50 pt-1">
                         {voiceParticipants.map((vp) => (
                           <VoiceParticipantRow key={vp.user_id} participant={vp} />
                         ))}
                       </ul>
-                    )}
-
-                    {/* Quick Tactical Board link */}
-                    {isVoice && isActive && (
-                      <div className="px-2.5 pb-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowStratBoard(true)}
-                          className="rounded-lg w-full h-6 px-2 bg-[#190B10] hover:bg-[#7A121D]/35 border border-[#7A121D]/45 text-[10.5px] font-bold text-[#F08C96] flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <IconMapBoard size={11} />
-                          <span>Taktik Harita & Çizim ({game.shortName})</span>
-                        </button>
-                      </div>
                     )}
                   </div>
                 );
@@ -718,6 +684,123 @@ export const TacticalSidebar = memo(function TacticalSidebar({
           </StripButton>
         </div>
       </div>
+
+      {/* ── Multi-Purpose Context-Aware Channel Menu ── */}
+      {channelMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-[2px]"
+          onClick={() => setChannelMenu(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              top: Math.max(16, Math.min(channelMenu.y, (typeof window !== 'undefined' ? window.innerHeight : 600) - 240)),
+              left: Math.max(16, Math.min(channelMenu.x, (typeof window !== 'undefined' ? window.innerWidth : 800) - 260)),
+            }}
+            className="fixed z-50 w-64 rounded-2xl bg-[#0E070A]/95 border border-[#8F1622]/60 shadow-[0_16px_50px_rgba(0,0,0,0.95)] p-2 flex flex-col gap-1 text-[11.5px] font-bold text-[#F4EFF0] backdrop-blur-md"
+          >
+            <div className="px-2.5 py-2 border-b border-[#2C1218] flex items-center justify-between">
+              <span className="truncate text-[12px] font-extrabold text-[#FAF2EE]">
+                #{cleanLabel(channelMenu.channel.name)}
+              </span>
+              <span className="text-[9.5px] uppercase font-black px-1.5 py-0.5 rounded bg-[#2A0E15] text-[#FF5A6B] border border-[#7A121D]/50">
+                {channelMenu.channel.type === 'voice' ? 'SES ODASI' : 'METİN'}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (channelMenu.channel.type === 'voice') {
+                  handleSelectVoiceChannel(channelMenu.channel);
+                } else {
+                  setActiveChannel(channelMenu.channel.id);
+                }
+                setChannelMenu(null);
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-[#8F1622]/40 flex items-center gap-2 text-left transition-colors"
+            >
+              <IconVoiceWave size={14} className="text-[#F08C96]" />
+              <span>Frekansa Bağlan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const roomUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/?channel=${channelMenu.channel.id}`;
+                void navigator.clipboard.writeText(roomUrl);
+                setCopiedChannelId(channelMenu.channel.id);
+                setTimeout(() => {
+                  setCopiedChannelId(null);
+                  setChannelMenu(null);
+                }, 1000);
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-[#8F1622]/40 flex items-center justify-between transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <IconBolt size={14} className="text-[#00F0FF]" />
+                <span>Davet Linkini Kopyala</span>
+              </span>
+              {copiedChannelId === channelMenu.channel.id && (
+                <span className="text-[10px] text-[#00F0FF]">Kopyalandı!</span>
+              )}
+            </button>
+
+            {channelMenu.channel.type === 'voice' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const chGame = channelMenu.channel.game_id
+                    ? getGameById(channelMenu.channel.game_id)
+                    : detectGameFromChannel(channelMenu.channel.name, channelMenu.channel.tags);
+                  const candidateRole = chGame.roles[1]?.shortLabel || 'AWP';
+                  useAppStore.getState().setSlotBeacon(1, candidateRole);
+                  setChannelMenu(null);
+                }}
+                className="h-8 px-2.5 rounded-lg hover:bg-[#8F1622]/40 flex items-center gap-2 text-left transition-colors"
+              >
+                <IconShield size={14} className="text-[#FF5A6B]" />
+                <span>Slot Beacon / Rol Çağrısı Bırak</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowStratBoard(true);
+                setChannelMenu(null);
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-[#8F1622]/40 flex items-center gap-2 text-left transition-colors"
+            >
+              <IconMapBoard size={14} className="text-[#E07A86]" />
+              <span>Taktik Haritasını Aç</span>
+            </button>
+
+            <div className="my-1 border-t border-[#261016]" />
+
+            <button
+              type="button"
+              onClick={() => {
+                const ch = channelMenu.channel;
+                if (window.confirm(`"${cleanLabel(ch.name)}" kanalını silmek istediğinize emin misiniz?`)) {
+                  removeChannel(ch.id);
+                  try {
+                    const storage = getMevaStorageEngine();
+                    const remaining = channels.filter((c) => c.id !== ch.id);
+                    storage.scheduleWrite(STORE_PREFS, 'custom_channels', remaining);
+                    void storage.flushPendingWrites();
+                  } catch {}
+                }
+                setChannelMenu(null);
+              }}
+              className="h-8 px-2.5 rounded-lg hover:bg-[#590C15] text-[#FF5A6B] hover:text-[#FAF2EE] flex items-center gap-2 text-left transition-colors"
+            >
+              <IconTrash size={14} />
+              <span>Frekansı Güvenle Sil</span>
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 });
