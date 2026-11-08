@@ -402,7 +402,7 @@ async function runQAAndBenchmarkSuite() {
   // Dynamic Game Map Pools & Isolation
   const mapBoardMod = require('@/components/tactical/TacticalMapBoard');
   assert.ok(mapBoardMod.GAME_MAP_POOLS, 'Missing GAME_MAP_POOLS');
-  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.valorant, ['ascent', 'bind', 'haven', 'split', 'lotus']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.valorant, ['ascent', 'bind', 'haven', 'split', 'lotus', 'breeze']);
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.cs2, ['mirage', 'inferno', 'dust2', 'ancient', 'nuke']);
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.lol, ['rift', 'aram']);
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.pubg, ['erangel', 'miramar', 'sanhok']);
