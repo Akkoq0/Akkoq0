@@ -402,10 +402,10 @@ async function runQAAndBenchmarkSuite() {
   // Dynamic Game Map Pools & Isolation
   const mapBoardMod = require('@/components/tactical/TacticalMapBoard');
   assert.ok(mapBoardMod.GAME_MAP_POOLS, 'Missing GAME_MAP_POOLS');
-  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.valorant, ['ascent', 'bind', 'haven', 'split']);
-  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.cs2, ['mirage', 'inferno', 'dust2', 'ancient']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.valorant, ['ascent', 'bind', 'haven', 'split', 'lotus']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.cs2, ['mirage', 'inferno', 'dust2', 'ancient', 'nuke']);
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.lol, ['rift', 'aram']);
-  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.pubg, ['erangel', 'miramar']);
+  assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.pubg, ['erangel', 'miramar', 'sanhok']);
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.dota2, ['dota']);
   console.log('  ✔ Dynamic Game-Based Map Filtering Verified: Strict isolation for Valorant, CS2, LoL, PUBG, Dota 2\n');
 
