@@ -190,11 +190,11 @@ export const GhostNavbar = memo(function GhostNavbar() {
           <button
             type="button"
             onClick={() => setShowChannelBuilderModal(true)}
-            title="Kendi Özgün Sunucunu Kur"
+            title="Yeni Sunucu Oluştur"
             className="rounded-xl h-8 px-2.5 flex items-center gap-1.5 text-[11.5px] font-extrabold text-[#F4EFF0] bg-[#1F0B11] hover:bg-[#2F0F1A] border border-[#C82333]/60 hover:border-[#DC3545] shadow-[0_0_12px_rgba(200,35,51,0.35)] transition-all flex-shrink-0 animate-pulse"
           >
             <IconPlus size={13} className="text-[#F5B5BC]" />
-            <span>[+] Kendi Sunucunu Kur</span>
+            <span>Sunucu Oluştur</span>
           </button>
         </nav>
       </div>

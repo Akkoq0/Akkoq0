@@ -278,7 +278,7 @@ export const InteractiveTourModal: React.FC<InteractiveTourModalProps> = ({
                 className="px-4 py-2 rounded-xl text-xs font-bold crimson-cta flex items-center gap-1.5 shadow-[0_0_16px_rgba(200,35,51,0.5)] transition-all"
               >
                 <IconPlus size={14} />
-                <span>Kendi Sunucunu Kur 🚀</span>
+                <span>Sunucu Oluştur 🚀</span>
               </button>
             )}
           </div>

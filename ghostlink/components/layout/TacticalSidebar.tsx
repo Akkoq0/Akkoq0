@@ -291,36 +291,66 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
   if (servers.length === 0 || !activeServer) {
     return (
-      <aside className="w-full lg:w-[264px] h-full flex flex-col justify-between overflow-hidden select-none titanium-module lg:rounded-xl font-sans p-4">
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-3">
-          <div className="w-14 h-14 rounded-2xl bg-[#1C0B10] border border-[#8F1622]/50 flex items-center justify-center text-[#C82333] mb-3 shadow-[0_0_24px_rgba(200,35,51,0.3)] animate-pulse">
-            <IconBolt size={26} />
+      <aside className="w-full lg:w-[264px] h-full flex flex-col justify-between overflow-hidden select-none titanium-module lg:rounded-xl font-sans">
+        {/* Minimalist Top Header */}
+        <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-[#2A1319] bg-[linear-gradient(135deg,rgba(230,36,50,0.1)_0%,transparent_60%)]">
+          <div>
+            <h2 className="text-[13px] font-extrabold text-[#FAF2EE]">
+              Sunucular & Odalar
+            </h2>
+            <p className="text-[10px] text-[#8E7E81]">
+              Komuta Karargahı
+            </p>
           </div>
-          <h3 className="text-sm font-extrabold text-[#F4EFF0] tracking-wide mb-1.5">
-            Aktif Sunucu Yok
-          </h3>
-          <p className="text-[11.5px] text-[#A8989B] leading-relaxed mb-5">
-            Taktiksel ses ve kanal altyapınızı kurmak için aşağıdaki butondan hazır şablonla veya sıfırdan sunucunuzu oluşturun.
-          </p>
-
           <button
             type="button"
             onClick={() => setShowChannelBuilderModal(true)}
-            className="w-full py-2.5 px-4 rounded-xl crimson-cta text-xs font-black text-[#F4EFF0] flex items-center justify-center gap-2 shadow-[0_0_18px_rgba(200,35,51,0.45)] transition-all active:scale-95"
+            title="Yeni Sunucu Oluştur"
+            className="rounded-lg h-7 px-2.5 bg-[#590C15]/40 hover:bg-[#8F1622] border border-[#8F1622]/50 text-[11px] font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors"
           >
-            <IconPlus size={15} />
-            <span>[+] Kendi Sunucunu Kur</span>
+            <IconPlus size={12} />
+            <span>Sunucu Oluştur</span>
           </button>
         </div>
 
-        <div className="pt-3 border-t border-[#2A1319]">
+        {/* Minimal Subtle Placeholder (Ortadaki ana karşılama ekranını boğmayan sade durum) */}
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4">
+          <div className="w-9 h-9 rounded-xl bg-[#140A0D] border border-[#281318] flex items-center justify-center text-[#8E7E81] mb-2">
+            <IconChannelText size={16} />
+          </div>
+          <span className="text-[11.5px] font-bold text-[#A8989B]">
+            Sunucu Bulunmuyor
+          </span>
+          <span className="text-[10.5px] text-[#6E5F62] mt-0.5 max-w-[180px] leading-relaxed">
+            Ortadaki alandan hazır şablon seçerek hemen başlayabilirsiniz.
+          </span>
+        </div>
+
+        {/* Operator Identity Status Strip */}
+        <div className="relative h-14 px-3 flex items-center justify-between gap-2 bg-[#0A0708]/90 flex-shrink-0 border-t border-[#2A1319]">
+          <div className="flex items-center gap-2 min-w-0">
+            <OperatorAvatar
+              name={username}
+              status="online"
+              size="sm"
+            />
+            <div className="min-w-0">
+              <span className="block truncate text-[12px] font-semibold text-[#F7EEE9]">
+                {username}
+              </span>
+              <span className="flex items-center gap-1.5 text-[10px] text-[#8E7E81]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
+                <span>Hazır · Çevrimiçi</span>
+              </span>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => setShowTourModal(true)}
-            className="w-full py-2 px-3 rounded-lg bg-[#140A0D] hover:bg-[#1E0D13] border border-[#2A1319] text-[#9E8E91] hover:text-[#F4EFF0] text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors"
+            onClick={() => setShowCommandSettingsModal(true)}
+            className="rounded-lg w-7 h-7 flex items-center justify-center text-[#A5908A] hover:text-[#F7EEE9] hover:bg-[#23161B] transition-colors"
+            title="Meva Komuta & DSP Ayarları"
           >
-            <IconHelp size={13} className="text-[#C82333]" />
-            <span>Meva İnteraktif Rehber</span>
+            <IconSettingsGear size={13} />
           </button>
         </div>
       </aside>

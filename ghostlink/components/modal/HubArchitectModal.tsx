@@ -9,12 +9,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useHUDStore } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import {
   COMMUNITY_SERVER_TEMPLATES,
   QUICK_CHANNEL_PRESETS,
   SUPPORTED_GAMES,
   getGameById,
+  detectGameFromChannel,
   type SupportedGameId,
 } from '@/src/lib/gameRegistry';
 import {
@@ -165,7 +167,13 @@ export const HubArchitectModal: React.FC<HubArchitectModalProps> = ({
     setChannels(updatedChans);
 
     const firstVoice = newChans.find((c) => c.type === 'voice');
-    if (firstVoice) setActiveVoiceChannel(firstVoice.id);
+    if (firstVoice) {
+      setActiveVoiceChannel(firstVoice.id);
+      const game = firstVoice.game_id
+        ? getGameById(firstVoice.game_id)
+        : detectGameFromChannel(firstVoice.name, firstVoice.tags);
+      useHUDStore.getState().setOperatorRole('usr-local', game.roles[0]?.key || 'IGL');
+    }
     const firstText = newChans.find((c) => c.type === 'text');
     if (firstText) setActiveChannel(firstText.id);
 

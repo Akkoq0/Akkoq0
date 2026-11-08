@@ -1065,62 +1065,47 @@ export const StreamChatArea = memo(function StreamChatArea({
   if (servers.length === 0) {
     return (
       <main className="flex-1 h-full min-h-0 flex flex-col items-center justify-center overflow-hidden min-w-0 p-6 select-none bg-[radial-gradient(ellipse_at_center,rgba(143,22,34,0.14)_0%,rgba(7,6,7,0.98)_70%)] font-sans">
-        <div className="max-w-lg w-full flex flex-col items-center text-center space-y-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-3xl bg-[#1C0B10] border-2 border-[#8F1622] shadow-[0_0_40px_rgba(200,35,51,0.35)] flex items-center justify-center text-[#C82333]">
-              <IconMevaMark size={40} />
+        <div className="max-w-xl w-full flex flex-col items-center text-center space-y-6">
+          {/* Logo & Top Badge (Sade, Şık, PROD kaldırıldı) */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-20 h-20 rounded-3xl bg-[#1C0B10] border-2 border-[#8F1622] shadow-[0_0_40px_rgba(200,35,51,0.35)] flex items-center justify-center text-[#C82333] transition-transform hover:scale-105">
+              <IconMevaMark size={42} />
             </div>
-            <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#C82333] text-[#FAF2EE] shadow-sm">
-              PROD
-            </span>
+
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#1C0B10] border border-[#8F1622]/50 text-[#F08C96] text-[11px] font-extrabold tracking-wide uppercase shadow-sm">
+              <span>⚡ UÇTAN UCA ŞİFRELİ • SIFIR GECİKME</span>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1C0B10] border border-[#8F1622]/40 text-[#F08C96] text-[11px] font-extrabold tracking-wide uppercase">
-              <IconBolt size={12} className="text-[#C82333]" />
-              <span>PROFESYONEL ESPOR İLETİŞİMİ · ÖZGÜN KOMUTA MATRİSİ</span>
-            </div>
-            <h1 className="text-2xl font-black text-[#F4EFF0] tracking-tight sm:text-3xl">
-              MEVA KOMUTA KOKPİTİ
+          {/* Başlık ve Tanıtım Metni (Güven Veren, Doğal Dil) */}
+          <div className="space-y-2.5 max-w-lg mx-auto">
+            <h1 className="text-3xl font-black text-[#F4EFF0] tracking-tight sm:text-4xl">
+              MEVA
             </h1>
-            <p className="text-xs sm:text-sm text-[#A8989B] leading-relaxed max-w-md mx-auto">
-              Taktiksel Ses Matrisi, Slot Beacon, Duo-Link ve Doğrudan P2P WebRTC mimarisiyle sıfır donanım yükü ve gecikmesiz espor iletişimi.
+            <p className="text-xs sm:text-sm font-extrabold text-[#E08C96] tracking-wider uppercase">
+              KESİNTİSİZ TAKIM İLETİŞİMİ
+            </p>
+            <p className="text-xs sm:text-sm text-[#B8AAAC] leading-relaxed max-w-md mx-auto pt-1 font-normal">
+              Oyun performansınızı (FPS) düşürmeyen, kristal netliğinde ve uçtan uca şifreli yeni nesil ses platformu. Arada hantal sunucular olmadan, takımınızla en düşük ping değerinde güvenle konuşun.
             </p>
           </div>
 
-          <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          {/* 3 Net & Davetkar Giriş Kartı */}
+          <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
             <button
               type="button"
               onClick={() => setShowChannelBuilderModal(true)}
-              className="p-4 rounded-xl bg-gradient-to-b from-[#2A0E16] to-[#12070A] hover:from-[#3B141F] hover:to-[#1C0B10] border border-[#8F1622]/70 hover:border-[#C82333] shadow-[0_4px_20px_rgba(200,35,51,0.25)] flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
+              className="p-4 rounded-2xl bg-gradient-to-b from-[#2A0E16] to-[#12070A] hover:from-[#3B141F] hover:to-[#1C0B10] border border-[#8F1622]/70 hover:border-[#C82333] shadow-[0_4px_24px_rgba(200,35,51,0.25)] flex flex-col items-center gap-2.5 transition-all active:scale-95 group text-center"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#4A0D18] text-[#FAF2EE] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-xl bg-[#4A0D18] text-[#FAF2EE] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform shadow-inner">
                 ➕
               </div>
-              <div>
-                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-[#FF5A6B]">
-                  Sunucu Kur
+              <div className="space-y-1">
+                <span className="block text-sm font-black text-[#F4EFF0] group-hover:text-[#FF5A6B] transition-colors">
+                  + Sunucu Oluştur
                 </span>
-                <span className="block text-[10px] text-[#827376] mt-0.5">
-                  YouTuber / Scrim
-                </span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowTourModal(true)}
-              className="p-4 rounded-xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#1C0B10] text-[#C82333] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
-                ❓
-              </div>
-              <div>
-                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-[#F08C96]">
-                  İnteraktif Tur
-                </span>
-                <span className="block text-[10px] text-[#827376] mt-0.5">
-                  Meva Rehberi
+                <span className="block text-[11px] text-[#A8989B] leading-snug">
+                  Takımınız, topluluğunuz veya arkadaşlarınız için özel ses odaları kurun.
                 </span>
               </div>
             </button>
@@ -1128,17 +1113,35 @@ export const StreamChatArea = memo(function StreamChatArea({
             <button
               type="button"
               onClick={() => setShowLobbyGate(true)}
-              className="p-4 rounded-xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2 transition-all active:scale-95 group text-center"
+              className="p-4 rounded-2xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2.5 transition-all active:scale-95 group text-center"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#1C0B10] text-amber-400 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-xl bg-[#1C0B10] border border-[#2E151C] text-amber-400 flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform shadow-inner">
                 ⚡
               </div>
-              <div>
-                <span className="block text-xs font-black text-[#F4EFF0] group-hover:text-amber-300">
-                  Taktik Lobi
+              <div className="space-y-1">
+                <span className="block text-sm font-black text-[#F4EFF0] group-hover:text-amber-300 transition-colors">
+                  ⚡ Odaya Katıl
                 </span>
-                <span className="block text-[10px] text-[#827376] mt-0.5">
-                  Oda Kodu / Katıl
+                <span className="block text-[11px] text-[#A8989B] leading-snug">
+                  Davet kodu ile mevcut bir frekansa saniyeler içinde bağlanın.
+                </span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowTourModal(true)}
+              className="p-4 rounded-2xl bg-[#120A0D] hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex flex-col items-center gap-2.5 transition-all active:scale-95 group text-center"
+            >
+              <div className="w-11 h-11 rounded-xl bg-[#1C0B10] border border-[#2E151C] text-[#C82333] flex items-center justify-center text-lg font-bold group-hover:scale-110 transition-transform shadow-inner">
+                ❓
+              </div>
+              <div className="space-y-1">
+                <span className="block text-sm font-black text-[#F4EFF0] group-hover:text-[#F08C96] transition-colors">
+                  ? Nasıl Çalışır?
+                </span>
+                <span className="block text-[11px] text-[#A8989B] leading-snug">
+                  Meva&apos;nın ses teknolojisini ve özelliklerini 30 saniyede keşfedin.
                 </span>
               </div>
             </button>
