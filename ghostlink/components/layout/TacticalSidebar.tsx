@@ -21,6 +21,11 @@ import {
   getGameById,
   SUPPORTED_GAMES,
 } from '@/src/lib/gameRegistry';
+import {
+  getRecommendedSquadPods,
+  evaluatePodMatch,
+  type UserTacticalProfile,
+} from '@/src/lib/channelDiscoveryEngine';
 import { OperatorAvatar, SignalBars } from '@/components/ui/HudPrimitives';
 import {
   IconChannelText,
@@ -57,12 +62,14 @@ const PEER_PING: Record<string, number> = {
 };
 
 const GAME_FILTER_OPTIONS: Array<{ key: string; label: string }> = [
-  { key: 'all', label: 'Tümü' },
+  { key: 'all', label: 'TÜMÜ' },
+  { key: 'for-you', label: '⚡ SANA UYGUN' },
   { key: 'lol', label: 'LoL' },
   { key: 'cs2', label: 'CS2' },
-  { key: 'valorant', label: 'Valo' },
-  { key: 'dota2', label: 'Dota' },
-  { key: 'chill', label: 'Chill' },
+  { key: 'valorant', label: 'VALO' },
+  { key: 'dota2', label: 'DOTA2' },
+  { key: 'pubg', label: 'PUBG' },
+  { key: 'chill', label: 'CHILL' },
 ];
 
 function SectionLabel({
@@ -136,6 +143,26 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const voiceCapacity = activeVoiceChannel?.max_participants ?? 5;
   const squadCount = voiceParticipants.length;
 
+  const slotBeacons = useAppStore((s) => s.slotBeacons);
+
+  const userProfile: UserTacticalProfile = useMemo(
+    () => ({
+      primaryGame: userPrimaryGame,
+      favoriteGames: [userPrimaryGame, 'lol', 'cs2', 'valorant', 'dota2'],
+      gameRoles: userGameRoles,
+      communityTags: ['tryhard', 'ranked', 'scrim'],
+    }),
+    [userPrimaryGame, userGameRoles],
+  );
+
+  const recommendedPods = useMemo(() => {
+    const occMap = {
+      ...STANDBY_OCCUPANCY,
+      [activeVoiceChannelId ?? '']: squadCount,
+    };
+    return getRecommendedSquadPods(channels, userProfile, slotBeacons as any, occMap);
+  }, [channels, userProfile, slotBeacons, activeVoiceChannelId, squadCount]);
+
   const voiceLabel = activeVoiceChannel
     ? cleanLabel(activeVoiceChannel.name)
     : activeVoiceChannelId?.startsWith('scrim-')
@@ -145,13 +172,18 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   // Filter channels based on quick filter pill
   const filteredChannels = useMemo(() => {
     if (selectedGameFilter === 'all') return channels;
+    if (selectedGameFilter === 'for-you') {
+      const recIds = new Set(recommendedPods.map((r) => r.channelId));
+      const matched = channels.filter((ch) => recIds.has(ch.id));
+      return matched.length > 0 ? matched : channels.filter((c) => c.type === 'voice');
+    }
     return channels.filter((ch) => {
       const g = ch.game_id
         ? getGameById(ch.game_id)
         : detectGameFromChannel(ch.name, ch.tags);
       return g.id === selectedGameFilter;
     });
-  }, [channels, selectedGameFilter]);
+  }, [channels, selectedGameFilter, recommendedPods]);
 
   // Group channels by category
   const categorizedChannels = useMemo(() => {
@@ -183,25 +215,18 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
   // Smart Channel Recommendation Engine
   const recommendedChannel = useMemo(() => {
-    const role = userGameRoles[userPrimaryGame] || 'IGL';
-    const voiceChans = channels.filter((c) => c.type === 'voice');
-    let bestMatch: ReturnType<typeof evaluateChannelMatch> = null;
-
-    for (const c of voiceChans) {
-      if (c.id === activeVoiceChannelId) continue;
-      const occ = STANDBY_OCCUPANCY[c.id] ?? 0;
-      const match = evaluateChannelMatch(c, userPrimaryGame, role, occ);
-      if (match && (!bestMatch || match.score > bestMatch.score)) {
-        bestMatch = match;
+    if (
+      recommendedPods.length > 0 &&
+      recommendedPods[0].channelId !== activeVoiceChannelId
+    ) {
+      const top = recommendedPods[0];
+      const ch = channels.find((c) => c.id === top.channelId);
+      if (ch) {
+        return { match: top, channel: ch };
       }
     }
-
-    if (bestMatch && bestMatch.score >= 50) {
-      const ch = channels.find((c) => c.id === bestMatch!.channelId);
-      return { match: bestMatch, channel: ch };
-    }
     return null;
-  }, [channels, activeVoiceChannelId, userPrimaryGame, userGameRoles]);
+  }, [recommendedPods, channels, activeVoiceChannelId]);
 
   // Handle Channel Click with 0ms Context Update
   const handleSelectVoiceChannel = (channel: Channel) => {
@@ -272,6 +297,18 @@ export const TacticalSidebar = memo(function TacticalSidebar({
               </button>
             );
           })}
+        </div>
+
+        {/* 1-Tap Pod Spawner */}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setShowChannelBuilderModal(true)}
+            className="w-full h-7 rounded-lg bg-[#200A11] hover:bg-[#380E1B] border border-[#591421] hover:border-[#C82333] text-[#FAF2EE] text-[10.5px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-98"
+          >
+            <IconPlus size={12} className="text-[#FF4655]" />
+            <span>+ Yeni Frekans Aç (Live Squad Pod)</span>
+          </button>
         </div>
       </div>
 
@@ -384,20 +421,58 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                           </span>
                         )}
                         {isVoice && (
-                          <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10.5px] font-bold tabular-nums ${
-                              isActive
-                                ? 'bg-[#8F1622]/25 text-[#F08C96] border border-[#961826]/45'
-                                : occ > 0
-                                  ? 'bg-[#180B10] text-[#B8AAAC]'
-                                  : 'text-[#6E5F62]'
-                            }`}
-                          >
-                            {occ}/{cap === 0 ? '∞' : cap}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {/* 5-Dot Mini Occupancy Meter */}
+                            <div
+                              className="flex items-center gap-0.5"
+                              title={`Doluluk: ${occ}/${cap === 0 ? 5 : cap}`}
+                            >
+                              {Array.from({ length: 5 }).map((_, dIdx) => (
+                                <span
+                                  key={dIdx}
+                                  className={`w-1.5 h-1.5 rounded-full transition-all ${
+                                    dIdx < occ
+                                      ? isActive
+                                        ? 'bg-[#FF4655] shadow-[0_0_5px_#FF4655]'
+                                        : 'bg-[#C82333]'
+                                      : 'bg-[#2A131A]'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span
+                              className={`rounded px-1 text-[10px] font-bold tabular-nums ${
+                                isActive
+                                  ? 'text-[#F08C96]'
+                                  : occ > 0
+                                    ? 'text-[#B8AAAC]'
+                                    : 'text-[#6E5F62]'
+                              }`}
+                            >
+                              {occ}/{cap === 0 ? '5' : cap}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </button>
+
+                    {/* Active Slot Beacon Indicator */}
+                    {isVoice &&
+                      isActive &&
+                      Object.values(slotBeacons).some(Boolean) && (
+                        <div className="px-2.5 pb-1">
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#4A0D18] text-[#FF5A6B] border border-[#C82333]/50 animate-pulse flex items-center gap-1">
+                            <span>⚡ BEACON:</span>
+                            <span>
+                              {Object.values(slotBeacons)
+                                .map((b) => b?.targetRole)
+                                .filter(Boolean)
+                                .join(', ')}{' '}
+                              Aranıyor
+                            </span>
+                          </span>
+                        </div>
+                      )}
 
                     {/* Active Voice Participants list */}
                     {isVoice && isActive && voiceParticipants.length > 0 && (

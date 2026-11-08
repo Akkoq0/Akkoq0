@@ -52,6 +52,9 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
   onClose,
 }: TacticalPlayerHUDProps) {
   const setActiveDMUser = useAppStore((s) => s.setActiveDMUser);
+  const duoLink = useAppStore((s) => s.duoLink);
+  const setDuoLinkPartner = useAppStore((s) => s.setDuoLinkPartner);
+  const triggerSonarPulse = useAppStore((s) => s.triggerSonarPulse);
 
   const playerGains = useHUDStore((s) => s.playerGains);
   const localMutes = useHUDStore((s) => s.localMutes);
@@ -311,6 +314,47 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
                 </button>
               )}
             </div>
+
+            {!isSelf && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (duoLink.partnerId === player.id) {
+                      setDuoLinkPartner(null);
+                    } else {
+                      setDuoLinkPartner(player.id, player.username);
+                    }
+                  }}
+                  className={`rounded-xl min-h-[40px] text-xs font-extrabold border flex items-center justify-center gap-1.5 transition-all ${
+                    duoLink.partnerId === player.id
+                      ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                      : 'bg-[#090608] hover:bg-cyan-950/40 text-[#9E8E91] hover:text-cyan-300 border-[#881A26]/25 hover:border-cyan-800'
+                  }`}
+                >
+                  <span>🔗</span>
+                  <span>
+                    {duoLink.partnerId === player.id
+                      ? 'Duo-Link Kopar'
+                      : 'Duo-Link (B)'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    triggerSonarPulse(
+                      player.id,
+                      activePan === 'L' ? -0.8 : activePan === 'R' ? 0.8 : 0,
+                    )
+                  }
+                  className="rounded-xl min-h-[40px] text-xs font-extrabold border bg-[#090608] hover:bg-[#8F1622]/40 text-[#9E8E91] hover:text-[#FF4655] border-[#881A26]/25 hover:border-[#8F1622] flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                >
+                  <span>📡</span>
+                  <span>3D Sonar</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

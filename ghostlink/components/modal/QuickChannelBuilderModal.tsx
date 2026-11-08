@@ -6,7 +6,7 @@
 // Enables 1-Click Server Templates (Streamer Hub, Scrim Clan, Fast Squad)
 // and 1-Click Channel Pills (+LoL 5v5, +CS2 Premier, +Valo 5-Stack, +Dota 2, +PUBG, +Chill).
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import {
   COMMUNITY_SERVER_TEMPLATES,
@@ -49,6 +49,15 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
   const addCategory = useAppStore((s) => s.addCategory);
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -236,6 +245,7 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
           <button
             type="button"
             onClick={onClose}
+            aria-label="Kapat"
             className="w-8 h-8 rounded-lg bg-[#180A0E] hover:bg-[#281016] border border-[#590C15]/45 text-[#A58D8E] hover:text-[#FAF2EE] flex items-center justify-center transition-colors"
           >
             <IconClose size={16} />

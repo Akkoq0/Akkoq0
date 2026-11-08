@@ -847,6 +847,106 @@ export class MevaAudioEngine {
     } catch {}
   }
 
+  /**
+   * 3D Akustik Sonar (Spatial Attention Pulse):
+   * Synthesizes an authentic spatial radar ping sweeping through StereoPannerNode (-0.8 to +0.8 or target pan).
+   */
+  public play3DSonarPulse(pan: number = 0): void {
+    if (this.masterDeafened) return;
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const harmonicOsc = ctx.createOscillator();
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      const env = ctx.createGain();
+
+      // Chirp sweep: 640Hz -> 1880Hz
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(640, now);
+      osc.frequency.exponentialRampToValueAtTime(1880, now + 0.18);
+
+      harmonicOsc.type = 'triangle';
+      harmonicOsc.frequency.setValueAtTime(1280, now);
+      harmonicOsc.frequency.exponentialRampToValueAtTime(2560, now + 0.18);
+
+      // Amplitude envelope
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.linearRampToValueAtTime(0.09, now + 0.012);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.36);
+
+      if (panner) {
+        const startPan = pan !== 0 ? pan : -0.7;
+        const endPan = pan !== 0 ? pan : 0.7;
+        panner.pan.setValueAtTime(startPan, now);
+        panner.pan.linearRampToValueAtTime(endPan, now + 0.28);
+        osc.connect(env);
+        harmonicOsc.connect(env);
+        env.connect(panner);
+        panner.connect(this.masterGain);
+      } else {
+        osc.connect(env);
+        harmonicOsc.connect(env);
+        env.connect(this.masterGain);
+      }
+
+      osc.start(now);
+      harmonicOsc.start(now);
+      osc.stop(now + 0.38);
+      harmonicOsc.stop(now + 0.38);
+    } catch {}
+  }
+
+  /**
+   * Tactile chirp when Duo-Link toggles.
+   */
+  public playDuoLinkChirp(isLinked: boolean): void {
+    if (this.masterDeafened) return;
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      if (isLinked) {
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880.0, now + 0.05);
+      } else {
+        osc.frequency.setValueAtTime(880.0, now);
+        osc.frequency.setValueAtTime(440.0, now + 0.05);
+      }
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.linearRampToValueAtTime(0.06, now + 0.008);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+      osc.connect(env);
+      env.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 0.13);
+    } catch {}
+  }
+
+  private duoLinkPartnerId: string | null = null;
+  private duoLinkTransmitting: boolean = false;
+
+  public setDuoLinkPartner(partnerId: string | null): void {
+    this.duoLinkPartnerId = partnerId;
+  }
+
+  public getDuoLinkPartner(): string | null {
+    return this.duoLinkPartnerId;
+  }
+
+  public setDuoLinkTransmitting(active: boolean): void {
+    this.duoLinkTransmitting = active;
+  }
+
+  public isDuoLinkTransmitting(): boolean {
+    return this.duoLinkTransmitting;
+  }
+
   public detachPeer(peerId: string): void {
     const chain = this.peers.get(peerId);
     if (!chain) return;

@@ -94,6 +94,9 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
 
   const channels = useAppStore((s) => s.channels);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
+  const duoLink = useAppStore((s) => s.duoLink);
+  const setDuoLinkPartner = useAppStore((s) => s.setDuoLinkPartner);
+  const triggerSonarPulse = useAppStore((s) => s.triggerSonarPulse);
   const activeVoiceChannel = channels.find((c) => c.id === activeVoiceChannelId);
   const activeGame = useMemo(() => {
     if (activeVoiceChannel) {
@@ -286,6 +289,49 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
               <span>{isPriority ? 'Öncelikli ✓' : 'IGL Öncelik'}</span>
             </button>
           </div>
+
+          {!isSelf && (
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (duoLink.partnerId === target.id) {
+                    setDuoLinkPartner(null);
+                  } else {
+                    setDuoLinkPartner(target.id, target.username);
+                  }
+                  onClose();
+                }}
+                className={`rounded-xl h-8 px-2 text-[11px] font-extrabold border flex items-center justify-center gap-1.5 transition-all ${
+                  duoLink.partnerId === target.id
+                    ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                    : 'bg-[#0E0709] hover:bg-cyan-950/40 text-[#9E8E91] hover:text-cyan-300 border-[#2A1319] hover:border-cyan-800'
+                }`}
+              >
+                <span>🔗</span>
+                <span>
+                  {duoLink.partnerId === target.id
+                    ? 'Duo-Link Kopar'
+                    : 'Duo-Link (B)'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  triggerSonarPulse(
+                    target.id,
+                    activePan === 'L' ? -0.8 : activePan === 'R' ? 0.8 : 0,
+                  );
+                  onClose();
+                }}
+                className="rounded-xl h-8 px-2 text-[11px] font-extrabold border bg-[#0E0709] hover:bg-[#8F1622]/40 text-[#9E8E91] hover:text-[#FF4655] border-[#2A1319] hover:border-[#8F1622] flex items-center justify-center gap-1.5 transition-all active:scale-95"
+              >
+                <span>📡</span>
+                <span>3D Sonar</span>
+              </button>
+            </div>
+          )}
 
           <button
             type="button"

@@ -95,6 +95,8 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
   const storeMessages = useAppStore((s) => s.messages);
   const ecoActive = useAppStore((s) => s.ecoMode.isActive);
   const voiceParticipants = useAppStore((s) => s.voiceParticipants);
+  const duoLink = useAppStore((s) => s.duoLink);
+  const activeSonarTargetId = useAppStore((s) => s.activeSonarTargetId);
   const { sendMessage } = useRealtimeChat(activeChannelId);
 
   const activeVoiceChannel = useMemo(
@@ -305,6 +307,12 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
               <span className="rounded-md px-2 py-0.5 bg-[#180B10] border border-[#7A121D]/45 text-[10px] font-bold text-[#F08C96]">
                 {telemetry.rttMs}ms RTT · %{telemetry.stabilityPercent} P2P
               </span>
+              {duoLink.partnerId && (
+                <span className="rounded-md px-1.5 py-0.5 bg-cyan-950 border border-cyan-500/60 text-[10px] font-extrabold text-cyan-300 animate-pulse">
+                  🔗 DUO: {duoLink.partnerName}{' '}
+                  {duoLink.isTransmitting ? '(CANLI)' : ''}
+                </span>
+              )}
             </div>
             <span className="block text-[10.5px] text-[#8E7F83]">
               Oyun üstü / ikinci ekran komuta şeridi · Opus 48kHz Stereo
@@ -395,6 +403,9 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
           const pan = spatialPans[op.id] ?? 'C';
           const rtt = telemetry.nodes[op.id]?.rttMs ?? op.fallbackPing;
 
+          const isDuo = !isSelf && duoLink.partnerId === op.id;
+          const isSonar = activeSonarTargetId === op.id;
+
           return (
             <button
               key={op.id}
@@ -404,11 +415,15 @@ export const MiniHudOverlay = memo(function MiniHudOverlay({
               }
               title={muted ? 'Sesi açmak için tıkla' : 'Susturmak için tıkla'}
               className={`rounded-xl p-2.5 text-left border transition-all flex flex-col justify-between gap-1.5 ${
-                speaking
-                  ? 'cockpit-pod-live border-[#C82333]/55'
-                  : muted
-                    ? 'cockpit-pod-muted opacity-75 border-[#261217]'
-                    : 'bg-[#10080B] border-[#261217] hover:border-[#4A1B24]'
+                isSonar
+                  ? 'ring-2 ring-[#FF334B] shadow-[0_0_20px_rgba(255,51,75,0.7)] border-[#FF334B] animate-pulse'
+                  : isDuo
+                    ? 'border-cyan-500 bg-[#061F26] shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                    : speaking
+                      ? 'cockpit-pod-live border-[#C82333]/55'
+                      : muted
+                        ? 'cockpit-pod-muted opacity-75 border-[#261217]'
+                        : 'bg-[#10080B] border-[#261217] hover:border-[#4A1B24]'
               }`}
             >
               <div className="flex items-center justify-between gap-1.5">

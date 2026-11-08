@@ -180,6 +180,21 @@ export interface NetGuardStats {
   qualityLabel: 'Mükemmel' | 'İyi' | 'Orta' | 'Zayıf';
 }
 
+// ─── Slot Beacon & Duo-Link ────────────────────────────
+
+export interface SlotBeacon {
+  slotIndex: number;
+  targetRole: string | null;
+  beaconActive: boolean;
+}
+
+export interface DuoLinkState {
+  partnerId: string | null;
+  partnerName: string | null;
+  isActive: boolean;
+  isTransmitting: boolean;
+}
+
 // ─── Global Store ──────────────────────────────────────
 
 export type MobileCockpitTab = 'chat' | 'voice' | 'mesh';
@@ -216,6 +231,11 @@ export interface AppState {
   userFavoriteGames: string[];
   userGameRoles: Record<string, string>;
   userCommunityTags: string[];
+
+  // ── Meva Native Slot Beacons & Duo-Link ──
+  slotBeacons: Record<number, SlotBeacon>;
+  duoLink: DuoLinkState;
+  activeSonarTargetId: string | null;
 
   // ── Net-Guard ──
   netGuard: NetGuardStats;
@@ -265,6 +285,13 @@ export interface AppState {
   setUserFavoriteGames: (games: string[]) => void;
   setUserGameRole: (gameId: string, role: string) => void;
   setUserCommunityTags: (tags: string[]) => void;
+
+  // ── Actions — Slot Beacons & Duo-Link ──
+  setSlotBeacon: (slotIndex: number, targetRole: string | null) => void;
+  clearSlotBeacon: (slotIndex: number) => void;
+  setDuoLinkPartner: (partnerId: string | null, partnerName?: string | null) => void;
+  setDuoLinkActive: (active: boolean) => void;
+  triggerSonarPulse: (targetId: string, pan?: number) => void;
 
   // ── Actions — Net-Guard ──
   setNetGuard: (stats: Partial<NetGuardStats>) => void;

@@ -200,6 +200,14 @@ export const StreamChatArea = memo(function StreamChatArea({
   const activeScrim = useAppStore((s) => s.activeScrimRoom);
   const mobileTab = useAppStore((s) => s.mobileTab);
   const voiceParticipants = useAppStore((s) => s.voiceParticipants);
+  const slotBeacons = useAppStore((s) => s.slotBeacons);
+  const setSlotBeacon = useAppStore((s) => s.setSlotBeacon);
+  const clearSlotBeacon = useAppStore((s) => s.clearSlotBeacon);
+  const duoLink = useAppStore((s) => s.duoLink);
+  const setDuoLinkPartner = useAppStore((s) => s.setDuoLinkPartner);
+  const setDuoLinkActive = useAppStore((s) => s.setDuoLinkActive);
+  const activeSonarTargetId = useAppStore((s) => s.activeSonarTargetId);
+  const triggerSonarPulse = useAppStore((s) => s.triggerSonarPulse);
   const [inviteCopied, setInviteCopied] = useState(false);
 
   const setActiveVoiceChannel = useAppStore((s) => s.setActiveVoiceChannel);
@@ -285,12 +293,44 @@ export const StreamChatArea = memo(function StreamChatArea({
   useEffect(() => {
     const cryptoEngine = getMevaCryptoEngine();
     void cryptoEngine.initialize();
+    if (typeof window !== 'undefined') {
+      (window as any).__MEVA_STORE__ = useAppStore;
+      (window as any).__MEVA_HUD_STORE__ = useHUDStore;
+    }
     return cryptoEngine.subscribeStatus((snap) => {
       if (snap.initialized) {
         setLocalFingerprint(snap.localFingerprint.slice(0, 9));
       }
     });
   }, []);
+
+  // Duo-Link Tactical Alt-PTT Hotkey listener ('KeyB')
+  useEffect(() => {
+    if (!duoLink.partnerId) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+      if (e.code === 'KeyB' && !e.repeat) {
+        setDuoLinkActive(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyB') {
+        setDuoLinkActive(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [duoLink.partnerId, setDuoLinkActive]);
 
   const filteredMessages = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -512,6 +552,10 @@ export const StreamChatArea = memo(function StreamChatArea({
       const isBoosted = gainVal > 100;
       const livePing = telemetry.nodes[op.id]?.rttMs ?? op.pingMs;
 
+      const isDuoPartner = !isSelf && duoLink.partnerId === op.id;
+      const isDuoTransmitting = isDuoPartner && duoLink.isTransmitting;
+      const isSonarTarget = activeSonarTargetId === op.id;
+
       return (
         <div
           key={op.id}
@@ -527,12 +571,18 @@ export const StreamChatArea = memo(function StreamChatArea({
           }}
           className={`cockpit-pod rounded-xl ${
             mobileComfort ? 'p-3.5 gap-2.5' : 'p-3 gap-2'
-          } flex flex-col justify-between ${
-            isSpeaking
-              ? 'cockpit-pod-live'
-              : isMuted
-                ? 'cockpit-pod-muted opacity-85'
-                : ''
+          } flex flex-col justify-between transition-all duration-200 ${
+            isSonarTarget
+              ? 'ring-2 ring-[#FF334B] shadow-[0_0_26px_rgba(255,51,75,0.75)] border-[#FF334B] animate-pulse'
+              : isDuoTransmitting
+                ? 'bg-[#07242E] border-cyan-400 shadow-[0_0_22px_rgba(6,182,212,0.6)]'
+                : isDuoPartner
+                  ? 'border-cyan-500/70 shadow-[0_0_14px_rgba(6,182,212,0.35)] bg-[#07171C]/80'
+                  : isSpeaking
+                    ? 'cockpit-pod-live'
+                    : isMuted
+                      ? 'cockpit-pod-muted opacity-85'
+                      : ''
           }`}
         >
           {/* Row 1: Avatar + Full Unclipped Name + Mute + Tactical Menu */}
@@ -549,9 +599,16 @@ export const StreamChatArea = memo(function StreamChatArea({
                 speaking={isSpeaking}
               />
               <div className="min-w-0">
-                <span className="block text-[13.5px] lg:text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F29AA3] transition-colors whitespace-nowrap leading-tight">
-                  {displayName}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="block text-[13.5px] lg:text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F29AA3] transition-colors whitespace-nowrap leading-tight">
+                    {displayName}
+                  </span>
+                  {isDuoPartner && (
+                    <span className="text-[9px] font-black px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)] animate-pulse">
+                      {isDuoTransmitting ? 'DUO CANLI' : 'DUO'}
+                    </span>
+                  )}
+                </div>
                 {mobileComfort && (
                   <span className="block text-[11px] font-semibold text-[#827376] mt-0.5">
                     {isMuted
@@ -565,6 +622,50 @@ export const StreamChatArea = memo(function StreamChatArea({
             </button>
 
             <div className="flex items-center gap-1 flex-shrink-0">
+              {!isSelf && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isDuoPartner) {
+                        setDuoLinkPartner(null);
+                      } else {
+                        setDuoLinkPartner(op.id, displayName);
+                      }
+                    }}
+                    title={
+                      isDuoPartner
+                        ? 'Duo-Link Bağlantısını Kes'
+                        : `${displayName} ile Özel Taktiksel Duo-Link Bağla (Kısayol: B)`
+                    }
+                    className={`rounded-lg ${
+                      mobileComfort ? 'h-8 px-2 text-[10.5px]' : 'h-7 px-1.5 text-[10px]'
+                    } font-extrabold border transition-all flex items-center gap-1 ${
+                      isDuoPartner
+                        ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                        : 'bg-[#120A0D] text-[#8E7E81] hover:text-cyan-400 border-[#281318] hover:border-cyan-800/60'
+                    }`}
+                  >
+                    <span>🔗</span>
+                    <span>{isDuoPartner ? 'Duo' : 'Duo'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      triggerSonarPulse(
+                        op.id,
+                        pan === 'L' ? -0.8 : pan === 'R' ? 0.8 : 0,
+                      )
+                    }
+                    title={`${displayName} kulaklığına 3D Akustik Sonar Darbesi gönder`}
+                    className={`rounded-lg ${
+                      mobileComfort ? 'w-8 h-8' : 'w-7 h-7'
+                    } flex items-center justify-center bg-[#120A0D] text-[#8E7E81] hover:text-[#FF4655] border border-[#281318] hover:border-[#8F1622] transition-all active:scale-90`}
+                  >
+                    <span className="text-[11px]">📡</span>
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() =>
@@ -706,49 +807,123 @@ export const StreamChatArea = memo(function StreamChatArea({
       );
     });
 
-    // Render empty slots up to 5
+    // Render empty slots up to 5 with Meva-native Slot Beacons
     for (let i = activeSquadOperators.length; i < 5; i++) {
-      cards.push(
-        <div
-          key={`empty-slot-${i}`}
-          className={`cockpit-pod rounded-xl border border-dashed border-[#2A1319] bg-[#0E0709]/50 ${
-            mobileComfort
-              ? 'p-3.5 gap-2.5 min-h-[140px]'
-              : 'p-3 gap-2 min-h-[130px]'
-          } flex flex-col justify-between items-center text-center`}
-        >
-          <div className="flex flex-col items-center gap-1.5 pt-2">
-            <div className="w-8 h-8 rounded-full border border-dashed border-[#3D1A22] bg-[#1A0B10]/60 flex items-center justify-center text-[#7A5A60]">
-              <span className="text-sm font-bold">+</span>
-            </div>
-            <span className="text-[12px] font-bold text-[#827376]">
-              Operatör Bekleniyor
-            </span>
-            <span className="text-[10px] font-semibold text-[#57484B]">
-              Slot #{i + 1} (Boş)
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              const code =
-                activeScrim?.code ??
-                activeVoiceChannelId?.replace(/^scrim-/, '') ??
-                'MEVA-8492';
-              const link =
-                typeof window !== 'undefined'
-                  ? `${window.location.origin}/?room=${code}`
-                  : code;
-              void navigator.clipboard.writeText(link);
-              setInviteCopied(true);
-              setTimeout(() => setInviteCopied(false), 2000);
-            }}
-            className="w-full h-7 rounded-lg text-[10.5px] font-extrabold border border-[#3D1A22] bg-[#1A0B10]/80 hover:bg-[#2A0E18] text-[#D65D6E] transition-all flex items-center justify-center gap-1 active:scale-95"
+      const beacon = slotBeacons[i];
+
+      if (beacon) {
+        cards.push(
+          <div
+            key={`slot-beacon-${i}`}
+            className={`cockpit-pod rounded-xl border-2 border-[#C82333] shadow-[0_0_22px_rgba(200,35,51,0.38)] bg-gradient-to-b from-[#2B0A13]/90 to-[#0F0609]/95 animate-pulse ${
+              mobileComfort
+                ? 'p-3.5 gap-2.5 min-h-[140px]'
+                : 'p-3 gap-2 min-h-[130px]'
+            } flex flex-col justify-between items-center text-center`}
           >
-            {inviteCopied ? 'Kopyalandı!' : 'Davet Et (+)'}
-          </button>
-        </div>,
-      );
+            <div className="w-full flex items-center justify-between">
+              <span className="text-[9.5px] font-extrabold tracking-wider text-[#FF5A6B] bg-[#590C15]/70 px-2 py-0.5 rounded border border-[#C82333]/60">
+                ⚡ SLOT BEACON #{i + 1}
+              </span>
+              <button
+                type="button"
+                onClick={() => clearSlotBeacon(i)}
+                className="text-[#9E8E91] hover:text-[#FAF2EE] text-xs font-bold px-1"
+                title="Çağrıyı Kaldır"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="my-1">
+              <span className="text-[13px] font-extrabold text-[#FAF2EE] tracking-wide block">
+                [ ⚡ {beacon.targetRole} BEKLENİYOR ]
+              </span>
+              <span className="text-[10px] text-[#E07A86] font-medium mt-0.5 block">
+                {activeGame.name} · Otomatik Kenetlenme Aktif
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const code =
+                  activeScrim?.code ??
+                  activeVoiceChannelId?.replace(/^scrim-/, '') ??
+                  'MEVA-8492';
+                const link =
+                  typeof window !== 'undefined'
+                    ? `${window.location.origin}/?room=${code}&role=${beacon.targetRole}`
+                    : code;
+                void navigator.clipboard.writeText(link);
+                setInviteCopied(true);
+                setTimeout(() => setInviteCopied(false), 2000);
+              }}
+              className="w-full h-7 rounded-lg text-[10.5px] font-extrabold border border-[#C82333] bg-[#8F1622] hover:bg-[#B31D2C] text-[#FAF2EE] transition-all flex items-center justify-center gap-1 active:scale-95 shadow-[0_0_12px_rgba(200,35,51,0.3)]"
+            >
+              {inviteCopied ? 'Link Kopyalandı ✓' : `+ ${beacon.targetRole} Çağrı Linki`}
+            </button>
+          </div>,
+        );
+      } else {
+        cards.push(
+          <div
+            key={`empty-slot-${i}`}
+            className={`cockpit-pod rounded-xl border border-dashed border-[#3D1A22] bg-[#0E0709]/60 hover:border-[#8F1622]/60 transition-all ${
+              mobileComfort
+                ? 'p-3.5 gap-2.5 min-h-[140px]'
+                : 'p-3 gap-2 min-h-[130px]'
+            } flex flex-col justify-between items-center text-center`}
+          >
+            <div className="flex flex-col items-center gap-1 pt-1 w-full">
+              <div className="w-7 h-7 rounded-full border border-dashed border-[#591C27] bg-[#1A0B10]/70 flex items-center justify-center text-[#B87A85]">
+                <span className="text-sm font-bold">+</span>
+              </div>
+              <span className="text-[11.5px] font-bold text-[#F4EFF0]">
+                Slot #{i + 1} (Boş Koltuk)
+              </span>
+              <span className="text-[9.5px] font-semibold text-[#8E7E81]">
+                Slot Beacon Çağrısı Başlat:
+              </span>
+
+              {/* 1-Tap Quick Role Beacon Chips */}
+              <div className="flex flex-wrap items-center justify-center gap-1 mt-0.5 max-w-full">
+                {activeGame.roles.slice(0, 4).map((r: GameRoleDef) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => setSlotBeacon(i, r.shortLabel)}
+                    className="rounded px-1.5 py-0.5 text-[9px] font-extrabold bg-[#1A0B10] hover:bg-[#8F1622]/60 text-[#D68C96] hover:text-[#FAF2EE] border border-[#3D1A22] transition-colors"
+                    title={`${r.label} için çağrı başlat`}
+                  >
+                    +{r.shortLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const code =
+                  activeScrim?.code ??
+                  activeVoiceChannelId?.replace(/^scrim-/, '') ??
+                  'MEVA-8492';
+                const link =
+                  typeof window !== 'undefined'
+                    ? `${window.location.origin}/?room=${code}`
+                    : code;
+                void navigator.clipboard.writeText(link);
+                setInviteCopied(true);
+                setTimeout(() => setInviteCopied(false), 2000);
+              }}
+              className="w-full h-7 rounded-lg text-[10px] font-extrabold border border-[#3D1A22] bg-[#1A0B10]/80 hover:bg-[#2A0E18] text-[#D65D6E] transition-all flex items-center justify-center gap-1 active:scale-95"
+            >
+              {inviteCopied ? 'Kopyalandı!' : 'Davet Et (+)'}
+            </button>
+          </div>,
+        );
+      }
     }
 
     return cards;

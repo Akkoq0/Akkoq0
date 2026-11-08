@@ -3,12 +3,15 @@
 // ─────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
+import { getMevaAudioEngine } from '@/src/lib/audioEngine';
 import type {
   AppState,
   Message,
   EcoModeState,
   NetGuardStats,
   Friendship,
+  SlotBeacon,
+  DuoLinkState,
 } from '@/types';
 
 const SEED_ISO = '2026-11-06T19:00:00.000Z';
@@ -47,6 +50,20 @@ export const useAppStore = create<AppState>((set) => ({
   userFavoriteGames: ['cs2', 'valorant', 'lol'],
   userGameRoles: { cs2: 'IGL', valorant: 'DUELIST', lol: 'JUNGLE' },
   userCommunityTags: ['#Tryhard-Dereceli', '#Scrim-Turnuva'],
+
+  slotBeacons: {
+    1: { slotIndex: 1, targetRole: null, beaconActive: false },
+    2: { slotIndex: 2, targetRole: null, beaconActive: false },
+    3: { slotIndex: 3, targetRole: null, beaconActive: false },
+    4: { slotIndex: 4, targetRole: null, beaconActive: false },
+  },
+  duoLink: {
+    partnerId: null,
+    partnerName: null,
+    isActive: false,
+    isTransmitting: false,
+  },
+  activeSonarTargetId: null,
 
   netGuard: {
     jitterMs: 0.2,
@@ -212,6 +229,65 @@ export const useAppStore = create<AppState>((set) => ({
     })),
 
   setUserCommunityTags: (tags) => set({ userCommunityTags: tags }),
+
+  setSlotBeacon: (slotIndex, targetRole) =>
+    set((s) => ({
+      slotBeacons: {
+        ...s.slotBeacons,
+        [slotIndex]: {
+          slotIndex,
+          targetRole,
+          beaconActive: Boolean(targetRole),
+        },
+      },
+    })),
+
+  clearSlotBeacon: (slotIndex) =>
+    set((s) => ({
+      slotBeacons: {
+        ...s.slotBeacons,
+        [slotIndex]: {
+          slotIndex,
+          targetRole: null,
+          beaconActive: false,
+        },
+      },
+    })),
+
+  setDuoLinkPartner: (partnerId, partnerName = null) => {
+    const isNew = Boolean(partnerId);
+    getMevaAudioEngine().playDuoLinkChirp(isNew);
+    getMevaAudioEngine().setDuoLinkPartner(partnerId);
+    set({
+      duoLink: {
+        partnerId,
+        partnerName: partnerName ?? (partnerId ? 'Partner' : null),
+        isActive: isNew,
+        isTransmitting: false,
+      },
+    });
+  },
+
+  setDuoLinkActive: (active) => {
+    getMevaAudioEngine().setDuoLinkTransmitting(active);
+    set((s) => ({
+      duoLink: {
+        ...s.duoLink,
+        isTransmitting: active,
+        isActive: active || Boolean(s.duoLink.partnerId),
+      },
+    }));
+  },
+
+  triggerSonarPulse: (targetId, pan = 0) => {
+    getMevaAudioEngine().play3DSonarPulse(pan);
+    set({ activeSonarTargetId: targetId });
+    setTimeout(() => {
+      if (useAppStore.getState().activeSonarTargetId === targetId) {
+        set({ activeSonarTargetId: null });
+      }
+    }, 2200);
+  },
 
   setNetGuard: (stats: Partial<NetGuardStats>) =>
     set((s) => ({ netGuard: { ...s.netGuard, ...stats } })),
