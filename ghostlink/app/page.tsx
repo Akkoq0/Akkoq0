@@ -31,6 +31,11 @@ import { LobbyGateModal } from '@/components/lobby/LobbyGateModal';
 import { QuickChannelBuilderModal } from '@/components/modal/QuickChannelBuilderModal';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { InteractiveTourModal } from '@/components/modal/InteractiveTourModal';
+import { StreamerOverlayModal } from '@/components/broadcast/StreamerOverlayModal';
+import { BroadcastSoundboardModal } from '@/components/audio/BroadcastSoundboardModal';
+import { RadialCommandWheel } from '@/components/tactical/RadialCommandWheel';
+import { VoiceClipBufferModal } from '@/components/audio/VoiceClipBufferModal';
+import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
@@ -76,6 +81,16 @@ export default function MevaHUDApp() {
   const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
   const showTourModal = useAppStore((s) => s.showTourModal);
   const setShowTourModal = useAppStore((s) => s.setShowTourModal);
+  const showStreamerOverlayModal = useAppStore((s) => s.showStreamerOverlayModal);
+  const setShowStreamerOverlayModal = useAppStore((s) => s.setShowStreamerOverlayModal);
+  const showSoundboardModal = useAppStore((s) => s.showSoundboardModal);
+  const setShowSoundboardModal = useAppStore((s) => s.setShowSoundboardModal);
+  const showRadialCommandWheel = useAppStore((s) => s.showRadialCommandWheel);
+  const setShowRadialCommandWheel = useAppStore((s) => s.setShowRadialCommandWheel);
+  const showVoiceClipBufferModal = useAppStore((s) => s.showVoiceClipBufferModal);
+  const setShowVoiceClipBufferModal = useAppStore((s) => s.setShowVoiceClipBufferModal);
+  const showScrimScheduleModal = useAppStore((s) => s.showScrimScheduleModal);
+  const setShowScrimScheduleModal = useAppStore((s) => s.setShowScrimScheduleModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -195,6 +210,12 @@ export default function MevaHUDApp() {
         useAppStore.getState().setShowLobbyGate(false);
         useAppStore.getState().setShowChannelBuilderModal(false);
         useAppStore.getState().setShowOnboardingModal(false);
+        useAppStore.getState().setShowTourModal(false);
+        useAppStore.getState().setShowStreamerOverlayModal(false);
+        useAppStore.getState().setShowSoundboardModal(false);
+        useAppStore.getState().setShowRadialCommandWheel(false);
+        useAppStore.getState().setShowVoiceClipBufferModal(false);
+        useAppStore.getState().setShowScrimScheduleModal(false);
         useAppStore.getState().setIsMobileSidebarOpen(false);
         useAppStore.getState().setIsMobileRadarOpen(false);
         useThemeStore.getState().setShowThemeModal(false);
@@ -217,6 +238,12 @@ export default function MevaHUDApp() {
 
       const vState = useVoiceSettingsStore.getState();
       if (vState.showCommandSettingsModal) return;
+
+      if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const cur = useAppStore.getState().showRadialCommandWheel;
+        useAppStore.getState().setShowRadialCommandWheel(!cur);
+        return;
+      }
 
       if (e.code === vState.keybinds.stratBoardKey) {
         vState.toggleStratBoard();
@@ -444,6 +471,37 @@ export default function MevaHUDApp() {
           isOpen={showTourModal}
           onClose={() => setShowTourModal(false)}
           onOpenServerBuilder={() => setShowChannelBuilderModal(true)}
+        />
+      )}
+      {showStreamerOverlayModal && (
+        <StreamerOverlayModal
+          isOpen={showStreamerOverlayModal}
+          onClose={() => setShowStreamerOverlayModal(false)}
+        />
+      )}
+      {showSoundboardModal && (
+        <BroadcastSoundboardModal
+          isOpen={showSoundboardModal}
+          onClose={() => setShowSoundboardModal(false)}
+        />
+      )}
+      {showRadialCommandWheel && (
+        <RadialCommandWheel
+          isOpen={showRadialCommandWheel}
+          onClose={() => setShowRadialCommandWheel(false)}
+        />
+      )}
+      {showVoiceClipBufferModal && (
+        <VoiceClipBufferModal
+          isOpen={showVoiceClipBufferModal}
+          onClose={() => setShowVoiceClipBufferModal(false)}
+        />
+      )}
+      {showScrimScheduleModal && (
+        <ScrimScheduleModal
+          isOpen={showScrimScheduleModal}
+          onClose={() => setShowScrimScheduleModal(false)}
+          onLaunchVeto={() => useVoiceSettingsStore.getState().toggleStratBoard()}
         />
       )}
       {radarContextTarget && (

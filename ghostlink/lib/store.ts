@@ -45,6 +45,11 @@ export const useAppStore = create<AppState>((set) => ({
   showChannelBuilderModal: false,
   showOnboardingModal: false,
   showTourModal: false,
+  showStreamerOverlayModal: false,
+  showSoundboardModal: false,
+  showRadialCommandWheel: false,
+  showVoiceClipBufferModal: false,
+  showScrimScheduleModal: false,
 
   selectedGameFilter: 'all',
   userPrimaryGame: 'cs2',
@@ -263,6 +268,16 @@ export const useAppStore = create<AppState>((set) => ({
   setShowOnboardingModal: (show) => set({ showOnboardingModal: show }),
 
   setShowTourModal: (show) => set({ showTourModal: show }),
+
+  setShowStreamerOverlayModal: (show) => set({ showStreamerOverlayModal: show }),
+
+  setShowSoundboardModal: (show) => set({ showSoundboardModal: show }),
+
+  setShowRadialCommandWheel: (show) => set({ showRadialCommandWheel: show }),
+
+  setShowVoiceClipBufferModal: (show) => set({ showVoiceClipBufferModal: show }),
+
+  setShowScrimScheduleModal: (show) => set({ showScrimScheduleModal: show }),
 
   setSelectedGameFilter: (filter) => set({ selectedGameFilter: filter }),
 

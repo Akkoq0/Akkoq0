@@ -409,6 +409,55 @@ async function runQAAndBenchmarkSuite() {
   assert.deepEqual(mapBoardMod.GAME_MAP_POOLS.dota2, ['dota']);
   console.log('  ✔ Dynamic Game-Based Map Filtering Verified: Strict isolation for Valorant, CS2, LoL, PUBG, Dota 2\n');
 
+  // ─────────────────────────────────────────────────────────────
+  // 8. FAZ 8: ENTERPRISE BROADCAST & STREAMER ENGINE (OBS & VOD)
+  // ─────────────────────────────────────────────────────────────
+  console.log('▶ [FAZ 8] ENTERPRISE BROADCAST & STREAMER ENGINE (OBS & VOD)');
+
+  // 8.1 Esports Soundboard Validation
+  const soundboardMod = require('@/src/lib/esportsSoundboard');
+  assert.ok(Array.isArray(soundboardMod.ESPORTS_SOUNDS));
+  assert.equal(soundboardMod.ESPORTS_SOUNDS.length, 8);
+  const soundIds = soundboardMod.ESPORTS_SOUNDS.map((s) => s.id);
+  assert.ok(soundIds.includes('spike_planted'));
+  assert.ok(soundIds.includes('bomb_defused'));
+  assert.ok(soundIds.includes('timeout_buzzer'));
+  assert.ok(soundIds.includes('round_win'));
+  assert.ok(soundIds.includes('clutch_heartbeat'));
+  console.log('  ✔ Zero-Latency WebAudio Synthetic Esports Soundboard: 8 Synthetic Audio Cues Verified');
+
+  // 8.2 Voice Clip Ring Buffer & WAV Header Encoding
+  const voiceClipMod = require('@/src/lib/voiceClipRecorder');
+  const ringBuffer = voiceClipMod.getVoiceClipBuffer();
+  assert.ok(ringBuffer);
+  const status = ringBuffer.getStatus();
+  assert.equal(status.isCapturing, true);
+  assert.equal(status.maxSeconds, 60);
+
+  // Test PCM to WAV blob generation
+  const testPcm = new Float32Array(4800); // 100ms test audio
+  for (let i = 0; i < testPcm.length; i++) {
+    testPcm[i] = Math.sin((2 * Math.PI * 440 * i) / 48000);
+  }
+  const wavBlob = voiceClipMod.encodePcmToWavBlob(testPcm, 48000);
+  assert.ok(wavBlob);
+  assert.equal(wavBlob.type, 'audio/wav');
+  assert.equal(wavBlob.size, 44 + testPcm.length * 2);
+  console.log(`  ✔ Voice VOD Ring Buffer & WAV Encoder: 48kHz PCM Blob Verified (${wavBlob.size} bytes)`);
+
+  // 8.3 Broadcast & Streamer Modal State Verification
+  storeMod.useAppStore.getState().setShowStreamerOverlayModal(true);
+  assert.equal(storeMod.useAppStore.getState().showStreamerOverlayModal, true);
+  storeMod.useAppStore.getState().setShowSoundboardModal(true);
+  assert.equal(storeMod.useAppStore.getState().showSoundboardModal, true);
+  storeMod.useAppStore.getState().setShowRadialCommandWheel(true);
+  assert.equal(storeMod.useAppStore.getState().showRadialCommandWheel, true);
+  storeMod.useAppStore.getState().setShowVoiceClipBufferModal(true);
+  assert.equal(storeMod.useAppStore.getState().showVoiceClipBufferModal, true);
+  storeMod.useAppStore.getState().setShowScrimScheduleModal(true);
+  assert.equal(storeMod.useAppStore.getState().showScrimScheduleModal, true);
+  console.log('  ✔ Streamer, Soundboard, Radial Wheel & Scrim Modals: State Store Verified\n');
+
   console.log('================================================================');
   console.log('  ALL QA & BENCHMARK PHASES PASSED WITH 100% PRECISION');
   console.log('================================================================');

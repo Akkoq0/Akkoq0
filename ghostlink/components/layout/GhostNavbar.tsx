@@ -93,6 +93,11 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const setShowTourModal = useAppStore((s) => s.setShowTourModal);
   const setShowOnboardingModal = useAppStore((s) => s.setShowOnboardingModal);
   const setShowFriendsModal = useAppStore((s) => s.setShowFriendsModal);
+  const setShowStreamerOverlayModal = useAppStore((s) => s.setShowStreamerOverlayModal);
+  const setShowSoundboardModal = useAppStore((s) => s.setShowSoundboardModal);
+  const setShowRadialCommandWheel = useAppStore((s) => s.setShowRadialCommandWheel);
+  const setShowVoiceClipBufferModal = useAppStore((s) => s.setShowVoiceClipBufferModal);
+  const setShowScrimScheduleModal = useAppStore((s) => s.setShowScrimScheduleModal);
   const toggleRadar = useAppStore((s) => s.toggleRadar);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
   const setShowThemeModal = useThemeStore((s) => s.setShowThemeModal);
@@ -242,6 +247,45 @@ export const GhostNavbar = memo(function GhostNavbar() {
           active={showStratBoard}
         >
           <IconMapBoard size={16} />
+        </CommandButton>
+
+        <CommandButton
+          label="Yayıncı & OBS Tarayıcı Kaynağı Modu"
+          onClick={() => setShowStreamerOverlayModal(true)}
+          className="hidden md:flex"
+        >
+          <span className="text-sm">🎥</span>
+        </CommandButton>
+
+        <CommandButton
+          label="Espor Soundboard & Taktik Ses Efektleri (NumPad 1-8)"
+          onClick={() => setShowSoundboardModal(true)}
+          className="hidden md:flex"
+        >
+          <span className="text-sm">🎛️</span>
+        </CommandButton>
+
+        <CommandButton
+          label="IGL Taktik Hızlı Komut Çarkı (C)"
+          onClick={() => setShowRadialCommandWheel(true)}
+        >
+          <span className="text-sm">🎯</span>
+        </CommandButton>
+
+        <CommandButton
+          label="Son 30 Sn Ses Klibi & Replay (VOD Buffer)"
+          onClick={() => setShowVoiceClipBufferModal(true)}
+          className="hidden sm:flex"
+        >
+          <span className="text-sm">🎙️</span>
+        </CommandButton>
+
+        <CommandButton
+          label="Espor Scrim & Turnuva Maç Takvimi"
+          onClick={() => setShowScrimScheduleModal(true)}
+          className="hidden lg:flex"
+        >
+          <span className="text-sm">📅</span>
         </CommandButton>
 
         <CommandButton

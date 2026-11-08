@@ -225,6 +225,11 @@ export interface AppState {
   showChannelBuilderModal: boolean;
   showOnboardingModal: boolean;
   showTourModal: boolean;
+  showStreamerOverlayModal: boolean;
+  showSoundboardModal: boolean;
+  showRadialCommandWheel: boolean;
+  showVoiceClipBufferModal: boolean;
+  showScrimScheduleModal: boolean;
 
   // ── Multi-Game Hub & Tag Filter ──
   selectedGameFilter: string; // 'all' | 'lol' | 'cs2' | 'valorant' | 'dota2' | 'chill'
@@ -285,6 +290,11 @@ export interface AppState {
   setShowChannelBuilderModal: (show: boolean) => void;
   setShowOnboardingModal: (show: boolean) => void;
   setShowTourModal: (show: boolean) => void;
+  setShowStreamerOverlayModal: (show: boolean) => void;
+  setShowSoundboardModal: (show: boolean) => void;
+  setShowRadialCommandWheel: (show: boolean) => void;
+  setShowVoiceClipBufferModal: (show: boolean) => void;
+  setShowScrimScheduleModal: (show: boolean) => void;
   setSelectedGameFilter: (filter: string) => void;
   setUserPrimaryGame: (gameId: string) => void;
   setUserFavoriteGames: (games: string[]) => void;
