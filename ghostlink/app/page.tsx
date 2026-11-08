@@ -185,14 +185,15 @@ export default function MevaHUDApp() {
         if (saved?.callsign) {
           setUser((prev) => ({ ...prev, username: saved.callsign }));
         } else {
-          setShowLobbyGate(true);
+          // 100% Optional / Skip-friendly dynamic onboarding wizard
+          setShowOnboardingModal(true);
         }
       });
 
     return () => {
       storage.disposeBindings();
     };
-  }, [setShowLobbyGate]);
+  }, [setShowOnboardingModal]);
 
   // Auto-join P2P room when opened via serverless URL Hash (#meva=...) or Query Param (?room=MEVA-XXXX)
   useEffect(() => {

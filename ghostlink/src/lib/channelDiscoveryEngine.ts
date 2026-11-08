@@ -66,15 +66,33 @@ export function evaluatePodMatch(
     'IGL'
   ).toUpperCase();
 
-  // 1. Check for Active Slot Beacon demand (Highest Priority)
+  // 1. Check for Active Slot Beacon demand or Tagged Missing Role (Highest Priority 98%)
   let beaconMatchedRole: string | null = null;
   for (const beacon of Object.values(slotBeacons)) {
-    if (beacon?.beaconActive && beacon.targetRole) {
+    if (beacon?.targetRole) {
       const bRole = beacon.targetRole.toUpperCase();
-      if (bRole === userRole || userRole.includes(bRole) || bRole.includes(userRole)) {
+      if (
+        bRole === userRole ||
+        userRole.includes(bRole) ||
+        bRole.includes(userRole)
+      ) {
         beaconMatchedRole = beacon.targetRole;
         break;
       }
+    }
+  }
+
+  // Also check channel tags for role demand (e.g. #AWP-Aranıyor)
+  if (!beaconMatchedRole && channel.tags) {
+    const roleTag = channel.tags.find((t) => {
+      const upper = t.toUpperCase().replace(/^#/, '');
+      return (
+        upper.includes(userRole) ||
+        userRole.includes(upper.replace('-ARANIYOR', ''))
+      );
+    });
+    if (roleTag) {
+      beaconMatchedRole = userRole;
     }
   }
 
@@ -84,9 +102,26 @@ export function evaluatePodMatch(
       channelName: channel.name,
       game,
       score: 98,
-      badgeText: `⚡ %98 Uyumlu — Senin Rolün Aranıyor (${beaconMatchedRole} Bekleniyor)`,
+      badgeText: `⚡ %98 Eşleşme — ${beaconMatchedRole} Rolün Aranıyor!`,
       isBeaconMatch: true,
       neededRole: beaconMatchedRole,
+      occupancy,
+      capacity,
+    };
+  }
+
+  // Special flex handler for user with FLEX role
+  if (userRole === 'FLEX') {
+    const missingRole =
+      game.roles[(occupancy + 1) % game.roles.length]?.shortLabel ?? 'FLEX';
+    return {
+      channelId: channel.id,
+      channelName: channel.name,
+      game,
+      score: 92,
+      badgeText: `⚡ %92 Eşleşme — Serbest Operatör (Flex) Aranıyor!`,
+      isBeaconMatch: true,
+      neededRole: missingRole,
       occupancy,
       capacity,
     };

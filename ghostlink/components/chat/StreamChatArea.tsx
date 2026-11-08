@@ -1231,7 +1231,7 @@ export const StreamChatArea = memo(function StreamChatArea({
 
             {/* Breathable Dedicated Swipeable Callout Bar */}
             <div className="px-3 py-2 bg-[#0A0708]/80 border-t border-[#221015] flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
-              {CALLOUTS.map((c) => (
+              {dynamicCallouts.map((c) => (
                 <button
                   key={c.label}
                   type="button"

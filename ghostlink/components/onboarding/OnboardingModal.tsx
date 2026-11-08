@@ -107,6 +107,39 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     }
   };
 
+  const handleSkip = () => {
+    // Default "Serbest Operatör (Flex)" profile when user skips onboarding
+    const defaultGame = primaryGame || 'cs2';
+    const defaultRole = 'FLEX';
+    const defaultTags = ['#Chill', '#Serbest'];
+
+    setUserPrimaryGame(defaultGame);
+    setUserFavoriteGames([defaultGame]);
+    setUserGameRole(defaultGame, defaultRole);
+    setUserCommunityTags(defaultTags);
+    setOperatorRole('usr-local', defaultRole);
+
+    try {
+      const storage = getMevaStorageEngine();
+      storage.scheduleWrite(STORE_PREFS, 'operator_identity', {
+        callsign: callsign.trim() || 'Operatör',
+        primaryGame: defaultGame,
+        favoriteGames: [defaultGame],
+        gameRoles: { [defaultGame]: defaultRole },
+        role: defaultRole,
+        tags: defaultTags,
+        isSkipped: true,
+        updatedAt: Date.now(),
+      });
+      void storage.flushPendingWrites();
+    } catch {}
+
+    if (onCompleted) {
+      onCompleted(callsign.trim() || 'Operatör', defaultGame, defaultRole);
+    }
+    onClose();
+  };
+
   const handleFinish = async () => {
     const assignedRole = gameRoles[primaryGame] || 'IGL';
 
@@ -199,10 +232,11 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
           <button
             type="button"
-            onClick={handleFinish}
-            className="text-xs font-bold text-[#A58D8E] hover:text-[#FAF2EE] px-2.5 py-1 rounded hover:bg-[#240C12] transition-colors"
+            onClick={handleSkip}
+            className="text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] px-2.5 py-1 rounded bg-[#2D0B12]/80 hover:bg-[#590C15] border border-[#7A121D]/60 transition-all flex items-center gap-1 shadow-sm"
           >
-            Hızlı Geç (Skip) ⏩
+            <span>Hızlı Geç (Skip)</span>
+            <span>⏩</span>
           </button>
         </div>
 
@@ -441,7 +475,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           )}
         </div>
 
-        {/* Footer Navigation */}
+        {/* Footer Navigation with Flexible Skip on Every Step */}
         <div className="px-5 py-3.5 border-t border-[#7A121D]/35 bg-[#12070A] flex items-center justify-between">
           {step > 1 ? (
             <button
@@ -452,27 +486,63 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               ← Geri
             </button>
           ) : (
-            <div />
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="h-9 px-3.5 rounded-xl bg-[#1D090E] border border-[#590C15]/50 hover:bg-[#3D0A14] text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] transition-all flex items-center gap-1.5"
+            >
+              <span>⚡ Hızlı Geç & Serbest Başla</span>
+            </button>
           )}
 
-          <div className="flex gap-2">
-            {step < 3 ? (
+          <div className="flex items-center gap-2">
+            {step === 1 && (
               <button
                 type="button"
-                onClick={() => setStep((s) => (s + 1) as any)}
+                onClick={() => setStep(2)}
                 className="h-9 px-5 rounded-xl bg-[#C82333] hover:bg-[#D63344] text-xs font-extrabold text-[#FAF2EE] shadow-md transition-all"
               >
-                İleri →
+                İleri (Rol Seçimi) →
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleFinish}
-                className="h-9 px-6 rounded-xl bg-[#C82333] hover:bg-[#D63344] text-xs font-extrabold text-[#FAF2EE] shadow-md transition-all flex items-center gap-1.5"
-              >
-                <IconCheck size={14} />
-                <span>Profili Kaydet & Başla</span>
-              </button>
+            )}
+
+            {step === 2 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  className="h-9 px-3.5 rounded-xl bg-[#1D090E] border border-[#590C15]/50 hover:bg-[#3D0A14] text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] transition-all"
+                >
+                  Rolü Atla (Flex) ⏩
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(3)}
+                  className="h-9 px-5 rounded-xl bg-[#C82333] hover:bg-[#D63344] text-xs font-extrabold text-[#FAF2EE] shadow-md transition-all"
+                >
+                  İleri (Etiketler) →
+                </button>
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="h-9 px-3.5 rounded-xl bg-[#1D090E] border border-[#3B141C] text-xs font-bold text-[#A58D8E] hover:text-[#FAF2EE] transition-all"
+                >
+                  Hızlı Geç ⏩
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFinish}
+                  className="h-9 px-6 rounded-xl bg-[#C82333] hover:bg-[#D63344] text-xs font-extrabold text-[#FAF2EE] shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <IconCheck size={14} />
+                  <span>Profili Kaydet & Başla</span>
+                </button>
+              </>
             )}
           </div>
         </div>

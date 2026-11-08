@@ -8,10 +8,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
+import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import {
   COMMUNITY_SERVER_TEMPLATES,
   QUICK_CHANNEL_PRESETS,
   SUPPORTED_GAMES,
+  getGameById,
   type SupportedGameId,
 } from '@/src/lib/gameRegistry';
 import {
@@ -81,6 +83,12 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
       addCategory(targetCat);
     }
 
+    const gameDef =
+      SUPPORTED_GAMES[preset.gameId] || getGameById(preset.gameId);
+    const missingRoles = (gameDef?.roles || [])
+      .slice(1, 5)
+      .map((r) => r.shortLabel);
+
     const uniqueId = `ch-${preset.gameId}-${Date.now().toString(36)}`;
     const newChan = {
       id: uniqueId,
@@ -92,15 +100,37 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
       created_at: new Date().toISOString(),
       game_id: preset.gameId,
       max_participants: preset.maxParticipants,
-      tags: [SUPPORTED_GAMES[preset.gameId]?.tags[0] ?? '#Oyun'],
+      tags: [
+        ...(SUPPORTED_GAMES[preset.gameId]?.tags ?? ['#Oyun']),
+        ...(missingRoles[0] ? [`#${missingRoles[0]}-Aranıyor`] : []),
+      ],
     };
 
     addChannel(newChan);
     if (preset.type === 'voice') {
       setActiveVoiceChannel(newChan.id);
+      // Auto-populate empty seat slot beacons for missing roles in this squad
+      missingRoles.forEach((role, idx) => {
+        useAppStore.getState().setSlotBeacon(idx + 1, role);
+      });
     } else {
       setActiveChannel(newChan.id);
     }
+
+    // Persist smart channel & missing roles in IndexedDB
+    try {
+      const storage = getMevaStorageEngine();
+      storage.scheduleWrite(STORE_PREFS, `smart_channel_${newChan.id}`, {
+        channelId: newChan.id,
+        name: newChan.name,
+        gameId: preset.gameId,
+        gameCategory: gameDef.category,
+        missingRoles,
+        tags: newChan.tags,
+        createdAt: Date.now(),
+      });
+      void storage.flushPendingWrites();
+    } catch {}
 
     setFeedback(`✅ ${preset.label} başarıyla eklendi ve bağlandı!`);
     setTimeout(() => {
@@ -111,10 +141,15 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
   // Custom Channel Creation
   const handleCreateCustomChannel = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = customName.trim().replace(/\s+/g, '-').toLowerCase() || `${customGame}-odasi`;
+    const cleanName =
+      customName.trim().replace(/\s+/g, '-').toLowerCase() ||
+      `${customGame}-odasi`;
     const srvId = activeServerId ?? 'srv-1';
 
     const gameDef = SUPPORTED_GAMES[customGame];
+    const missingRoles = (gameDef?.roles || [])
+      .slice(1, 5)
+      .map((r) => r.shortLabel);
     const catName =
       gameDef.category === 'moba'
         ? '⚔️ MOBA KANALLARI'
@@ -146,15 +181,37 @@ export const QuickChannelBuilderModal: React.FC<QuickChannelBuilderModalProps> =
       created_at: new Date().toISOString(),
       game_id: customGame,
       max_participants: customMax,
-      tags: gameDef.tags,
+      tags: [
+        ...gameDef.tags,
+        ...(missingRoles[0] ? [`#${missingRoles[0]}-Aranıyor`] : []),
+      ],
     };
 
     addChannel(newChan);
     if (customType === 'voice') {
       setActiveVoiceChannel(newChan.id);
+      // Auto-populate empty slot beacons for missing roles
+      missingRoles.forEach((role, idx) => {
+        useAppStore.getState().setSlotBeacon(idx + 1, role);
+      });
     } else {
       setActiveChannel(newChan.id);
     }
+
+    // Persist smart channel & missing roles in IndexedDB
+    try {
+      const storage = getMevaStorageEngine();
+      storage.scheduleWrite(STORE_PREFS, `smart_channel_${newChan.id}`, {
+        channelId: newChan.id,
+        name: newChan.name,
+        gameId: customGame,
+        gameCategory: gameDef.category,
+        missingRoles,
+        tags: newChan.tags,
+        createdAt: Date.now(),
+      });
+      void storage.flushPendingWrites();
+    } catch {}
 
     onClose();
   };

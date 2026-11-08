@@ -173,9 +173,13 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const filteredChannels = useMemo(() => {
     if (selectedGameFilter === 'all') return channels;
     if (selectedGameFilter === 'for-you') {
-      const recIds = new Set(recommendedPods.map((r) => r.channelId));
-      const matched = channels.filter((ch) => recIds.has(ch.id));
-      return matched.length > 0 ? matched : channels.filter((c) => c.type === 'voice');
+      const recMap = new Map(recommendedPods.map((r) => [r.channelId, r]));
+      const voiceChans = channels.filter((c) => c.type === 'voice');
+      return [...voiceChans].sort((a, b) => {
+        const scoreA = recMap.get(a.id)?.score ?? 0;
+        const scoreB = recMap.get(b.id)?.score ?? 0;
+        return scoreB - scoreA;
+      });
     }
     return channels.filter((ch) => {
       const g = ch.game_id
@@ -187,6 +191,15 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
   // Group channels by category
   const categorizedChannels = useMemo(() => {
+    if (selectedGameFilter === 'for-you') {
+      return [
+        {
+          categoryName: '⚡ SANA EN UYGUN FREKANSLAR',
+          channels: filteredChannels,
+        },
+      ];
+    }
+
     const map = new Map<string, { categoryName: string; channels: Channel[] }>();
 
     // 1. Existing categories
@@ -211,7 +224,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
     });
 
     return Array.from(map.values()).filter((g) => g.channels.length > 0);
-  }, [categories, filteredChannels]);
+  }, [categories, filteredChannels, selectedGameFilter]);
 
   // Smart Channel Recommendation Engine
   const recommendedChannel = useMemo(() => {
@@ -314,24 +327,37 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
       {/* ── Scrollable Directory ── */}
       <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-2.5 space-y-3.5">
-        {/* Smart Channel Recommendation Card */}
+        {/* Smart Channel Recommendation Card: "Sana Özel Katıl" Widget */}
         {recommendedChannel && recommendedChannel.channel && (
-          <div className="rounded-xl p-2.5 bg-gradient-to-br from-[#3D0A14]/80 to-[#19080D]/90 border border-[#8F1622]/60 shadow-[0_4px_16px_rgba(200,35,51,0.18)]">
-            <div className="flex items-center gap-1.5 mb-1 text-[10px] font-extrabold text-[#F08C96]">
-              <IconBolt size={12} className="text-[#FF4655]" />
-              <span className="truncate">{recommendedChannel.match.badgeText}</span>
+          <div className="rounded-xl p-3 bg-gradient-to-br from-[#450A15]/90 via-[#220B12]/95 to-[#12070A]/95 border border-[#C82333]/65 shadow-[0_4px_18px_rgba(200,35,51,0.22)]">
+            <div className="flex items-center justify-between gap-1 mb-1.5">
+              <span className="text-[9px] font-black uppercase tracking-wider text-[#FF5A6B] bg-[#590C15]/75 px-1.5 py-0.5 rounded border border-[#C82333]/50 flex items-center gap-1">
+                <IconBolt size={10} className="text-[#FF4655]" />
+                <span>SANA ÖZEL EŞLEŞME</span>
+              </span>
+              <span className="text-[10px] font-extrabold text-[#F08C96] tabular-nums">
+                %{recommendedChannel.match.score}
+              </span>
             </div>
+
+            <div className="mb-2">
+              <span className="text-[12.5px] font-extrabold text-[#FAF2EE] block truncate">
+                #{cleanLabel(recommendedChannel.channel.name)}
+              </span>
+              <span className="text-[10px] text-[#E08C96] font-semibold block truncate mt-0.5">
+                {recommendedChannel.match.badgeText}
+              </span>
+            </div>
+
             <button
               type="button"
               onClick={() =>
                 handleSelectVoiceChannel(recommendedChannel.channel!)
               }
-              className="w-full mt-1.5 h-7 px-2 rounded-lg bg-[#8F1622] hover:bg-[#C82333] text-[11px] font-extrabold text-[#FAF2EE] flex items-center justify-between transition-colors"
+              className="w-full h-7 rounded-lg bg-[#8F1622] hover:bg-[#C82333] active:scale-98 text-[11px] font-extrabold text-[#FAF2EE] flex items-center justify-center gap-1.5 shadow-[0_0_10px_rgba(200,35,51,0.3)] transition-all"
             >
-              <span className="truncate">
-                #{cleanLabel(recommendedChannel.channel.name)}
-              </span>
-              <span className="text-[10px] opacity-90">Hemen Katıl →</span>
+              <span>Hemen Katıl</span>
+              <span className="text-xs">→</span>
             </button>
           </div>
         )}
@@ -473,6 +499,41 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                           </span>
                         </div>
                       )}
+
+                    {/* Affinity Score & 1-Tap Join Action */}
+                    {isVoice &&
+                      (() => {
+                        const recMatch = recommendedPods.find(
+                          (r) => r.channelId === channel.id,
+                        );
+                        if (
+                          !recMatch ||
+                          (selectedGameFilter !== 'for-you' &&
+                            recMatch.score < 70)
+                        ) {
+                          return null;
+                        }
+                        return (
+                          <div className="px-2.5 pb-2 pt-0.5 flex items-center justify-between gap-1.5 border-t border-[#261217]/60">
+                            <span className="text-[9.5px] font-extrabold text-[#FF5A6B] truncate">
+                              {recMatch.badgeText}
+                            </span>
+                            {!isActive && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectVoiceChannel(channel);
+                                }}
+                                className="rounded-lg px-2 py-0.5 bg-[#8F1622] hover:bg-[#C82333] text-[9.5px] font-black text-[#FAF2EE] whitespace-nowrap active:scale-95 transition-all shadow-sm flex items-center gap-0.5"
+                              >
+                                <span>Hemen Katıl</span>
+                                <span>→</span>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {/* Active Voice Participants list */}
                     {isVoice && isActive && voiceParticipants.length > 0 && (

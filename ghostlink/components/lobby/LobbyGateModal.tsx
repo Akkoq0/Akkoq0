@@ -73,6 +73,7 @@ export const LobbyGateModal: React.FC<LobbyGateModalProps> = ({
   const [roomInput, setRoomInput] = useState('');
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const setShowLobbyGate = useAppStore((s) => s.setShowLobbyGate);
 
   // Load saved identity from IndexedDB on initial mount
   useEffect(() => {
@@ -194,16 +195,29 @@ export const LobbyGateModal: React.FC<LobbyGateModalProps> = ({
               </div>
             </div>
           </div>
-          {onClose && (
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={onClose}
-              aria-label="Pencereyi kapat"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8F7D80] hover:text-[#F5EBE6] hover:bg-[#1E0F13] transition-colors"
+              onClick={() => {
+                setShowLobbyGate(false);
+                if (onClose) onClose();
+              }}
+              className="text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] px-2.5 py-1 rounded-lg bg-[#2A0910] hover:bg-[#4A0E18] border border-[#7A121D]/50 transition-all flex items-center gap-1"
             >
-              <IconClose size={16} />
+              <span>Hızlı Geç</span>
+              <span>⏩</span>
             </button>
-          )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Pencereyi kapat"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#8F7D80] hover:text-[#F5EBE6] hover:bg-[#1E0F13] transition-colors"
+              >
+                <IconClose size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Modal Body */}
