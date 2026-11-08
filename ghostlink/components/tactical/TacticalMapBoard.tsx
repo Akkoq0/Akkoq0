@@ -1,81 +1,76 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Pro Stratbook Studio (İnteraktif Taktik Masası)
+// Meva HUD — Pro Stratbook Studio (High-Performance 60 FPS)
 // ─────────────────────────────────────────────────────────
-// Features:
-//   1. Horizontal Game Tabs Bar: LoL, CS2, Valorant, Dota 2, PUBG + Custom Games (+ Yeni Oyun Ekle).
-//   2. Real 2D Radar Images: Real minimap textures, zero schematic boxes.
-//   3. Game-Specific Equipment Toolbar:
-//      - CS2/Valorant: Smoke, Flash, Molly, Spike/C4, Defuse Kit, Sensor/Trap, Danger.
-//      - LoL/Dota 2: Stealth Ward, Control Pink Ward, Honeyfruit/Shrine, River Rune, Gank Alert, Boss/Roshan.
-//      - PUBG: Smoke, Air Drop, Flight Path, Vehicle, Bluezone, Danger.
-//   4. Global Strategy Tools: 1-5 Numbered Team Pins (Blue/Red), Auto-Incrementing Path Sequence (1->2->3...),
-//      Freehand Pen, Attack/Dashed Arrows, Circle/Box Zones, Callout Text Note, Eraser, Pan.
-//   5. Multi-Phase Layers: Phase 1 (Erken/Lvl 1), Phase 2 (Execute/Mid), Phase 3 (Post-Plant/Late).
-//   6. Export / Import Studio:
-//      - JSON Export (Download backup: taktik-dosyasi.json).
-//      - PNG Export (High-res snapshot combining radar texture & drawings).
-//      - JSON Import (Load saved stratbook back onto the canvas).
-//   7. Zoom & Pan: 0.6x - 2.5x wheel zoom, Space/Alt drag, and 100% reset.
-//   8. Dual-Layer Canvas: Zero re-rasterization 60 FPS performance + E2EE P2P WebRTC Mesh Sync.
+// Topographical 2D Minimap Radar Textures, Dynamic Game Filtering,
+// Strict Game Mechanics Isolation, Modern Collapsible Tactical Sidebar,
+// 60 FPS Direct-DOM Pan/Zoom & Multi-Touch Gestures, Undo/Redo & JSON/PNG Export.
+//
+// CRITICAL RULES:
+// 1. ZERO LAG / 60 FPS STABILITY:
+//    - Panning & token dragging use direct DOM mutation & RAF; NO React state thrashing on mousemove.
+//    - Bounded memory: history stack capped at 50 ops, undo/redo limited.
+// 2. STRICT GAME MECHANICS ISOLATION:
+//    - FPS: Smoke, Flash, Molly, Spike/C4, Defuse Kit, Ses/Ayak Sinyali (Audio Ping), Tehlike.
+//    - MOBA: Gözetleme Totemi (Ward), Kontrol Totemi (Pink), Bal Suyu, Rün, Roshan/Baron, Gank.
+//    - Universal: 1-5 Takım Jetonları, Rota Sıralama Pini, Serbest Kalem, Oklar, Alanlar, Not.
+// 3. MODERN TACTICAL SIDEBAR & ZOOM/PAN:
+//    - Dedicated collapsible sidebar for phases, tools, colors, team pins, and history.
+//    - Top bar freed up for game & map selection.
+//    - Direct Zoom (+ / -), %100, %150, %200, 1:1 Reset, Wheel Zoom, Space+Drag & Touch gestures.
 
-import React, { memo, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
 import { useAppStore } from '@/lib/store';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { getMevaCryptoEngine } from '@/src/lib/cryptoEngine';
 import { getMevaWebRTCMesh } from '@/src/lib/webrtcMesh';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
-import { useRealtimeChat } from '@/hooks/useRealtimeChat';
-import {
-  IconClose,
-  IconMapBoard,
-  IconSend,
-  IconShield,
-  IconUpload,
-  IconCheck,
-  IconTrash,
-  IconPlus,
-} from '@/components/ui/MevaIcons';
 import {
   LOGICAL_W,
   LOGICAL_H,
   TacticalGameCategory,
   TacticalMapId,
-  GAME_MAP_POOLS,
   MAP_BLUEPRINTS,
+  GAME_MAP_POOLS,
   drawRealisticArenaBlueprint,
 } from './tacticalBlueprints';
+import {
+  IconClose,
+  IconPlus,
+} from '@/components/ui/MevaIcons';
 
-export {
-  type TacticalGameCategory,
-  type TacticalMapId,
-  LOGICAL_W,
-  LOGICAL_H,
-  GAME_MAP_POOLS,
-  MAP_BLUEPRINTS,
-};
+export { GAME_MAP_POOLS };
+export type { TacticalMapId, TacticalGameCategory };
 
 export type StratTool =
-  // Universal
-  | 'pen'
+  // Universal Vector Tools
   | 'arrow'
   | 'dashed-arrow'
+  | 'pen'
   | 'zone-circle'
   | 'zone-box'
   | 'text'
+  | 'eraser'
+  | 'pan'
   | 'pin-blue'
   | 'pin-red'
   | 'seq-path'
-  | 'eraser'
-  | 'pan'
-  // Tactical FPS (CS2 / Valorant)
+  // Tactical FPS (CS2 / Valorant / Tactical Shooter)
   | 'smoke'
   | 'flash'
   | 'molly'
   | 'spike'
   | 'defuse'
   | 'sensor'
+  | 'audio-ping'
   | 'danger'
   // MOBA (LoL / Dota 2)
   | 'ward-yellow'
@@ -159,26 +154,20 @@ function resolveGameCategory(
     if (id === 'cs2' || id === 'csgo' || id === 'standoff2' || id === 'r6') return 'cs2';
     if (id === 'lol' || id === 'wildrift' || id === 'mlbb') return 'lol';
     if (id === 'dota2' || id === 'dota') return 'dota2';
-    if (id === 'pubg' || id === 'pubgm' || id === 'apex' || id === 'warzone' || id === 'fortnite') return 'pubg';
+    if (id === 'pubg' || id === 'apex' || id === 'warzone' || id === 'fortnite') return 'pubg';
   }
-  if (channelName) {
-    const n = channelName.toLowerCase();
-    if (n.includes('val') || n.includes('ascent') || n.includes('bind') || n.includes('haven') || n.includes('lotus')) return 'valorant';
-    if (n.includes('cs') || n.includes('mirage') || n.includes('faceit') || n.includes('dust') || n.includes('inferno') || n.includes('nuke')) return 'cs2';
-    if (n.includes('lol') || n.includes('rift') || n.includes('dereceli') || n.includes('aram')) return 'lol';
-    if (n.includes('dota')) return 'dota2';
-    if (n.includes('pubg') || n.includes('erangel') || n.includes('miramar') || n.includes('sanhok') || n.includes('apex')) return 'pubg';
-  }
-  if (tags && tags.length > 0) {
-    const joined = tags.join(' ').toLowerCase();
-    if (joined.includes('val')) return 'valorant';
-    if (joined.includes('cs')) return 'cs2';
-    if (joined.includes('lol')) return 'lol';
-    if (joined.includes('dota')) return 'dota2';
-    if (joined.includes('pubg')) return 'pubg';
-  }
+  const hay = `${channelName ?? ''} ${(tags ?? []).join(' ')}`.toLowerCase();
+  if (hay.includes('valo') || hay.includes('bind') || hay.includes('ascent') || hay.includes('breeze')) return 'valorant';
+  if (hay.includes('cs2') || hay.includes('csgo') || hay.includes('mirage') || hay.includes('dust')) return 'cs2';
+  if (hay.includes('lol') || hay.includes('league') || hay.includes('vadi') || hay.includes('aram')) return 'lol';
+  if (hay.includes('dota')) return 'dota2';
+  if (hay.includes('pubg') || hay.includes('erangel') || hay.includes('miramar')) return 'pubg';
   return 'cs2';
 }
+
+// ─────────────────────────────────────────────────────────
+// High-Performance Vector & Stamp Renderer
+// ─────────────────────────────────────────────────────────
 
 function drawCustomUploadedMap(
   ctx: CanvasRenderingContext2D,
@@ -188,36 +177,11 @@ function drawCustomUploadedMap(
   ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
   if (img && img.complete && img.naturalWidth > 0) {
-    // Preserve Aspect Ratio Centered
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    const canvasAspect = LOGICAL_W / LOGICAL_H;
-    let drawW = LOGICAL_W;
-    let drawH = LOGICAL_H;
-    let drawX = 0;
-    let drawY = 0;
+    ctx.drawImage(img, 0, 0, LOGICAL_W, LOGICAL_H);
 
-    if (imgAspect > canvasAspect) {
-      drawW = LOGICAL_W;
-      drawH = LOGICAL_W / imgAspect;
-      drawY = (LOGICAL_H - drawH) / 2;
-    } else {
-      drawH = LOGICAL_H;
-      drawW = LOGICAL_H * imgAspect;
-      drawX = (LOGICAL_W - drawW) / 2;
-    }
-
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-    const vignette = ctx.createRadialGradient(
-      LOGICAL_W / 2,
-      LOGICAL_H / 2,
-      180,
-      LOGICAL_W / 2,
-      LOGICAL_H / 2,
-      480,
-    );
-    vignette.addColorStop(0, 'rgba(4, 2, 3, 0.05)');
-    vignette.addColorStop(0.7, 'rgba(4, 2, 3, 0.28)');
+    const vignette = ctx.createLinearGradient(0, 0, 0, LOGICAL_H);
+    vignette.addColorStop(0, 'rgba(4, 2, 3, 0.45)');
+    vignette.addColorStop(0.5, 'rgba(4, 2, 3, 0.12)');
     vignette.addColorStop(1, 'rgba(4, 2, 3, 0.65)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
@@ -230,7 +194,7 @@ function drawCustomUploadedMap(
     ctx.fillText('Özel Taktik Haritası Yükleniyor...', LOGICAL_W / 2, LOGICAL_H / 2);
   }
 
-  // Tactical coordinate grid overlay (crisp 60px crosshairs)
+  // Tactical coordinate grid overlay
   ctx.strokeStyle = 'rgba(200, 35, 51, 0.15)';
   ctx.lineWidth = 1;
   for (let x = 60; x < LOGICAL_W; x += 60) {
@@ -259,103 +223,73 @@ function drawCustomUploadedMap(
   ctx.restore();
 }
 
-// ─────────────────────────────────────────────────────────
-// Comprehensive Operation Renderer
-// ─────────────────────────────────────────────────────────
-
 function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
-  if (op.points.length === 0) return;
-  ctx.save();
-
+  if (!op.points || op.points.length === 0) return;
   const start = op.points[0];
   const end = op.points[op.points.length - 1];
-  const lw = op.lineWidth || 2.5;
+  const lw = op.lineWidth || 3;
 
-  // 1. Tactical FPS Equipment (Smoke, Flash, Molly, Spike, Defuse, Sensor, Danger)
+  // 1. Tactical FPS Equipment (Smoke, Flash, Molly, Spike, Defuse, Audio Ping, Danger)
   if (op.tool === 'smoke') {
-    const rad = 30;
-    const grad = ctx.createRadialGradient(end.x, end.y, 4, end.x, end.y, rad);
-    grad.addColorStop(0, 'rgba(244, 239, 240, 0.44)');
-    grad.addColorStop(0.65, 'rgba(184, 170, 172, 0.24)');
-    grad.addColorStop(1, 'rgba(122, 18, 29, 0.06)');
-    ctx.fillStyle = grad;
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(end.x, end.y, rad, 0, Math.PI * 2);
+    ctx.arc(end.x, end.y, 28, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(160, 160, 175, 0.35)';
     ctx.fill();
-
-    ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = op.color;
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(230, 230, 245, 0.85)';
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([4, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = '#F4EFF0';
-    ctx.font = '900 9px sans-serif';
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#FAF2EE';
+    ctx.fill();
+    ctx.fillStyle = '#0B0608';
+    ctx.font = '800 8.5px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('SMK', end.x, end.y + 3);
+    ctx.fillText('S', end.x, end.y + 3);
+    ctx.restore();
   } else if (op.tool === 'flash') {
-    if (op.points.length > 1) {
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = op.color;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    ctx.strokeStyle = '#FAF2EE';
-    ctx.fillStyle = op.color;
-    ctx.lineWidth = 1.8;
-    for (let i = 0; i < 8; i++) {
-      const ang = (Math.PI / 4) * i;
-      const r1 = 5;
-      const r2 = i % 2 === 0 ? 15 : 10;
-      ctx.beginPath();
-      ctx.moveTo(end.x + Math.cos(ang) * r1, end.y + Math.sin(ang) * r1);
-      ctx.lineTo(end.x + Math.cos(ang) * r2, end.y + Math.sin(ang) * r2);
-      ctx.stroke();
-    }
     ctx.beginPath();
-    ctx.arc(end.x, end.y, 4.5, 0, Math.PI * 2);
+    ctx.arc(end.x, end.y, 18, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.3)';
     ctx.fill();
-  } else if (op.tool === 'molly') {
-    const rad = 28;
-    const grad = ctx.createRadialGradient(end.x, end.y, 3, end.x, end.y, rad);
-    grad.addColorStop(0, 'rgba(239, 68, 68, 0.55)');
-    grad.addColorStop(0.7, 'rgba(249, 115, 22, 0.3)');
-    grad.addColorStop(1, 'rgba(239, 68, 68, 0.05)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(end.x, end.y, rad, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#F97316';
+    ctx.strokeStyle = '#FACC15';
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 10px sans-serif';
+    ctx.fillStyle = '#FACC15';
+    ctx.font = '900 13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('🔥 ATEŞ', end.x, end.y + 3.5);
-  } else if (op.tool === 'spike') {
-    const sz = 12;
+    ctx.fillText('⚡', end.x, end.y + 4.5);
+  } else if (op.tool === 'molly') {
     ctx.beginPath();
-    ctx.moveTo(end.x, end.y - sz);
-    ctx.lineTo(end.x + sz, end.y);
-    ctx.lineTo(end.x, end.y + sz);
-    ctx.lineTo(end.x - sz, end.y);
-    ctx.closePath();
-    ctx.fillStyle = '#EAB308';
+    ctx.arc(end.x, end.y, 24, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+    ctx.fill();
+    ctx.strokeStyle = '#EF4444';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#EF4444';
+    ctx.font = '900 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔥', end.x, end.y + 4);
+  } else if (op.tool === 'spike') {
+    ctx.beginPath();
+    ctx.rect(end.x - 11, end.y - 11, 22, 22);
+    ctx.fillStyle = '#DC2626';
     ctx.fill();
     ctx.strokeStyle = '#FAF2EE';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#000000';
-    ctx.font = '900 8.5px sans-serif';
+    ctx.fillStyle = '#FAF2EE';
+    ctx.font = '900 10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('C4', end.x, end.y + 3);
+    ctx.fillText('C4', end.x, end.y + 3.5);
   } else if (op.tool === 'defuse') {
     ctx.beginPath();
     ctx.arc(end.x, end.y, 11, 0, Math.PI * 2);
@@ -382,6 +316,34 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.arc(end.x, end.y, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#00F0FF';
     ctx.fill();
+  } else if (op.tool === 'audio-ping') {
+    // Concentric Sonar Audio Ping Rings
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 25, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 14, 0, Math.PI * 2);
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#0369A1';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔊', end.x, end.y + 3.5);
   } else if (op.tool === 'danger') {
     ctx.beginPath();
     ctx.arc(end.x, end.y, 14, 0, Math.PI * 2);
@@ -498,53 +460,53 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
 
   // 3. Battle Royale Equipment (PUBG: Airdrop, Flight, Vehicle, Bluezone)
   else if (op.tool === 'airdrop') {
-    const sz = 13;
+    ctx.beginPath();
+    ctx.rect(end.x - 12, end.y - 12, 24, 24);
     ctx.fillStyle = '#DC2626';
-    ctx.fillRect(end.x - sz / 2, end.y - sz / 2, sz, sz);
-    ctx.fillStyle = '#2563EB';
-    ctx.fillRect(end.x - sz / 2, end.y - sz / 2, sz, 4);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 1.6;
-    ctx.strokeRect(end.x - sz / 2, end.y - sz / 2, sz, sz);
-  } else if (op.tool === 'flight') {
-    if (op.points.length > 1) {
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.setLineDash([6, 6]);
-      ctx.strokeStyle = '#FAF2EE';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    ctx.fillStyle = '#FAF2EE';
-    ctx.font = '900 12px sans-serif';
+    ctx.fill();
+    ctx.strokeStyle = '#1D4ED8';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 9.5px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('✈️', end.x, end.y + 4);
+    ctx.fillText('DROP', end.x, end.y + 3.5);
+  } else if (op.tool === 'flight') {
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#F59E0B';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#F59E0B';
+    ctx.font = '900 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('✈', end.x, end.y + 5);
   } else if (op.tool === 'vehicle') {
     ctx.beginPath();
-    ctx.arc(end.x, end.y, 11, 0, Math.PI * 2);
-    ctx.fillStyle = '#D97706';
+    ctx.arc(end.x, end.y, 13, 0, Math.PI * 2);
+    ctx.fillStyle = '#3B82F6';
     ctx.fill();
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1.8;
     ctx.stroke();
-
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 9px sans-serif';
+    ctx.font = '900 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('ARAÇ', end.x, end.y + 3);
+    ctx.fillText('🚗', end.x, end.y + 4);
   } else if (op.tool === 'bluezone') {
-    const rx = Math.abs(end.x - start.x);
-    const ry = Math.abs(end.y - start.y);
-    const rad = Math.max(20, Math.hypot(rx, ry));
+    const r = Math.max(15, Math.hypot(end.x - start.x, end.y - start.y));
     ctx.beginPath();
-    ctx.arc(start.x, start.y, rad, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.16)';
+    ctx.arc(start.x, start.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
     ctx.fill();
-    ctx.strokeStyle = '#38BDF8';
-    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // 4. Universal Strategy Tokens (Pins, Sequence, Arrows, Zones, Text, Pen)
@@ -643,7 +605,9 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.lineCap = 'round';
 
     if (op.tool === 'dashed-arrow') {
-      ctx.setLineDash([5, 4]);
+      ctx.setLineDash([6, 4]);
+    } else {
+      ctx.setLineDash([]);
     }
 
     ctx.beginPath();
@@ -652,141 +616,119 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    if (len > 6) {
-      const angle = Math.atan2(dy, dx);
-      const head = Math.max(10, lw * 3.5);
+    if (len > 12) {
+      const ang = Math.atan2(dy, dx);
+      const headLen = Math.min(18, Math.max(10, lw * 3.5));
       ctx.beginPath();
       ctx.moveTo(end.x, end.y);
       ctx.lineTo(
-        end.x - head * Math.cos(angle - Math.PI / 6),
-        end.y - head * Math.sin(angle - Math.PI / 6),
+        end.x - headLen * Math.cos(ang - Math.PI / 6),
+        end.y - headLen * Math.sin(ang - Math.PI / 6),
       );
       ctx.lineTo(
-        end.x - head * Math.cos(angle + Math.PI / 6),
-        end.y - head * Math.sin(angle + Math.PI / 6),
+        end.x - headLen * Math.cos(ang + Math.PI / 6),
+        end.y - headLen * Math.sin(ang + Math.PI / 6),
       );
       ctx.closePath();
       ctx.fill();
     }
   } else if (op.tool === 'zone-circle') {
-    const rx = Math.abs(end.x - start.x);
-    const ry = Math.abs(end.y - start.y);
-    const rad = Math.max(12, Math.hypot(rx, ry));
-
+    const r = Math.max(10, Math.hypot(end.x - start.x, end.y - start.y));
     ctx.beginPath();
-    ctx.arc(start.x, start.y, rad, 0, Math.PI * 2);
-    ctx.fillStyle = `${op.color}33`;
+    ctx.arc(start.x, start.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `${op.color}22`;
     ctx.fill();
     ctx.strokeStyle = op.color;
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = lw;
+    ctx.setLineDash([5, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
   } else if (op.tool === 'zone-box') {
-    const minX = Math.min(start.x, end.x);
-    const minY = Math.min(start.y, end.y);
-    const bw = Math.abs(end.x - start.x);
-    const bh = Math.abs(end.y - start.y);
-
+    const w = end.x - start.x;
+    const h = end.y - start.y;
     ctx.beginPath();
-    ctx.roundRect(minX, minY, bw, bh, 6);
-    ctx.fillStyle = `${op.color}33`;
+    ctx.rect(start.x, start.y, w, h);
+    ctx.fillStyle = `${op.color}20`;
     ctx.fill();
     ctx.strokeStyle = op.color;
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = lw;
     ctx.stroke();
-    ctx.setLineDash([]);
   } else if (op.tool === 'text') {
-    const text = op.text || 'TAKTİK NOT';
-    ctx.font = '800 11.5px sans-serif';
-    const metrics = ctx.measureText(text);
-    const pad = 6;
-    const boxW = metrics.width + pad * 2;
-    const boxH = 22;
+    const txt = op.text || 'CALLOUT';
+    ctx.font = '800 12px sans-serif';
+    const m = ctx.measureText(txt);
+    const pw = m.width + 12;
+    const ph = 22;
 
     ctx.beginPath();
-    ctx.roundRect(end.x - boxW / 2, end.y - boxH / 2, boxW, boxH, 4);
-    ctx.fillStyle = 'rgba(15, 7, 10, 0.9)';
+    ctx.rect(end.x - 4, end.y - 14, pw, ph);
+    ctx.fillStyle = 'rgba(7, 6, 7, 0.92)';
     ctx.fill();
     ctx.strokeStyle = op.color;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.fillStyle = '#FAF2EE';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, end.x, end.y + 4);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.fillText(txt, end.x + 2, end.y + 2);
   } else if (op.tool === 'pen') {
+    if (op.points.length < 2) return;
     ctx.strokeStyle = op.color;
     ctx.lineWidth = lw;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
+    ctx.moveTo(op.points[0].x, op.points[0].y);
     for (let i = 1; i < op.points.length; i++) {
       ctx.lineTo(op.points[i].x, op.points[i].y);
     }
     ctx.stroke();
   }
-
-  ctx.restore();
 }
 
-let stratOpSeq = 0;
+// ─────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────
 
-export const TacticalMapBoard = memo(function TacticalMapBoard() {
+export const TacticalMapBoard: React.FC = () => {
   const open = useVoiceSettingsStore((s) => s.showStratBoard);
   const setOpen = useVoiceSettingsStore((s) => s.setShowStratBoard);
   const activeChannelId = useAppStore((s) => s.activeChannelId);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const channels = useAppStore((s) => s.channels);
+  const activeChannel = channels.find((c) => c.id === (activeVoiceChannelId || activeChannelId));
   const { sendMessage } = useRealtimeChat(activeChannelId);
 
-  // 1. Channel Game Auto-Detection
-  const activeVoiceChannel = channels.find((c) => c.id === activeVoiceChannelId);
-  const activeTextChannel = channels.find((c) => c.id === activeChannelId);
-
+  // Detect initial game archetype from active channel context
   const detectedGameCat = useMemo(() => {
-    if (activeVoiceChannel) {
-      return resolveGameCategory(
-        activeVoiceChannel.game_id,
-        activeVoiceChannel.name,
-        activeVoiceChannel.tags,
-      );
-    }
-    if (activeTextChannel) {
-      return resolveGameCategory(
-        activeTextChannel.game_id,
-        activeTextChannel.name,
-        activeTextChannel.tags,
-      );
-    }
-    return 'cs2';
-  }, [activeVoiceChannel, activeTextChannel]);
+    return resolveGameCategory(undefined, activeChannel?.name, activeChannel?.tags);
+  }, [activeChannel]);
 
-  // Dynamic Game Tabs & Custom Game State
+  // Selected horizontal game tab
   const [selectedGameTab, setSelectedGameTab] = useState<string>(detectedGameCat);
-  const [customGames, setCustomGames] = useState<CustomGameDef[]>([]);
-  const [showAddGameModal, setShowAddGameModal] = useState<boolean>(false);
-  const [newGameName, setNewGameName] = useState<string>('');
-  const [newGameMaps, setNewGameMaps] = useState<string>('');
-  const [newGameArchetype, setNewGameArchetype] = useState<'fps' | 'moba' | 'br'>('fps');
 
-  // Combined Games Catalog
+  // Dynamic Custom Games state
+  const [customGames, setCustomGames] = useState<CustomGameDef[]>([]);
+  const [showAddGameModal, setShowAddGameModal] = useState(false);
+  const [newGameName, setNewGameName] = useState('');
+  const [newGameArchetype, setNewGameArchetype] = useState<'fps' | 'moba' | 'br'>('fps');
+  const [newGameMaps, setNewGameMaps] = useState('');
+
+  // Combine Default & Custom Games
   const allGameTabs = useMemo(() => {
     return [
       ...DEFAULT_GAMES,
-      ...customGames.map((g) => ({
-        id: g.id as TacticalGameCategory,
-        name: g.name,
-        icon: g.icon,
-        archetype: g.archetype,
+      ...customGames.map((cg) => ({
+        id: cg.id,
+        name: cg.name,
+        icon: cg.icon,
+        archetype: cg.archetype,
         isCustom: true,
       })),
     ];
   }, [customGames]);
 
-  // Active Game Meta
+  // Active Game Meta & Archetype
   const activeGameMeta = useMemo(() => {
     return (
       allGameTabs.find((g) => g.id === selectedGameTab) ||
@@ -795,41 +737,55 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     );
   }, [allGameTabs, selectedGameTab, detectedGameCat]);
 
-  // Dynamic Map Pool for current selected game
-  const availableMaps = useMemo(() => {
-    const customDef = customGames.find((g) => g.id === selectedGameTab);
-    if (customDef) {
-      return customDef.maps.map((m) => m.id as TacticalMapId);
+  // Available Maps Filtered Strictly by Game Tab
+  const availableMaps = useMemo<TacticalMapId[]>(() => {
+    const customMatch = customGames.find((cg) => cg.id === selectedGameTab);
+    if (customMatch) {
+      return customMatch.maps.map((m) => m.id as TacticalMapId);
     }
-    return GAME_MAP_POOLS[selectedGameTab as TacticalGameCategory] || GAME_MAP_POOLS.cs2;
+    const cat = (selectedGameTab in GAME_MAP_POOLS ? selectedGameTab : 'cs2') as TacticalGameCategory;
+    return GAME_MAP_POOLS[cat] || GAME_MAP_POOLS.cs2;
   }, [selectedGameTab, customGames]);
 
-  const [mapId, setMapId] = useState<TacticalMapId>(() => availableMaps[0] || 'mirage');
+  // Active map state
+  const [mapId, setMapId] = useState<TacticalMapId>(availableMaps[0] || 'mirage');
+
+  // Stratbook operations and phase states
+  const [ops, setOps] = useState<StratOperation[]>([]);
+  const [redoStack, setRedoStack] = useState<StratOperation[]>([]);
   const [tool, setTool] = useState<StratTool>('arrow');
   const [inkColor, setInkColor] = useState<string>('#C82333');
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [selectedPinNumber, setSelectedPinNumber] = useState<number>(1);
   const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1);
-  const [showAllPhases, setShowAllPhases] = useState<boolean>(false);
+  const [showAllPhases, setShowAllPhases] = useState<boolean>(true);
+  const [selectedPinNumber, setSelectedPinNumber] = useState<number>(1);
   const [seqCounter, setSeqCounter] = useState<number>(1);
   const [lastSeqPoint, setLastSeqPoint] = useState<StratPoint | null>(null);
-
-  // Strat Operations Stack & Undo/Redo
-  const [ops, setOps] = useState<StratOperation[]>([]);
-  const [redoStack, setRedoStack] = useState<StratOperation[]>([]);
   const [syncedPackets, setSyncedPackets] = useState(0);
 
-  // Zoom & Pan
+  // Modern Tactical Sidebar Toggle State
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+
+  // High-Performance Direct DOM Zoom & Pan
   const [zoomScale, setZoomScale] = useState<number>(1.0);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const boardTransformRef = useRef<HTMLDivElement | null>(null);
+  const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const zoomScaleRef = useRef<number>(1.0);
   const isPanningRef = useRef(false);
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isSpacePressedRef = useRef(false);
+
+  // Multi-Touch tracking for mobile 60 FPS pinch-zoom & pan
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const initialPinchDistRef = useRef<number | null>(null);
+  const initialPinchZoomRef = useRef<number>(1.0);
+  const initialPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initialMidpointRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Custom Map Image State & Persistence
   const [customMapUrl, setCustomMapUrl] = useState<string | null>(null);
   const [customMapName, setCustomMapName] = useState<string>('Özel Harita');
-  const [showUrlModal, setShowUrlModal] = useState<boolean>(false);
-  const [urlInput, setUrlInput] = useState<string>('');
   const customImgRef = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const jsonImportInputRef = useRef<HTMLInputElement | null>(null);
@@ -889,7 +845,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     } catch {}
   }, []);
 
-  // Persist tactical drawings to IndexedDB per map
+  // Persist tactical drawings to IndexedDB per map (bounded size)
   useEffect(() => {
     if (ops.length === 0) return;
     try {
@@ -899,7 +855,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
         .then((cached) => {
           const updated = {
             ...(cached || {}),
-            [mapId]: ops.filter((o) => o.mapId === mapId),
+            [mapId]: ops.filter((o) => o.mapId === mapId).slice(-60),
           };
           storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
           void storage.flushPendingWrites();
@@ -909,10 +865,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
 
   // Preload custom image object whenever customMapUrl changes
   useEffect(() => {
-    if (!customMapUrl) {
-      customImgRef.current = null;
-      return;
-    }
+    if (!customMapUrl) return;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -928,7 +881,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     img.src = customMapUrl;
   }, [customMapUrl, customMapName, mapId]);
 
-  // Overlay Paint Scheduler
+  // Overlay Paint Scheduler (RAF-batched)
   const scheduleOverlayPaint = useCallback(() => {
     if (rafIdRef.current !== null) return;
     rafIdRef.current = requestAnimationFrame(() => {
@@ -946,7 +899,12 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
       });
 
       for (const op of visibleOps) {
-        renderSingleOp(ctx, op);
+        // If this op is being actively dragged, draw draggedOpRef instead
+        if (draggedOpRef.current && draggedOpRef.current.id === op.id) {
+          renderSingleOp(ctx, draggedOpRef.current);
+        } else {
+          renderSingleOp(ctx, op);
+        }
       }
       if (draftOpRef.current && draftOpRef.current.mapId === mapId) {
         renderSingleOp(ctx, draftOpRef.current);
@@ -967,7 +925,6 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
         ctx,
         mapId as Exclude<TacticalMapId, 'custom'>,
         () => {
-          // Trigger redraw when real 2D texture finishes async loading
           redrawCurrentMapBlueprint();
         },
       );
@@ -1013,7 +970,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
             setSyncedPackets((c) => c + 1);
             if (pkt.action === 'add') {
               setOps((prev) =>
-                prev.some((x) => x.id === pkt.op.id) ? prev : [...prev.slice(-150), pkt.op],
+                prev.some((x) => x.id === pkt.op.id) ? prev : [...prev.slice(-100), pkt.op],
               );
             } else if (pkt.action === 'update') {
               setOps((prev) => prev.map((x) => (x.id === pkt.op.id ? pkt.op : x)));
@@ -1049,7 +1006,6 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     };
   };
 
-  // Hit test for tokens to allow dragging or eraser
   const hitTestToken = (pt: StratPoint): StratOperation | null => {
     const visibleOps = ops.filter(
       (o) => o.mapId === mapId && (showAllPhases || !o.phase || o.phase === activePhase),
@@ -1063,38 +1019,62 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     return null;
   };
 
+  // ─────────────────────────────────────────────────────────
+  // 60 FPS Direct-DOM Pan & Multi-Touch Gestures
+  // ─────────────────────────────────────────────────────────
+
+  const applyCanvasTransform = (x: number, y: number, scale: number) => {
+    panOffsetRef.current = { x, y };
+    zoomScaleRef.current = scale;
+    if (boardTransformRef.current) {
+      boardTransformRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    }
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    // Pan Mode Check
-    if (tool === 'pan' || e.button === 1 || e.altKey) {
+    // Multi-touch pinch-to-zoom detected (2 fingers)
+    if (activePointersRef.current.size === 2) {
+      draftOpRef.current = null;
+      draggedOpRef.current = null;
+      const pts = Array.from(activePointersRef.current.values());
+      initialPinchDistRef.current = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      initialPinchZoomRef.current = zoomScaleRef.current;
+      initialPanRef.current = { ...panOffsetRef.current };
+      initialMidpointRef.current = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      return;
+    }
+
+    // Single pointer Pan (Middle Click, Space+Drag, or Pan Tool)
+    if (e.button === 1 || isSpacePressedRef.current || tool === 'pan') {
       isPanningRef.current = true;
-      panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+      panStartRef.current = { x: e.clientX - panOffsetRef.current.x, y: e.clientY - panOffsetRef.current.y };
       return;
     }
 
     const pt = toLogicalCoords(e);
 
-    // Eraser Tool Check
+    // Eraser Tool
     if (tool === 'eraser') {
       const hit = hitTestToken(pt);
       if (hit) {
         setOps((prev) => prev.filter((o) => o.id !== hit.id));
+        setRedoStack((prev) => [...prev.slice(-30), hit]);
         void broadcastStratPacket({ action: 'undo', opId: hit.id, mapId });
       }
       return;
     }
 
-    // Hit test existing draggable token
+    // Check if dragging existing token
     const hit = hitTestToken(pt);
-    if (hit && (hit.tool.startsWith('pin-') || hit.tool === 'seq-path' || hit.tool === 'text' || !['pen', 'arrow', 'dashed-arrow', 'zone-circle', 'zone-box'].includes(hit.tool))) {
+    if (hit) {
       draggedOpRef.current = hit;
       return;
     }
 
-    const opId = `st-${Date.now().toString(36)}-${(++stratOpSeq).toString(36)}`;
-
-    // Text Callout Prompt
+    // Text tool
     if (tool === 'text') {
       setPendingTextPoint(pt);
       setTextInput('');
@@ -1102,7 +1082,9 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
       return;
     }
 
-    // Numbered Team Pins (1 to 5)
+    const opId = `op-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // Team Numbered Pins (1-5)
     if (tool === 'pin-blue' || tool === 'pin-red') {
       const pinOp: StratOperation = {
         id: opId,
@@ -1116,28 +1098,27 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
         pinNumber: selectedPinNumber,
         team: tool === 'pin-blue' ? 'blue' : 'red',
       };
-      setOps((prev) => [...prev.slice(-150), pinOp]);
+      setOps((prev) => [...prev.slice(-100), pinOp]);
       setRedoStack([]);
       void broadcastStratPacket({ action: 'add', op: pinOp });
-      setSelectedPinNumber((n) => (n >= 5 ? 1 : n + 1));
       return;
     }
 
-    // Auto Sequence Pathing (1 -> 2 -> 3 -> 4...)
+    // Auto-Incrementing Path Sequence (1 -> 2 -> 3...)
     if (tool === 'seq-path') {
-      const points = lastSeqPoint ? [lastSeqPoint, pt] : [pt];
+      const pts = lastSeqPoint ? [lastSeqPoint, pt] : [pt];
       const seqOp: StratOperation = {
         id: opId,
         mapId,
         tool: 'seq-path',
-        color: '#0284C7',
+        color: '#38BDF8',
         author: 'IGL',
-        points,
+        points: pts,
         ts: Date.now(),
         phase: activePhase,
         seqNumber: seqCounter,
       };
-      setOps((prev) => [...prev.slice(-150), seqOp]);
+      setOps((prev) => [...prev.slice(-100), seqOp]);
       setRedoStack([]);
       setLastSeqPoint(pt);
       setSeqCounter((c) => c + 1);
@@ -1145,8 +1126,27 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
       return;
     }
 
-    // Dynamic Game Equipment Stamps
-    if (!['pen', 'arrow', 'dashed-arrow', 'zone-circle', 'zone-box'].includes(tool)) {
+    // Stamp placement tools (Smoke, Flash, Ward, Spike, Audio Ping, etc.)
+    const isStamp = [
+      'smoke',
+      'flash',
+      'molly',
+      'spike',
+      'defuse',
+      'sensor',
+      'audio-ping',
+      'danger',
+      'ward-yellow',
+      'ward-pink',
+      'honeyfruit',
+      'rune',
+      'gank',
+      'boss',
+      'airdrop',
+      'vehicle',
+    ].includes(tool);
+
+    if (isStamp) {
       const stampOp: StratOperation = {
         id: opId,
         mapId,
@@ -1157,13 +1157,13 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
         ts: Date.now(),
         phase: activePhase,
       };
-      setOps((prev) => [...prev.slice(-150), stampOp]);
+      setOps((prev) => [...prev.slice(-100), stampOp]);
       setRedoStack([]);
       void broadcastStratPacket({ action: 'add', op: stampOp });
       return;
     }
 
-    // Drawing Tools (Pen, Arrow, Dashed Arrow, Zone Circle, Zone Box)
+    // Vector Drawing Tools (Pen, Arrow, Dashed Arrow, Zone Circle, Zone Box)
     draftOpRef.current = {
       id: opId,
       mapId,
@@ -1179,24 +1179,42 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Pan Movement
-    if (isPanningRef.current) {
-      setPanOffset({
-        x: e.clientX - panStartRef.current.x,
-        y: e.clientY - panStartRef.current.y,
-      });
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    // 2-Finger Pinch Zoom & Pan (Zero lag direct DOM)
+    if (activePointersRef.current.size === 2 && initialPinchDistRef.current !== null) {
+      const pts = Array.from(activePointersRef.current.values());
+      const curDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const scaleRatio = curDist / Math.max(10, initialPinchDistRef.current);
+      const nextZoom = Math.min(3.0, Math.max(0.5, initialPinchZoomRef.current * scaleRatio));
+
+      const curMid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      const dMidX = curMid.x - initialMidpointRef.current.x;
+      const dMidY = curMid.y - initialMidpointRef.current.y;
+      const nextPanX = initialPanRef.current.x + dMidX;
+      const nextPanY = initialPanRef.current.y + dMidY;
+
+      applyCanvasTransform(nextPanX, nextPanY, nextZoom);
       return;
     }
 
-    // Dragging an existing token
+    // Direct DOM Pan Movement (Zero React state updates during drag!)
+    if (isPanningRef.current) {
+      const nextPanX = e.clientX - panStartRef.current.x;
+      const nextPanY = e.clientY - panStartRef.current.y;
+      applyCanvasTransform(nextPanX, nextPanY, zoomScaleRef.current);
+      return;
+    }
+
+    // Dragging an existing token (RAF batched, zero React state re-render during drag!)
     if (draggedOpRef.current) {
       const pt = toLogicalCoords(e);
-      const updated = {
+      draggedOpRef.current = {
         ...draggedOpRef.current,
         points: [pt],
       };
-      draggedOpRef.current = updated;
-      setOps((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
       scheduleOverlayPaint();
       return;
     }
@@ -1215,23 +1233,34 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     scheduleOverlayPaint();
   };
 
-  const finalizeDraft = () => {
+  const finalizeDraft = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    activePointersRef.current.delete(e.pointerId);
+
+    if (activePointersRef.current.size < 2 && initialPinchDistRef.current !== null) {
+      initialPinchDistRef.current = null;
+      setZoomScale(zoomScaleRef.current);
+      setPanOffset({ ...panOffsetRef.current });
+    }
+
     if (isPanningRef.current) {
       isPanningRef.current = false;
+      setPanOffset({ ...panOffsetRef.current });
       return;
     }
 
     if (draggedOpRef.current) {
       const finalOp = draggedOpRef.current;
       draggedOpRef.current = null;
+      setOps((prev) => prev.map((o) => (o.id === finalOp.id ? finalOp : o)));
       void broadcastStratPacket({ action: 'update', op: finalOp });
+      scheduleOverlayPaint();
       return;
     }
 
     const draft = draftOpRef.current;
     if (!draft) return;
     draftOpRef.current = null;
-    setOps((prev) => [...prev.slice(-150), draft]);
+    setOps((prev) => [...prev.slice(-100), draft]);
     setRedoStack([]);
     void broadcastStratPacket({ action: 'add', op: draft });
   };
@@ -1240,21 +1269,21 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     if (e) e.preventDefault();
     if (!pendingTextPoint || !textInput.trim()) {
       setShowTextModal(false);
+      setPendingTextPoint(null);
       return;
     }
-    const opId = `st-txt-${Date.now().toString(36)}-${(++stratOpSeq).toString(36)}`;
     const textOp: StratOperation = {
-      id: opId,
+      id: `op-text-${Date.now().toString(36)}`,
       mapId,
       tool: 'text',
       color: inkColor,
       author: 'IGL',
       points: [pendingTextPoint],
+      text: textInput.trim().toUpperCase(),
       ts: Date.now(),
       phase: activePhase,
-      text: textInput.trim(),
     };
-    setOps((prev) => [...prev.slice(-150), textOp]);
+    setOps((prev) => [...prev.slice(-100), textOp]);
     setRedoStack([]);
     setShowTextModal(false);
     setPendingTextPoint(null);
@@ -1268,7 +1297,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     const last = mapOps[mapOps.length - 1];
     if (!last) return;
     setOps((prev) => prev.filter((o) => o.id !== last.id));
-    setRedoStack((prev) => [...prev, last]);
+    setRedoStack((prev) => [...prev.slice(-30), last]);
     void broadcastStratPacket({ action: 'undo', opId: last.id, mapId });
   }, [ops, mapId, broadcastStratPacket]);
 
@@ -1277,7 +1306,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     if (redoStack.length === 0) return;
     const next = redoStack[redoStack.length - 1];
     setRedoStack((prev) => prev.slice(0, -1));
-    setOps((prev) => [...prev, next]);
+    setOps((prev) => [...prev.slice(-100), next]);
     void broadcastStratPacket({ action: 'add', op: next });
   }, [redoStack, broadcastStratPacket]);
 
@@ -1290,16 +1319,24 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     void broadcastStratPacket({ action: 'clear', mapId });
   };
 
+  const handleClearPhase = () => {
+    setOps((prev) => prev.filter((o) => !(o.mapId === mapId && o.phase === activePhase)));
+    setRedoStack([]);
+    void broadcastStratPacket({ action: 'clear', mapId, phase: activePhase });
+  };
+
   const handleResetSequence = () => {
     setSeqCounter(1);
     setLastSeqPoint(null);
   };
 
-  // Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Esc)
+  // Keyboard Shortcuts (Ctrl+Z, Ctrl+Y, Esc, Space Pan)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = true;
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (e.shiftKey) {
           handleRedo();
         } else {
@@ -1312,23 +1349,52 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
         scheduleOverlayPaint();
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false;
+      }
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, [handleUndo, handleRedo, scheduleOverlayPaint]);
 
-  // Wheel Zoom (0.6x - 2.5x)
-  const handleWheelZoom = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    setZoomScale((z) => Math.min(2.5, Math.max(0.6, z * zoomFactor)));
+  // Zoom Presets & Controls
+  const handleSetZoomLevel = (lvl: number) => {
+    setZoomScale(lvl);
+    applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, lvl);
+  };
+
+  const handleZoomIn = () => {
+    const next = Math.min(2.5, Math.round((zoomScaleRef.current + 0.25) * 100) / 100);
+    setZoomScale(next);
+    applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
+  };
+
+  const handleZoomOut = () => {
+    const next = Math.max(0.6, Math.round((zoomScaleRef.current - 0.25) * 100) / 100);
+    setZoomScale(next);
+    applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
   };
 
   const handleResetZoomPan = () => {
     setZoomScale(1.0);
     setPanOffset({ x: 0, y: 0 });
+    applyCanvasTransform(0, 0, 1.0);
   };
 
-  // Instant Map Switcher — 0ms delay with automatic cached drawing recall
+  const handleWheelZoom = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const next = Math.min(2.5, Math.max(0.6, Math.round(zoomScaleRef.current * zoomFactor * 100) / 100));
+    setZoomScale(next);
+    applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
+  };
+
+  // Instant Map Switcher
   const handleSwitchMap = (next: TacticalMapId, e?: React.SyntheticEvent) => {
     if (e) {
       e.preventDefault();
@@ -1337,53 +1403,60 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     setMapId(next);
     setLastSeqPoint(null);
     setSeqCounter(1);
-
-    try {
-      const storage = getMevaStorageEngine();
-      void storage
-        .getRecord<Record<string, StratOperation[]>>(STORE_PREFS, 'tactical_map_drawings_cache')
-        .then((cached) => {
-          if (cached && cached[next] && Array.isArray(cached[next])) {
-            const saved = cached[next];
-            setOps((prev) => {
-              const seen = new Set(prev.map((o) => o.id));
-              const toAdd = saved.filter((o) => !seen.has(o.id));
-              return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
-            });
-          }
-        });
-    } catch {}
-
     void broadcastStratPacket({ action: 'switch-map', mapId: next });
   };
 
-  // Game Tab Switcher
-  const handleSwitchGameTab = (gameId: string) => {
-    setSelectedGameTab(gameId);
-    const customDef = customGames.find((g) => g.id === gameId);
-    const pool = customDef
-      ? customDef.maps.map((m) => m.id as TacticalMapId)
-      : GAME_MAP_POOLS[gameId as TacticalGameCategory] || GAME_MAP_POOLS.cs2;
+  // Game Switcher with Strict Tool Isolation Sanitization
+  const handleSwitchGameTab = (gameTabId: string) => {
+    setSelectedGameTab(gameTabId);
+    setLastSeqPoint(null);
+    setSeqCounter(1);
 
-    if (pool.length > 0) {
-      handleSwitchMap(pool[0]);
+    const meta = allGameTabs.find((g) => g.id === gameTabId) || DEFAULT_GAMES[0];
+    const isFPS = meta.archetype === 'fps';
+    const isMOBA = meta.archetype === 'moba';
+
+    const fpsStamps: StratTool[] = ['smoke', 'flash', 'molly', 'spike', 'defuse', 'sensor', 'audio-ping', 'danger'];
+    const mobaStamps: StratTool[] = ['ward-yellow', 'ward-pink', 'honeyfruit', 'rune', 'gank', 'boss', 'danger'];
+    const universal: StratTool[] = ['arrow', 'dashed-arrow', 'pen', 'zone-circle', 'zone-box', 'text', 'eraser', 'pan', 'pin-blue', 'pin-red', 'seq-path'];
+
+    // Sanitization: If current tool does not match the newly selected archetype, reset tool to a valid default
+    if (isFPS && !fpsStamps.includes(tool) && !universal.includes(tool)) {
+      setTool('smoke');
+    } else if (isMOBA && !mobaStamps.includes(tool) && !universal.includes(tool)) {
+      setTool('ward-yellow');
     }
+
+    // Auto-select first map of this game
+    const customMatch = customGames.find((cg) => cg.id === gameTabId);
+    let nextMap: TacticalMapId = 'mirage';
+    if (customMatch && customMatch.maps.length > 0) {
+      nextMap = customMatch.maps[0].id as TacticalMapId;
+    } else {
+      const cat = (gameTabId in GAME_MAP_POOLS ? gameTabId : 'cs2') as TacticalGameCategory;
+      const pool = GAME_MAP_POOLS[cat];
+      if (pool && pool.length > 0) {
+        nextMap = pool[0];
+      }
+    }
+    setMapId(nextMap);
+    void broadcastStratPacket({ action: 'switch-map', mapId: nextMap });
   };
 
-  // Add Custom Game Handler
+  // Create Custom Game Handler
   const handleCreateCustomGame = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGameName.trim()) return;
 
-    const gameId = newGameName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 16);
+    const gameId = `cg-${Date.now().toString(36)}`;
     const parsedMaps = newGameMaps
-      .split(',')
-      .map((m) => m.trim())
-      .filter(Boolean)
-      .map((name) => ({
-        id: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        title: name,
-        subtitle: `${newGameName} Özel Haritası`,
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line, idx) => ({
+        id: `${gameId}-map-${idx + 1}`,
+        title: line,
+        subtitle: `${newGameName.trim()} Haritası #${idx + 1}`,
       }));
 
     const newGame: CustomGameDef = {
@@ -1471,82 +1544,46 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     e.target.value = '';
   };
 
-  const handleCustomUrlSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput.trim()) return;
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const oc = document.createElement('canvas');
-      oc.width = LOGICAL_W;
-      oc.height = LOGICAL_H;
-      const octx = oc.getContext('2d');
-      if (octx) {
-        octx.drawImage(img, 0, 0, LOGICAL_W, LOGICAL_H);
-        const optimized = oc.toDataURL('image/jpeg', 0.85);
-        setCustomMapUrl(optimized);
-        setCustomMapName('Web Haritası');
-        setMapId('custom');
-
-        try {
-          const storage = getMevaStorageEngine();
-          storage.scheduleWrite(STORE_PREFS, 'custom_tactical_map', {
-            url: optimized,
-            name: 'Web Haritası',
-          });
-          void storage.flushPendingWrites();
-        } catch {}
-
-        void broadcastStratPacket({
-          action: 'upload-map',
-          mapDataUrl: optimized,
-          mapName: 'Web Haritası',
-        });
-      }
-      setShowUrlModal(false);
-      setUrlInput('');
-    };
-    img.onerror = () => {
-      alert("Görsel yüklenemedi. Lütfen doğrudan bir görsel URL'si girdiğinizden emin olun.");
-    };
-    img.src = urlInput.trim();
-  };
-
-  // ── EXPORT: JSON Format ──
+  // ── EXPORT: Stratbook Backup as JSON ──
   const handleExportJSON = () => {
-    const data = {
-      app: 'Meva HUD Pro Stratbook Studio',
-      version: '2.0',
+    const mapOps = ops.filter((o) => o.mapId === mapId);
+    const payload = {
+      version: 'meva-stratbook-v2',
       game: selectedGameTab,
       mapId,
-      timestamp: Date.now(),
-      phases: [1, 2, 3],
-      operations: ops.filter((o) => o.mapId === mapId),
+      exportedAt: new Date().toISOString(),
+      operations: mapOps,
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.download = `meva-stratbook-${mapId}-${Date.now().toString(36)}.json`;
-    link.href = url;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `taktik-${selectedGameTab}-${mapId}-${Date.now().toString(36)}.json`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  // ── EXPORT: High-Res PNG Image ──
+  // ── EXPORT: Merged High-Resolution PNG ──
   const handleExportPNG = () => {
-    const bg = bgCanvasRef.current;
-    const fg = fgCanvasRef.current;
-    if (!bg || !fg) return;
+    const bgCanvas = bgCanvasRef.current;
+    const fgCanvas = fgCanvasRef.current;
+    if (!bgCanvas || !fgCanvas) return;
 
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = LOGICAL_W;
     exportCanvas.height = LOGICAL_H;
-    const ectx = exportCanvas.getContext('2d');
-    if (!ectx) return;
+    const ctx = exportCanvas.getContext('2d');
+    if (!ctx) return;
 
-    ectx.drawImage(bg, 0, 0);
-    ectx.drawImage(fg, 0, 0);
+    ctx.drawImage(bgCanvas, 0, 0);
+    ctx.drawImage(fgCanvas, 0, 0);
+
+    // Tactical Watermark
+    ctx.fillStyle = 'rgba(250, 242, 238, 0.4)';
+    ctx.font = '700 9px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('MEVA STRATBOOK STUDIO · ZERO-LATENCY ESPORTS', LOGICAL_W - 16, LOGICAL_H - 12);
 
     const link = document.createElement('a');
     link.download = `meva-taktik-masasi-${mapId}-${Date.now().toString(36)}.png`;
@@ -1567,12 +1604,11 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
           setOps((prev) => {
             const existingIds = new Set(prev.map((o) => o.id));
             const newOps = parsed.operations.filter((o: StratOperation) => !existingIds.has(o.id));
-            return [...prev, ...newOps];
+            return [...prev.slice(-100), ...newOps];
           });
           if (parsed.mapId) setMapId(parsed.mapId);
           if (parsed.game) setSelectedGameTab(parsed.game);
 
-          // Broadcast all imported operations
           for (const op of parsed.operations) {
             void broadcastStratPacket({ action: 'add', op });
           }
@@ -1601,13 +1637,11 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
     );
   };
 
-  const currentMapCount = ops.filter((o) => o.mapId === mapId).length;
-
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center exec-backdrop p-2 sm:p-4 font-sans tabular-nums select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center exec-backdrop p-1 sm:p-3 font-sans tabular-nums select-none"
       onClick={(e) => {
         e.preventDefault();
         setOpen(false);
@@ -1618,7 +1652,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
           e.preventDefault();
           e.stopPropagation();
         }}
-        className="w-full max-w-6xl max-h-[96dvh] rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_24px_90px_rgba(0,0,0,0.95)] border border-[#8F1622]/60"
+        className="w-full max-w-[1500px] h-full max-h-[96dvh] rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_24px_90px_rgba(0,0,0,0.95)] border border-[#8F1622]/60"
       >
         {/* Hidden Inputs for File Upload & JSON Import */}
         <input
@@ -1636,8 +1670,8 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
           onChange={handleImportJSON}
         />
 
-        {/* ── TOP LAYER 1: Horizontal Espor Game Tabs Bar & [+ Yeni Oyun Ekle] ── */}
-        <div className="px-4 py-2 border-b border-[#2A1319] flex items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
+        {/* ── TOP HEADER LAYER 1: Game Tabs & Close Studio ── */}
+        <div className="px-3 sm:px-4 py-2 border-b border-[#2A1319] flex items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
           <div className="flex items-center gap-1.5 flex-nowrap">
             <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
               OYUN:
@@ -1645,7 +1679,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
             {allGameTabs.map((g) => {
               const isActive = selectedGameTab === g.id;
               return (
-                <div key={g.id} className="relative group">
+                <div key={g.id} className="relative group flex-shrink-0">
                   <button
                     type="button"
                     onClick={() => handleSwitchGameTab(g.id)}
@@ -1658,7 +1692,6 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
                     <span>{g.icon}</span>
                     <span>{g.name}</span>
                   </button>
-                  {/* Delete custom game button */}
                   {'isCustom' in g && Boolean(g.isCustom) ? (
                     <button
                       type="button"
@@ -1678,32 +1711,49 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
               type="button"
               onClick={() => setShowAddGameModal(true)}
               title="Yeni espor oyunu, haritaları ve mekaniklerini ekleyin"
-              className="h-7 px-2 rounded-lg bg-[#180B10] hover:bg-[#2E1218] border border-[#8F1622]/50 text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
+              className="h-7 px-2 rounded-lg bg-[#180B10] hover:bg-[#2E1218] border border-[#8F1622]/50 text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap flex-shrink-0"
             >
               <IconPlus size={12} />
               <span>+ Oyun Ekle</span>
             </button>
           </div>
 
-          {/* Close Studio Button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              setOpen(false);
-            }}
-            aria-label="Kapat"
-            className="rounded-xl w-7 h-7 flex items-center justify-center bg-[#140A0D] hover:bg-[#220D13] border border-[#2C141A] text-[#9E8E91] hover:text-[#F4EFF0] transition-colors flex-shrink-0"
-          >
-            <IconClose size={14} />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Sidebar Toggle for Desktop / Mobile */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((s) => !s)}
+              title="Taktiksel Kontrol Panelini Aç/Kapat"
+              className={`h-7 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all ${
+                sidebarOpen
+                  ? 'bg-[#2E1218] text-[#FAF2EE] border-[#8F1622]'
+                  : 'bg-[#140A0D] text-[#9E8E91] hover:text-[#FAF2EE] border-[#2C141A]'
+              }`}
+            >
+              <span>📐</span>
+              <span className="hidden sm:inline">Taktik Paneli</span>
+            </button>
+
+            {/* Close Studio Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen(false);
+              }}
+              aria-label="Kapat"
+              className="rounded-xl w-7 h-7 flex items-center justify-center bg-[#140A0D] hover:bg-[#220D13] border border-[#2C141A] text-[#9E8E91] hover:text-[#F4EFF0] transition-colors flex-shrink-0"
+            >
+              <IconClose size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* ── TOP LAYER 2: Map Selector + Custom Map Uploader + Export/Import ── */}
-        <div className="px-4 py-2 border-b border-[#241116] flex flex-wrap items-center justify-between gap-2.5 flex-shrink-0 bg-gradient-to-r from-[#1C0B10] via-[#0D090B] to-[#070607]">
-          {/* Left: Filtered Map Buttons for Selected Game */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider">
+        {/* ── TOP HEADER LAYER 2: Map Selector + Zoom Controls + Quick Export ── */}
+        <div className="px-3 sm:px-4 py-1.5 border-b border-[#241116] flex flex-wrap items-center justify-between gap-2 flex-shrink-0 bg-gradient-to-r from-[#1C0B10] via-[#0D090B] to-[#070607]">
+          {/* Map Selector Chips */}
+          <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto">
+            <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
               HARİTA:
             </span>
             {availableMaps.map((mKey) => {
@@ -1717,7 +1767,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
                   type="button"
                   onClick={(e) => handleSwitchMap(mKey, e)}
                   title={`${title} haritasına geç ve taktik çizimlerini yükle`}
-                  className={`rounded-lg h-7 px-2.5 text-[11px] font-extrabold border transition-all flex items-center gap-1 ${
+                  className={`rounded-lg h-6 px-2 text-[11px] font-extrabold border transition-all flex items-center gap-1 whitespace-nowrap ${
                     isActive
                       ? 'crimson-cta text-[#F4EFF0] shadow-[0_0_12px_rgba(200,35,51,0.45)]'
                       : 'bg-[#120A0D] hover:bg-[#1C0D12] text-[#B8AAAC] hover:text-[#FAF2EE] border-[#2A1319]'
@@ -1738,7 +1788,7 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
               <button
                 type="button"
                 onClick={(e) => handleSwitchMap('custom', e)}
-                className={`rounded-lg h-7 px-2.5 text-[11px] font-extrabold border transition-all ${
+                className={`rounded-lg h-6 px-2 text-[11px] font-extrabold border transition-all whitespace-nowrap ${
                   mapId === 'custom'
                     ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
                     : 'bg-[#0E0709] hover:bg-cyan-950/40 text-cyan-400/80 border-[#2A1319]'
@@ -1748,641 +1798,687 @@ export const TacticalMapBoard = memo(function TacticalMapBoard() {
               </button>
             )}
 
-            {/* [+ Harita Yükle] Local File & Direct URL */}
-            <div className="flex items-center rounded-lg border border-[#8F1622]/60 bg-[#1F0C13] overflow-hidden ml-1">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }}
-                title="Bilgisayarınızdan harita yükleyin (.png, .jpg, .webp)"
-                className="h-7 px-2 hover:bg-[#3B141E] text-[11px] font-extrabold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors"
-              >
-                <IconUpload size={12} className="text-[#FF4655]" />
-                <span>+ Harita</span>
-              </button>
-              <span className="w-px h-4 bg-[#8F1622]/40" />
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowUrlModal(true);
-                }}
-                title="Web bağlantısından (URL) harita yükleyin"
-                className="h-7 px-2 hover:bg-[#3B141E] text-[11px] font-extrabold text-[#F08C96] hover:text-[#FAF2EE] transition-colors"
-              >
-                URL
-              </button>
-            </div>
-          </div>
-
-          {/* Right: Export (JSON/PNG), Import (JSON), Share to Chat */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Export JSON / PNG Button Group */}
-            <div className="flex items-center rounded-lg border border-[#8F1622]/55 bg-[#140A0D] overflow-hidden">
-              <button
-                type="button"
-                onClick={handleExportPNG}
-                title="Haritayı ve çizimleri yüksek çözünürlüklü PNG görseli olarak indir"
-                className="h-7 px-2 hover:bg-[#250C13] text-[11px] font-extrabold text-[#FAF2EE] flex items-center gap-1 transition-colors"
-              >
-                <span>📥 PNG İndir</span>
-              </button>
-              <span className="w-px h-4 bg-[#8F1622]/40" />
-              <button
-                type="button"
-                onClick={handleExportJSON}
-                title="Tüm strateji ve aşamaları JSON dosyası olarak yedekle"
-                className="h-7 px-2 hover:bg-[#250C13] text-[11px] font-extrabold text-[#F08C96] hover:text-[#FAF2EE] transition-colors"
-              >
-                JSON
-              </button>
-            </div>
-
-            {/* Import JSON Button */}
+            {/* [+ Harita Yükle] */}
             <button
               type="button"
-              onClick={() => jsonImportInputRef.current?.click()}
-              title="Daha önce kaydedilmiş taktik JSON dosyasını yükle"
-              className="rounded-lg h-7 px-2 bg-[#140A0D] hover:bg-[#200A11] border border-[#2A1319] text-[11px] font-extrabold text-[#B8AAAC] hover:text-[#FAF2EE] transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }}
+              title="Bilgisayarınızdan harita yükleyin (.png, .jpg, .webp)"
+              className="h-6 px-2 rounded-lg bg-[#1F0C13] hover:bg-[#3B141E] border border-[#8F1622]/60 text-[10.5px] font-extrabold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
             >
-              📤 Yükle
-            </button>
-
-            <span className="w-px h-4 bg-[#2A1319] mx-0.5" />
-
-            <button
-              type="button"
-              onClick={() => void handleShareBriefToChat()}
-              className="crimson-cta rounded-lg h-7 px-3 text-[11px] font-bold text-[#F4EFF0] flex items-center gap-1.5 shadow-sm active:scale-95"
-            >
-              <IconSend size={11} />
-              <span>Brifing At</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── SUB-BAR: Multi-Phase Tabs + Controls (Undo, Redo, Clear, Zoom) ── */}
-        <div className="px-4 py-1.5 bg-[#080406]/95 border-b border-[#200D12] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
-          {/* Phase Planning Tabs */}
-          <div className="flex items-center gap-1 bg-[#120A0D] p-1 rounded-xl border border-[#2A1319]">
-            <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1.5 tracking-wider">
-              FAZ:
-            </span>
-            {([1, 2, 3] as const).map((ph) => {
-              const label =
-                ph === 1 ? '1: Erken / Lvl 1' : ph === 2 ? '2: Execute / Mid' : '3: Post-Plant / Late';
-              const isActive = activePhase === ph;
-              return (
-                <button
-                  key={ph}
-                  type="button"
-                  onClick={() => {
-                    setActivePhase(ph);
-                    void broadcastStratPacket({ action: 'switch-phase', phase: ph });
-                  }}
-                  className={`rounded-lg px-2.5 py-0.5 text-[10.5px] font-extrabold transition-all ${
-                    isActive
-                      ? 'bg-[#C82333] text-white shadow-xs'
-                      : 'text-[#9E8E91] hover:text-[#FAF2EE] hover:bg-[#200A11]'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => setShowAllPhases((s) => !s)}
-              title="Tüm fazların çizimlerini birleşik göster"
-              className={`rounded-lg px-2 py-0.5 text-[10px] font-bold border transition-colors ${
-                showAllPhases
-                  ? 'bg-amber-950/80 text-amber-300 border-amber-500/50'
-                  : 'text-[#8E7E81] hover:text-[#B8AAAC] border-transparent'
-              }`}
-            >
-              {showAllPhases ? '👁️ Tüm Fazlar' : 'Tek Faz'}
+              <IconPlus size={10} />
+              <span>Harita Yükle</span>
             </button>
           </div>
 
-          {/* Quick Action Controls */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={currentMapCount === 0}
-              title="Geri Al (Ctrl+Z)"
-              className="rounded-lg h-6 px-2 bg-[#120A0D] hover:bg-[#1B0C11] disabled:opacity-35 border border-[#2A1319] text-[10.5px] font-bold text-[#B8AAAC] transition-colors"
-            >
-              ↶ Geri
-            </button>
-            <button
-              type="button"
-              onClick={handleRedo}
-              disabled={redoStack.length === 0}
-              title="İleri Al (Ctrl+Y)"
-              className="rounded-lg h-6 px-2 bg-[#120A0D] hover:bg-[#1B0C11] disabled:opacity-35 border border-[#2A1319] text-[10.5px] font-bold text-[#B8AAAC] transition-colors"
-            >
-              ↷ İleri
-            </button>
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={currentMapCount === 0}
-              title="Bu haritadaki tüm çizimleri sil"
-              className="rounded-lg h-6 px-2 bg-[#190B10] hover:bg-[#7A121D]/40 disabled:opacity-35 border border-[#7A121D]/55 text-[10.5px] font-bold text-[#F08C96] transition-colors"
-            >
-              <IconTrash size={11} className="inline mr-0.5" />
-              Temizle ({currentMapCount})
-            </button>
-
-            {/* Zoom Controls */}
-            <div className="flex items-center gap-1 bg-[#120A0D] px-2 py-0.5 rounded-lg border border-[#2A1319]">
+          {/* Zoom Controls & Export Actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+            {/* Zoom (+ / -) & Percentage Pill */}
+            <div className="flex items-center bg-[#10070A] p-0.5 rounded-lg border border-[#2A1016]">
               <button
                 type="button"
-                onClick={() => setZoomScale((z) => Math.max(0.6, z - 0.15))}
-                title="Uzaklaştır"
-                className="text-[#9E8E91] hover:text-[#FAF2EE] text-xs px-1 font-bold"
+                onClick={handleZoomOut}
+                title="Uzaklaştır (% -25)"
+                className="w-6 h-6 rounded flex items-center justify-center text-[#9E8E91] hover:text-white hover:bg-[#1E0B11] font-bold text-xs"
               >
                 -
               </button>
-              <button
-                type="button"
-                onClick={handleResetZoomPan}
-                title="Ölçeği Sıfırla (%100)"
-                className="text-[10px] font-mono font-bold text-[#F08C96] hover:text-[#FAF2EE] px-1"
-              >
-                {Math.round(zoomScale * 100)}%
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoomScale((z) => Math.min(2.5, z + 0.15))}
-                title="Yakınlaştır"
-                className="text-[#9E8E91] hover:text-[#FAF2EE] text-xs px-1 font-bold"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* ── TOOLBAR: Dynamic Game-Specific Equipment + Pins + Core Tools ── */}
-        <div className="px-4 py-1.5 bg-[#060305] border-b border-[#1C0B10] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Universal Numbered Strategy Pins & Sequence */}
-            <div className="flex items-center gap-1 bg-[#10070A] p-0.5 rounded-lg border border-[#2A1016]">
-              <span className="text-[9px] font-black text-[#8E7E81] uppercase px-1">PİNLER:</span>
-              <button
-                type="button"
-                onClick={() => setTool('pin-blue')}
-                title="Mavi Takım Numaralı Pin (1-5)"
-                className={`rounded-md px-1.5 h-5 text-[10.5px] font-black flex items-center gap-1 transition-all ${
-                  tool === 'pin-blue' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-400 hover:text-blue-200'
-                }`}
-              >
-                <span className="w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-bold">
-                  {selectedPinNumber}
-                </span>
-                <span>Dost</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTool('pin-red')}
-                title="Kırmızı Takım Numaralı Pin (1-5)"
-                className={`rounded-md px-1.5 h-5 text-[10.5px] font-black flex items-center gap-1 transition-all ${
-                  tool === 'pin-red' ? 'bg-red-600 text-white shadow-xs' : 'text-red-400 hover:text-red-200'
-                }`}
-              >
-                <span className="w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[9px] flex items-center justify-center font-bold">
-                  {selectedPinNumber}
-                </span>
-                <span>Düşman</span>
-              </button>
-
-              <div className="flex items-center gap-0.5 ml-0.5">
-                {([1, 2, 3, 4, 5] as const).map((n) => (
+              <div className="flex items-center px-1 gap-1 text-[10px] font-mono font-bold">
+                {[1.0, 1.5, 2.0].map((lvl) => (
                   <button
-                    key={n}
+                    key={lvl}
                     type="button"
-                    onClick={() => setSelectedPinNumber(n)}
-                    className={`w-3.5 h-4.5 rounded text-[9.5px] font-black transition-colors ${
-                      selectedPinNumber === n ? 'bg-[#FAF2EE] text-black' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                    onClick={() => handleSetZoomLevel(lvl)}
+                    className={`px-1 rounded transition-colors ${
+                      Math.abs(zoomScale - lvl) < 0.05
+                        ? 'bg-[#8F1622] text-white'
+                        : 'text-[#8E7E81] hover:text-[#FAF2EE]'
                     }`}
                   >
-                    {n}
+                    %{Math.round(lvl * 100)}
                   </button>
                 ))}
               </div>
 
-              <span className="w-px h-3.5 bg-[#2A1319] mx-0.5" />
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                title="Yakınlaştır (% +25)"
+                className="w-6 h-6 rounded flex items-center justify-center text-[#9E8E91] hover:text-white hover:bg-[#1E0B11] font-bold text-xs"
+              >
+                +
+              </button>
 
               <button
                 type="button"
-                onClick={() => setTool('seq-path')}
-                title="Numaralı Rota Dizilimi (1 -> 2 -> 3...)"
-                className={`rounded-md px-1.5 h-5 text-[10.5px] font-black flex items-center gap-1 transition-all ${
-                  tool === 'seq-path' ? 'bg-sky-500 text-slate-950 shadow-xs' : 'text-sky-400 hover:text-sky-200'
-                }`}
+                onClick={handleResetZoomPan}
+                title="Ölçeği ve Konumu Sıfırla (1:1)"
+                className="px-1.5 h-6 text-[10px] font-bold text-[#F08C96] hover:text-white hover:bg-[#2E1218] rounded transition-colors"
               >
-                <span className="w-3.5 h-3.5 rounded-full bg-sky-200 text-sky-950 text-[9px] flex items-center justify-center font-bold">
-                  {seqCounter}
-                </span>
-                <span>Rota #{seqCounter}</span>
+                ⟲
+              </button>
+            </div>
+
+            {/* Quick Export / Backup */}
+            <div className="flex items-center gap-1 bg-[#10070A] p-0.5 rounded-lg border border-[#2A1016]">
+              <button
+                type="button"
+                onClick={handleExportPNG}
+                title="Yüksek çözünürlüklü taktik şemasını PNG olarak indirin"
+                className="h-6 px-2 rounded text-[10.5px] font-extrabold text-[#A8989B] hover:text-[#FAF2EE] hover:bg-[#1E0B11] flex items-center gap-1"
+              >
+                <span>📥</span>
+                <span className="hidden sm:inline">PNG</span>
               </button>
 
-              {seqCounter > 1 && (
-                <button
-                  type="button"
-                  onClick={handleResetSequence}
-                  title="Sıfırla"
-                  className="text-[9px] font-bold text-[#F08C96] hover:text-[#FAF2EE] px-0.5"
-                >
-                  Sıfırla
-                </button>
-              )}
-            </div>
+              <button
+                type="button"
+                onClick={handleExportJSON}
+                title="Taktik dosyasını (.json) bilgisayarınıza yedekleyin"
+                className="h-6 px-2 rounded text-[10.5px] font-extrabold text-[#A8989B] hover:text-[#FAF2EE] hover:bg-[#1E0B11] flex items-center gap-1"
+              >
+                <span>💾</span>
+                <span className="hidden sm:inline">JSON</span>
+              </button>
 
-            {/* DYNAMIC GAME-SPECIFIC EQUIPMENT STAMPS */}
-            <div className="flex items-center gap-0.5 bg-[#10070A] p-0.5 rounded-lg border border-[#2A1016]">
-              <span className="text-[9px] font-black text-[#8E7E81] uppercase px-1">
-                {activeGameMeta.archetype.toUpperCase()}:
-              </span>
-
-              {/* 1. Tactical FPS Stamps (CS2 / Valorant) */}
-              {activeGameMeta.archetype === 'fps' &&
-                [
-                  { id: 'smoke', label: 'Smoke', icon: '⭕' },
-                  { id: 'flash', label: 'Flash', icon: '⚡' },
-                  { id: 'molly', label: 'Molly', icon: '🔥' },
-                  { id: 'spike', label: 'Spike/C4', icon: '💣' },
-                  { id: 'defuse', label: 'İmha Kiti', icon: '✂️' },
-                  { id: 'sensor', label: 'Kapan', icon: '📡' },
-                  { id: 'danger', label: 'Tehlike', icon: '⚠️' },
-                ].map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => setTool(st.id as StratTool)}
-                    title={st.label}
-                    className={`h-5 px-1.5 rounded text-[11px] flex items-center gap-0.5 transition-colors ${
-                      tool === st.id ? 'bg-[#8F1622] text-white shadow-xs' : 'text-[#9E8E91] hover:text-[#FAF2EE]'
-                    }`}
-                  >
-                    <span>{st.icon}</span>
-                    <span className="text-[9.5px] font-bold hidden sm:inline">{st.label}</span>
-                  </button>
-                ))}
-
-              {/* 2. MOBA Stamps (LoL / Dota 2) */}
-              {activeGameMeta.archetype === 'moba' &&
-                [
-                  { id: 'ward-yellow', label: 'Görüş', icon: '👁️' },
-                  { id: 'ward-pink', label: 'Pembe Totem', icon: '🛡️' },
-                  { id: 'honeyfruit', label: 'Bal Suyu', icon: '🌿' },
-                  { id: 'rune', label: 'Rün', icon: '💎' },
-                  { id: 'gank', label: 'Gank!', icon: '⚔️' },
-                  { id: 'boss', label: 'Roshan/Baron', icon: '🐉' },
-                  { id: 'danger', label: 'Tehlike', icon: '⚠️' },
-                ].map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => setTool(st.id as StratTool)}
-                    title={st.label}
-                    className={`h-5 px-1.5 rounded text-[11px] flex items-center gap-0.5 transition-colors ${
-                      tool === st.id ? 'bg-[#7E22CE] text-white shadow-xs' : 'text-[#9E8E91] hover:text-[#FAF2EE]'
-                    }`}
-                  >
-                    <span>{st.icon}</span>
-                    <span className="text-[9.5px] font-bold hidden sm:inline">{st.label}</span>
-                  </button>
-                ))}
-
-              {/* 3. Battle Royale Stamps (PUBG) */}
-              {activeGameMeta.archetype === 'br' &&
-                [
-                  { id: 'smoke', label: 'Smoke', icon: '⭕' },
-                  { id: 'airdrop', label: 'Drop', icon: '📦' },
-                  { id: 'flight', label: 'Uçak Hattı', icon: '✈️' },
-                  { id: 'vehicle', label: 'Araç', icon: '🚗' },
-                  { id: 'bluezone', label: 'Alan', icon: '🔵' },
-                  { id: 'danger', label: 'Tehlike', icon: '⚠️' },
-                ].map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => setTool(st.id as StratTool)}
-                    title={st.label}
-                    className={`h-5 px-1.5 rounded text-[11px] flex items-center gap-0.5 transition-colors ${
-                      tool === st.id ? 'bg-[#B45309] text-white shadow-xs' : 'text-[#9E8E91] hover:text-[#FAF2EE]'
-                    }`}
-                  >
-                    <span>{st.icon}</span>
-                    <span className="text-[9.5px] font-bold hidden sm:inline">{st.label}</span>
-                  </button>
-                ))}
-            </div>
-
-            {/* Core Drawing Vector Tools */}
-            <div className="flex items-center gap-0.5 bg-[#10070A] p-0.5 rounded-lg border border-[#2A1016]">
-              <span className="text-[9px] font-black text-[#8E7E81] uppercase px-1">ÇİZİM:</span>
-              {[
-                { id: 'arrow', label: 'Saldırı Oku', icon: '➡️' },
-                { id: 'dashed-arrow', label: 'Rotasyon', icon: '⇢' },
-                { id: 'pen', label: 'Kalem', icon: '✏️' },
-                { id: 'zone-circle', label: 'Alan ◯', icon: '◯' },
-                { id: 'zone-box', label: 'Bölge ▢', icon: '▢' },
-                { id: 'text', label: 'Not', icon: '💬' },
-                { id: 'eraser', label: 'Silgi', icon: '🧹' },
-                { id: 'pan', label: 'Pan', icon: '✋' },
-              ].map((dt) => (
-                <button
-                  key={dt.id}
-                  type="button"
-                  onClick={() => setTool(dt.id as StratTool)}
-                  title={dt.label}
-                  className={`h-5 px-1.5 rounded text-xs flex items-center gap-0.5 transition-colors ${
-                    tool === dt.id ? 'bg-[#C82333] text-white shadow-xs' : 'text-[#9E8E91] hover:text-[#FAF2EE]'
-                  }`}
-                >
-                  <span>{dt.icon}</span>
-                  <span className="text-[9.5px] font-bold hidden md:inline">{dt.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Stroke Width & Ink Swatches */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex items-center gap-0.5 bg-[#10070A] px-1 py-0.5 rounded-lg border border-[#2A1319]">
-              {([2, 4, 7] as const).map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => setLineWidth(w)}
-                  title={`Çizgi: ${w === 2 ? 'İnce' : w === 4 ? 'Orta' : 'Kalın'}`}
-                  className={`w-3.5 h-3.5 rounded flex items-center justify-center transition-colors ${
-                    lineWidth === w ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
-                  }`}
-                >
-                  <span className="rounded-full bg-current" style={{ width: `${w * 1.3}px`, height: `${w * 1.3}px` }} />
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1 bg-[#10070A] px-1.5 py-0.5 rounded-lg border border-[#2A1319]">
-              {INK_SWATCHES.map((sw) => (
-                <button
-                  key={sw.hex}
-                  type="button"
-                  onClick={() => setInkColor(sw.hex)}
-                  title={sw.label}
-                  className={`w-3.5 h-3.5 rounded-full transition-transform flex items-center justify-center ${
-                    inkColor === sw.hex ? 'ring-2 ring-[#C82333] scale-110 shadow-xs' : 'opacity-80 hover:opacity-100'
-                  }`}
-                  style={{ background: sw.hex }}
-                />
-              ))}
+              <button
+                type="button"
+                onClick={() => jsonImportInputRef.current?.click()}
+                title="Önceden kaydedilmiş taktik JSON dosyasını haritaya yükleyin"
+                className="h-6 px-2 rounded text-[10.5px] font-extrabold text-[#A8989B] hover:text-[#FAF2EE] hover:bg-[#1E0B11] flex items-center gap-1"
+              >
+                <span>📤</span>
+                <span className="hidden sm:inline">Yükle</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* ── CANVAS VIEWPORT: 2D Radar Minimap + Interactive Strat Layer ── */}
-        <div
-          className="flex-1 min-h-0 p-3 sm:p-4 bg-[#050304] flex items-center justify-center overflow-hidden cursor-crosshair select-none relative"
-          onWheel={handleWheelZoom}
-        >
+        {/* ── MAIN STUDIO BODY: Canvas Area + Modern Tactical Sidebar ── */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+          {/* ── CANVAS WORKSPACE (Left / Center) ── */}
           <div
-            style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
-              transformOrigin: 'center center',
-              transition: isPanningRef.current ? 'none' : 'transform 0.05s ease-out',
-            }}
-            className="relative w-full max-w-[840px] aspect-[840/480] rounded-xl overflow-hidden border border-[#2E151C] shadow-[0_20px_60px_rgba(0,0,0,0.95)] touch-none flex-shrink-0"
+            className={`flex-1 flex items-center justify-center p-2 sm:p-4 bg-[#050304] overflow-hidden relative cursor-default ${
+              tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
+            onWheel={handleWheelZoom}
           >
-            {/* Background 2D Radar Texture Layer */}
-            <canvas
-              ref={bgCanvasRef}
-              width={LOGICAL_W}
-              height={LOGICAL_H}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-            />
-            {/* Foreground Interactive Stratbook Layer */}
-            <canvas
-              ref={fgCanvasRef}
-              width={LOGICAL_W}
-              height={LOGICAL_H}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={finalizeDraft}
-              onPointerCancel={finalizeDraft}
-              className={`absolute inset-0 w-full h-full ${
-                tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
-              }`}
-            />
-          </div>
-
-          {/* Quick Info Pill */}
-          <div className="absolute bottom-5 left-6 pointer-events-none bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10 text-[10px] text-[#A8989B] flex items-center gap-2">
-            <span>🖱️ Zoom: Tekerlek</span>
-            <span>•</span>
-            <span>✋ Kaydır: Space/Alt</span>
-            <span>•</span>
-            <span>⌨️ Ctrl+Z / Y</span>
-          </div>
-        </div>
-
-        {/* ── MODAL: [+ Yeni Oyun Ekle] ── */}
-        {showAddGameModal && (
-          <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setShowAddGameModal(false)}
-          >
+            {/* Transform Container with direct DOM translation for 60 FPS */}
             <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-[#12080B] border border-[#8F1622] rounded-2xl p-5 shadow-2xl"
+              ref={boardTransformRef}
+              style={{
+                transformOrigin: 'center center',
+                willChange: 'transform',
+              }}
+              className="relative w-full max-w-[840px] aspect-[840/480] rounded-xl overflow-hidden border border-[#2E151C] shadow-[0_20px_60px_rgba(0,0,0,0.95)] touch-none flex-shrink-0"
             >
-              <h3 className="text-sm font-extrabold text-[#FAF2EE] mb-1">
-                + Yeni Özel Espor Oyunu Tanımla
-              </h3>
-              <p className="text-xs text-[#A8989B] mb-3">
-                Özel oyununuzu, haritalarını ve mekanik ikon setini studioya ekleyin:
-              </p>
-              <form onSubmit={handleCreateCustomGame}>
-                <div className="space-y-3 mb-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-[#D8CBCE] block mb-1">
-                      Oyun Adı:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Örn: Rainbow Six Siege, Overwatch 2, Apex..."
-                      value={newGameName}
-                      onChange={(e) => setNewGameName(e.target.value)}
-                      required
-                      autoFocus
-                      className="w-full px-3 py-1.5 bg-[#090406] border border-[#2E1218] rounded-xl text-xs text-[#FAF2EE] focus:outline-none focus:border-[#C82333]"
-                    />
+              {/* Background 2D Radar Texture Layer */}
+              <canvas
+                ref={bgCanvasRef}
+                width={LOGICAL_W}
+                height={LOGICAL_H}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+              />
+              {/* Foreground Interactive Stratbook Layer */}
+              <canvas
+                ref={fgCanvasRef}
+                width={LOGICAL_W}
+                height={LOGICAL_H}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={finalizeDraft}
+                onPointerCancel={finalizeDraft}
+                className="absolute inset-0 w-full h-full z-10 touch-none"
+              />
+            </div>
+
+            {/* Floating Canvas HUD Overlay */}
+            <div className="absolute bottom-3 left-4 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
+              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
+                {tool.toUpperCase()}
+              </span>
+              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116]">
+                ÖLÇEK: %{Math.round(zoomScale * 100)}
+              </span>
+              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] hidden sm:inline">
+                AŞAMA {activePhase} ({ops.filter((o) => o.mapId === mapId).length} ÇİZİM)
+              </span>
+            </div>
+
+            {/* Mobile Bottom Quick-Toggle Bar */}
+            <div className="md:hidden absolute bottom-3 right-4 flex items-center gap-1.5 z-20">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen((s) => !s)}
+                className="h-8 px-3 rounded-xl bg-[#8F1622] text-white text-xs font-black shadow-lg flex items-center gap-1.5"
+              >
+                <span>📐</span>
+                <span>Taktik Paneli</span>
+              </button>
+            </div>
+          </div>
+
+          {/* ── MODERN TACTICAL SIDEBAR (Right) ── */}
+          {sidebarOpen && (
+            <aside
+              className="w-full md:w-72 lg:w-80 bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all"
+            >
+              {/* Sidebar Header */}
+              <div className="p-3 border-b border-[#1E0B11] flex items-center justify-between bg-[#0E070A]">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs">🎯</span>
+                  <span className="text-xs font-black text-[#FAF2EE] uppercase tracking-wider">
+                    STRATBOOK KONTROLÜ
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="md:hidden text-[#9E8E91] hover:text-white p-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-3 space-y-3.5">
+                {/* ── SECTION 1: AŞAMA & KADEME YÖNETİMİ (PHASES) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                      1. AŞAMA VE KADEME
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPhases((s) => !s)}
+                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                        showAllPhases ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                      }`}
+                    >
+                      {showAllPhases ? 'Kümülatif (Tümü)' : 'Tek Aşama'}
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-bold text-[#D8CBCE] block mb-1">
-                      İlk Haritalar (virgülle ayırın):
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Örn: Bank, Clubhouse, Oregon, Kafe"
-                      value={newGameMaps}
-                      onChange={(e) => setNewGameMaps(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-[#090406] border border-[#2E1218] rounded-xl text-xs text-[#FAF2EE] focus:outline-none focus:border-[#C82333]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-[#D8CBCE] block mb-1">
-                      Mekanik & Ekipman Tipi:
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { id: 'fps', label: 'Taktiksel FPS', icon: '🎯' },
-                        { id: 'moba', label: 'MOBA', icon: '⚔️' },
-                        { id: 'br', label: 'Battle Royale', icon: '🪂' },
-                      ].map((t) => (
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 1, label: 'Erken / Lvl 1' },
+                      { id: 2, label: 'Mid / Execute' },
+                      { id: 3, label: 'Late / Post' },
+                    ].map((ph) => {
+                      const isActive = activePhase === ph.id;
+                      const count = ops.filter((o) => o.mapId === mapId && o.phase === ph.id).length;
+                      return (
                         <button
-                          key={t.id}
+                          key={ph.id}
                           type="button"
-                          onClick={() => setNewGameArchetype(t.id as 'fps' | 'moba' | 'br')}
-                          className={`p-2 rounded-xl text-xs font-bold border transition-colors flex flex-col items-center gap-1 ${
-                            newGameArchetype === t.id
-                              ? 'crimson-cta text-white border-[#FF4655]'
-                              : 'bg-[#180A0E] text-[#9E8E91] border-[#2A1319]'
+                          onClick={() => {
+                            setActivePhase(ph.id as 1 | 2 | 3);
+                            void broadcastStratPacket({ action: 'switch-phase', phase: ph.id as 1 | 2 | 3 });
+                          }}
+                          className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold flex flex-col items-center justify-center border transition-all ${
+                            isActive
+                              ? 'crimson-cta text-white border-[#FF4655] shadow-xs'
+                              : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#FAF2EE] border-[#1E0B11]'
                           }`}
                         >
-                          <span>{t.icon}</span>
-                          <span>{t.label}</span>
+                          <span>{ph.label}</span>
+                          <span className="text-[8.5px] opacity-70">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── SECTION 2: OYUNA ÖZEL MEKANİKLER (STRICT ISOLATION) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                      2. {activeGameMeta.name.toUpperCase()} EKİPMANLARI
+                    </span>
+                  </div>
+
+                  {/* 2A. Tactical FPS Equipment (Strictly for FPS) */}
+                  {activeGameMeta.archetype === 'fps' && (
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { id: 'smoke', label: 'Smoke (Duman)', icon: '⭕' },
+                        { id: 'flash', label: 'Flash (Kör)', icon: '⚡' },
+                        { id: 'molly', label: 'Molly / Yanıcı', icon: '🔥' },
+                        { id: 'spike', label: 'Spike / C4', icon: '💣' },
+                        { id: 'defuse', label: 'İmha Kiti', icon: '✂️' },
+                        { id: 'audio-ping', label: 'Ses / Ayak İzi', icon: '🔊' },
+                        { id: 'sensor', label: 'Kapan / Tuzak', icon: '📡' },
+                        { id: 'danger', label: 'Tehlike Sinyali', icon: '⚠️' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setTool(st.id as StratTool)}
+                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                            tool === st.id
+                              ? 'bg-[#8F1622] text-white border-[#FF4655] shadow-xs'
+                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                          }`}
+                        >
+                          <span>{st.icon}</span>
+                          <span className="text-[10px] truncate">{st.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 2B. MOBA Equipment (Strictly for LoL & Dota 2) */}
+                  {activeGameMeta.archetype === 'moba' && (
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { id: 'ward-yellow', label: 'Görüş Totemi', icon: '👁️' },
+                        { id: 'ward-pink', label: 'Pembe Totem', icon: '🛡️' },
+                        { id: 'honeyfruit', label: 'Bal Suyu / Çiçek', icon: '🌿' },
+                        { id: 'rune', label: 'Nehir Rünü', icon: '💎' },
+                        { id: 'gank', label: 'Baskın (Gank)', icon: '⚔️' },
+                        { id: 'boss', label: 'Roshan / Baron', icon: '🐉' },
+                        { id: 'danger', label: 'Tehlike Sinyali', icon: '⚠️' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setTool(st.id as StratTool)}
+                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                            tool === st.id
+                              ? 'bg-[#7E22CE] text-white border-purple-400 shadow-xs'
+                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                          }`}
+                        >
+                          <span>{st.icon}</span>
+                          <span className="text-[10px] truncate">{st.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 2C. Battle Royale Equipment (Strictly for PUBG) */}
+                  {activeGameMeta.archetype === 'br' && (
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { id: 'smoke', label: 'Smoke', icon: '⭕' },
+                        { id: 'airdrop', label: 'Air Drop', icon: '📦' },
+                        { id: 'flight', label: 'Uçak Rotası', icon: '✈️' },
+                        { id: 'vehicle', label: 'Araç / Buggy', icon: '🚗' },
+                        { id: 'bluezone', label: 'Alan (Bluezone)', icon: '🔵' },
+                        { id: 'danger', label: 'Tehlike Pini', icon: '⚠️' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setTool(st.id as StratTool)}
+                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                            tool === st.id
+                              ? 'bg-[#B45309] text-white border-amber-400 shadow-xs'
+                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                          }`}
+                        >
+                          <span>{st.icon}</span>
+                          <span className="text-[10px] truncate">{st.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── SECTION 3: TAKIM JETONLARI & SIRALI ROTA ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block mb-1.5">
+                    3. TAKIM JETONLARI VE ROTA
+                  </span>
+
+                  {/* 1-5 Number Picker */}
+                  <div className="flex items-center justify-between mb-2 bg-[#090507] p-1 rounded-lg border border-[#1E0B11]">
+                    <span className="text-[9.5px] font-black text-[#8E7E81] px-1">NUMARA:</span>
+                    <div className="flex items-center gap-1">
+                      {([1, 2, 3, 4, 5] as const).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setSelectedPinNumber(n)}
+                          className={`w-5 h-5 rounded text-[10px] font-black transition-colors ${
+                            selectedPinNumber === n ? 'bg-[#FAF2EE] text-black shadow-xs' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1 mb-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setTool('pin-blue')}
+                      className={`h-7 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all ${
+                        tool === 'pin-blue' ? 'bg-blue-600 text-white border-blue-400' : 'bg-[#0A0507] text-blue-400 border-[#1E0B11]'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9.5px] flex items-center justify-center font-bold">
+                        {selectedPinNumber}
+                      </span>
+                      <span className="text-[10px]">Dost Pin</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTool('pin-red')}
+                      className={`h-7 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all ${
+                        tool === 'pin-red' ? 'bg-red-600 text-white border-red-400' : 'bg-[#0A0507] text-red-400 border-[#1E0B11]'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-red-600 text-white text-[9.5px] flex items-center justify-center font-bold">
+                        {selectedPinNumber}
+                      </span>
+                      <span className="text-[10px]">Düşman Pin</span>
+                    </button>
+                  </div>
+
+                  {/* Sequential Path Button (Dignitas Style) */}
+                  <div className="flex items-center gap-1 bg-[#090507] p-1 rounded-lg border border-[#1E0B11]">
+                    <button
+                      type="button"
+                      onClick={() => setTool('seq-path')}
+                      className={`flex-1 h-7 px-2 rounded text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
+                        tool === 'seq-path' ? 'bg-sky-500 text-slate-950 font-black' : 'text-sky-400 hover:text-sky-200'
+                      }`}
+                    >
+                      <span className="w-4 h-4 rounded-full bg-sky-200 text-sky-950 text-[9.5px] flex items-center justify-center font-bold">
+                        {seqCounter}
+                      </span>
+                      <span className="text-[10.5px]">Sıralı Rota #{seqCounter}</span>
+                    </button>
+                    {seqCounter > 1 && (
+                      <button
+                        type="button"
+                        onClick={handleResetSequence}
+                        title="Sayacı 1'e Sıfırla"
+                        className="text-[9.5px] font-bold text-[#F08C96] hover:text-white px-2 h-7 rounded hover:bg-[#1E0B11]"
+                      >
+                        Sıfırla
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── SECTION 4: VEKTÖREL ÇİZİM & KALEM AYARLARI ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block mb-1.5">
+                    4. ÇİZİM ARAÇLARI VE RENK
+                  </span>
+
+                  <div className="grid grid-cols-4 gap-1 mb-2">
+                    {[
+                      { id: 'arrow', label: 'Saldırı', icon: '➡️' },
+                      { id: 'dashed-arrow', label: 'Rotasyon', icon: '⇢' },
+                      { id: 'pen', label: 'Kalem', icon: '✏️' },
+                      { id: 'zone-circle', label: 'Alan ◯', icon: '◯' },
+                      { id: 'zone-box', label: 'Bölge ▢', icon: '▢' },
+                      { id: 'text', label: 'Not', icon: '💬' },
+                      { id: 'eraser', label: 'Silgi', icon: '🧹' },
+                      { id: 'pan', label: 'Pan (Kaydır)', icon: '✋' },
+                    ].map((dt) => (
+                      <button
+                        key={dt.id}
+                        type="button"
+                        onClick={() => setTool(dt.id as StratTool)}
+                        title={dt.label}
+                        className={`h-7 rounded flex flex-col items-center justify-center text-[10px] font-bold transition-all border ${
+                          tool === dt.id
+                            ? 'bg-[#8F1622] text-white border-[#FF4655]'
+                            : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                        }`}
+                      >
+                        <span className="text-xs">{dt.icon}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Ink Swatches */}
+                  <div className="flex items-center justify-between mb-2 bg-[#090507] p-1.5 rounded-lg border border-[#1E0B11]">
+                    <span className="text-[9.5px] font-black text-[#8E7E81]">RENK:</span>
+                    <div className="flex items-center gap-1">
+                      {INK_SWATCHES.map((sw) => (
+                        <button
+                          key={sw.hex}
+                          type="button"
+                          onClick={() => setInkColor(sw.hex)}
+                          title={sw.label}
+                          style={{ backgroundColor: sw.hex }}
+                          className={`w-4 h-4 rounded-full transition-transform ${
+                            inkColor === sw.hex ? 'scale-125 ring-2 ring-white shadow-xs' : 'opacity-70 hover:opacity-100'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Stroke Width Slider */}
+                  <div className="flex items-center justify-between bg-[#090507] p-1.5 rounded-lg border border-[#1E0B11]">
+                    <span className="text-[9.5px] font-black text-[#8E7E81]">KALINLIK:</span>
+                    <div className="flex items-center gap-1">
+                      {[2, 3, 5, 8].map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => setLineWidth(w)}
+                          className={`px-1.5 py-0.5 rounded text-[9.5px] font-black ${
+                            lineWidth === w ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                          }`}
+                        >
+                          {w}px
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
+                {/* ── SECTION 5: GEÇMİŞ VE İŞLEM YÖNETİMİ ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleUndo}
+                      title="Geri Al (Ctrl+Z)"
+                      className="flex-1 h-7 rounded bg-[#0A0507] hover:bg-[#1C0D12] border border-[#2A1319] text-[10.5px] font-bold text-[#FAF2EE] flex items-center justify-center gap-1"
+                    >
+                      <span>↶</span>
+                      <span>Geri Al</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRedo}
+                      title="İleri Al (Ctrl+Y)"
+                      className="flex-1 h-7 rounded bg-[#0A0507] hover:bg-[#1C0D12] border border-[#2A1319] text-[10.5px] font-bold text-[#FAF2EE] flex items-center justify-center gap-1"
+                    >
+                      <span>↷</span>
+                      <span>İleri Al</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleClearPhase}
+                      title="Sadece mevcut aktif aşamadaki çizimleri temizler"
+                      className="flex-1 h-7 rounded bg-[#1C0A0E] hover:bg-[#2E1016] border border-[#3C141E] text-[10px] font-bold text-[#F08C96] hover:text-white"
+                    >
+                      Aşamayı Sil
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      title="Tüm haritadaki taktik çizimlerini sıfırlar"
+                      className="flex-1 h-7 rounded bg-[#1C0A0E] hover:bg-[#2E1016] border border-[#3C141E] text-[10px] font-bold text-red-400 hover:text-white"
+                    >
+                      Tümünü Sil
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setShowAddGameModal(false)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] bg-[#180A0E]"
+                    onClick={handleShareBriefToChat}
+                    className="w-full h-7 rounded-lg bg-[#1F0C13] hover:bg-[#3B141E] border border-[#8F1622] text-[10.5px] font-black text-[#FAF2EE] flex items-center justify-center gap-1 transition-colors"
                   >
-                    Vazgeç
-                  </button>
-                  <button
-                    type="submit"
-                    className="crimson-cta px-4 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1"
-                  >
-                    <IconPlus size={12} />
-                    <span>Oyunu Ekle</span>
+                    <span>📢</span>
+                    <span>Odaya Taktik Brifingi Gönder</span>
                   </button>
                 </div>
-              </form>
-            </div>
-          </div>
-        )}
+              </div>
+            </aside>
+          )}
+        </div>
 
-        {/* ── MODAL: Custom Map Direct URL Input ── */}
-        {showUrlModal && (
-          <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setShowUrlModal(false)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-[#12080B] border border-[#8F1622] rounded-2xl p-5 shadow-2xl"
-            >
-              <h3 className="text-sm font-extrabold text-[#FAF2EE] mb-1">
-                Web Bağlantısından Harita Yükle
-              </h3>
-              <p className="text-xs text-[#A8989B] mb-3">
-                Doğrudan görsel bağlantısını (.png, .jpg) yapıştırın:
-              </p>
-              <form onSubmit={handleCustomUrlSubmit}>
-                <input
-                  type="url"
-                  placeholder="https://example.com/map.jpg"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  autoFocus
-                  className="w-full px-3 py-2 bg-[#090406] border border-[#2E1218] rounded-xl text-xs text-[#FAF2EE] focus:outline-none focus:border-[#C82333] mb-4"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlModal(false)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] bg-[#180A0E]"
-                  >
-                    Vazgeç
-                  </button>
-                  <button
-                    type="submit"
-                    className="crimson-cta px-4 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm"
-                  >
-                    Yükle ve Uygula
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ── MODAL: Callout Text Input ── */}
+        {/* ── MODAL: CALLOUT TEXT NOTE ── */}
         {showTextModal && (
-          <div
-            className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setShowTextModal(false)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-[#12080B] border border-[#8F1622] rounded-2xl p-5 shadow-2xl"
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <form
+              onSubmit={handleTextModalSubmit}
+              className="w-full max-w-sm bg-[#12080B] p-4 rounded-2xl border border-[#8F1622] shadow-2xl flex flex-col gap-3"
             >
-              <h3 className="text-sm font-extrabold text-[#FAF2EE] mb-1">
-                Taktik Notu Ekle
-              </h3>
-              <p className="text-xs text-[#A8989B] mb-3">
-                Harita üzerine bırakılacak espor callout notu (Örn: 01:30 Baron Kontrol, B Fake):
-              </p>
-              <form onSubmit={handleTextModalSubmit}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-white uppercase tracking-wider">
+                  💬 Taktik Notu Ekle
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowTextModal(false)}
+                  className="text-[#9E8E91] hover:text-white text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Örn: A SHORT, MID PUSH, FLASH ÇUKURU..."
+                autoFocus
+                className="w-full px-3 py-2 rounded-lg bg-[#070406] border border-[#2E151C] text-sm text-white focus:outline-hidden focus:border-[#C82333]"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTextModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-[#9E8E91] hover:text-white"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg crimson-cta text-xs font-black text-white"
+                >
+                  Haritaya Ekle
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ── MODAL: ADD CUSTOM GAME ── */}
+        {showAddGameModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <form
+              onSubmit={handleCreateCustomGame}
+              className="w-full max-w-md bg-[#12080B] p-5 rounded-2xl border border-[#8F1622] shadow-2xl flex flex-col gap-3.5"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🎮</span>
+                  <span className="text-sm font-black text-white uppercase tracking-wider">
+                    Yeni Espor Oyunu Ekle
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddGameModal(false)}
+                  className="text-[#9E8E91] hover:text-white text-sm"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-[#8E7E81] uppercase block mb-1">
+                  Oyun Adı
+                </label>
                 <input
                   type="text"
-                  placeholder="Örn: 01:30 Baron Kontrol, B Fake..."
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  autoFocus
-                  className="w-full px-3 py-2 bg-[#090406] border border-[#2E1218] rounded-xl text-xs text-[#FAF2EE] focus:outline-none focus:border-[#C82333] mb-4"
+                  value={newGameName}
+                  onChange={(e) => setNewGameName(e.target.value)}
+                  placeholder="Örn: Rainbow Six Siege, Overwatch 2, Mobile Legends"
+                  className="w-full px-3 py-2 rounded-lg bg-[#070406] border border-[#2E151C] text-xs text-white focus:outline-hidden focus:border-[#C82333]"
+                  required
                 />
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowTextModal(false)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] bg-[#180A0E]"
-                  >
-                    İptal
-                  </button>
-                  <button
-                    type="submit"
-                    className="crimson-cta px-4 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1"
-                  >
-                    <IconCheck size={12} />
-                    <span>Haritaya Ekle</span>
-                  </button>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-[#8E7E81] uppercase block mb-1">
+                  Oyun Mekanik Türü (Araç Kiti Filtresi)
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 'fps', label: 'FPS / Shooter', icon: '🎯' },
+                    { id: 'moba', label: 'MOBA', icon: '⚔️' },
+                    { id: 'br', label: 'Battle Royale', icon: '🪂' },
+                  ].map((arch) => (
+                    <button
+                      key={arch.id}
+                      type="button"
+                      onClick={() => setNewGameArchetype(arch.id as any)}
+                      className={`py-2 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-1 border transition-all ${
+                        newGameArchetype === arch.id
+                          ? 'crimson-cta text-white border-[#FF4655]'
+                          : 'bg-[#070406] text-[#9E8E91] hover:text-white border-[#241116]'
+                      }`}
+                    >
+                      <span className="text-sm">{arch.icon}</span>
+                      <span className="text-[10px]">{arch.label}</span>
+                    </button>
+                  ))}
                 </div>
-              </form>
-            </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-[#8E7E81] uppercase block mb-1">
+                  Harita Listesi (Her satıra bir harita)
+                </label>
+                <textarea
+                  value={newGameMaps}
+                  onChange={(e) => setNewGameMaps(e.target.value)}
+                  placeholder={"Bank\nClubhouse\nOregon\nChalet"}
+                  rows={4}
+                  className="w-full px-3 py-2 rounded-lg bg-[#070406] border border-[#2E151C] text-xs text-white focus:outline-hidden focus:border-[#C82333] font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#241116]">
+                <button
+                  type="button"
+                  onClick={() => setShowAddGameModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-[#9E8E91] hover:text-white"
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg crimson-cta text-xs font-black text-white"
+                >
+                  Oyunu ve Haritaları Kaydet
+                </button>
+              </div>
+            </form>
           </div>
         )}
       </div>
     </div>
   );
-});
+};
 
-// Re-export as TacticalStratDrawer for backwards compatibility
 export const TacticalStratDrawer = TacticalMapBoard;
