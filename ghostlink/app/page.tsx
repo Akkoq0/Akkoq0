@@ -263,7 +263,7 @@ export default function MevaHUDApp() {
         return;
       }
 
-      if (e.code === vState.keybinds.stratBoardKey) {
+      if (e.code === vState.keybinds.stratBoardKey || e.code === 'KeyM' || e.key.toLowerCase() === 'm') {
         vState.toggleStratBoard();
       } else if (e.code === vState.keybinds.miniHudKey) {
         vState.toggleMiniHud();
