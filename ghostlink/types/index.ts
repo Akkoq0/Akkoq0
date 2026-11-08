@@ -90,7 +90,7 @@ export interface DirectMessage {
 
 // ─── Server Members ────────────────────────────────────
 
-export type MemberRole = 'owner' | 'admin' | 'member';
+export type MemberRole = 'owner' | 'admin' | 'member' | 'coach';
 
 export interface ServerMember {
   server_id: string;

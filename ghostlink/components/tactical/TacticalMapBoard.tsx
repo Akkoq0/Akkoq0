@@ -46,6 +46,11 @@ import {
   IconClose,
   IconPlus,
 } from '@/components/ui/MevaIcons';
+import { MapVetoModal } from './MapVetoModal';
+import { NetworkStressModal } from '../telemetry/NetworkStressModal';
+import { NotificationDrawer } from '../notifications/NotificationDrawer';
+import { EconomyTimerWidget } from './EconomyTimerWidget';
+import { MevaErrorBoundary } from '../ui/MevaErrorBoundary';
 
 export { GAME_MAP_POOLS };
 export type { TacticalMapId, TacticalGameCategory };
@@ -72,6 +77,9 @@ export type StratTool =
   | 'sensor'
   | 'audio-ping'
   | 'danger'
+  | 'site-a'
+  | 'site-b'
+  | 'teleport'
   // MOBA (LoL / Dota 2)
   | 'ward-yellow'
   | 'ward-pink'
@@ -79,6 +87,9 @@ export type StratTool =
   | 'rune'
   | 'gank'
   | 'boss'
+  | 'tormentor'
+  | 'watcher'
+  | 'twin-gate'
   // Battle Royale (PUBG)
   | 'airdrop'
   | 'flight'
@@ -99,6 +110,7 @@ export interface StratOperation {
   points: StratPoint[];
   ts: number;
   phase?: 1 | 2 | 3;
+  stratId?: string;
   lineWidth?: number;
   text?: string;
   pinNumber?: number; // 1 to 5 for team pins
@@ -357,9 +369,53 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.font = '900 13px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('!', end.x, end.y + 4.5);
+  } else if (op.tool === 'site-a') {
+    ctx.beginPath();
+    ctx.arc(end.x, end.y + 2, 14, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#EF4444';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('A', end.x, end.y + 4.5);
+  } else if (op.tool === 'site-b') {
+    ctx.beginPath();
+    ctx.arc(end.x, end.y + 2, 14, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#DC2626';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('B', end.x, end.y + 4.5);
+  } else if (op.tool === 'teleport') {
+    ctx.beginPath();
+    ctx.rect(end.x - 13, end.y - 13, 26, 26);
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.85)';
+    ctx.fill();
+    ctx.strokeStyle = '#22D3EE';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#083344';
+    ctx.font = '900 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🌀', end.x, end.y + 4);
   }
 
-  // 2. MOBA Equipment (LoL & Dota 2: Stealth Ward, Control Pink Ward, Honeyfruit, Rune, Gank, Boss)
+  // 2. MOBA Equipment (LoL & Dota 2: Stealth Ward, Control Pink Ward, Honeyfruit, Rune, Gank, Boss, Tormentor, Watcher, Twin Gate)
   else if (op.tool === 'ward-yellow') {
     ctx.beginPath();
     ctx.arc(end.x, end.y, 35, -Math.PI / 4, Math.PI / 4);
@@ -456,6 +512,42 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.font = '900 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('BOSS', end.x, end.y + 4);
+  } else if (op.tool === 'tormentor') {
+    ctx.beginPath();
+    ctx.rect(end.x - 12, end.y - 12, 24, 24);
+    ctx.fillStyle = '#7E22CE';
+    ctx.fill();
+    ctx.strokeStyle = '#E9D5FF';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 8.5px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('TRM', end.x, end.y + 3);
+  } else if (op.tool === 'watcher') {
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#0D9488';
+    ctx.fill();
+    ctx.strokeStyle = '#5EEAD4';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('👁', end.x, end.y + 3);
+  } else if (op.tool === 'twin-gate') {
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 13, 0, Math.PI * 2);
+    ctx.fillStyle = '#6366F1';
+    ctx.fill();
+    ctx.strokeStyle = '#C7D2FE';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 8.5px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('GATE', end.x, end.y + 3);
   }
 
   // 3. Battle Royale Equipment (PUBG: Airdrop, Flight, Vehicle, Bluezone)
@@ -795,6 +887,39 @@ export const TacticalMapBoard: React.FC = () => {
   const [pendingTextPoint, setPendingTextPoint] = useState<StratPoint | null>(null);
   const [textInput, setTextInput] = useState<string>('');
 
+  // Enterprise Modal States
+  const [showMapVetoModal, setShowMapVetoModal] = useState<boolean>(false);
+  const [showNetworkStressModal, setShowNetworkStressModal] = useState<boolean>(false);
+  const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
+
+  // Timeline Playback Replay State (Adım 27-28)
+  const [isPlayingTimeline, setIsPlayingTimeline] = useState<boolean>(false);
+  const [timelineProgress, setTimelineProgress] = useState<number>(100);
+
+  // Multi-Stratbook Tabs State (Adım 10)
+  const [stratTabs, setStratTabs] = useState<Array<{ id: string; name: string }>>([
+    { id: 'main', name: 'Ana Taktik' },
+    { id: 'attack', name: 'A Hücumu' },
+    { id: 'defense', name: 'B Tutuşu' },
+    { id: 'eco', name: 'Eko / Tabanca' },
+  ]);
+  const [activeStratId, setActiveStratId] = useState<string>('main');
+
+  // Timeline Playback Interval (Adım 27-28)
+  useEffect(() => {
+    if (!isPlayingTimeline) return;
+    const interval = setInterval(() => {
+      setTimelineProgress((prev) => {
+        if (prev >= 100) {
+          setIsPlayingTimeline(false);
+          return 100;
+        }
+        return Math.min(100, prev + 2);
+      });
+    }, 60);
+    return () => clearInterval(interval);
+  }, [isPlayingTimeline]);
+
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const draftOpRef = useRef<StratOperation | null>(null);
@@ -892,11 +1017,17 @@ export const TacticalMapBoard: React.FC = () => {
       if (!ctx) return;
       ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-      const visibleOps = opsRef.current.filter((op) => {
+      let visibleOps = opsRef.current.filter((op) => {
         if (op.mapId !== mapId) return false;
+        if (op.stratId && activeStratId && op.stratId !== activeStratId) return false;
         if (showAllPhases) return true;
         return !op.phase || op.phase === activePhase;
       });
+
+      if (timelineProgress < 100 && visibleOps.length > 0) {
+        const count = Math.max(1, Math.ceil((visibleOps.length * timelineProgress) / 100));
+        visibleOps = visibleOps.slice(0, count);
+      }
 
       for (const op of visibleOps) {
         // If this op is being actively dragged, draw draggedOpRef instead
@@ -910,7 +1041,7 @@ export const TacticalMapBoard: React.FC = () => {
         renderSingleOp(ctx, draftOpRef.current);
       }
     });
-  }, [mapId, activePhase, showAllPhases]);
+  }, [mapId, activePhase, showAllPhases, activeStratId, timelineProgress]);
 
   // Redraw blueprint immediately whenever mapId or custom map changes
   const redrawCurrentMapBlueprint = useCallback(() => {
@@ -1095,6 +1226,7 @@ export const TacticalMapBoard: React.FC = () => {
         points: [pt],
         ts: Date.now(),
         phase: activePhase,
+        stratId: activeStratId,
         pinNumber: selectedPinNumber,
         team: tool === 'pin-blue' ? 'blue' : 'red',
       };
@@ -1116,6 +1248,7 @@ export const TacticalMapBoard: React.FC = () => {
         points: pts,
         ts: Date.now(),
         phase: activePhase,
+        stratId: activeStratId,
         seqNumber: seqCounter,
       };
       setOps((prev) => [...prev.slice(-100), seqOp]);
@@ -1126,7 +1259,7 @@ export const TacticalMapBoard: React.FC = () => {
       return;
     }
 
-    // Stamp placement tools (Smoke, Flash, Ward, Spike, Audio Ping, etc.)
+    // Stamp placement tools (Smoke, Flash, Ward, Spike, Audio Ping, Site A/B, Tormentor, etc.)
     const isStamp = [
       'smoke',
       'flash',
@@ -1136,12 +1269,18 @@ export const TacticalMapBoard: React.FC = () => {
       'sensor',
       'audio-ping',
       'danger',
+      'site-a',
+      'site-b',
+      'teleport',
       'ward-yellow',
       'ward-pink',
       'honeyfruit',
       'rune',
       'gank',
       'boss',
+      'tormentor',
+      'watcher',
+      'twin-gate',
       'airdrop',
       'vehicle',
     ].includes(tool);
@@ -1156,6 +1295,7 @@ export const TacticalMapBoard: React.FC = () => {
         points: [pt],
         ts: Date.now(),
         phase: activePhase,
+        stratId: activeStratId,
       };
       setOps((prev) => [...prev.slice(-100), stampOp]);
       setRedoStack([]);
@@ -1173,6 +1313,7 @@ export const TacticalMapBoard: React.FC = () => {
       points: [pt, pt],
       ts: Date.now(),
       phase: activePhase,
+      stratId: activeStratId,
       lineWidth,
     };
     scheduleOverlayPaint();
@@ -1282,6 +1423,7 @@ export const TacticalMapBoard: React.FC = () => {
       text: textInput.trim().toUpperCase(),
       ts: Date.now(),
       phase: activePhase,
+      stratId: activeStratId,
     };
     setOps((prev) => [...prev.slice(-100), textOp]);
     setRedoStack([]);
@@ -1416,8 +1558,8 @@ export const TacticalMapBoard: React.FC = () => {
     const isFPS = meta.archetype === 'fps';
     const isMOBA = meta.archetype === 'moba';
 
-    const fpsStamps: StratTool[] = ['smoke', 'flash', 'molly', 'spike', 'defuse', 'sensor', 'audio-ping', 'danger'];
-    const mobaStamps: StratTool[] = ['ward-yellow', 'ward-pink', 'honeyfruit', 'rune', 'gank', 'boss', 'danger'];
+    const fpsStamps: StratTool[] = ['smoke', 'flash', 'molly', 'spike', 'defuse', 'sensor', 'audio-ping', 'danger', 'site-a', 'site-b', 'teleport'];
+    const mobaStamps: StratTool[] = ['ward-yellow', 'ward-pink', 'honeyfruit', 'rune', 'gank', 'boss', 'danger', 'tormentor', 'watcher', 'twin-gate'];
     const universal: StratTool[] = ['arrow', 'dashed-arrow', 'pen', 'zone-circle', 'zone-box', 'text', 'eraser', 'pan', 'pin-blue', 'pin-red', 'seq-path'];
 
     // Sanitization: If current tool does not match the newly selected archetype, reset tool to a valid default
@@ -1654,6 +1796,7 @@ export const TacticalMapBoard: React.FC = () => {
         }}
         className="w-full max-w-[1500px] h-full max-h-[96dvh] rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_24px_90px_rgba(0,0,0,0.95)] border border-[#8F1622]/60"
       >
+        <MevaErrorBoundary fallbackTitle="Taktik Masası Koruma Modu">
         {/* Hidden Inputs for File Upload & JSON Import */}
         <input
           ref={fileInputRef}
@@ -1719,6 +1862,39 @@ export const TacticalMapBoard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Map Veto & Pick-Ban Button */}
+            <button
+              type="button"
+              onClick={() => setShowMapVetoModal(true)}
+              title="Espor Harita Veto & Pick-Ban Matrisi (BO1/BO3/BO5)"
+              className="h-7 px-2 rounded-lg bg-[#180B10] hover:bg-[#2E1218] border border-[#8F1622]/60 text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
+            >
+              <span>⚖️</span>
+              <span className="hidden sm:inline">Map Veto</span>
+            </button>
+
+            {/* Network P2P Stress Test Button */}
+            <button
+              type="button"
+              onClick={() => setShowNetworkStressModal(true)}
+              title="P2P Mesh Ağı Gecikme ve Stres Testi Telemetrisi"
+              className="h-7 px-2 rounded-lg bg-[#140A0D] hover:bg-[#240F15] border border-[#2C141A] text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
+            >
+              <span>📡</span>
+              <span className="hidden sm:inline">Ağ Testi</span>
+            </button>
+
+            {/* Tactical Notifications Drawer Button */}
+            <button
+              type="button"
+              onClick={() => setShowNotificationDrawer(true)}
+              title="Taktik Bildirim ve Emir Merkezi"
+              className="h-7 px-2 rounded-lg bg-[#140A0D] hover:bg-[#240F15] border border-[#2C141A] text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors relative whitespace-nowrap"
+            >
+              <span>🔔</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C82333] absolute top-1 right-1" />
+            </button>
+
             {/* Sidebar Toggle for Desktop / Mobile */}
             <button
               type="button"
@@ -1984,6 +2160,92 @@ export const TacticalMapBoard: React.FC = () => {
               </div>
 
               <div className="p-3 space-y-3.5">
+                {/* ── SECTION 0: ÇOKLU TAKTİK DEFTERLERİ (MULTI-STRATBOOK) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                      STRATBOOK DEFTERLERİ
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = prompt('Yeni taktik defteri adı (Örn: A Split Execute, Pistol Eco):');
+                        if (name && name.trim()) {
+                          const newId = `strat-${Date.now().toString(36)}`;
+                          setStratTabs((prev) => [...prev, { id: newId, name: name.trim() }]);
+                          setActiveStratId(newId);
+                        }
+                      }}
+                      className="text-[9.5px] font-bold text-[#F08C96] hover:text-white"
+                    >
+                      + Ekle
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                    {stratTabs.map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveStratId(st.id);
+                          setTimelineProgress(100);
+                        }}
+                        className={`px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap border transition-all ${
+                          activeStratId === st.id
+                            ? 'bg-[#8F1622] text-white border-[#FF4655]'
+                            : 'bg-[#090507] text-[#8E7E81] hover:text-white border-[#1E0B11]'
+                        }`}
+                      >
+                        {st.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── SECTION 0B: ZAMAN ÇİZELGESİ & REPLAY OYNATICI (TIMELINE) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                      ZAMAN ÇİZELGESİ (REPLAY)
+                    </span>
+                    <span className="text-[9.5px] font-mono text-[#F08C96]">%{timelineProgress}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (timelineProgress >= 100) setTimelineProgress(0);
+                        setIsPlayingTimeline((p) => !p);
+                      }}
+                      className="h-6 px-2 rounded bg-[#1C0D12] hover:bg-[#2E1218] border border-[#3C141E] text-[10px] font-black text-[#FAF2EE] flex items-center gap-1"
+                    >
+                      {isPlayingTimeline ? '⏸ Durdur' : '▶ Oynat'}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={timelineProgress}
+                      onChange={(e) => {
+                        setIsPlayingTimeline(false);
+                        setTimelineProgress(Number(e.target.value));
+                      }}
+                      className="flex-1 accent-[#C82333] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlayingTimeline(false);
+                        setTimelineProgress(100);
+                      }}
+                      title="Canlı Konuma Git"
+                      className="h-6 px-1.5 rounded bg-[#0A0507] text-[9.5px] font-bold text-[#8E7E81] hover:text-white"
+                    >
+                      Canlı
+                    </button>
+                  </div>
+                </div>
+
                 {/* ── SECTION 1: AŞAMA & KADEME YÖNETİMİ (PHASES) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
                   <div className="flex items-center justify-between mb-1.5">
@@ -2051,6 +2313,9 @@ export const TacticalMapBoard: React.FC = () => {
                         { id: 'audio-ping', label: 'Ses / Ayak İzi', icon: '🔊' },
                         { id: 'sensor', label: 'Kapan / Tuzak', icon: '📡' },
                         { id: 'danger', label: 'Tehlike Sinyali', icon: '⚠️' },
+                        { id: 'site-a', label: 'A Site (Bölge)', icon: '🅰️' },
+                        { id: 'site-b', label: 'B Site (Bölge)', icon: '🅱️' },
+                        { id: 'teleport', label: 'Işınlayıcı / Port', icon: '🌀' },
                       ].map((st) => (
                         <button
                           key={st.id}
@@ -2079,6 +2344,9 @@ export const TacticalMapBoard: React.FC = () => {
                         { id: 'rune', label: 'Nehir Rünü', icon: '💎' },
                         { id: 'gank', label: 'Baskın (Gank)', icon: '⚔️' },
                         { id: 'boss', label: 'Roshan / Baron', icon: '🐉' },
+                        { id: 'tormentor', label: 'Tormentor', icon: '💎' },
+                        { id: 'watcher', label: 'Watcher (Gözcü)', icon: '👁️' },
+                        { id: 'twin-gate', label: 'İkiz Geçit', icon: '⛩️' },
                         { id: 'danger', label: 'Tehlike Sinyali', icon: '⚠️' },
                       ].map((st) => (
                         <button
@@ -2126,6 +2394,9 @@ export const TacticalMapBoard: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* ── SECTION 2B: EKONOMİ VE OBJEKTİF SAYACI (ADIM 26) ── */}
+                <EconomyTimerWidget archetype={activeGameMeta.archetype} />
 
                 {/* ── SECTION 3: TAKIM JETONLARI & SIRALI ROTA ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
@@ -2476,6 +2747,12 @@ export const TacticalMapBoard: React.FC = () => {
             </form>
           </div>
         )}
+
+        {/* ── ENTERPRISE MODALS ── */}
+        <MapVetoModal isOpen={showMapVetoModal} onClose={() => setShowMapVetoModal(false)} />
+        <NetworkStressModal isOpen={showNetworkStressModal} onClose={() => setShowNetworkStressModal(false)} />
+        <NotificationDrawer isOpen={showNotificationDrawer} onClose={() => setShowNotificationDrawer(false)} />
+        </MevaErrorBoundary>
       </div>
     </div>
   );

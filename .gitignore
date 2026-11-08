@@ -24,3 +24,4 @@ android-sdk/
 .DS_Store
 Thumbs.db
 **/*.log
+.codespaces-heartbeat
