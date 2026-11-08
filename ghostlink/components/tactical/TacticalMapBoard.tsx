@@ -41,12 +41,16 @@ import {
   MAP_BLUEPRINTS,
   GAME_MAP_POOLS,
   drawRealisticArenaBlueprint,
+  drawMapCalloutsOverlay,
+  drawTeleporterLinksOverlay,
+  TacticalPresetStrat,
 } from './tacticalBlueprints';
 import {
   IconClose,
   IconPlus,
 } from '@/components/ui/MevaIcons';
 import { MapVetoModal } from './MapVetoModal';
+import { TacticalPresetsModal } from './TacticalPresetsModal';
 import { NetworkStressModal } from '../telemetry/NetworkStressModal';
 import { NotificationDrawer } from '../notifications/NotificationDrawer';
 import { EconomyTimerWidget } from './EconomyTimerWidget';
@@ -891,6 +895,8 @@ export const TacticalMapBoard: React.FC = () => {
   const [showMapVetoModal, setShowMapVetoModal] = useState<boolean>(false);
   const [showNetworkStressModal, setShowNetworkStressModal] = useState<boolean>(false);
   const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
+  const [showPresetModal, setShowPresetModal] = useState<boolean>(false);
+  const [showCallouts, setShowCallouts] = useState<boolean>(true);
 
   // Timeline Playback Replay State (Adım 27-28)
   const [isPlayingTimeline, setIsPlayingTimeline] = useState<boolean>(false);
@@ -1040,8 +1046,14 @@ export const TacticalMapBoard: React.FC = () => {
       if (draftOpRef.current && draftOpRef.current.mapId === mapId) {
         renderSingleOp(ctx, draftOpRef.current);
       }
+
+      // Render Teleporter Links & Map Callouts Overlay if enabled
+      if (showCallouts && mapId !== 'custom') {
+        drawTeleporterLinksOverlay(ctx, mapId as TacticalMapId);
+        drawMapCalloutsOverlay(ctx, mapId as TacticalMapId);
+      }
     });
-  }, [mapId, activePhase, showAllPhases, activeStratId, timelineProgress]);
+  }, [mapId, activePhase, showAllPhases, activeStratId, timelineProgress, showCallouts]);
 
   // Redraw blueprint immediately whenever mapId or custom map changes
   const redrawCurrentMapBlueprint = useCallback(() => {
@@ -1548,6 +1560,52 @@ export const TacticalMapBoard: React.FC = () => {
     void broadcastStratPacket({ action: 'switch-map', mapId: next });
   };
 
+  // 1-Click Pro Strat Preset Applicator
+  const handleApplyPresetStrat = useCallback(
+    (preset: TacticalPresetStrat) => {
+      setMapId(preset.mapId);
+
+      for (const [cat, maps] of Object.entries(GAME_MAP_POOLS)) {
+        if ((maps as TacticalMapId[]).includes(preset.mapId)) {
+          setSelectedGameTab(cat as TacticalGameCategory);
+          break;
+        }
+      }
+
+      let maxSeq = seqCounter;
+      const newOps: StratOperation[] = preset.operations.map((item, idx) => {
+        if (item.seqNumber && item.seqNumber >= maxSeq) {
+          maxSeq = item.seqNumber + 1;
+        }
+        return {
+          id: `preset-${preset.id}-${Date.now()}-${idx}`,
+          mapId: preset.mapId,
+          tool: item.tool as StratTool,
+          color: item.color || '#EF4444',
+          author: 'Pro Stratbook',
+          points: item.points,
+          ts: Date.now() + idx,
+          phase: activePhase,
+          stratId: activeStratId,
+          text: item.text,
+          seqNumber: item.seqNumber,
+          pinNumber: item.pinNumber,
+          team: item.team,
+        };
+      });
+
+      setOps((prev) => [...prev.slice(-80), ...newOps]);
+      setRedoStack([]);
+      setSeqCounter(maxSeq);
+      setShowPresetModal(false);
+
+      for (const op of newOps) {
+        void broadcastStratPacket({ action: 'add', op });
+      }
+    },
+    [activePhase, activeStratId, broadcastStratPacket, seqCounter],
+  );
+
   // Game Switcher with Strict Tool Isolation Sanitization
   const handleSwitchGameTab = (gameTabId: string) => {
     setSelectedGameTab(gameTabId);
@@ -1862,6 +1920,17 @@ export const TacticalMapBoard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Pro Stratbook Presets Modal Button */}
+            <button
+              type="button"
+              onClick={() => setShowPresetModal(true)}
+              title="Profesyonel Espor Taktik ve Orman Rotası Şablonları"
+              className="h-7 px-2.5 rounded-lg bg-[#2E1218] hover:bg-[#451822] border border-[#C82333]/70 text-xs font-black text-[#FAF2EE] flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(200,35,51,0.3)] whitespace-nowrap"
+            >
+              <span>📋</span>
+              <span className="hidden sm:inline">Şablonlar</span>
+            </button>
+
             {/* Map Veto & Pick-Ban Button */}
             <button
               type="button"
@@ -1986,6 +2055,23 @@ export const TacticalMapBoard: React.FC = () => {
             >
               <IconPlus size={10} />
               <span>Harita Yükle</span>
+            </button>
+
+            {/* [🏷️ Calloutlar] Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCallouts((prev) => !prev);
+              }}
+              title="Resmi espor harita bölge ve callout isimlerini göster/gizle"
+              className={`h-6 px-2 rounded-lg text-[10.5px] font-extrabold flex items-center gap-1 border transition-all whitespace-nowrap ${
+                showCallouts
+                  ? 'bg-[#8F1622] text-[#FAF2EE] border-[#FF4655]'
+                  : 'bg-[#10070A] text-[#9E8E91] hover:text-[#FAF2EE] border-[#2A1016]'
+              }`}
+            >
+              <span>🏷️</span>
+              <span>Calloutlar</span>
             </button>
           </div>
 
@@ -2752,6 +2838,12 @@ export const TacticalMapBoard: React.FC = () => {
         <MapVetoModal isOpen={showMapVetoModal} onClose={() => setShowMapVetoModal(false)} />
         <NetworkStressModal isOpen={showNetworkStressModal} onClose={() => setShowNetworkStressModal(false)} />
         <NotificationDrawer isOpen={showNotificationDrawer} onClose={() => setShowNotificationDrawer(false)} />
+        <TacticalPresetsModal
+          open={showPresetModal}
+          onClose={() => setShowPresetModal(false)}
+          onApplyPreset={handleApplyPresetStrat}
+          currentMapId={mapId}
+        />
         </MevaErrorBoundary>
       </div>
     </div>

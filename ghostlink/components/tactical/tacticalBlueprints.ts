@@ -378,3 +378,448 @@ export function drawRealisticArenaBlueprint(
   ctx.fill();
   ctx.restore();
 }
+
+// ─────────────────────────────────────────────────────────
+// Map Callouts & Tactical Landmarks (LoL, Valorant, Dota, CS2)
+// ─────────────────────────────────────────────────────────
+
+export interface MapCallout {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  type: 'site' | 'spawn' | 'portal' | 'choke' | 'objective' | 'neutral';
+}
+
+export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> = {
+  // ── VALORANT: BIND ──
+  bind: [
+    { id: 'b-def', label: 'DEFENDER SPAWN', x: 420, y: 70, type: 'spawn' },
+    { id: 'b-atk', label: 'ATTACKER SPAWN', x: 420, y: 420, type: 'spawn' },
+    { id: 'b-site-a', label: 'A SITE', x: 510, y: 160, type: 'site' },
+    { id: 'b-site-b', label: 'B SITE', x: 305, y: 140, type: 'site' },
+    { id: 'b-a-port', label: 'A PORT (Işınlayıcı)', x: 455, y: 195, type: 'portal' },
+    { id: 'b-a-exit', label: 'A PORT ÇIKIŞI (B Short)', x: 385, y: 210, type: 'portal' },
+    { id: 'b-b-port', label: 'B PORT (Işınlayıcı)', x: 240, y: 205, type: 'portal' },
+    { id: 'b-b-exit', label: 'B PORT ÇIKIŞI (A Lobby)', x: 565, y: 300, type: 'portal' },
+    { id: 'b-showers', label: 'HAMAM (Showers)', x: 550, y: 210, type: 'choke' },
+    { id: 'b-uhall', label: 'LAMBA (U-Hall)', x: 470, y: 160, type: 'choke' },
+    { id: 'b-hookah', label: 'NARGİLE (Hookah)', x: 315, y: 230, type: 'choke' },
+    { id: 'b-blong', label: 'B UZUN (B Long)', x: 270, y: 250, type: 'choke' },
+    { id: 'b-ashort', label: 'A KISA (A Short)', x: 450, y: 250, type: 'choke' },
+  ],
+
+  // ── VALORANT: BREEZE ──
+  breeze: [
+    { id: 'brz-def', label: 'DEFENDER SIDE SPAWN', x: 450, y: 80, type: 'spawn' },
+    { id: 'brz-atk', label: 'ATTACKER SIDE SPAWN', x: 375, y: 400, type: 'spawn' },
+    { id: 'brz-site-a', label: 'A SITE (Piramitler)', x: 530, y: 230, type: 'site' },
+    { id: 'brz-site-b', label: 'B SITE (B Back)', x: 295, y: 160, type: 'site' },
+    { id: 'brz-acave', label: 'A MAĞARA (Cave)', x: 530, y: 340, type: 'choke' },
+    { id: 'brz-ahall', label: 'A KORİDOR (Hall)', x: 480, y: 260, type: 'choke' },
+    { id: 'brz-midchutes', label: 'ORTA KAYDIRAK (Chutes)', x: 410, y: 270, type: 'choke' },
+    { id: 'brz-midnest', label: 'ORTA YUVA (Nest)', x: 410, y: 150, type: 'choke' },
+    { id: 'brz-bmain', label: 'B ANA (Main)', x: 285, y: 250, type: 'choke' },
+    { id: 'brz-belbow', label: 'B DİRSEK (Elbow)', x: 295, y: 200, type: 'choke' },
+  ],
+
+  // ── VALORANT: ASCENT ──
+  ascent: [
+    { id: 'asc-def', label: 'DEFENDER SPAWN', x: 420, y: 80, type: 'spawn' },
+    { id: 'asc-atk', label: 'ATTACKER SPAWN', x: 420, y: 410, type: 'spawn' },
+    { id: 'asc-site-a', label: 'A SITE (Heaven / Hell)', x: 515, y: 180, type: 'site' },
+    { id: 'asc-site-b', label: 'B SITE (Boathouse)', x: 325, y: 190, type: 'site' },
+    { id: 'asc-tree', label: 'A AĞAÇ (Tree Door)', x: 465, y: 210, type: 'choke' },
+    { id: 'asc-market', label: 'MARKET (B Market)', x: 375, y: 220, type: 'choke' },
+    { id: 'asc-mid', label: 'ORTA AVLU (Mid Courtyard)', x: 420, y: 250, type: 'choke' },
+    { id: 'asc-amain', label: 'A ANA (A Main)', x: 510, y: 290, type: 'choke' },
+    { id: 'asc-bmain', label: 'B ANA (B Main)', x: 330, y: 290, type: 'choke' },
+  ],
+
+  // ── LEAGUE OF LEGENDS: SIHIRDAR VADISI ──
+  rift: [
+    { id: 'lol-blue-base', label: 'MAVİ ÜS (Blue Base)', x: 240, y: 420, type: 'spawn' },
+    { id: 'lol-red-base', label: 'KIRMIZI ÜS (Red Base)', x: 600, y: 60, type: 'spawn' },
+    { id: 'lol-baron', label: 'BARON NASHOR (20:00+)', x: 350, y: 160, type: 'objective' },
+    { id: 'lol-dragon', label: 'EJDERHA ÇUKURU (Dragon)', x: 490, y: 320, type: 'objective' },
+    { id: 'lol-herald', label: "VADİ'NİN ALAMETİ / KURT", x: 350, y: 175, type: 'objective' },
+    { id: 'lol-blue-buff', label: 'MAVİ GÜÇLENDİRME (1)', x: 330, y: 320, type: 'neutral' },
+    { id: 'lol-gromp', label: 'GROMP (2)', x: 290, y: 290, type: 'neutral' },
+    { id: 'lol-wolves', label: 'ALACAKURTLAR (3)', x: 345, y: 275, type: 'neutral' },
+    { id: 'lol-raptors', label: 'YIRTICILAR (4)', x: 410, y: 305, type: 'neutral' },
+    { id: 'lol-red-buff', label: 'KIRMIZI GÜÇLENDİRME (5)', x: 440, y: 335, type: 'neutral' },
+    { id: 'lol-krugs', label: 'KAYACILLAR (6)', x: 465, y: 370, type: 'neutral' },
+    { id: 'lol-mid', label: 'ORTA KORİDOR (Mid)', x: 420, y: 240, type: 'choke' },
+  ],
+
+  // ── DOTA 2: KADIMLER VADISI (7.33+ NEW FRONTIERS) ──
+  dota: [
+    { id: 'dota-rad-base', label: 'RADIANT KADİMİ', x: 235, y: 425, type: 'spawn' },
+    { id: 'dota-dire-base', label: 'DIRE KADİMİ', x: 605, y: 55, type: 'spawn' },
+    { id: 'dota-roshan-day', label: 'ROSHAN (Gündüz Çukuru)', x: 220, y: 60, type: 'objective' },
+    { id: 'dota-roshan-night', label: 'ROSHAN (Gece Çukuru)', x: 620, y: 420, type: 'objective' },
+    { id: 'dota-twin-top', label: 'İKİZ GEÇİT (Kuzey)', x: 205, y: 65, type: 'portal' },
+    { id: 'dota-twin-bot', label: 'İKİZ GEÇİT (Güney)', x: 635, y: 415, type: 'portal' },
+    { id: 'dota-torm-rad', label: 'TORMENTOR (Radiant 20m)', x: 280, y: 330, type: 'objective' },
+    { id: 'dota-torm-dire', label: 'TORMENTOR (Dire 20m)', x: 560, y: 150, type: 'objective' },
+    { id: 'dota-lotus-top', label: 'LOTUS HAVUZU (Kuzey)', x: 230, y: 180, type: 'neutral' },
+    { id: 'dota-lotus-bot', label: 'LOTUS HAVUZU (Güney)', x: 610, y: 300, type: 'neutral' },
+    { id: 'dota-mid', label: 'ORTA NEHİR (River Runes)', x: 420, y: 240, type: 'choke' },
+  ],
+
+  // ── CS2: MIRAGE ──
+  mirage: [
+    { id: 'mrg-t', label: 'T BAŞLANGICI (T Spawn)', x: 250, y: 410, type: 'spawn' },
+    { id: 'mrg-ct', label: 'CT BAŞLANGICI (CT Spawn)', x: 520, y: 130, type: 'spawn' },
+    { id: 'mrg-site-a', label: 'A BOMBSITE', x: 490, y: 240, type: 'site' },
+    { id: 'mrg-site-b', label: 'B BOMBSITE', x: 310, y: 170, type: 'site' },
+    { id: 'mrg-window', label: 'ORTA PENCERE (Window)', x: 390, y: 260, type: 'choke' },
+    { id: 'mrg-conn', label: 'KONNEKTÖR', x: 440, y: 260, type: 'choke' },
+    { id: 'mrg-palace', label: 'SARAY (Palace)', x: 540, y: 320, type: 'choke' },
+    { id: 'mrg-aramp', label: 'A RAMPA (A Ramp)', x: 470, y: 340, type: 'choke' },
+    { id: 'mrg-bapps', label: 'B APARTMANLAR', x: 280, y: 260, type: 'choke' },
+  ],
+
+  // ── CS2: INFERNO ──
+  inferno: [
+    { id: 'inf-t', label: 'T BAŞLANGICI (T Spawn)', x: 240, y: 390, type: 'spawn' },
+    { id: 'inf-ct', label: 'CT BAŞLANGICI (CT Spawn)', x: 540, y: 120, type: 'spawn' },
+    { id: 'inf-site-a', label: 'A BOMBSITE', x: 490, y: 210, type: 'site' },
+    { id: 'inf-site-b', label: 'B BOMBSITE', x: 370, y: 140, type: 'site' },
+    { id: 'inf-banana', label: 'MUZ (Banana)', x: 340, y: 280, type: 'choke' },
+    { id: 'inf-apps', label: 'APARTMANLAR (Apps)', x: 440, y: 230, type: 'choke' },
+    { id: 'inf-pit', label: 'ÇUKUR (Pit)', x: 540, y: 220, type: 'choke' },
+  ],
+};
+
+// ─────────────────────────────────────────────────────────
+// Teleporter Connection Overlays (Bind & Dota 2 Twin Gates)
+// ─────────────────────────────────────────────────────────
+
+export function drawTeleporterLinksOverlay(ctx: CanvasRenderingContext2D, mapId: TacticalMapId) {
+  if (mapId === 'bind') {
+    // A Port (455, 195) -> A Port Exit (385, 210)
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#22D3EE';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(455, 195);
+    ctx.quadraticCurveTo(420, 185, 385, 210);
+    ctx.stroke();
+
+    // Portal Badge A
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.25)';
+    ctx.beginPath();
+    ctx.arc(455, 195, 14, 0, Math.PI * 2);
+    ctx.arc(385, 210, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // B Port (240, 205) -> B Port Exit (565, 300)
+    ctx.strokeStyle = '#38BDF8';
+    ctx.beginPath();
+    ctx.moveTo(240, 205);
+    ctx.bezierCurveTo(240, 360, 520, 370, 565, 300);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    ctx.beginPath();
+    ctx.arc(240, 205, 14, 0, Math.PI * 2);
+    ctx.arc(565, 300, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else if (mapId === 'dota') {
+    // Twin Gates: North (205, 65) <-> South (635, 415)
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = '#C084FC';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(205, 65);
+    ctx.bezierCurveTo(150, 240, 680, 240, 635, 415);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(192, 132, 252, 0.3)';
+    ctx.beginPath();
+    ctx.arc(205, 65, 16, 0, Math.PI * 2);
+    ctx.arc(635, 415, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Map Callouts Renderer (Clean Esports Typography & Badges)
+// ─────────────────────────────────────────────────────────
+
+export function drawMapCalloutsOverlay(ctx: CanvasRenderingContext2D, mapId: TacticalMapId) {
+  const callouts = MAP_CALLOUT_PRESETS[mapId];
+  if (!callouts || callouts.length === 0) return;
+
+  ctx.save();
+  for (const c of callouts) {
+    ctx.font = '800 9px monospace';
+    const textWidth = ctx.measureText(c.label).width;
+    const padX = 7;
+    const padY = 4;
+    const w = textWidth + padX * 2 + 10;
+    const h = 18;
+    const rx = c.x - w / 2;
+    const ry = c.y - h / 2;
+
+    // Background pill
+    ctx.fillStyle = 'rgba(9, 6, 8, 0.88)';
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, w, h, 6);
+    ctx.fill();
+
+    let borderColor = 'rgba(184, 170, 172, 0.3)';
+    let dotColor = '#B8AAAC';
+    let textColor = '#FAF2EE';
+
+    if (c.type === 'site') {
+      borderColor = 'rgba(239, 68, 68, 0.85)';
+      dotColor = '#EF4444';
+      textColor = '#FEE2E2';
+    } else if (c.type === 'portal') {
+      borderColor = 'rgba(34, 211, 238, 0.85)';
+      dotColor = '#22D3EE';
+      textColor = '#CFFAFE';
+    } else if (c.type === 'objective') {
+      borderColor = 'rgba(192, 132, 252, 0.85)';
+      dotColor = '#C084FC';
+      textColor = '#F3E8FF';
+    } else if (c.type === 'neutral') {
+      borderColor = 'rgba(52, 211, 153, 0.8)';
+      dotColor = '#34D399';
+      textColor = '#D1FAE5';
+    } else if (c.type === 'spawn') {
+      borderColor = 'rgba(148, 163, 184, 0.4)';
+      dotColor = '#94A3B8';
+      textColor = '#CBD5E1';
+    } else if (c.type === 'choke') {
+      borderColor = 'rgba(200, 35, 51, 0.55)';
+      dotColor = '#C82333';
+      textColor = '#FAF2EE';
+    }
+
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Type indicator dot
+    ctx.fillStyle = dotColor;
+    ctx.beginPath();
+    ctx.arc(rx + 8, ry + h / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = textColor;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c.label, rx + 16, ry + h / 2 + 0.5);
+  }
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────
+// Esports Preset Strategies (LoL, Valorant, CS2, Dota 2)
+// ─────────────────────────────────────────────────────────
+
+export interface TacticalPresetStrat {
+  id: string;
+  title: string;
+  description: string;
+  mapId: TacticalMapId;
+  game: TacticalGameCategory;
+  tags: string[];
+  operations: Array<{
+    tool: string;
+    points: Array<{ x: number; y: number }>;
+    color?: string;
+    text?: string;
+    seqNumber?: number;
+    pinNumber?: number;
+    team?: 'blue' | 'red';
+  }>;
+}
+
+export const TACTICAL_PRESET_STRATS: TacticalPresetStrat[] = [
+  // ── 1. LEAGUE OF LEGENDS: DIGNITAS FULL CLEAR JUNGLE ROUTE (1-6) ──
+  {
+    id: 'lol-dignitas-full-clear',
+    title: 'Dignitas Pro Full Clear Orman Rotası (1-6)',
+    description: '1: Mavi -> 2: Gromp -> 3: Kurtlar -> 4: Yırtıcılar -> 5: Kırmızı -> 6: Yampiri. Profesyonel espor tempo rotası.',
+    mapId: 'rift',
+    game: 'lol',
+    tags: ['ORMAN', 'DİGNİTAS', 'META 2026'],
+    operations: [
+      { tool: 'seq-path', points: [{ x: 330, y: 320 }], seqNumber: 1, color: '#38BDF8' },
+      { tool: 'seq-path', points: [{ x: 330, y: 320 }, { x: 290, y: 290 }], seqNumber: 2, color: '#38BDF8' },
+      { tool: 'seq-path', points: [{ x: 290, y: 290 }, { x: 345, y: 275 }], seqNumber: 3, color: '#38BDF8' },
+      { tool: 'seq-path', points: [{ x: 345, y: 275 }, { x: 410, y: 305 }], seqNumber: 4, color: '#38BDF8' },
+      { tool: 'seq-path', points: [{ x: 410, y: 305 }, { x: 440, y: 335 }], seqNumber: 5, color: '#38BDF8' },
+      { tool: 'seq-path', points: [{ x: 440, y: 335 }, { x: 490, y: 380 }], seqNumber: 6, color: '#38BDF8' },
+      { tool: 'ward-yellow', points: [{ x: 510, y: 340 }] },
+      { tool: 'arrow', points: [{ x: 490, y: 380 }, { x: 540, y: 400 }], color: '#22C55E' },
+      { tool: 'text', points: [{ x: 330, y: 235 }], text: 'Dignitas Orman Rotası (3:15 Yampiri Hazır)' },
+    ],
+  },
+
+  // ── 2. VALORANT BIND: A HAMAM & KISA PINCER EXECUTE ──
+  {
+    id: 'val-bind-a-pincer',
+    title: 'Bind: A Hamam & A Kısa Çifte Kıskanç Baskın',
+    description: 'U-Hall (Lamba) ve Heaven sisleri, hamam ve kısa üzerinden eşzamanlı çifte giriş ve default A plantı.',
+    mapId: 'bind',
+    game: 'valorant',
+    tags: ['A EXECUTE', 'PRO STRAT', 'SMOKES'],
+    operations: [
+      { tool: 'site-a', points: [{ x: 510, y: 160 }] },
+      { tool: 'smoke', points: [{ x: 470, y: 160 }] }, // U-Hall (Lamba) Smoke
+      { tool: 'smoke', points: [{ x: 510, y: 115 }] }, // Heaven Smoke
+      { tool: 'arrow', points: [{ x: 450, y: 250 }, { x: 500, y: 170 }], color: '#22C55E' }, // A Short Entry
+      { tool: 'arrow', points: [{ x: 550, y: 210 }, { x: 520, y: 165 }], color: '#38BDF8' }, // Showers Entry
+      { tool: 'flash', points: [{ x: 495, y: 175 }] },
+      { tool: 'spike', points: [{ x: 510, y: 160 }] },
+      { tool: 'text', points: [{ x: 430, y: 310 }], text: 'A Bölgesi Eşzamanlı Giriş & Lamba Kapatma' },
+    ],
+  },
+
+  // ── 3. VALORANT BIND: IŞINLAYICI FAKE & B KISA SPLIT ──
+  {
+    id: 'val-bind-teleport-fake',
+    title: 'Bind: A Port Işınlayıcı Fake & B Kısa Split',
+    description: 'A Hamam ses gürültüsü sonrası A Porttan B Kısa çıkışına ışınlanma, Elbow dumanı ve B Site hızlı kurulumu.',
+    mapId: 'bind',
+    game: 'valorant',
+    tags: ['PORTAL', 'FAKE', 'B SPLIT'],
+    operations: [
+      { tool: 'audio-ping', points: [{ x: 550, y: 230 }] },
+      { tool: 'teleport', points: [{ x: 455, y: 195 }] }, // A Port Entry
+      { tool: 'dashed-arrow', points: [{ x: 455, y: 195 }, { x: 385, y: 210 }], color: '#22D3EE' },
+      { tool: 'smoke', points: [{ x: 280, y: 140 }] }, // B Elbow
+      { tool: 'smoke', points: [{ x: 320, y: 100 }] }, // B Hall
+      { tool: 'arrow', points: [{ x: 385, y: 210 }, { x: 310, y: 140 }], color: '#22C55E' },
+      { tool: 'site-b', points: [{ x: 305, y: 140 }] },
+      { tool: 'spike', points: [{ x: 305, y: 140 }] },
+    ],
+  },
+
+  // ── 4. VALORANT BREEZE: A VIPER DUVARI & PIRAMIT FAST PLANT ──
+  {
+    id: 'val-breeze-a-viper',
+    title: 'Breeze: A Site Viper Zehir Duvarı & Hızlı Piramit Plant',
+    description: 'Piramitleri ikiye bölen Viper duvarı, A Mağara çıkışı ve A Site piramit arkası güvenli plant.',
+    mapId: 'breeze',
+    game: 'valorant',
+    tags: ['A VIPER', 'BREEZE', 'RED BULL'],
+    operations: [
+      { tool: 'site-a', points: [{ x: 530, y: 230 }] },
+      { tool: 'site-b', points: [{ x: 295, y: 160 }] },
+      { tool: 'dashed-arrow', points: [{ x: 510, y: 190 }, { x: 550, y: 270 }], color: '#22C55E' }, // Viper Wall
+      { tool: 'smoke', points: [{ x: 530, y: 310 }] }, // Poison Orb
+      { tool: 'arrow', points: [{ x: 530, y: 340 }, { x: 530, y: 245 }], color: '#22C55E' },
+      { tool: 'spike', points: [{ x: 530, y: 230 }] },
+      { tool: 'text', points: [{ x: 470, y: 370 }], text: 'Red Bull Breeze A Piramit Plantı' },
+    ],
+  },
+
+  // ── 5. CS2 MIRAGE: PRO A BOMBSITE EXECUTE (STAIRS, JUNGLE, CT) ──
+  {
+    id: 'cs2-mirage-a-exec',
+    title: 'CS2 Mirage: Pro A Sis Girişi (Merdiven + Orman + CT)',
+    description: 'Merdiven, Orman ve CT Spawn sisleri ile A Ramp ve Saraydan eşzamanlı Tetris temizliği ve A Bombsite plantı.',
+    mapId: 'mirage',
+    game: 'cs2',
+    tags: ['A EXECUTE', 'MIRAGE', 'SMOKES'],
+    operations: [
+      { tool: 'smoke', points: [{ x: 505, y: 170 }] }, // CT Smoke
+      { tool: 'smoke', points: [{ x: 460, y: 210 }] }, // Jungle Smoke
+      { tool: 'smoke', points: [{ x: 445, y: 240 }] }, // Stairs Smoke
+      { tool: 'flash', points: [{ x: 470, y: 280 }] },
+      { tool: 'arrow', points: [{ x: 470, y: 340 }, { x: 480, y: 260 }], color: '#EF4444' }, // A Ramp to Tetris
+      { tool: 'arrow', points: [{ x: 540, y: 310 }, { x: 495, y: 240 }], color: '#F59E0B' }, // Palace to Site
+      { tool: 'spike', points: [{ x: 490, y: 240 }] }, // Bomb Default
+      { tool: 'site-a', points: [{ x: 490, y: 240 }] },
+    ],
+  },
+
+  // ── 6. CS2 MIRAGE: B APARTMAN BASKINI & KISA BÖLÜNME ──
+  {
+    id: 'cs2-mirage-b-split',
+    title: 'CS2 Mirage: B Apartman Baskını & Market Sisi',
+    description: 'Market pencere ve kapı sisleri, araba alevi ve apartman + kısa üzerinden B Bombsite kuşatması.',
+    mapId: 'mirage',
+    game: 'cs2',
+    tags: ['B SPLIT', 'MIRAGE', 'APARTMAN'],
+    operations: [
+      { tool: 'smoke', points: [{ x: 330, y: 150 }] }, // Market Window
+      { tool: 'smoke', points: [{ x: 310, y: 130 }] }, // Market Door
+      { tool: 'molly', points: [{ x: 270, y: 200 }] }, // Van Molly
+      { tool: 'flash', points: [{ x: 290, y: 230 }] },
+      { tool: 'arrow', points: [{ x: 280, y: 260 }, { x: 310, y: 170 }], color: '#EF4444' },
+      { tool: 'dashed-arrow', points: [{ x: 350, y: 210 }, { x: 315, y: 175 }], color: '#38BDF8' },
+      { tool: 'spike', points: [{ x: 310, y: 170 }] },
+      { tool: 'site-b', points: [{ x: 310, y: 170 }] },
+    ],
+  },
+
+  // ── 7. CS2 INFERNO: BANANA KONTROLÜ & B SITE GİRİŞİ ──
+  {
+    id: 'cs2-inferno-banana',
+    title: 'CS2 Inferno: Muz Kontrolü & Tabut Sisi Girişi',
+    description: 'Muz araba alevi, tabut ve CT spawn sisleri ile B Bombsite hızlı giriş ve havuz arkası plant.',
+    mapId: 'inferno',
+    game: 'cs2',
+    tags: ['BANANA', 'INFERNO', 'B SITE'],
+    operations: [
+      { tool: 'molly', points: [{ x: 340, y: 260 }] }, // Car Molly
+      { tool: 'smoke', points: [{ x: 350, y: 130 }] }, // Coffins
+      { tool: 'smoke', points: [{ x: 410, y: 130 }] }, // CT Spawn
+      { tool: 'flash', points: [{ x: 335, y: 230 }] },
+      { tool: 'arrow', points: [{ x: 340, y: 280 }, { x: 370, y: 140 }], color: '#EF4444' },
+      { tool: 'spike', points: [{ x: 370, y: 140 }] },
+      { tool: 'site-b', points: [{ x: 370, y: 140 }] },
+    ],
+  },
+
+  // ── 8. DOTA 2: RADIANT SAFE LANE & İKİZ GEÇİT BASKINI ──
+  {
+    id: 'dota-twin-gate-gank',
+    title: 'Dota 2: Radiant Güvenli Koridor & İkiz Geçit Baskını',
+    description: 'Güney ikiz geçidini kullanarak Kuzey koridoruna ani ışınlanma, Watcher görüşü ve Tormentor hazırlığı.',
+    mapId: 'dota',
+    game: 'dota2',
+    tags: ['7.33+', 'TWIN GATE', 'GANK', 'ROSHAN'],
+    operations: [
+      { tool: 'twin-gate', points: [{ x: 205, y: 65 }] },
+      { tool: 'twin-gate', points: [{ x: 635, y: 415 }] },
+      { tool: 'arrow', points: [{ x: 580, y: 420 }, { x: 635, y: 415 }], color: '#C084FC' },
+      { tool: 'dashed-arrow', points: [{ x: 205, y: 65 }, { x: 260, y: 100 }], color: '#EF4444' },
+      { tool: 'watcher', points: [{ x: 340, y: 180 }] },
+      { tool: 'tormentor', points: [{ x: 280, y: 330 }] },
+      { tool: 'gank', points: [{ x: 260, y: 100 }] },
+      { tool: 'text', points: [{ x: 380, y: 70 }], text: 'İkiz Geçit İle Kuzey Gank Rotası' },
+    ],
+  },
+
+  // ── 9. DOTA 2: 7.33+ TAKTİKSEL ÇİFTLİK VE GÜVENLİ BÖLGE HARİTASI ──
+  {
+    id: 'dota-safe-zones',
+    title: 'Dota 2 7.33+: Güvenli Çiftlik Bölgeleri & Çift Roshan Tuzağı',
+    description: 'IGN / Reddit taktik rehberine göre Radiant ve Dire güvenli orman sınırları ve Gündüz/Gece Roshan pusu hatları.',
+    mapId: 'dota',
+    game: 'dota2',
+    tags: ['FARM ZONE', '7.33+', 'IGN GUIDE'],
+    operations: [
+      { tool: 'boss', points: [{ x: 220, y: 60 }] }, // Day Roshan
+      { tool: 'boss', points: [{ x: 620, y: 420 }] }, // Night Roshan
+      { tool: 'zone-box', points: [{ x: 240, y: 280 }, { x: 390, y: 410 }], color: '#22C55E' }, // Radiant Safe Jungle
+      { tool: 'zone-box', points: [{ x: 440, y: 80 }, { x: 590, y: 210 }], color: '#EF4444' }, // Dire Safe Jungle
+      { tool: 'rune', points: [{ x: 420, y: 240 }] },
+      { tool: 'text', points: [{ x: 250, y: 350 }], text: 'Radiant Güvenli Çiftlik Bölgesi' },
+      { tool: 'text', points: [{ x: 450, y: 140 }], text: 'Dire Güvenli Çiftlik Bölgesi' },
+    ],
+  },
+];
