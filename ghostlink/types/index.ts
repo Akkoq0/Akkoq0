@@ -234,6 +234,8 @@ export interface AppState {
   showVoiceClipBufferModal: boolean;
   showScrimScheduleModal: boolean;
   showShortcutsHelpModal: boolean;
+  showProLicenseModal: boolean;
+  subscriptionTier: 'community' | 'pro';
 
   // ── Multi-Game Hub & Tag Filter ──
   selectedGameFilter: string; // 'all' | 'lol' | 'cs2' | 'valorant' | 'dota2' | 'chill'
@@ -332,4 +334,6 @@ export interface AppState {
   setMobileDensity: (density: MobileDensity) => void;
   setMobileVoiceMode: (mode: MobileVoiceMode) => void;
   setShowMobileCustomizer: (show: boolean) => void;
+  setSubscriptionTier: (tier: 'community' | 'pro') => void;
+  setShowProLicenseModal: (show: boolean) => void;
 }

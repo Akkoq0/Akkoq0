@@ -39,18 +39,24 @@ step('Adım 2: ESLint Kod Standartları Doğrulaması', () => {
 });
 
 // 3. Domain Service Layer Purity (Boundary Enforcement)
-step('Adım 3: Clean Domain Mimari İzolasyonu (src/services)', () => {
-  const servicesDir = join(process.cwd(), 'src/services');
-  const serviceFiles = readdirSync(servicesDir).filter((f) => f.endsWith('.ts'));
+step('Adım 3: Clean Domain Mimari İzolasyonu (src/services & src/core)', () => {
+  const dirs = [
+    join(process.cwd(), 'src/services'),
+    join(process.cwd(), 'src/core/subscription'),
+    join(process.cwd(), 'src/core/esports'),
+    join(process.cwd(), 'src/core/tactical'),
+  ];
 
-  for (const file of serviceFiles) {
-    const content = readFileSync(join(servicesDir, file), 'utf-8');
-    // Ensure domain services do not import React UI or DOM elements
-    if (content.includes("from 'react'") || content.includes('from "react"')) {
-      throw new Error(`Mimari İhlali: ${file} dosyası React UI katmanına doğrudan bağımlı olamaz.`);
-    }
-    if (content.includes('document.') || content.includes('window.')) {
-      throw new Error(`Mimari İhlali: ${file} dosyası doğrudan DOM global objelerine bağımlı olamaz.`);
+  for (const dir of dirs) {
+    const files = readdirSync(dir).filter((f) => f.endsWith('.ts'));
+    for (const file of files) {
+      const content = readFileSync(join(dir, file), 'utf-8');
+      if (content.includes("from 'react'") || content.includes('from "react"')) {
+        throw new Error(`Mimari İhlali: ${file} dosyası React UI katmanına doğrudan bağımlı olamaz.`);
+      }
+      if (content.includes('document.') || content.includes('window.')) {
+        throw new Error(`Mimari İhlali: ${file} dosyası doğrudan DOM global objelerine bağımlı olamaz.`);
+      }
     }
   }
 });
@@ -90,6 +96,46 @@ step('Adım 4: Temel Clean Code Servisleri & Birim Testleri', async () => {
   const dist = TacticalCoordinatesService.getEuclideanDistance({ x: 0, y: 0 }, { x: 3, y: 4 });
   if (dist !== 5) {
     throw new Error(`Öklid mesafesi hatalı: ${dist}`);
+  }
+
+  // Check LicenseManager
+  const { LicenseManager } = await import('../src/core/subscription/licenseManager.ts');
+  if (LicenseManager.canAccessFeature('pro-analytics', 'community')) {
+    throw new Error('Topluluk modu kilitli Pro özelliğine doğrudan erişmemelidir.');
+  }
+  if (!LicenseManager.canAccessFeature('pro-analytics', 'pro')) {
+    throw new Error('Pro modu Pro özelliğine erişemedi.');
+  }
+
+  // Check ProAnalyticsService
+  const { ProAnalyticsService } = await import('../src/core/esports/proAnalyticsService.ts');
+  const report = ProAnalyticsService.generateMatchReport('session-test-01', 1200, [
+    { operatorId: 'op1', username: 'Shroud', role: 'IGL', talkTimeSeconds: 150, calloutsCount: 8, interruptionsCount: 1 },
+    { operatorId: 'op2', username: 'Simple', role: 'AWP', talkTimeSeconds: 90, calloutsCount: 6, interruptionsCount: 0 },
+  ]);
+  if (report.clarityScore < 50 || report.clarityScore > 100) {
+    throw new Error(`Acoustic Clarity Score geçersiz aralıkta: ${report.clarityScore}`);
+  }
+  if (report.dominantSpeakerId !== 'op1') {
+    throw new Error('Dominant konuşmacı hatalı hesaplandı.');
+  }
+
+  // Check TacticalPresetManager
+  const { TacticalPresetManager } = await import('../src/core/tactical/tacticalPresetManager.ts');
+  const playbookJson = TacticalPresetManager.exportPlaybookToJson({
+    schemaVersion: '1.0',
+    id: 'strat-mirage-a',
+    title: 'Mirage A Execute',
+    gameId: 'cs2',
+    mapId: 'mirage',
+    author: 'Coach Meva',
+    createdAt: new Date().toISOString(),
+    notes: 'Smoke stairs, jungle and CT ticket.',
+    markers: [{ id: 'm1', x: 200, y: 150, tool: 'smoke', color: '#8F1622' }],
+  });
+  const imported = TacticalPresetManager.importPlaybookFromJson(playbookJson);
+  if (!imported || imported.title !== 'Mirage A Execute' || imported.markers.length !== 1) {
+    throw new Error('Tactical playbook dışa/içe aktarımı başarısız oldu.');
   }
 });
 

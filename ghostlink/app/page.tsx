@@ -37,6 +37,7 @@ import { RadialCommandWheel } from '@/components/tactical/RadialCommandWheel';
 import { VoiceClipBufferModal } from '@/components/audio/VoiceClipBufferModal';
 import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
 import { ShortcutsHelpModal } from '@/components/modal/ShortcutsHelpModal';
+import { MevaProLicenseModal } from '@/components/modal/MevaProLicenseModal';
 import { MobileCustomizerSheet } from '@/components/mobile/MobileCustomizerSheet';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
@@ -95,6 +96,8 @@ export default function MevaHUDApp() {
   const setShowScrimScheduleModal = useAppStore((s) => s.setShowScrimScheduleModal);
   const showShortcutsHelpModal = useAppStore((s) => s.showShortcutsHelpModal);
   const setShowShortcutsHelpModal = useAppStore((s) => s.setShowShortcutsHelpModal);
+  const showProLicenseModal = useAppStore((s) => s.showProLicenseModal);
+  const setShowProLicenseModal = useAppStore((s) => s.setShowProLicenseModal);
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const showCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.showCommandSettingsModal,
@@ -227,6 +230,7 @@ export default function MevaHUDApp() {
         useAppStore.getState().setShowVoiceClipBufferModal(false);
         useAppStore.getState().setShowScrimScheduleModal(false);
         useAppStore.getState().setShowShortcutsHelpModal(false);
+        useAppStore.getState().setShowProLicenseModal(false);
         useAppStore.getState().setIsMobileSidebarOpen(false);
         useAppStore.getState().setIsMobileRadarOpen(false);
         useThemeStore.getState().setShowThemeModal(false);
@@ -526,6 +530,12 @@ export default function MevaHUDApp() {
         <ShortcutsHelpModal
           isOpen={showShortcutsHelpModal}
           onClose={() => setShowShortcutsHelpModal(false)}
+        />
+      )}
+      {showProLicenseModal && (
+        <MevaProLicenseModal
+          isOpen={showProLicenseModal}
+          onClose={() => setShowProLicenseModal(false)}
         />
       )}
       {radarContextTarget && (

@@ -51,6 +51,8 @@ export const useAppStore = create<AppState>((set) => ({
   showVoiceClipBufferModal: false,
   showScrimScheduleModal: false,
   showShortcutsHelpModal: false,
+  showProLicenseModal: false,
+  subscriptionTier: 'community',
 
   selectedGameFilter: 'all',
   userPrimaryGame: 'cs2',
@@ -459,4 +461,11 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setShowMobileCustomizer: (show) => set({ showMobileCustomizer: show }),
+  setSubscriptionTier: (tier) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('meva_sub_tier', tier); } catch {}
+    }
+    set({ subscriptionTier: tier });
+  },
+  setShowProLicenseModal: (show) => set({ showProLicenseModal: show }),
 }));

@@ -84,6 +84,8 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const activeScrim = useAppStore((s) => s.activeScrimRoom);
   const ecoEnabled = useAppStore((s) => s.ecoMode.isEnabled);
   const isRadarOpen = useAppStore((s) => s.isRadarOpen);
+  const subscriptionTier = useAppStore((s) => s.subscriptionTier);
+  const setShowProLicenseModal = useAppStore((s) => s.setShowProLicenseModal);
 
   const setActiveServer = useAppStore((s) => s.setActiveServer);
   const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
@@ -329,6 +331,20 @@ export const GhostNavbar = memo(function GhostNavbar() {
         >
           <IconUsers size={16} />
         </CommandButton>
+
+        <button
+          type="button"
+          onClick={() => setShowProLicenseModal(true)}
+          title="Meva HUD Lisans & E-Spor Paketi"
+          className={`hidden md:flex items-center gap-1.5 h-8 px-2.5 rounded-xl border text-[11px] font-extrabold tracking-wide transition-all active:scale-95 ${
+            subscriptionTier === 'pro'
+              ? 'bg-[#400B13]/70 hover:bg-[#590C15] border-[#A61826] text-[#F08C96] shadow-[0_0_10px_rgba(200,35,51,0.3)]'
+              : 'bg-[#14080B] hover:bg-[#200A10] border-[#2A1319] hover:border-[#590C15] text-[#9E8E91] hover:text-[#FAF2EE]'
+          }`}
+        >
+          <span className="text-[10px]">⚡</span>
+          <span>{subscriptionTier === 'pro' ? 'MEVA PRO' : 'TOPLULUK'}</span>
+        </button>
 
         <CommandButton
           label="Görünüm ve Tema Ayarları"
