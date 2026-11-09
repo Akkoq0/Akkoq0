@@ -45,6 +45,7 @@ import {
   drawTeleporterLinksOverlay,
   TacticalPresetStrat,
 } from './tacticalBlueprints';
+import { TacticalCoordinatesService } from '@/src/services/tacticalCoordinatesService';
 import {
   IconClose,
   IconPlus,
@@ -1523,13 +1524,17 @@ export const TacticalMapBoard: React.FC = () => {
   };
 
   const handleZoomIn = () => {
-    const next = Math.min(2.5, Math.round((zoomScaleRef.current + 0.25) * 100) / 100);
+    const next = TacticalCoordinatesService.clampZoom(
+      Math.round((zoomScaleRef.current + 0.25) * 100) / 100,
+    );
     setZoomScale(next);
     applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
   };
 
   const handleZoomOut = () => {
-    const next = Math.max(0.6, Math.round((zoomScaleRef.current - 0.25) * 100) / 100);
+    const next = TacticalCoordinatesService.clampZoom(
+      Math.round((zoomScaleRef.current - 0.25) * 100) / 100,
+    );
     setZoomScale(next);
     applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
   };
@@ -1543,7 +1548,9 @@ export const TacticalMapBoard: React.FC = () => {
   const handleWheelZoom = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    const next = Math.min(2.5, Math.max(0.6, Math.round(zoomScaleRef.current * zoomFactor * 100) / 100));
+    const next = TacticalCoordinatesService.clampZoom(
+      Math.round(zoomScaleRef.current * zoomFactor * 100) / 100,
+    );
     setZoomScale(next);
     applyCanvasTransform(panOffsetRef.current.x, panOffsetRef.current.y, next);
   };
