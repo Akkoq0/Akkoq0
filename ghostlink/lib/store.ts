@@ -198,9 +198,48 @@ export const useAppStore = create<AppState>((set) => ({
   setMessages: (messages) => set({ messages }),
 
   setVoiceParticipants: (participants) =>
-    set({ voiceParticipants: participants }),
+    set((s) => {
+      if (s.voiceParticipants.length === participants.length) {
+        let same = true;
+        for (let i = 0; i < participants.length; i++) {
+          const a = s.voiceParticipants[i];
+          const b = participants[i];
+          if (
+            a.user_id !== b.user_id ||
+            a.is_speaking !== b.is_speaking ||
+            a.is_muted !== b.is_muted ||
+            a.is_deafened !== b.is_deafened
+          ) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return s;
+      }
+      return { voiceParticipants: participants };
+    }),
 
-  setOnlineMembers: (members) => set({ onlineMembers: members }),
+  setOnlineMembers: (members) =>
+    set((s) => {
+      if (s.onlineMembers.length === members.length) {
+        let same = true;
+        for (let i = 0; i < members.length; i++) {
+          const a = s.onlineMembers[i];
+          const b = members[i];
+          if (
+            a.id !== b.id ||
+            a.status !== b.status ||
+            a.username !== b.username ||
+            a.activity !== b.activity
+          ) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return s;
+      }
+      return { onlineMembers: members };
+    }),
 
   setFriends: (friends) => set({ friends }),
 
@@ -359,7 +398,17 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setNetGuard: (stats: Partial<NetGuardStats>) =>
-    set((s) => ({ netGuard: { ...s.netGuard, ...stats } })),
+    set((s) => {
+      let changed = false;
+      for (const key of Object.keys(stats) as Array<keyof NetGuardStats>) {
+        if (s.netGuard[key] !== stats[key]) {
+          changed = true;
+          break;
+        }
+      }
+      if (!changed) return s;
+      return { netGuard: { ...s.netGuard, ...stats } };
+    }),
 
   toggleCategory: (categoryId) =>
     set((s) => {

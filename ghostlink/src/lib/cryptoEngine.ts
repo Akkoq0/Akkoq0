@@ -47,29 +47,30 @@ export interface CryptoStatusSnapshot {
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
-  if (typeof btoa === 'function') {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('base64');
   }
-  return Buffer.from(bytes).toString('base64');
+  const CHUNK_SIZE = 0x8000;
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK_SIZE) as unknown as number[]));
+  }
+  return btoa(chunks.join(''));
 }
 
 function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
-  if (typeof atob === 'function') {
-    const bin = atob(b64);
-    const arr = new Uint8Array(new ArrayBuffer(bin.length));
-    for (let i = 0; i < bin.length; i++) {
-      arr[i] = bin.charCodeAt(i);
-    }
-    return arr;
+  if (typeof Buffer !== 'undefined') {
+    const buf = Buffer.from(b64, 'base64');
+    const out = new Uint8Array(new ArrayBuffer(buf.length));
+    out.set(buf);
+    return out;
   }
-  const buf = Buffer.from(b64, 'base64');
-  const out = new Uint8Array(new ArrayBuffer(buf.length));
-  out.set(buf);
-  return out;
+  const bin = atob(b64);
+  const arr = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) {
+    arr[i] = bin.charCodeAt(i);
+  }
+  return arr;
 }
 
 function toArrayBuffer(view: Uint8Array): ArrayBuffer {

@@ -62,6 +62,15 @@ interface SquadOperatorMeta {
   waveSpeed: number;
 }
 
+const CpuLoadBadge = memo(function CpuLoadBadge({
+  fallbackCpu,
+}: {
+  fallbackCpu: number;
+}) {
+  const ecoCpu = useAppStore((s) => s.ecoMode.cpuEstimate);
+  return <>{ecoCpu > 0 ? ecoCpu : fallbackCpu}</>;
+});
+
 const MESH_NODES: Array<{
   opIndex: number;
   cx: number;
@@ -199,7 +208,6 @@ export const StreamChatArea = memo(function StreamChatArea({
   const storeMessages = useAppStore((s) => s.messages);
   const ecoActive = useAppStore((s) => s.ecoMode.isActive);
   const ecoEnabled = useAppStore((s) => s.ecoMode.isEnabled);
-  const ecoCpu = useAppStore((s) => s.ecoMode.cpuEstimate);
   const activeScrim = useAppStore((s) => s.activeScrimRoom);
   const mobileTab = useAppStore((s) => s.mobileTab);
   const voiceParticipants = useAppStore((s) => s.voiceParticipants);
@@ -1479,7 +1487,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 İşlemci Yükü
               </span>
               <span className="block text-[14px] font-extrabold text-[#F4EFF0] mt-0.5">
-                %{ecoCpu > 0 ? ecoCpu : simMetrics.cpu} CPU
+                %<CpuLoadBadge fallbackCpu={simMetrics.cpu} /> CPU
               </span>
             </div>
             <div className="rounded-xl p-3 bg-[linear-gradient(160deg,#1A0B10_0%,#0B0809_100%)] border border-[#2A1319]">
@@ -1829,7 +1837,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 Yük
               </span>
               <span className="block text-[12px] font-extrabold text-[#F4EFF0] mt-0.5 whitespace-nowrap">
-                %{ecoCpu > 0 ? ecoCpu : simMetrics.cpu} CPU
+                %<CpuLoadBadge fallbackCpu={simMetrics.cpu} /> CPU
               </span>
             </div>
             <div className="px-1.5">

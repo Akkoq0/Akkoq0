@@ -78,6 +78,10 @@ const nextConfig = {
   images: { unoptimized: true },
   poweredByHeader: false,
   reactStrictMode: true,
+  swcMinify: true,
+  compiler: {
+    removeConsole: isProd ? { exclude: ['error', 'warn'] } : false,
+  },
   experimental: {
     optimizePackageImports: ['@supabase/supabase-js', 'zustand', 'clsx'],
   },
