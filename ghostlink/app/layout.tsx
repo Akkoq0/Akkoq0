@@ -19,6 +19,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Meva HUD',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
