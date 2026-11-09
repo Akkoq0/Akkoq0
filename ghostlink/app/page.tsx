@@ -37,6 +37,7 @@ import { RadialCommandWheel } from '@/components/tactical/RadialCommandWheel';
 import { VoiceClipBufferModal } from '@/components/audio/VoiceClipBufferModal';
 import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
 import { ShortcutsHelpModal } from '@/components/modal/ShortcutsHelpModal';
+import { MobileCustomizerSheet } from '@/components/mobile/MobileCustomizerSheet';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
@@ -131,10 +132,9 @@ export default function MevaHUDApp() {
       .then((saved) => {
         if (saved?.callsign) {
           setUser((prev) => ({ ...prev, username: saved.callsign }));
-        } else {
-          // 100% Optional / Skip-friendly dynamic onboarding wizard
-          setShowOnboardingModal(true);
         }
+        // Clean boot: Do not hijack mobile with mandatory onboarding popup.
+        // User starts directly in clean HUD and can access profile via topbar or mobile customizer.
       });
 
     // PWA Offline Service Worker Registration
@@ -450,7 +450,7 @@ export default function MevaHUDApp() {
           </div>
 
           {/* 3. MOBILE COMMAND DOCK */}
-          <MobileBottomNav />
+          <MobileBottomNav voiceControls={voiceControls} />
         </>
       )}
 
@@ -559,6 +559,7 @@ export default function MevaHUDApp() {
           onClose={() => setSelectedPlayer(null)}
         />
       )}
+      <MobileCustomizerSheet />
     </div>
   );
 }

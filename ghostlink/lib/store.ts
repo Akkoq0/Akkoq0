@@ -87,6 +87,10 @@ export const useAppStore = create<AppState>((set) => ({
   isMobileSidebarOpen: false,
   isMobileRadarOpen: false,
   mobileTab: 'chat',
+  mobileHandMode: 'right',
+  mobileDensity: 'compact',
+  mobileVoiceMode: 'vad',
+  showMobileCustomizer: false,
 
   setActiveServer: (id) =>
     set({
@@ -383,4 +387,27 @@ export const useAppStore = create<AppState>((set) => ({
       showFriendsModal: false,
       showScrimModal: false,
     }),
+
+  setMobileHandMode: (mode) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('meva_mobile_hand', mode); } catch {}
+    }
+    set({ mobileHandMode: mode });
+  },
+
+  setMobileDensity: (density) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('meva_mobile_density', density); } catch {}
+    }
+    set({ mobileDensity: density });
+  },
+
+  setMobileVoiceMode: (mode) => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('meva_mobile_voicemode', mode); } catch {}
+    }
+    set({ mobileVoiceMode: mode });
+  },
+
+  setShowMobileCustomizer: (show) => set({ showMobileCustomizer: show }),
 }));

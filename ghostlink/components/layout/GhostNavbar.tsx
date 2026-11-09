@@ -105,6 +105,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const toggleStratBoard = useVoiceSettingsStore((s) => s.toggleStratBoard);
   const toggleMiniHud = useVoiceSettingsStore((s) => s.toggleMiniHud);
+  const setShowMobileCustomizer = useAppStore((s) => s.setShowMobileCustomizer);
 
   const mobileTitle = activeDMName
     ? `@${activeDMName}`
@@ -210,15 +211,15 @@ export const GhostNavbar = memo(function GhostNavbar() {
           type="button"
           onClick={() => setShowTourModal(true)}
           title="Meva İnteraktif Rehber & Tur"
-          className="rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 flex items-center gap-1.5 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0] transition-colors"
+          className="hidden sm:flex rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 hover:bg-[#1C0B10] border border-[#2A1319] hover:border-[#8F1622]/60 items-center gap-1.5 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0] transition-colors"
         >
           <IconHelp size={15} className="text-[#C82333]" />
-          <span className="hidden sm:inline">Meva Rehberi</span>
+          <span>Meva Rehberi</span>
         </button>
 
         <div
           title={`Ağ Kalitesi: %${qualityScore} · DTLS-SRTP P2P`}
-          className="rounded-xl h-9 px-2.5 lg:px-3 bg-[#120A0D]/80 border border-[#2A1319] flex items-center gap-1.5 lg:gap-2 text-[11.5px] lg:text-[12px] font-bold text-[#F4EFF0]"
+          className="rounded-xl h-8 lg:h-9 px-2 lg:px-3 bg-[#120A0D]/80 border border-[#2A1319] flex items-center gap-1 lg:gap-2 text-[11px] lg:text-[12px] font-bold text-[#F4EFF0]"
         >
           <SignalBars score={qualityScore} />
           <span className="tabular-nums">
@@ -226,6 +227,18 @@ export const GhostNavbar = memo(function GhostNavbar() {
             <span className="text-[#827376] font-semibold ml-0.5">ms</span>
           </span>
         </div>
+
+        {/* Dedicated Mobile Ergonomic Customizer Pill */}
+        <button
+          type="button"
+          onClick={() => setShowMobileCustomizer(true)}
+          aria-label="Mobil Kontrol & Ergonomi Ayarları"
+          title="Mobil Kontrol & Ergonomi Ayarları"
+          className="lg:hidden rounded-xl h-8 px-2.5 bg-gradient-to-r from-[#2B0A13] to-[#17080D] border border-[#8F1622]/80 hover:border-[#C82333] flex items-center gap-1.5 text-[11px] font-black text-[#FAF2EE] shadow-[0_0_12px_rgba(200,35,51,0.3)] active:scale-95"
+        >
+          <span className="text-xs">📐</span>
+          <span>Ayar</span>
+        </button>
 
         <button
           type="button"
@@ -245,6 +258,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
           label="Taktik Harita & Çizim Tahtası (B)"
           onClick={toggleStratBoard}
           active={showStratBoard}
+          className="hidden md:flex"
         >
           <IconMapBoard size={16} />
         </CommandButton>
@@ -268,6 +282,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
         <CommandButton
           label="IGL Taktik Hızlı Komut Çarkı (C)"
           onClick={() => setShowRadialCommandWheel(true)}
+          className="hidden md:flex"
         >
           <span className="text-sm">🎯</span>
         </CommandButton>
@@ -300,6 +315,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
         <CommandButton
           label="Operatör Profili & Oyun Tercihleri"
           onClick={() => setShowOnboardingModal(true)}
+          className="hidden sm:flex"
         >
           <IconShield size={16} />
         </CommandButton>
@@ -308,6 +324,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
           label="Operatör Ağı & 1v1 (Arkadaşlar)"
           onClick={() => setShowFriendsModal(true)}
           badge={pendingCount}
+          className="hidden sm:flex"
         >
           <IconUsers size={16} />
         </CommandButton>
@@ -315,6 +332,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
         <CommandButton
           label="Görünüm ve Tema Ayarları"
           onClick={() => setShowThemeModal(true)}
+          className="hidden sm:flex"
         >
           <IconSliders size={16} />
         </CommandButton>

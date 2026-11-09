@@ -198,6 +198,9 @@ export interface DuoLinkState {
 // ─── Global Store ──────────────────────────────────────
 
 export type MobileCockpitTab = 'chat' | 'voice' | 'mesh';
+export type MobileHandMode = 'right' | 'left';
+export type MobileDensity = 'compact' | 'comfortable';
+export type MobileVoiceMode = 'vad' | 'ptt';
 
 export interface AppState {
   // ── Current Selections ──
@@ -255,6 +258,10 @@ export interface AppState {
   isMobileSidebarOpen: boolean;
   isMobileRadarOpen: boolean;
   mobileTab: MobileCockpitTab;
+  mobileHandMode: MobileHandMode;
+  mobileDensity: MobileDensity;
+  mobileVoiceMode: MobileVoiceMode;
+  showMobileCustomizer: boolean;
 
   // ── Actions — Navigation ──
   setActiveServer: (id: string) => void;
@@ -321,4 +328,8 @@ export interface AppState {
   setIsMobileSidebarOpen: (open: boolean) => void;
   setIsMobileRadarOpen: (open: boolean) => void;
   setMobileTab: (tab: MobileCockpitTab) => void;
+  setMobileHandMode: (mode: MobileHandMode) => void;
+  setMobileDensity: (density: MobileDensity) => void;
+  setMobileVoiceMode: (mode: MobileVoiceMode) => void;
+  setShowMobileCustomizer: (show: boolean) => void;
 }
