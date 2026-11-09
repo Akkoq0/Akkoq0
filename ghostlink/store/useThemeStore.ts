@@ -13,6 +13,46 @@ export type ThemePreset =
   | 'ares-crimson'
   | 'oled-stealth';
 
+export type FontPreset =
+  | 'inter'
+  | 'jetbrains-mono'
+  | 'rajdhani'
+  | 'orbitron';
+
+export interface FontConfig {
+  id: FontPreset;
+  label: string;
+  tagline: string;
+  fontFamily: string;
+}
+
+export const FONT_PRESETS: Record<FontPreset, FontConfig> = {
+  inter: {
+    id: 'inter',
+    label: 'Inter (Humanist Espor)',
+    tagline: 'Modern, net ve yüksek okunabilirlikli arayüz yazı tipi',
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+  },
+  'jetbrains-mono': {
+    id: 'jetbrains-mono',
+    label: 'JetBrains Mono (Taktiksel Kod)',
+    tagline: 'Hassas koordinatlar ve ping değerleri için monospaced karakterler',
+    fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, monospace',
+  },
+  rajdhani: {
+    id: 'rajdhani',
+    label: 'Rajdhani (Siber Askeri HUD)',
+    tagline: 'Köşeli, sert ve profesyonel taktiksel komuta fontu',
+    fontFamily: 'Rajdhani, sans-serif',
+  },
+  orbitron: {
+    id: 'orbitron',
+    label: 'Orbitron (Fütüristik Radar)',
+    tagline: 'Yüksek teknolojili fütüristik bilimkurgu espor fontu',
+    fontFamily: 'Orbitron, sans-serif',
+  },
+};
+
 export interface ThemeColors {
   name: string;
   tagline: string;
@@ -144,12 +184,14 @@ function isThemePreset(val: string | null): val is ThemePreset {
 
 interface ThemeState {
   currentTheme: ThemePreset;
+  currentFont: FontPreset;
   customWallpaper: string | null;
   glassOpacity: number;
   blurIntensity: number;
   showThemeModal: boolean;
 
   setTheme: (preset: ThemePreset) => void;
+  setFont: (font: FontPreset) => void;
   setCustomWallpaper: (url: string | null) => boolean;
   setGlassOpacity: (opacity: number) => void;
   setBlurIntensity: (blur: number) => void;
@@ -170,11 +212,16 @@ function hexToRgbChannels(hex: string): string {
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
 }
 
+function isFontPreset(val: string | null): val is FontPreset {
+  return Boolean(val && Object.prototype.hasOwnProperty.call(FONT_PRESETS, val));
+}
+
 function applyThemeToDOM(
   preset: ThemePreset,
   opacity: number,
   blur: number,
   wallpaper: string | null,
+  font: FontPreset = 'inter',
 ) {
   if (typeof document === 'undefined') return;
 
@@ -183,7 +230,9 @@ function applyThemeToDOM(
   const safeOpacity = clamp(opacity, 0.45, 0.96, 0.82);
   const safeBlur = clamp(blur, 0, 28, 16);
   const safeWallpaper = sanitizeWallpaperUrl(wallpaper);
+  const fontConfig = FONT_PRESETS[font] ?? FONT_PRESETS.inter;
 
+  root.style.setProperty('--font-family', fontConfig.fontFamily);
   root.style.setProperty('--ghost-bg-darkest', theme.bgDarkest);
   root.style.setProperty('--ghost-bg-dark', theme.bgDark);
   root.style.setProperty('--ghost-bg-mid', theme.bgMid);
@@ -214,6 +263,7 @@ function applyThemeToDOM(
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   currentTheme: 'ghost-cyberpunk',
+  currentFont: 'inter',
   customWallpaper: null,
   glassOpacity: 0.82,
   blurIntensity: 16,
@@ -222,18 +272,28 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setTheme: (preset) => {
     if (!isThemePreset(preset)) return;
     set({ currentTheme: preset });
-    const { glassOpacity, blurIntensity, customWallpaper } = get();
-    applyThemeToDOM(preset, glassOpacity, blurIntensity, customWallpaper);
+    const { glassOpacity, blurIntensity, customWallpaper, currentFont } = get();
+    applyThemeToDOM(preset, glassOpacity, blurIntensity, customWallpaper, currentFont);
     try {
       localStorage.setItem('ghost_theme', preset);
+    } catch {}
+  },
+
+  setFont: (font) => {
+    if (!isFontPreset(font)) return;
+    set({ currentFont: font });
+    const { currentTheme, glassOpacity, blurIntensity, customWallpaper } = get();
+    applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, customWallpaper, font);
+    try {
+      localStorage.setItem('ghost_font', font);
     } catch {}
   },
 
   setCustomWallpaper: (url) => {
     if (!url || !url.trim()) {
       set({ customWallpaper: null });
-      const { currentTheme, glassOpacity, blurIntensity } = get();
-      applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, null);
+      const { currentTheme, glassOpacity, blurIntensity, currentFont } = get();
+      applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, null, currentFont);
       try {
         localStorage.removeItem('ghost_wallpaper');
       } catch {}
@@ -244,8 +304,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (!safe) return false;
 
     set({ customWallpaper: safe });
-    const { currentTheme, glassOpacity, blurIntensity } = get();
-    applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, safe);
+    const { currentTheme, glassOpacity, blurIntensity, currentFont } = get();
+    applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, safe, currentFont);
     try {
       localStorage.setItem('ghost_wallpaper', safe);
     } catch {}
@@ -255,8 +315,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setGlassOpacity: (opacity) => {
     const safeOpacity = clamp(opacity, 0.45, 0.96, 0.82);
     set({ glassOpacity: safeOpacity });
-    const { currentTheme, blurIntensity, customWallpaper } = get();
-    applyThemeToDOM(currentTheme, safeOpacity, blurIntensity, customWallpaper);
+    const { currentTheme, blurIntensity, customWallpaper, currentFont } = get();
+    applyThemeToDOM(currentTheme, safeOpacity, blurIntensity, customWallpaper, currentFont);
     try {
       localStorage.setItem('ghost_opacity_v3', safeOpacity.toString());
     } catch {}
@@ -265,8 +325,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setBlurIntensity: (blur) => {
     const safeBlur = clamp(blur, 0, 28, 16);
     set({ blurIntensity: safeBlur });
-    const { currentTheme, glassOpacity, customWallpaper } = get();
-    applyThemeToDOM(currentTheme, glassOpacity, safeBlur, customWallpaper);
+    const { currentTheme, glassOpacity, customWallpaper, currentFont } = get();
+    applyThemeToDOM(currentTheme, glassOpacity, safeBlur, customWallpaper, currentFont);
     try {
       localStorage.setItem('ghost_blur_v3', safeBlur.toString());
     } catch {}
@@ -275,16 +335,18 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setShowThemeModal: (show) => set({ showThemeModal: show }),
 
   applyCSSVariables: () => {
-    let { currentTheme, glassOpacity, blurIntensity, customWallpaper } = get();
+    let { currentTheme, glassOpacity, blurIntensity, customWallpaper, currentFont } = get();
 
     if (typeof window !== 'undefined') {
       try {
         const storedTheme = localStorage.getItem('ghost_theme');
+        const storedFont = localStorage.getItem('ghost_font');
         const storedOpacity = localStorage.getItem('ghost_opacity_v3');
         const storedBlur = localStorage.getItem('ghost_blur_v3');
         const storedWallpaper = localStorage.getItem('ghost_wallpaper');
 
         if (isThemePreset(storedTheme)) currentTheme = storedTheme;
+        if (isFontPreset(storedFont)) currentFont = storedFont;
         if (storedOpacity !== null) {
           glassOpacity = clamp(parseFloat(storedOpacity), 0.45, 0.96, 0.82);
         }
@@ -293,10 +355,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         }
         customWallpaper = sanitizeWallpaperUrl(storedWallpaper);
 
-        set({ currentTheme, glassOpacity, blurIntensity, customWallpaper });
+        set({ currentTheme, currentFont, glassOpacity, blurIntensity, customWallpaper });
       } catch {}
     }
 
-    applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, customWallpaper);
+    applyThemeToDOM(currentTheme, glassOpacity, blurIntensity, customWallpaper, currentFont);
   },
 }));

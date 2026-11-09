@@ -8,24 +8,28 @@ import { memo, useEffect, useState } from 'react';
 import {
   useThemeStore,
   THEME_PRESETS,
+  FONT_PRESETS,
   type ThemePreset,
+  type FontPreset,
 } from '@/store/useThemeStore';
 import { IconClose, IconSliders } from '@/components/ui/MevaIcons';
 
 export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
   const isOpen = useThemeStore((s) => s.showThemeModal);
   const activePreset = useThemeStore((s) => s.currentTheme);
+  const activeFont = useThemeStore((s) => s.currentFont);
   const glassOpacity = useThemeStore((s) => s.glassOpacity);
   const blurIntensity = useThemeStore((s) => s.blurIntensity);
   const customWallpaper = useThemeStore((s) => s.customWallpaper);
 
   const setTheme = useThemeStore((s) => s.setTheme);
+  const setFont = useThemeStore((s) => s.setFont);
   const setGlassOpacity = useThemeStore((s) => s.setGlassOpacity);
   const setBlurIntensity = useThemeStore((s) => s.setBlurIntensity);
   const setCustomWallpaper = useThemeStore((s) => s.setCustomWallpaper);
   const setShowThemeModal = useThemeStore((s) => s.setShowThemeModal);
 
-  const [tab, setTab] = useState<'themes' | 'wallpaper'>('themes');
+  const [tab, setTab] = useState<'themes' | 'fonts' | 'wallpaper'>('themes');
   const [wallpaperInput, setWallpaperInput] = useState(customWallpaper ?? '');
   const [urlError, setUrlError] = useState<string | null>(null);
 
@@ -92,7 +96,7 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
         </div>
 
         {/* ── Tabs ── */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#0A0708] border border-[#881A26]/20 mb-5">
+        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#0A0708] border border-[#881A26]/20 mb-5">
           <button
             type="button"
             onClick={() => setTab('themes')}
@@ -102,7 +106,18 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
                 : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
             }`}
           >
-            Siyah & Bordo Paletler
+            Temalar
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('fonts')}
+            className={`rounded-lg min-h-[38px] text-xs font-bold transition-all ${
+              tab === 'fonts'
+                ? 'bg-gradient-to-b from-[#2A0E15] to-[#13090C] text-[#F4EFF0] border border-[#881A26]/40'
+                : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
+            }`}
+          >
+            Yazı Tipleri
           </button>
           <button
             type="button"
@@ -113,9 +128,48 @@ export const ThemeSettingsModal = memo(function ThemeSettingsModal() {
                 : 'text-[#8E7F83] hover:text-[#F4EFF0] border border-transparent'
             }`}
           >
-            Yüzey & Doku
+            Yüzey & Cam
           </button>
         </div>
+
+        {tab === 'fonts' && (
+          <div className="space-y-2.5">
+            {(Object.keys(FONT_PRESETS) as FontPreset[]).map((key) => {
+              const f = FONT_PRESETS[key];
+              const isSelected = activeFont === key;
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setFont(key)}
+                  className={`relative rounded-2xl w-full text-left p-4 border transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'border-[#A61B29]/55 bg-gradient-to-r from-[#240C12] to-[#0D080A] shadow-[0_0_15px_rgba(200,35,51,0.25)]'
+                      : 'border-[#881A26]/20 bg-[#10080B] hover:border-[#881A26]/40'
+                  }`}
+                  style={{ fontFamily: f.fontFamily }}
+                >
+                  <div className="min-w-0">
+                    <span className="text-sm font-bold text-[#F4EFF0] block">
+                      {f.label}
+                    </span>
+                    <span className="text-xs text-[#8E7F83] mt-0.5 block font-sans">
+                      {f.tagline}
+                    </span>
+                    <span className="text-xs text-[#E35D6A] mt-1.5 block tracking-widest uppercase">
+                      CS2 · VALORANT · LOL · DOTA 2 • 144Hz HUD
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-[#C82333] flex items-center justify-center text-white text-[11px] font-black flex-shrink-0 font-sans shadow-md">
+                      ✓
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {tab === 'themes' ? (
           <div className="space-y-2.5">
