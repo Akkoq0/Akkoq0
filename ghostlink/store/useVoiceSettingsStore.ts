@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { getMevaAudioEngine } from '@/src/lib/audioEngine';
+import { getMevaAudioEngine, type RogerBeepStyle } from '@/src/lib/audioEngine';
 import {
   getMevaVadEngine,
   type NoiseGateConfig,
@@ -29,6 +29,8 @@ interface VoiceSettingsState {
   miniHudActive: boolean;
   proAnalyticsEnabled: boolean;
   rogerBeepEnabled: boolean;
+  rogerBeepStyle: RogerBeepStyle;
+  rogerBeepVolume: number;
 
   setInputMode: (mode: VoiceInputMode) => void;
   updateNoiseGate: (partial: Partial<NoiseGateConfig>) => void;
@@ -42,6 +44,8 @@ interface VoiceSettingsState {
   toggleMiniHud: () => void;
   setProAnalyticsEnabled: (enabled: boolean) => void;
   setRogerBeepEnabled: (enabled: boolean) => void;
+  setRogerBeepStyle: (style: RogerBeepStyle) => void;
+  setRogerBeepVolume: (volume: number) => void;
   hydrateSettings: (partial: Partial<{
     inputMode: VoiceInputMode;
     noiseGate: NoiseGateConfig;
@@ -49,6 +53,9 @@ interface VoiceSettingsState {
     inputDeviceId: string;
     outputDeviceId: string;
     proAnalyticsEnabled: boolean;
+    rogerBeepEnabled: boolean;
+    rogerBeepStyle: RogerBeepStyle;
+    rogerBeepVolume: number;
   }>) => void;
 }
 
@@ -75,6 +82,8 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   miniHudActive: false,
   proAnalyticsEnabled: false,
   rogerBeepEnabled: true,
+  rogerBeepStyle: 'classic-milsim',
+  rogerBeepVolume: 0.75,
 
   setInputMode: (mode) => {
     getMevaVadEngine().setMode(mode);
@@ -126,6 +135,10 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
 
   setRogerBeepEnabled: (enabled) => set({ rogerBeepEnabled: enabled }),
 
+  setRogerBeepStyle: (style) => set({ rogerBeepStyle: style }),
+
+  setRogerBeepVolume: (volume) => set({ rogerBeepVolume: Math.max(0, Math.min(1, volume)) }),
+
   hydrateSettings: (partial) =>
     set((s) => {
       const nextMode = partial.inputMode ?? s.inputMode;
@@ -145,6 +158,9 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
         outputDeviceId: partial.outputDeviceId ?? s.outputDeviceId,
         proAnalyticsEnabled:
           partial.proAnalyticsEnabled ?? s.proAnalyticsEnabled,
+        rogerBeepEnabled: partial.rogerBeepEnabled ?? s.rogerBeepEnabled,
+        rogerBeepStyle: partial.rogerBeepStyle ?? s.rogerBeepStyle,
+        rogerBeepVolume: partial.rogerBeepVolume ?? s.rogerBeepVolume,
       };
     }),
 }));

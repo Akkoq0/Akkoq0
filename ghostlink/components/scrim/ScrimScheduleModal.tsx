@@ -133,7 +133,7 @@ export const ScrimScheduleModal: React.FC<ScrimScheduleModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-2xl bg-[#0B0608] border border-[#8F1622] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden"
+        className="w-full max-w-3xl bg-[#0B0608] border border-[#8F1622] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

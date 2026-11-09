@@ -24,6 +24,12 @@ export type CalloutCueType =
   | 'force'
   | 'gg';
 
+export type RogerBeepStyle =
+  | 'classic-milsim'
+  | 'swat-squawk'
+  | 'quindar-nasa'
+  | 'subtle-esports';
+
 export const SPATIAL_PAN_VALUES: Record<SpatialPanPosition, number> = {
   L: -1.0,
   C: 0.0,
@@ -761,13 +767,24 @@ export class MevaAudioEngine {
    * Synthesizes a subtle, studio-grade WebAudio micro-chirp for Push-To-Talk engage
    * and an authentic Mil-Sim Roger Beep on release.
    */
-  public playPttBeep(phase: 'engage' | 'release', rogerBeep = true): void {
+  /**
+   * Synthesizes a subtle, studio-grade WebAudio micro-chirp for Push-To-Talk engage
+   * and an authentic Mil-Sim Roger Beep on release with selectable styles and volume.
+   */
+  public playPttBeep(
+    phase: 'engage' | 'release',
+    rogerBeep = true,
+    style: RogerBeepStyle = 'classic-milsim',
+    volume = 0.75,
+  ): void {
     if (!this.acousticCuesEnabled || this.masterDeafened) return;
     const ctx = this.ensureContext();
     if (!ctx || !this.masterGain) return;
 
     try {
       const now = ctx.currentTime;
+      const vol = Math.max(0.1, Math.min(1.0, volume));
+
       if (phase === 'engage') {
         const osc = ctx.createOscillator();
         const env = ctx.createGain();
@@ -775,40 +792,14 @@ export class MevaAudioEngine {
         osc.frequency.setValueAtTime(740, now);
         osc.frequency.exponentialRampToValueAtTime(1108, now + 0.032);
         env.gain.setValueAtTime(0.0001, now);
-        env.gain.linearRampToValueAtTime(0.042, now + 0.005);
+        env.gain.linearRampToValueAtTime(0.042 * vol, now + 0.005);
         env.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
         osc.connect(env);
         env.connect(this.masterGain);
         osc.start(now);
         osc.stop(now + 0.042);
       } else if (rogerBeep) {
-        // Authentic Mil-Sim Roger Beep: Dual-tone military walkie-talkie chirp (1046Hz -> 880Hz)
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const env1 = ctx.createGain();
-        const env2 = ctx.createGain();
-
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(1046.5, now);
-        env1.gain.setValueAtTime(0.0001, now);
-        env1.gain.linearRampToValueAtTime(0.038, now + 0.004);
-        env1.gain.exponentialRampToValueAtTime(0.0001, now + 0.024);
-
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(880.0, now + 0.024);
-        env2.gain.setValueAtTime(0.0001, now + 0.024);
-        env2.gain.linearRampToValueAtTime(0.042, now + 0.028);
-        env2.gain.exponentialRampToValueAtTime(0.0001, now + 0.052);
-
-        osc1.connect(env1);
-        env1.connect(this.masterGain);
-        osc2.connect(env2);
-        env2.connect(this.masterGain);
-
-        osc1.start(now);
-        osc1.stop(now + 0.026);
-        osc2.start(now + 0.024);
-        osc2.stop(now + 0.056);
+        this.synthesizeRogerBeep(ctx, this.masterGain, now, style, vol);
       } else {
         const osc = ctx.createOscillator();
         const env = ctx.createGain();
@@ -816,13 +807,110 @@ export class MevaAudioEngine {
         osc.frequency.setValueAtTime(988, now);
         osc.frequency.exponentialRampToValueAtTime(659, now + 0.038);
         env.gain.setValueAtTime(0.0001, now);
-        env.gain.linearRampToValueAtTime(0.035, now + 0.006);
+        env.gain.linearRampToValueAtTime(0.035 * vol, now + 0.006);
         env.gain.exponentialRampToValueAtTime(0.0001, now + 0.042);
         osc.connect(env);
         env.connect(this.masterGain);
         osc.start(now);
         osc.stop(now + 0.046);
       }
+    } catch {}
+  }
+
+  /**
+   * Mathematical Web Audio Roger Beep Synthesizer (0 MB Disk, 0 RAM, ~0.001% CPU).
+   */
+  private synthesizeRogerBeep(
+    ctx: AudioContext,
+    destination: AudioNode,
+    now: number,
+    style: RogerBeepStyle,
+    vol: number,
+  ): void {
+    if (style === 'quindar-nasa') {
+      // Famous Apollo Mission 2475Hz Quindar beep
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(2475, now);
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.linearRampToValueAtTime(0.048 * vol, now + 0.006);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.052);
+      osc.connect(env);
+      env.connect(destination);
+      osc.start(now);
+      osc.stop(now + 0.055);
+    } else if (style === 'swat-squawk') {
+      // Tactical SWAT frequency chirp
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1480, now);
+      osc.frequency.exponentialRampToValueAtTime(1860, now + 0.016);
+      osc.frequency.exponentialRampToValueAtTime(1174, now + 0.036);
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.linearRampToValueAtTime(0.044 * vol, now + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+      osc.connect(env);
+      env.connect(destination);
+      osc.start(now);
+      osc.stop(now + 0.042);
+    } else if (style === 'subtle-esports') {
+      // Modern warm esports comms blip
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(784, now);
+      osc.frequency.exponentialRampToValueAtTime(659, now + 0.028);
+      env.gain.setValueAtTime(0.0001, now);
+      env.gain.linearRampToValueAtTime(0.036 * vol, now + 0.005);
+      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.034);
+      osc.connect(env);
+      env.connect(destination);
+      osc.start(now);
+      osc.stop(now + 0.038);
+    } else {
+      // Classic Mil-Sim Dual-Tone Chirp (1046Hz -> 880Hz)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const env1 = ctx.createGain();
+      const env2 = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(1046.5, now);
+      env1.gain.setValueAtTime(0.0001, now);
+      env1.gain.linearRampToValueAtTime(0.038 * vol, now + 0.004);
+      env1.gain.exponentialRampToValueAtTime(0.0001, now + 0.024);
+
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880.0, now + 0.024);
+      env2.gain.setValueAtTime(0.0001, now + 0.024);
+      env2.gain.linearRampToValueAtTime(0.042 * vol, now + 0.028);
+      env2.gain.exponentialRampToValueAtTime(0.0001, now + 0.052);
+
+      osc1.connect(env1);
+      env1.connect(destination);
+      osc2.connect(env2);
+      env2.connect(destination);
+
+      osc1.start(now);
+      osc1.stop(now + 0.026);
+      osc2.start(now + 0.024);
+      osc2.stop(now + 0.056);
+    }
+  }
+
+  /**
+   * Previews a Roger Beep style in real-time on the output channel.
+   */
+  public previewRogerBeep(
+    style: RogerBeepStyle = 'classic-milsim',
+    volume = 0.75,
+  ): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    try {
+      this.synthesizeRogerBeep(ctx, this.masterGain, ctx.currentTime, style, volume);
     } catch {}
   }
 

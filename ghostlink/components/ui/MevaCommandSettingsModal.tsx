@@ -30,12 +30,17 @@ import {
   type ProAnalyticsReport,
 } from '@/src/lib/storageEngine';
 import {
+  getMevaAudioEngine,
+  type RogerBeepStyle,
+} from '@/src/lib/audioEngine';
+import {
   IconClose,
   IconMic,
   IconHeadphones,
   IconSliders,
   IconShield,
   IconBolt,
+  IconVoiceWave,
 } from '@/components/ui/MevaIcons';
 
 type SettingsTab = 'audio' | 'gate' | 'keybinds' | 'theme_pro';
@@ -92,7 +97,11 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
     (s) => s.proAnalyticsEnabled,
   );
   const rogerBeepEnabled = useVoiceSettingsStore((s) => s.rogerBeepEnabled);
+  const rogerBeepStyle = useVoiceSettingsStore((s) => s.rogerBeepStyle);
+  const rogerBeepVolume = useVoiceSettingsStore((s) => s.rogerBeepVolume);
   const setRogerBeepEnabled = useVoiceSettingsStore((s) => s.setRogerBeepEnabled);
+  const setRogerBeepStyle = useVoiceSettingsStore((s) => s.setRogerBeepStyle);
+  const setRogerBeepVolume = useVoiceSettingsStore((s) => s.setRogerBeepVolume);
 
   const setInputMode = useVoiceSettingsStore((s) => s.setInputMode);
   const updateNoiseGate = useVoiceSettingsStore((s) => s.updateNoiseGate);
@@ -433,12 +442,127 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
                   enabled={acousticCuesEnabled}
                   onToggle={() => setAcousticCuesEnabled(!acousticCuesEnabled)}
                 />
-                <ToggleCard
-                  title="Mil-Sim Roger Beep (Taktik Bip)"
-                  desc="Bas-konuş bırakıldığında askeri taktik telsiz bip sesi çalar (%0 CPU)"
-                  enabled={rogerBeepEnabled}
-                  onToggle={() => setRogerBeepEnabled(!rogerBeepEnabled)}
-                />
+                <div className="rounded-xl p-3 bg-[#11090C] border border-[#2A1319] space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="block text-xs font-extrabold text-[#F4EFF0]">
+                          Mil-Sim Roger Beep (Taktik Bip)
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2D1217] text-[#F08C96] font-mono font-bold">
+                          %0 CPU
+                        </span>
+                      </div>
+                      <span className="block text-[11px] text-[#8E7F83] mt-0.5">
+                        Bas-konuş bırakıldığında donanım sentezli taktik telsiz kapanış sesi çalar.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={rogerBeepEnabled}
+                      onClick={() => setRogerBeepEnabled(!rogerBeepEnabled)}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        rogerBeepEnabled ? 'bg-[#C82333]' : 'bg-[#2A1319]'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          rogerBeepEnabled ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  {rogerBeepEnabled && (
+                    <div className="pt-2 border-t border-[#1F0D12] space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-[#B8AAAC]">
+                          Bip Karakteri & Telsiz Tonu:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            getMevaAudioEngine().previewRogerBeep(
+                              rogerBeepStyle,
+                              rogerBeepVolume,
+                            )
+                          }
+                          className="px-2.5 py-1 rounded-lg bg-[#220D13] hover:bg-[#34121B] border border-[#7A121D]/60 text-[11px] font-bold text-[#F08C96] flex items-center gap-1.5 transition-colors"
+                        >
+                          <IconVoiceWave size={13} />
+                          <span>Sesi Dinle</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {[
+                          {
+                            id: 'classic-milsim' as const,
+                            label: 'Askeri (Mil-Sim)',
+                            desc: '1.0 kHz Klasik',
+                          },
+                          {
+                            id: 'swat-squawk' as const,
+                            label: 'SWAT Çift Ton',
+                            desc: 'Polis Telsizi',
+                          },
+                          {
+                            id: 'quindar-nasa' as const,
+                            label: 'NASA Apollo',
+                            desc: '2.47 kHz Quindar',
+                          },
+                          {
+                            id: 'subtle-esports' as const,
+                            label: 'Espor Soft',
+                            desc: '1.8 kHz Mikro',
+                          },
+                        ].map((styleOption) => (
+                          <button
+                            key={styleOption.id}
+                            type="button"
+                            onClick={() => {
+                              setRogerBeepStyle(styleOption.id);
+                              getMevaAudioEngine().previewRogerBeep(
+                                styleOption.id,
+                                rogerBeepVolume,
+                              );
+                            }}
+                            className={`p-2 rounded-lg text-left border transition-all ${
+                              rogerBeepStyle === styleOption.id
+                                ? 'bg-[#3A1017] border-[#C82333] text-[#F4EFF0] shadow-[0_0_8px_rgba(200,35,51,0.25)]'
+                                : 'bg-[#150A0E] border-[#251016] text-[#8E7F83] hover:text-[#B8AAAC] hover:border-[#38151D]'
+                            }`}
+                          >
+                            <span className="block text-[11px] font-bold">
+                              {styleOption.label}
+                            </span>
+                            <span className="block text-[9.5px] opacity-70">
+                              {styleOption.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3 pt-1">
+                        <span className="text-[11px] text-[#8E7F83]">
+                          Bip Seviyesi: %{Math.round(rogerBeepVolume * 100)}
+                        </span>
+                        <input
+                          type="range"
+                          min={0.1}
+                          max={1}
+                          step={0.05}
+                          value={rogerBeepVolume}
+                          onChange={(e) =>
+                            setRogerBeepVolume(parseFloat(e.target.value))
+                          }
+                          className="w-36 accent-[#C82333] cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}
