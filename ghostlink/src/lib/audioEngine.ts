@@ -909,6 +909,9 @@ export class MevaAudioEngine {
   ): void {
     const ctx = this.ensureContext();
     if (!ctx || !this.masterGain) return;
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {});
+    }
     try {
       this.synthesizeRogerBeep(ctx, this.masterGain, ctx.currentTime, style, volume);
     } catch {}
@@ -921,6 +924,9 @@ export class MevaAudioEngine {
     if (!this.acousticCuesEnabled || this.masterDeafened) return;
     const ctx = this.ensureContext();
     if (!ctx || !this.masterGain) return;
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {});
+    }
 
     const patterns: Record<CalloutCueType, Array<[number, number, number]>> = {
       ready: [
