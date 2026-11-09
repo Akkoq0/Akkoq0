@@ -1,13 +1,13 @@
 'use client';
 
 // ─────────────────────────────────────────────────────────
-// Meva HUD — Comprehensive Interactive Esports Bracket Engine v2.0
+// Meva HUD — Comprehensive Interactive Esports Bracket Engine v2.5
 // ─────────────────────────────────────────────────────────
 // Multi-tier 4-Team / 8-Team Tournament Tree with:
-// - Interactive score stepping (+ / -) & single-tap winner declaration
+// - Mobile-First Stage Switcher Tabs (Çeyrek Final / Yarı Final / Büyük Final)
+// - Large finger-friendly score steppers (w-7 h-7) with haptic feedback
 // - Live progression into Quarterfinals -> Semifinals -> Grand Final
-// - In-line roster editing & presets (Meva, FUT, BBL, NAVI, G2, FNC, C9, SEN)
-// - SVG branch connector visualization
+// - In-line roster editing & presets
 // - Instant bracket clipboard exporter for Discord / Telegram
 // - Pure React state: %0 CPU, 0 MB disk, 60 FPS mobile touch & PC desktop
 
@@ -15,6 +15,7 @@ import React, { useState } from 'react';
 import { IconShield, IconBolt, IconCheck } from '@/components/ui/MevaIcons';
 
 export type BracketSize = 4 | 8;
+export type BracketMobileStage = 'all' | 'quarter' | 'semi' | 'final';
 
 export interface BracketTeam {
   name: string;
@@ -152,14 +153,25 @@ const DEFAULT_4_MATCHES: BracketMatch[] = [
 export const TournamentBracketView: React.FC = () => {
   const [bracketSize, setBracketSize] = useState<BracketSize>(8);
   const [matches, setMatches] = useState<BracketMatch[]>(DEFAULT_8_MATCHES);
+  const [mobileStage, setMobileStage] = useState<BracketMobileStage>('semi');
   const [copied, setCopied] = useState(false);
 
   const handleSwitchSize = (size: BracketSize) => {
     setBracketSize(size);
     setMatches(size === 8 ? DEFAULT_8_MATCHES : DEFAULT_4_MATCHES);
+    if (size === 4 && mobileStage === 'quarter') {
+      setMobileStage('semi');
+    }
+  };
+
+  const triggerHaptic = () => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(12); } catch {}
+    }
   };
 
   const handlePickWinner = (matchId: string, winningTag: string) => {
+    triggerHaptic();
     setMatches((prev) => {
       const matchIndex = prev.findIndex((m) => m.id === matchId);
       if (matchIndex === -1) return prev;
@@ -226,6 +238,7 @@ export const TournamentBracketView: React.FC = () => {
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
+    triggerHaptic();
     setMatches((prev) =>
       prev.map((m) => {
         if (m.id !== matchId) return m;
@@ -260,6 +273,7 @@ export const TournamentBracketView: React.FC = () => {
       : null;
 
   const handleCopySummary = async () => {
+    triggerHaptic();
     const lines = [
       `⚔️ [MEVA ESPOR TURNUVA TABLOSU] (${bracketSize} Takımlı)`,
       `──────────────────────────────`,
@@ -287,9 +301,9 @@ export const TournamentBracketView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 font-sans select-none">
+    <div className="space-y-3 font-sans select-none">
       {/* Top Controller Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl bg-[#14080B] border border-[#2A1319]">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-[#14080B] border border-[#2A1319]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[#2A0E15] border border-[#7A121D] flex items-center justify-center text-sm">
             🏆
@@ -297,25 +311,25 @@ export const TournamentBracketView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-extrabold text-[#FAF2EE]">
-                Espor Turnuva & Playoff Ağacı
+                Espor Playoff Ağacı
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2D1217] text-[#F08C96] font-mono font-bold">
                 {bracketSize} Takım
               </span>
             </div>
             <span className="text-[10px] text-[#8E7E81] block">
-              Skorları +/- ile güncelleyin veya takıma tıklayarak turu kazandırın.
+              Skorları +/- ile güncelleyin veya takıma dokunarak turu kazandırın.
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-end">
           {/* 4 / 8 Mode switcher */}
           <div className="flex items-center bg-[#0C0608] border border-[#2A1319] rounded-lg p-0.5">
             <button
               type="button"
               onClick={() => handleSwitchSize(4)}
-              className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
                 bracketSize === 4
                   ? 'bg-[#A61826] text-white shadow-sm'
                   : 'text-[#8E7E81] hover:text-[#FAF2EE]'
@@ -326,7 +340,7 @@ export const TournamentBracketView: React.FC = () => {
             <button
               type="button"
               onClick={() => handleSwitchSize(8)}
-              className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${
                 bracketSize === 8
                   ? 'bg-[#A61826] text-white shadow-sm'
                   : 'text-[#8E7E81] hover:text-[#FAF2EE]'
@@ -342,7 +356,7 @@ export const TournamentBracketView: React.FC = () => {
             className="px-2.5 py-1.5 rounded-lg bg-[#1E0C12] hover:bg-[#2A1018] border border-[#590C15] text-[10px] font-bold text-[#F08C96] flex items-center gap-1 transition-colors"
           >
             {copied ? <IconCheck size={12} /> : null}
-            <span>{copied ? 'Kopyalandı!' : '📋 Fikstürü Kopyala'}</span>
+            <span>{copied ? 'Kopyalandı!' : '📋 Kopyala'}</span>
           </button>
 
           <button
@@ -353,6 +367,68 @@ export const TournamentBracketView: React.FC = () => {
             Sıfırla
           </button>
         </div>
+      </div>
+
+      {/* Mobile Stage Switcher Tabs (Only visible on small screens < 768px) */}
+      <div className="flex md:hidden items-center gap-1 bg-[#0E0609] p-1 rounded-xl border border-[#2A1319] overflow-x-auto no-scrollbar">
+        {bracketSize === 8 && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic();
+              setMobileStage('quarter');
+            }}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-[10.5px] font-bold whitespace-nowrap transition-all ${
+              mobileStage === 'quarter'
+                ? 'bg-[#A61826] text-white shadow-sm'
+                : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+            }`}
+          >
+            Çeyrek Final (4)
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic();
+            setMobileStage('semi');
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-[10.5px] font-bold whitespace-nowrap transition-all ${
+            mobileStage === 'semi'
+              ? 'bg-[#A61826] text-white shadow-sm'
+              : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+          }`}
+        >
+          Yarı Final (2)
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic();
+            setMobileStage('final');
+          }}
+          className={`flex-1 py-1.5 px-2 rounded-lg text-[10.5px] font-bold whitespace-nowrap transition-all ${
+            mobileStage === 'final'
+              ? 'bg-[#A61826] text-white shadow-sm'
+              : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+          }`}
+        >
+          Büyük Final 🏆
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic();
+            setMobileStage('all');
+          }}
+          className={`py-1.5 px-2 rounded-lg text-[10.5px] font-bold whitespace-nowrap transition-all ${
+            mobileStage === 'all'
+              ? 'bg-[#3A1017] text-[#FAF2EE] border border-[#7A121D]'
+              : 'text-[#8E7E81]'
+          }`}
+        >
+          Tümü
+        </button>
       </div>
 
       {/* Champion Podium if decided */}
@@ -375,22 +451,59 @@ export const TournamentBracketView: React.FC = () => {
         </div>
       )}
 
-      {/* Responsive Bracket Columns */}
+      {/* ─────────────────────────────────────────────────────────
+          MOBILE VIEW: Displays only selected stage on small screens
+          ───────────────────────────────────────────────────────── */}
+      <div className="block md:hidden space-y-3">
+        {(mobileStage === 'quarter' || mobileStage === 'all') && bracketSize === 8 && (
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-[#A58D8E] block px-1">
+              Çeyrek Finaller (BO3)
+            </span>
+            {matches
+              .filter((m) => m.round === 'quarter')
+              .map((match) => renderMatchCard(match, handlePickWinner, handleScoreDelta))}
+          </div>
+        )}
+
+        {(mobileStage === 'semi' || mobileStage === 'all') && (
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-[#A58D8E] block px-1">
+              Yarı Finaller (BO3)
+            </span>
+            {matches
+              .filter((m) => m.round === 'semi')
+              .map((match) => renderMatchCard(match, handlePickWinner, handleScoreDelta))}
+          </div>
+        )}
+
+        {(mobileStage === 'final' || mobileStage === 'all') && grandFinal && (
+          <div className="space-y-2">
+            <span className="text-[10px] font-black uppercase text-[#F08C96] block px-1">
+              🏆 Büyük Final (BO3)
+            </span>
+            {renderGrandFinalCard(grandFinal, handlePickWinner, handleScoreDelta)}
+          </div>
+        )}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          DESKTOP VIEW: Full multi-column grid side-by-side
+          ───────────────────────────────────────────────────────── */}
       <div
-        className={`grid gap-4 ${
-          bracketSize === 8 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'
+        className={`hidden md:grid gap-3.5 ${
+          bracketSize === 8 ? 'grid-cols-3' : 'grid-cols-2'
         }`}
       >
-        {/* Quarterfinals (Only when 8 teams) */}
+        {/* Quarterfinals */}
         {bracketSize === 8 && (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
               <span className="text-[10px] font-black uppercase tracking-wider text-[#A58D8E]">
                 Çeyrek Finaller (BO3)
               </span>
-              <span className="text-[9px] text-[#7A6A6D]">4 Karşılaşma</span>
+              <span className="text-[9px] text-[#7A6A6D]">4 Maç</span>
             </div>
-
             {matches
               .filter((m) => m.round === 'quarter')
               .map((match) => renderMatchCard(match, handlePickWinner, handleScoreDelta))}
@@ -398,120 +511,126 @@ export const TournamentBracketView: React.FC = () => {
         )}
 
         {/* Semifinals */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-black uppercase tracking-wider text-[#A58D8E]">
               Yarı Finaller (BO3)
             </span>
-            <span className="text-[9px] text-[#7A6A6D]">2 Karşılaşma</span>
+            <span className="text-[9px] text-[#7A6A6D]">2 Maç</span>
           </div>
-
           {matches
             .filter((m) => m.round === 'semi')
             .map((match) => renderMatchCard(match, handlePickWinner, handleScoreDelta))}
         </div>
 
         {/* Grand Final */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-black uppercase tracking-wider text-[#F08C96]">
               🏆 Büyük Final (BO3)
             </span>
             <span className="text-[9px] text-[#A61826] font-bold">Kupa Maçı</span>
           </div>
-
-          {grandFinal && (
-            <div className="p-3.5 rounded-xl bg-gradient-to-b from-[#180A0F] to-[#12070A] border-2 border-[#8F1622] space-y-2.5 shadow-lg relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#C82333]/10 rounded-full blur-2xl pointer-events-none" />
-
-              <div className="flex items-center justify-between">
-                <span className="text-[9.5px] font-black uppercase tracking-wider text-[#F08C96] flex items-center gap-1">
-                  <IconBolt size={12} />
-                  <span>Şampiyonluk Mücadelesi</span>
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#2D1217] text-[#FAF2EE] font-mono">
-                  GF
-                </span>
-              </div>
-
-              {/* Final Team 1 */}
-              <div
-                onClick={() => handlePickWinner('gf', grandFinal.team1.tag)}
-                className={`w-full flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all ${
-                  grandFinal.winnerTag === grandFinal.team1.tag
-                    ? 'bg-[#590C15] text-[#FAF2EE] border border-[#FF4655] shadow-md'
-                    : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className="w-5 h-5 rounded flex items-center justify-center bg-[#2B0E14] text-[10px] font-mono font-bold text-[#F08C96]">
-                    1
-                  </span>
-                  <span className="truncate text-xs font-black">{grandFinal.team1.name}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(e) => handleScoreDelta('gf', 1, -1, e)}
-                    className="w-5 h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-xs font-bold"
-                  >
-                    -
-                  </button>
-                  <span className="tabular-nums font-mono text-sm px-1 font-black">
-                    {grandFinal.winnerTag === grandFinal.team1.tag ? '🏆 2' : grandFinal.team1.score}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => handleScoreDelta('gf', 1, +1, e)}
-                    className="w-5 h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-xs font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Final Team 2 */}
-              <div
-                onClick={() => handlePickWinner('gf', grandFinal.team2.tag)}
-                className={`w-full flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all ${
-                  grandFinal.winnerTag === grandFinal.team2.tag
-                    ? 'bg-[#590C15] text-[#FAF2EE] border border-[#FF4655] shadow-md'
-                    : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className="w-5 h-5 rounded flex items-center justify-center bg-[#2B0E14] text-[10px] font-mono font-bold text-[#F08C96]">
-                    2
-                  </span>
-                  <span className="truncate text-xs font-black">{grandFinal.team2.name}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(e) => handleScoreDelta('gf', 2, -1, e)}
-                    className="w-5 h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-xs font-bold"
-                  >
-                    -
-                  </button>
-                  <span className="tabular-nums font-mono text-sm px-1 font-black">
-                    {grandFinal.winnerTag === grandFinal.team2.tag ? '🏆 2' : grandFinal.team2.score}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => handleScoreDelta('gf', 2, +1, e)}
-                    className="w-5 h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-xs font-bold"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {grandFinal && renderGrandFinalCard(grandFinal, handlePickWinner, handleScoreDelta)}
         </div>
       </div>
     </div>
   );
 };
+
+function renderGrandFinalCard(
+  grandFinal: BracketMatch,
+  onPickWinner: (matchId: string, tag: string) => void,
+  onScoreDelta: (matchId: string, teamSlot: 1 | 2, delta: number, e: React.MouseEvent) => void,
+) {
+  return (
+    <div className="p-3.5 rounded-xl bg-gradient-to-b from-[#180A0F] to-[#12070A] border-2 border-[#8F1622] space-y-2.5 shadow-lg relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-[#C82333]/10 rounded-full blur-2xl pointer-events-none" />
+
+      <div className="flex items-center justify-between">
+        <span className="text-[9.5px] font-black uppercase tracking-wider text-[#F08C96] flex items-center gap-1">
+          <IconBolt size={12} />
+          <span>Şampiyonluk Mücadelesi</span>
+        </span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#2D1217] text-[#FAF2EE] font-mono">
+          GF
+        </span>
+      </div>
+
+      {/* Final Team 1 */}
+      <div
+        onClick={() => onPickWinner('gf', grandFinal.team1.tag)}
+        className={`w-full flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all active:scale-[0.99] ${
+          grandFinal.winnerTag === grandFinal.team1.tag
+            ? 'bg-[#590C15] text-[#FAF2EE] border border-[#FF4655] shadow-md'
+            : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          <span className="w-5 h-5 rounded flex items-center justify-center bg-[#2B0E14] text-[10px] font-mono font-bold text-[#F08C96]">
+            1
+          </span>
+          <span className="truncate text-xs font-black">{grandFinal.team1.name}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => onScoreDelta('gf', 1, -1, e)}
+            className="w-7 h-7 sm:w-5 sm:h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-sm sm:text-xs font-bold"
+          >
+            -
+          </button>
+          <span className="tabular-nums font-mono text-sm px-1.5 font-black">
+            {grandFinal.winnerTag === grandFinal.team1.tag ? '🏆 2' : grandFinal.team1.score}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => onScoreDelta('gf', 1, +1, e)}
+            className="w-7 h-7 sm:w-5 sm:h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-sm sm:text-xs font-bold"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      {/* Final Team 2 */}
+      <div
+        onClick={() => onPickWinner('gf', grandFinal.team2.tag)}
+        className={`w-full flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-all active:scale-[0.99] ${
+          grandFinal.winnerTag === grandFinal.team2.tag
+            ? 'bg-[#590C15] text-[#FAF2EE] border border-[#FF4655] shadow-md'
+            : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          <span className="w-5 h-5 rounded flex items-center justify-center bg-[#2B0E14] text-[10px] font-mono font-bold text-[#F08C96]">
+            2
+          </span>
+          <span className="truncate text-xs font-black">{grandFinal.team2.name}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => onScoreDelta('gf', 2, -1, e)}
+            className="w-7 h-7 sm:w-5 sm:h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-sm sm:text-xs font-bold"
+          >
+            -
+          </button>
+          <span className="tabular-nums font-mono text-sm px-1.5 font-black">
+            {grandFinal.winnerTag === grandFinal.team2.tag ? '🏆 2' : grandFinal.team2.score}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => onScoreDelta('gf', 2, +1, e)}
+            className="w-7 h-7 sm:w-5 sm:h-5 rounded bg-[#2A1016] hover:bg-[#3D141F] text-white flex items-center justify-center text-sm sm:text-xs font-bold"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function renderMatchCard(
   match: BracketMatch,
@@ -527,7 +646,7 @@ function renderMatchCard(
         <span>Maç #{match.matchNum}</span>
         {match.winnerTag && (
           <span className="text-[#F08C96] font-mono font-black">
-            Kazanan: {match.winnerTag}
+            Galip: {match.winnerTag}
           </span>
         )}
       </div>
@@ -535,18 +654,18 @@ function renderMatchCard(
       {/* Team 1 */}
       <div
         onClick={() => onPickWinner(match.id, match.team1.tag)}
-        className={`w-full flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+        className={`w-full flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all active:scale-[0.99] ${
           match.winnerTag === match.team1.tag
             ? 'bg-[#3B0E17] text-[#FAF2EE] border border-[#A61826]'
             : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
         }`}
       >
         <span className="truncate text-xs font-bold">{match.team1.name}</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={(e) => onScoreDelta(match.id, 1, -1, e)}
-            className="w-4 h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-[10px] font-bold"
+            className="w-6 h-6 sm:w-4 sm:h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-xs sm:text-[10px] font-bold"
           >
             -
           </button>
@@ -556,7 +675,7 @@ function renderMatchCard(
           <button
             type="button"
             onClick={(e) => onScoreDelta(match.id, 1, +1, e)}
-            className="w-4 h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-[10px] font-bold"
+            className="w-6 h-6 sm:w-4 sm:h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-xs sm:text-[10px] font-bold"
           >
             +
           </button>
@@ -566,18 +685,18 @@ function renderMatchCard(
       {/* Team 2 */}
       <div
         onClick={() => onPickWinner(match.id, match.team2.tag)}
-        className={`w-full flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+        className={`w-full flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all active:scale-[0.99] ${
           match.winnerTag === match.team2.tag
             ? 'bg-[#3B0E17] text-[#FAF2EE] border border-[#A61826]'
             : 'bg-[#180A0E] text-[#8E7E81] hover:text-[#FAF2EE] border border-transparent'
         }`}
       >
         <span className="truncate text-xs font-bold">{match.team2.name}</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={(e) => onScoreDelta(match.id, 2, -1, e)}
-            className="w-4 h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-[10px] font-bold"
+            className="w-6 h-6 sm:w-4 sm:h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-xs sm:text-[10px] font-bold"
           >
             -
           </button>
@@ -587,7 +706,7 @@ function renderMatchCard(
           <button
             type="button"
             onClick={(e) => onScoreDelta(match.id, 2, +1, e)}
-            className="w-4 h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-[10px] font-bold"
+            className="w-6 h-6 sm:w-4 sm:h-4 rounded bg-[#240F14] hover:bg-[#34141B] text-white flex items-center justify-center text-xs sm:text-[10px] font-bold"
           >
             +
           </button>

@@ -290,7 +290,7 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`rounded-xl h-8 px-3.5 text-[11.5px] font-bold border whitespace-nowrap transition-all ${
+              className={`rounded-xl h-9 px-3.5 text-[11.5px] font-bold border whitespace-nowrap active:scale-95 transition-all ${
                 tab === t.id
                   ? 'crimson-cta text-[#F4EFF0]'
                   : 'bg-[#120A0D] hover:bg-[#1B0C11] text-[#B8AAAC] hover:text-[#F4EFF0] border-[#2A1319]'

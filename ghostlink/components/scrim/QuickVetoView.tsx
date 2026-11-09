@@ -63,8 +63,15 @@ export const QuickVetoView: React.FC = () => {
   const currentTurn: 'A' | 'B' = totalActions % 2 === 0 ? 'A' : 'B';
   const currentTeamName = currentTurn === 'A' ? teamAName : teamBName;
 
+  const triggerHaptic = () => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(12); } catch {}
+    }
+  };
+
   const handleFlipCoin = () => {
     if (flipping) return;
+    triggerHaptic();
     setFlipping(true);
     setCoinResult(null);
 
@@ -77,6 +84,7 @@ export const QuickVetoView: React.FC = () => {
 
   const handleBanMap = (mapName: string) => {
     if (bannedMaps.has(mapName) || pickedMaps.has(mapName)) return;
+    triggerHaptic();
 
     setBannedMaps((prev) => new Set(prev).add(mapName));
     setVetoHistory((prev) => [
@@ -87,6 +95,7 @@ export const QuickVetoView: React.FC = () => {
 
   const handlePickMap = (mapName: string) => {
     if (bannedMaps.has(mapName) || pickedMaps.has(mapName)) return;
+    triggerHaptic();
 
     setPickedMaps((prev) => new Set(prev).add(mapName));
     setVetoHistory((prev) => [
@@ -97,6 +106,7 @@ export const QuickVetoView: React.FC = () => {
 
   const handleUndoLastAction = () => {
     if (vetoHistory.length === 0) return;
+    triggerHaptic();
     const last = vetoHistory[vetoHistory.length - 1];
     setVetoHistory((prev) => prev.slice(0, -1));
 
@@ -348,14 +358,14 @@ export const QuickVetoView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleBanMap(mapName)}
-                    className="flex-1 py-1 rounded bg-[#240A10] hover:bg-[#380E18] text-[#F08C96] text-[10px] font-extrabold border border-[#590C15] transition-colors"
+                    className="flex-1 py-2 sm:py-1 min-h-[36px] sm:min-h-0 rounded bg-[#240A10] hover:bg-[#380E18] active:scale-95 text-[#F08C96] text-[11px] sm:text-[10px] font-extrabold border border-[#590C15] transition-all"
                   >
                     Banla
                   </button>
                   <button
                     type="button"
                     onClick={() => handlePickMap(mapName)}
-                    className="flex-1 py-1 rounded bg-[#0E2016] hover:bg-[#153424] text-emerald-300 text-[10px] font-extrabold border border-emerald-800 transition-colors"
+                    className="flex-1 py-2 sm:py-1 min-h-[36px] sm:min-h-0 rounded bg-[#0E2016] hover:bg-[#153424] active:scale-95 text-emerald-300 text-[11px] sm:text-[10px] font-extrabold border border-emerald-800 transition-all"
                   >
                     Seç
                   </button>
