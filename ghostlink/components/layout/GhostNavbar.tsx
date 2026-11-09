@@ -98,6 +98,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const setShowRadialCommandWheel = useAppStore((s) => s.setShowRadialCommandWheel);
   const setShowVoiceClipBufferModal = useAppStore((s) => s.setShowVoiceClipBufferModal);
   const setShowScrimScheduleModal = useAppStore((s) => s.setShowScrimScheduleModal);
+  const setShowShortcutsHelpModal = useAppStore((s) => s.setShowShortcutsHelpModal);
   const toggleRadar = useAppStore((s) => s.toggleRadar);
   const setIsMobileSidebarOpen = useAppStore((s) => s.setIsMobileSidebarOpen);
   const setShowThemeModal = useThemeStore((s) => s.setShowThemeModal);
@@ -335,6 +336,14 @@ export const GhostNavbar = memo(function GhostNavbar() {
           className="hidden sm:flex"
         >
           <IconSliders size={16} />
+        </CommandButton>
+
+        <CommandButton
+          label="Taktik Tuş Kısayolları ve Komut Rehberi (?)"
+          onClick={() => setShowShortcutsHelpModal(true)}
+          className="hidden sm:flex"
+        >
+          <IconHelp size={16} />
         </CommandButton>
       </div>
     </header>
