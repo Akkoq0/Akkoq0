@@ -12,6 +12,8 @@
 //     -> AnalyserNode (FFT 256 real-time dual-band harmonic extraction)
 //     -> Master Gain -> Master Brickwall Limiter -> Destination (48kHz)
 
+import { getMevaVisibilityManager } from '@/src/lib/visibilityManager';
+
 export type SpatialPanPosition = 'L' | 'C' | 'R';
 export type OperatorEqProfile = 'crisp' | 'balanced' | 'warm';
 export type CalloutCueType =
@@ -661,8 +663,9 @@ export class MevaAudioEngine {
   }
 
   public samplePeerSpectrum(peerId: string): SpectrumSnapshot {
+    if (getMevaVisibilityManager().isDocumentHidden()) return ZERO_SPECTRUM;
     const chain = this.peers.get(peerId);
-    if (!chain || chain.muted) return ZERO_SPECTRUM;
+    if (!chain || chain.muted || this.masterDeafened) return ZERO_SPECTRUM;
     return this.extractSpectrum(
       chain.analyser,
       chain.fftBuffer,
@@ -724,6 +727,7 @@ export class MevaAudioEngine {
   }
 
   public sampleMicSpectrum(): SpectrumSnapshot {
+    if (getMevaVisibilityManager().isDocumentHidden() || !this.micAnalyser) return ZERO_SPECTRUM;
     return this.extractSpectrum(
       this.micAnalyser,
       this.micFftBuffer,

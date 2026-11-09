@@ -104,7 +104,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
       </div>
 
       {/* ── Squad Roster ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3.5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3.5 space-y-4 no-scrollbar virtualized-stream">
         {onlineMembers.length === 0 ? (
           <div className="py-8 px-2 flex flex-col items-center justify-center text-center gap-2 text-[#8E7E81]">
             <div className="w-10 h-10 rounded-full border border-dashed border-[#3D141F] bg-[#160A0E] flex items-center justify-center text-[#D65D6E]">
@@ -146,7 +146,7 @@ export const PlayerRadarHUD = memo(function PlayerRadarHUD({
                             onContextMenuPlayer(m, e.clientX, e.clientY);
                           }
                         }}
-                        className="group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
+                        className="virtualized-list group rounded-xl w-full min-h-[52px] md:min-h-[48px] px-3 py-2 flex items-center gap-3 text-left bg-[linear-gradient(160deg,rgba(32,11,16,0.58)_0%,rgba(11,8,10,0.78)_100%)] hover:border-[#961826]/55 border border-[#2B1319] transition-all duration-150"
                       >
                         <OperatorAvatar
                           name={m.username}

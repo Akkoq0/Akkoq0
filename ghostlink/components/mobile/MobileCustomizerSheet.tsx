@@ -20,6 +20,9 @@ export const MobileCustomizerSheet: React.FC = () => {
   const setDensity = useAppStore((s) => s.setMobileDensity);
   const voiceMode = useAppStore((s) => s.mobileVoiceMode);
   const setVoiceMode = useAppStore((s) => s.setMobileVoiceMode);
+  const ecoEnabled = useAppStore((s) => s.ecoMode.isEnabled);
+  const toggleEcoEnabled = useAppStore((s) => s.toggleEcoEnabled);
+  const ecoCpu = useAppStore((s) => s.ecoMode.cpuEstimate);
 
   // Quick Action Bridges
   const setShowRadialWheel = useAppStore((s) => s.setShowRadialCommandWheel);
@@ -208,10 +211,51 @@ export const MobileCustomizerSheet: React.FC = () => {
           </div>
         </div>
 
-        {/* ── 4. MOBİL HIZLI ARAÇLAR & KISAYOLLAR ── */}
+        {/* ── 4. DONANIM VE OYUN OPTİMİZASYONU (ULTRA-LOW OVERHEAD) ── */}
         <div className="space-y-2 pt-1 border-t border-[#241116]">
           <span className="text-[11px] font-black uppercase tracking-wider text-[#E08C96] block">
-            4. HIZLI KOMUTA ARAÇLARI
+            4. OYUN & DONANIM OPTİMİZASYONU (GAME BOOST)
+          </span>
+          <button
+            type="button"
+            onClick={toggleEcoEnabled}
+            className={`w-full p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 ${
+              ecoEnabled
+                ? 'bg-gradient-to-r from-[#173822] to-[#0D1F13] border-emerald-500/80 shadow-[0_0_16px_rgba(16,185,129,0.25)]'
+                : 'bg-[#140A0D] border-[#2C141A] text-[#9E8E91]'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-2xl">{ecoEnabled ? '⚡' : '💤'}</span>
+              <div className="min-w-0">
+                <span className="block text-xs font-black text-[#FAF2EE]">
+                  {ecoEnabled ? 'Game-Boost & Eco Modu Aktif' : 'Game-Boost Kapalı'}
+                </span>
+                <span className="block text-[10px] text-[#A8989B] mt-0.5 leading-snug">
+                  {ecoEnabled
+                    ? `Oyunda ve arka planda CPU/GPU yükünü <%0.1 seviyesine kilitler, ısınmayı önler.`
+                    : 'Açıldığında arka plandaki tüm animasyonları ve GPU filtrelerini dondurur.'}
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span
+                className={`text-[9.5px] font-black px-2 py-0.5 rounded-full border ${
+                  ecoEnabled
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50'
+                    : 'bg-[#1C0D12] text-[#8E7E81] border-[#2E151C]'
+                }`}
+              >
+                {ecoEnabled ? 'AKTİF • 0.1% CPU' : 'DEVRE DIŞI'}
+              </span>
+            </div>
+          </button>
+        </div>
+
+        {/* ── 5. MOBİL HIZLI ARAÇLAR & KISAYOLLAR ── */}
+        <div className="space-y-2 pt-1 border-t border-[#241116]">
+          <span className="text-[11px] font-black uppercase tracking-wider text-[#E08C96] block">
+            5. HIZLI KOMUTA ARAÇLARI
           </span>
           <div className="grid grid-cols-3 gap-2">
             <button

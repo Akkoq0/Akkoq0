@@ -382,11 +382,11 @@ export const StreamChatArea = memo(function StreamChatArea({
     const vad = getMevaVadEngine();
     const unsubVad = vad.subscribe((snap) => {
       setPttActive(snap.pttPressed);
-      if (snap.transmitting) {
-        setSpeakingPeers((prev) =>
-          prev['usr-local'] ? prev : { ...prev, 'usr-local': true },
-        );
-      }
+      setSpeakingPeers((prev) => {
+        const wasSpeaking = Boolean(prev['usr-local']);
+        if (wasSpeaking === snap.transmitting) return prev;
+        return { ...prev, 'usr-local': snap.transmitting };
+      });
     });
 
     const tel = getMevaTelemetryEngine();
@@ -1925,7 +1925,7 @@ const TacticalMessageFeed = memo(function TacticalMessageFeed({
   bottomRef,
 }: TacticalMessageFeedProps) {
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-3.5 py-3 lg:py-2.5 space-y-2.5 lg:space-y-2">
+    <div className="flex-1 min-h-0 overflow-y-auto px-3.5 py-3 lg:py-2.5 space-y-2.5 lg:space-y-2 no-scrollbar virtualized-stream">
       {messages.map((msg) => {
         const isOwn =
           msg.author_id === userId || msg.author_id === 'usr-local';
@@ -1951,7 +1951,7 @@ const TacticalMessageFeed = memo(function TacticalMessageFeed({
         return (
           <div
             key={msg.id}
-            className={`relative rounded-xl px-3.5 py-2.5 lg:py-2 border transition-colors ${
+            className={`virtualized-list relative rounded-xl px-3.5 py-2.5 lg:py-2 border transition-colors ${
               isUrgent
                 ? 'bg-[linear-gradient(95deg,rgba(138,20,32,0.22)_0%,rgba(14,9,11,0.78)_75%)] border-[#961826]/45'
                 : isVoiceNote

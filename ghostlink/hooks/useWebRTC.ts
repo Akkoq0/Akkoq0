@@ -217,6 +217,7 @@ export function useWebRTC({
   isDeafenedRef.current = isDeafened;
   const ecoActiveRef = useRef(ecoActive);
   ecoActiveRef.current = ecoActive;
+  const bgSkipCounterRef = useRef(0);
 
   const safeChannelKey = channelId.replace(/[^A-Za-z0-9_:-]/g, '').slice(0, 64);
 
@@ -490,6 +491,10 @@ export function useWebRTC({
     stopNetGuard();
     statsIntervalRef.current = setInterval(async () => {
       if (ecoActiveRef.current) return;
+      if (typeof document !== 'undefined' && document.hidden) {
+        bgSkipCounterRef.current = (bgSkipCounterRef.current + 1) % 3;
+        if (bgSkipCounterRef.current !== 0) return;
+      }
 
       let totalJitterMs = 0;
       let totalLossPct = 0;
