@@ -28,6 +28,7 @@ interface VoiceSettingsState {
   showStratBoard: boolean;
   miniHudActive: boolean;
   proAnalyticsEnabled: boolean;
+  rogerBeepEnabled: boolean;
 
   setInputMode: (mode: VoiceInputMode) => void;
   updateNoiseGate: (partial: Partial<NoiseGateConfig>) => void;
@@ -40,6 +41,7 @@ interface VoiceSettingsState {
   setMiniHudActive: (active: boolean) => void;
   toggleMiniHud: () => void;
   setProAnalyticsEnabled: (enabled: boolean) => void;
+  setRogerBeepEnabled: (enabled: boolean) => void;
   hydrateSettings: (partial: Partial<{
     inputMode: VoiceInputMode;
     noiseGate: NoiseGateConfig;
@@ -72,6 +74,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   showStratBoard: false,
   miniHudActive: false,
   proAnalyticsEnabled: false,
+  rogerBeepEnabled: true,
 
   setInputMode: (mode) => {
     getMevaVadEngine().setMode(mode);
@@ -120,6 +123,8 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   toggleMiniHud: () => set((s) => ({ miniHudActive: !s.miniHudActive })),
 
   setProAnalyticsEnabled: (enabled) => set({ proAnalyticsEnabled: enabled }),
+
+  setRogerBeepEnabled: (enabled) => set({ rogerBeepEnabled: enabled }),
 
   hydrateSettings: (partial) =>
     set((s) => {

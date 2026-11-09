@@ -9,6 +9,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import { IconClose, IconPlus } from '@/components/ui/MevaIcons';
+import { TournamentBracketView } from './TournamentBracketView';
+import { QuickVetoView } from './QuickVetoView';
 
 interface ScrimMatch {
   id: string;
@@ -65,6 +67,7 @@ export const ScrimScheduleModal: React.FC<ScrimScheduleModalProps> = ({
   onClose,
   onLaunchVeto,
 }) => {
+  const [activeTab, setActiveTab] = useState<'schedule' | 'bracket' | 'veto'>('schedule');
   const [scrims, setScrims] = useState<ScrimMatch[]>(DEFAULT_SCRIMS);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
 
@@ -160,22 +163,72 @@ export const ScrimScheduleModal: React.FC<ScrimScheduleModalProps> = ({
           </button>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="px-5 pt-3 border-b border-[#241116] flex gap-3 bg-[#0A0507]">
+          <button
+            type="button"
+            onClick={() => setActiveTab('schedule')}
+            className={`pb-2.5 text-xs font-bold transition-all relative ${
+              activeTab === 'schedule'
+                ? 'text-[#F4EFF0]'
+                : 'text-[#8E7E81] hover:text-[#C5B5B8]'
+            }`}
+          >
+            📅 Maç Takvimi
+            {activeTab === 'schedule' && (
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#C82333]" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('bracket')}
+            className={`pb-2.5 text-xs font-bold transition-all relative ${
+              activeTab === 'bracket'
+                ? 'text-[#F4EFF0]'
+                : 'text-[#8E7E81] hover:text-[#C5B5B8]'
+            }`}
+          >
+            🏆 Turnuva Ağacı (Bracket)
+            {activeTab === 'bracket' && (
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#C82333]" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('veto')}
+            className={`pb-2.5 text-xs font-bold transition-all relative ${
+              activeTab === 'veto'
+                ? 'text-[#F4EFF0]'
+                : 'text-[#8E7E81] hover:text-[#C5B5B8]'
+            }`}
+          >
+            ⚖️ Harita Veto & Yazı-Tura
+            {activeTab === 'veto' && (
+              <span className="absolute bottom-0 inset-x-0 h-0.5 bg-[#C82333]" />
+            )}
+          </button>
+        </div>
+
         {/* Body */}
         <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
-          {/* Action Header */}
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-              PLANLANAN KARŞILAŞMALAR ({scrims.length})
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowAddForm((s) => !s)}
-              className="h-7 px-2.5 rounded-lg crimson-cta text-xs font-black text-white flex items-center gap-1 shadow-md"
-            >
-              <IconPlus size={12} />
-              <span>+ Yeni Scrim Ekle</span>
-            </button>
-          </div>
+          {activeTab === 'bracket' && <TournamentBracketView />}
+          {activeTab === 'veto' && <QuickVetoView />}
+          {activeTab === 'schedule' && (
+            <>
+              {/* Action Header */}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                  PLANLANAN KARŞILAŞMALAR ({scrims.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm((s) => !s)}
+                  className="h-7 px-2.5 rounded-lg crimson-cta text-xs font-black text-white flex items-center gap-1 shadow-md"
+                >
+                  <IconPlus size={12} />
+                  <span>+ Yeni Scrim Ekle</span>
+                </button>
+              </div>
 
           {/* New Scrim Creation Form */}
           {showAddForm && (
@@ -339,6 +392,8 @@ export const ScrimScheduleModal: React.FC<ScrimScheduleModalProps> = ({
               </div>
             ))}
           </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}

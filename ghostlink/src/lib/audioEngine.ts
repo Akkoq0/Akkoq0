@@ -758,35 +758,71 @@ export class MevaAudioEngine {
   }
 
   /**
-   * Synthesizes a subtle, studio-grade WebAudio micro-chirp for Push-To-Talk engage/release.
+   * Synthesizes a subtle, studio-grade WebAudio micro-chirp for Push-To-Talk engage
+   * and an authentic Mil-Sim Roger Beep on release.
    */
-  public playPttBeep(phase: 'engage' | 'release'): void {
+  public playPttBeep(phase: 'engage' | 'release', rogerBeep = true): void {
     if (!this.acousticCuesEnabled || this.masterDeafened) return;
     const ctx = this.ensureContext();
     if (!ctx || !this.masterGain) return;
 
     try {
       const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const env = ctx.createGain();
-
-      osc.type = 'sine';
       if (phase === 'engage') {
+        const osc = ctx.createOscillator();
+        const env = ctx.createGain();
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(740, now);
-        osc.frequency.exponentialRampToValueAtTime(1108, now + 0.036);
+        osc.frequency.exponentialRampToValueAtTime(1108, now + 0.032);
+        env.gain.setValueAtTime(0.0001, now);
+        env.gain.linearRampToValueAtTime(0.042, now + 0.005);
+        env.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+        osc.connect(env);
+        env.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.042);
+      } else if (rogerBeep) {
+        // Authentic Mil-Sim Roger Beep: Dual-tone military walkie-talkie chirp (1046Hz -> 880Hz)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const env1 = ctx.createGain();
+        const env2 = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(1046.5, now);
+        env1.gain.setValueAtTime(0.0001, now);
+        env1.gain.linearRampToValueAtTime(0.038, now + 0.004);
+        env1.gain.exponentialRampToValueAtTime(0.0001, now + 0.024);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880.0, now + 0.024);
+        env2.gain.setValueAtTime(0.0001, now + 0.024);
+        env2.gain.linearRampToValueAtTime(0.042, now + 0.028);
+        env2.gain.exponentialRampToValueAtTime(0.0001, now + 0.052);
+
+        osc1.connect(env1);
+        env1.connect(this.masterGain);
+        osc2.connect(env2);
+        env2.connect(this.masterGain);
+
+        osc1.start(now);
+        osc1.stop(now + 0.026);
+        osc2.start(now + 0.024);
+        osc2.stop(now + 0.056);
       } else {
+        const osc = ctx.createOscillator();
+        const env = ctx.createGain();
+        osc.type = 'sine';
         osc.frequency.setValueAtTime(988, now);
         osc.frequency.exponentialRampToValueAtTime(659, now + 0.038);
+        env.gain.setValueAtTime(0.0001, now);
+        env.gain.linearRampToValueAtTime(0.035, now + 0.006);
+        env.gain.exponentialRampToValueAtTime(0.0001, now + 0.042);
+        osc.connect(env);
+        env.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.046);
       }
-
-      env.gain.setValueAtTime(0.0001, now);
-      env.gain.linearRampToValueAtTime(0.045, now + 0.006);
-      env.gain.exponentialRampToValueAtTime(0.0001, now + 0.044);
-
-      osc.connect(env);
-      env.connect(this.masterGain);
-      osc.start(now);
-      osc.stop(now + 0.048);
     } catch {}
   }
 

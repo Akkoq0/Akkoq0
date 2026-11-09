@@ -91,6 +91,8 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
   const proAnalyticsEnabled = useVoiceSettingsStore(
     (s) => s.proAnalyticsEnabled,
   );
+  const rogerBeepEnabled = useVoiceSettingsStore((s) => s.rogerBeepEnabled);
+  const setRogerBeepEnabled = useVoiceSettingsStore((s) => s.setRogerBeepEnabled);
 
   const setInputMode = useVoiceSettingsStore((s) => s.setInputMode);
   const updateNoiseGate = useVoiceSettingsStore((s) => s.updateNoiseGate);
@@ -430,6 +432,12 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
                   desc="PTT ve hızlı Callout'larda zarif WebAudio mikro-bip"
                   enabled={acousticCuesEnabled}
                   onToggle={() => setAcousticCuesEnabled(!acousticCuesEnabled)}
+                />
+                <ToggleCard
+                  title="Mil-Sim Roger Beep (Taktik Bip)"
+                  desc="Bas-konuş bırakıldığında askeri taktik telsiz bip sesi çalar (%0 CPU)"
+                  enabled={rogerBeepEnabled}
+                  onToggle={() => setRogerBeepEnabled(!rogerBeepEnabled)}
                 />
               </div>
             </>
