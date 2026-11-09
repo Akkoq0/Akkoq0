@@ -43,7 +43,7 @@ import {
   IconVoiceWave,
 } from '@/components/ui/MevaIcons';
 
-type SettingsTab = 'audio' | 'gate' | 'keybinds' | 'theme_pro';
+type SettingsTab = 'audio' | 'gate' | 'overlay' | 'keybinds' | 'theme_pro';
 
 const KEYBIND_LABELS: ReadonlyArray<{
   key: keyof KeybindMap;
@@ -99,9 +99,19 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
   const rogerBeepEnabled = useVoiceSettingsStore((s) => s.rogerBeepEnabled);
   const rogerBeepStyle = useVoiceSettingsStore((s) => s.rogerBeepStyle);
   const rogerBeepVolume = useVoiceSettingsStore((s) => s.rogerBeepVolume);
+  const inGameOverlayEnabled = useVoiceSettingsStore((s) => s.inGameOverlayEnabled);
+  const inGameOverlayPosition = useVoiceSettingsStore((s) => s.inGameOverlayPosition);
+  const inGameOverlayMode = useVoiceSettingsStore((s) => s.inGameOverlayMode);
+  const inGameOverlayOpacity = useVoiceSettingsStore((s) => s.inGameOverlayOpacity);
+  const inGameOverlayAutoFade = useVoiceSettingsStore((s) => s.inGameOverlayAutoFade);
   const setRogerBeepEnabled = useVoiceSettingsStore((s) => s.setRogerBeepEnabled);
   const setRogerBeepStyle = useVoiceSettingsStore((s) => s.setRogerBeepStyle);
   const setRogerBeepVolume = useVoiceSettingsStore((s) => s.setRogerBeepVolume);
+  const setInGameOverlayEnabled = useVoiceSettingsStore((s) => s.setInGameOverlayEnabled);
+  const setInGameOverlayPosition = useVoiceSettingsStore((s) => s.setInGameOverlayPosition);
+  const setInGameOverlayMode = useVoiceSettingsStore((s) => s.setInGameOverlayMode);
+  const setInGameOverlayOpacity = useVoiceSettingsStore((s) => s.setInGameOverlayOpacity);
+  const setInGameOverlayAutoFade = useVoiceSettingsStore((s) => s.setInGameOverlayAutoFade);
 
   const setInputMode = useVoiceSettingsStore((s) => s.setInputMode);
   const updateNoiseGate = useVoiceSettingsStore((s) => s.updateNoiseGate);
@@ -271,6 +281,7 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
             [
               { id: 'audio', label: 'Ses & Cihazlar' },
               { id: 'gate', label: 'Noise Gate & VAD' },
+              { id: 'overlay', label: 'Oyun İçi Overlay' },
               { id: 'keybinds', label: 'Kısayol Atayıcı' },
               { id: 'theme_pro', label: 'Tema & Meva Pro' },
             ] as const
@@ -655,6 +666,136 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
                 }
               />
             </>
+          )}
+
+          {/* ── TAB: IN-GAME TACTICAL VOICE OVERLAY ── */}
+          {tab === 'overlay' && (
+            <div className="space-y-4">
+              {/* Master Toggle */}
+              <div className="rounded-xl p-3.5 bg-[#10080B] border border-[#2C141A] flex items-center justify-between gap-3">
+                <div className="flex-1 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="block text-xs font-extrabold text-[#F4EFF0]">
+                      Oyun İçi Sesli İletişim Overlay&apos;i
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#2D1217] text-[#F08C96] font-mono font-bold">
+                      Discord Alternatifi
+                    </span>
+                  </div>
+                  <span className="block text-[11px] text-[#8E7F83] mt-0.5">
+                    Oyun oynarken veya sekme arka plandayken ekranda kimin konuştuğunu, rollerini ve pingini gösterir (%0 DLL hooking, ban riski yok).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={inGameOverlayEnabled}
+                  onClick={() => setInGameOverlayEnabled(!inGameOverlayEnabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    inGameOverlayEnabled ? 'bg-[#C82333]' : 'bg-[#2A1319]'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      inGameOverlayEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {inGameOverlayEnabled && (
+                <>
+                  {/* Screen Position Picker */}
+                  <div className="rounded-xl p-3.5 bg-[#10080B] border border-[#2C141A] space-y-2.5">
+                    <span className="block text-xs font-extrabold text-[#F4EFF0]">
+                      Ekran Konumu
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: 'top-left' as const, label: 'Sol Üst', desc: 'Radar Yanı' },
+                        { id: 'top-right' as const, label: 'Sağ Üst', desc: 'Killfeed Üstü' },
+                        { id: 'bottom-left' as const, label: 'Sol Alt', desc: 'Can / Zırh Yanı' },
+                        { id: 'bottom-right' as const, label: 'Sağ Alt', desc: 'Mühimmat Yanı' },
+                      ].map((pos) => (
+                        <button
+                          key={pos.id}
+                          type="button"
+                          onClick={() => setInGameOverlayPosition(pos.id)}
+                          className={`p-2.5 rounded-lg text-left border transition-all ${
+                            inGameOverlayPosition === pos.id
+                              ? 'bg-[#3A1017] border-[#C82333] text-[#F4EFF0] shadow-[0_0_8px_rgba(200,35,51,0.25)]'
+                              : 'bg-[#150A0E] border-[#251016] text-[#8E7F83] hover:text-[#B8AAAC] hover:border-[#38151D]'
+                          }`}
+                        >
+                          <span className="block text-xs font-bold">{pos.label}</span>
+                          <span className="block text-[9.5px] opacity-70">{pos.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Display Mode */}
+                  <div className="rounded-xl p-3.5 bg-[#10080B] border border-[#2C141A] space-y-2.5">
+                    <span className="block text-xs font-extrabold text-[#F4EFF0]">
+                      Görünüm Karakteri
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {[
+                        {
+                          id: 'compact' as const,
+                          label: 'Standart Kompakt',
+                          desc: 'Tüm oda üyeleri, ses barları & roller',
+                        },
+                        {
+                          id: 'stealth' as const,
+                          label: 'Akıllı Gizli (Stealth)',
+                          desc: 'Yalnızca konuşulduğunda ekrana gelir',
+                        },
+                        {
+                          id: 'tactical-full' as const,
+                          label: 'Espor Cockpit',
+                          desc: 'Canlı ping, ducking ve hızlı taktik butonları',
+                        },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setInGameOverlayMode(m.id)}
+                          className={`p-2.5 rounded-lg text-left border transition-all ${
+                            inGameOverlayMode === m.id
+                              ? 'bg-[#3A1017] border-[#C82333] text-[#F4EFF0] shadow-[0_0_8px_rgba(200,35,51,0.25)]'
+                              : 'bg-[#150A0E] border-[#251016] text-[#8E7F83] hover:text-[#B8AAAC] hover:border-[#38151D]'
+                          }`}
+                        >
+                          <span className="block text-xs font-bold">{m.label}</span>
+                          <span className="block text-[9.5px] opacity-70 mt-0.5">{m.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Stealth Auto-Fade & Opacity */}
+                  <div className="rounded-xl p-3.5 bg-[#10080B] border border-[#2C141A] space-y-3">
+                    <ToggleCard
+                      title="Akıllı Saydamlaşma (Stealth Auto-Fade)"
+                      desc="Sessizlikte 2.5 saniye sonra %20 saydamlaşır; konuşma başladığında anında parlar (crosshair'ı engellemez)"
+                      enabled={inGameOverlayAutoFade}
+                      onToggle={() => setInGameOverlayAutoFade(!inGameOverlayAutoFade)}
+                    />
+
+                    <SliderRow
+                      label="Maksimum Overlay Opaklığı"
+                      valueLabel={`%${Math.round(inGameOverlayOpacity * 100)}`}
+                      min={0.3}
+                      max={1.0}
+                      step={0.05}
+                      value={inGameOverlayOpacity}
+                      onChange={(v) => setInGameOverlayOpacity(v)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* ── TAB 3: KEYBIND RECORDER ── */}

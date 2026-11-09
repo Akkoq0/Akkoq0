@@ -39,6 +39,7 @@ import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
 import { ShortcutsHelpModal } from '@/components/modal/ShortcutsHelpModal';
 import { MevaProLicenseModal } from '@/components/modal/MevaProLicenseModal';
 import { MobileCustomizerSheet } from '@/components/mobile/MobileCustomizerSheet';
+import { TacticalVoiceOverlay } from '@/components/hud/TacticalVoiceOverlay';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
 import type {
@@ -569,6 +570,11 @@ export default function MevaHUDApp() {
           onClose={() => setSelectedPlayer(null)}
         />
       )}
+      <TacticalVoiceOverlay
+        username={user.username}
+        userId={user.id}
+        voiceControls={voiceControls}
+      />
       <MobileCustomizerSheet />
     </div>
   );

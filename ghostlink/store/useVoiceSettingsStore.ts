@@ -18,6 +18,14 @@ export interface KeybindMap {
   miniHudKey: string;
 }
 
+export type OverlayPosition =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
+
+export type OverlayDisplayMode = 'stealth' | 'compact' | 'tactical-full';
+
 interface VoiceSettingsState {
   inputMode: VoiceInputMode;
   noiseGate: NoiseGateConfig;
@@ -31,6 +39,11 @@ interface VoiceSettingsState {
   rogerBeepEnabled: boolean;
   rogerBeepStyle: RogerBeepStyle;
   rogerBeepVolume: number;
+  inGameOverlayEnabled: boolean;
+  inGameOverlayPosition: OverlayPosition;
+  inGameOverlayMode: OverlayDisplayMode;
+  inGameOverlayOpacity: number;
+  inGameOverlayAutoFade: boolean;
 
   setInputMode: (mode: VoiceInputMode) => void;
   updateNoiseGate: (partial: Partial<NoiseGateConfig>) => void;
@@ -46,6 +59,11 @@ interface VoiceSettingsState {
   setRogerBeepEnabled: (enabled: boolean) => void;
   setRogerBeepStyle: (style: RogerBeepStyle) => void;
   setRogerBeepVolume: (volume: number) => void;
+  setInGameOverlayEnabled: (enabled: boolean) => void;
+  setInGameOverlayPosition: (pos: OverlayPosition) => void;
+  setInGameOverlayMode: (mode: OverlayDisplayMode) => void;
+  setInGameOverlayOpacity: (opacity: number) => void;
+  setInGameOverlayAutoFade: (autoFade: boolean) => void;
   hydrateSettings: (partial: Partial<{
     inputMode: VoiceInputMode;
     noiseGate: NoiseGateConfig;
@@ -56,6 +74,11 @@ interface VoiceSettingsState {
     rogerBeepEnabled: boolean;
     rogerBeepStyle: RogerBeepStyle;
     rogerBeepVolume: number;
+    inGameOverlayEnabled: boolean;
+    inGameOverlayPosition: OverlayPosition;
+    inGameOverlayMode: OverlayDisplayMode;
+    inGameOverlayOpacity: number;
+    inGameOverlayAutoFade: boolean;
   }>) => void;
 }
 
@@ -84,6 +107,11 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   rogerBeepEnabled: true,
   rogerBeepStyle: 'classic-milsim',
   rogerBeepVolume: 0.75,
+  inGameOverlayEnabled: true,
+  inGameOverlayPosition: 'top-left',
+  inGameOverlayMode: 'compact',
+  inGameOverlayOpacity: 0.9,
+  inGameOverlayAutoFade: true,
 
   setInputMode: (mode) => {
     getMevaVadEngine().setMode(mode);
@@ -139,6 +167,17 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
 
   setRogerBeepVolume: (volume) => set({ rogerBeepVolume: Math.max(0, Math.min(1, volume)) }),
 
+  setInGameOverlayEnabled: (enabled) => set({ inGameOverlayEnabled: enabled }),
+
+  setInGameOverlayPosition: (pos) => set({ inGameOverlayPosition: pos }),
+
+  setInGameOverlayMode: (mode) => set({ inGameOverlayMode: mode }),
+
+  setInGameOverlayOpacity: (opacity) =>
+    set({ inGameOverlayOpacity: Math.max(0.2, Math.min(1, opacity)) }),
+
+  setInGameOverlayAutoFade: (autoFade) => set({ inGameOverlayAutoFade: autoFade }),
+
   hydrateSettings: (partial) =>
     set((s) => {
       const nextMode = partial.inputMode ?? s.inputMode;
@@ -161,6 +200,15 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
         rogerBeepEnabled: partial.rogerBeepEnabled ?? s.rogerBeepEnabled,
         rogerBeepStyle: partial.rogerBeepStyle ?? s.rogerBeepStyle,
         rogerBeepVolume: partial.rogerBeepVolume ?? s.rogerBeepVolume,
+        inGameOverlayEnabled:
+          partial.inGameOverlayEnabled ?? s.inGameOverlayEnabled,
+        inGameOverlayPosition:
+          partial.inGameOverlayPosition ?? s.inGameOverlayPosition,
+        inGameOverlayMode: partial.inGameOverlayMode ?? s.inGameOverlayMode,
+        inGameOverlayOpacity:
+          partial.inGameOverlayOpacity ?? s.inGameOverlayOpacity,
+        inGameOverlayAutoFade:
+          partial.inGameOverlayAutoFade ?? s.inGameOverlayAutoFade,
       };
     }),
 }));
