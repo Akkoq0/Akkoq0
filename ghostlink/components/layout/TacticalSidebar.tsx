@@ -205,25 +205,37 @@ export const TacticalSidebar = memo(function TacticalSidebar({
       ? `Scrim #${activeVoiceChannelId.slice(6)}`
       : 'Bağlı değil';
 
+  // Channels belonging strictly to the active server
+  const serverChannels = useMemo(() => {
+    if (!activeServer) return [];
+    return channels.filter((ch) => !ch.server_id || ch.server_id === activeServer.id);
+  }, [channels, activeServer]);
+
+  // Categories belonging strictly to the active server
+  const serverCategories = useMemo(() => {
+    if (!activeServer) return [];
+    return categories.filter((cat) => !cat.server_id || cat.server_id === activeServer.id);
+  }, [categories, activeServer]);
+
   // Filter channels based on quick filter pill
   const filteredChannels = useMemo(() => {
-    if (selectedGameFilter === 'all') return channels;
+    if (selectedGameFilter === 'all') return serverChannels;
     if (selectedGameFilter === 'for-you') {
       const recMap = new Map(recommendedPods.map((r) => [r.channelId, r]));
-      const voiceChans = channels.filter((c) => c.type === 'voice');
+      const voiceChans = serverChannels.filter((c) => c.type === 'voice');
       return [...voiceChans].sort((a, b) => {
         const scoreA = recMap.get(a.id)?.score ?? 0;
         const scoreB = recMap.get(b.id)?.score ?? 0;
         return scoreB - scoreA;
       });
     }
-    return channels.filter((ch) => {
+    return serverChannels.filter((ch) => {
       const g = ch.game_id
         ? getGameById(ch.game_id)
         : detectGameFromChannel(ch.name, ch.tags);
       return g.id === selectedGameFilter;
     });
-  }, [channels, selectedGameFilter, recommendedPods]);
+  }, [serverChannels, selectedGameFilter, recommendedPods]);
 
   // Group channels by category
   const categorizedChannels = useMemo(() => {
@@ -238,8 +250,8 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
     const map = new Map<string, { categoryName: string; channels: Channel[] }>();
 
-    // 1. Existing categories
-    categories.forEach((cat) => {
+    // 1. Existing server categories
+    serverCategories.forEach((cat) => {
       map.set(cat.id, { categoryName: cat.name, channels: [] });
     });
 
@@ -260,7 +272,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
     });
 
     return Array.from(map.values()).filter((g) => g.channels.length > 0);
-  }, [categories, filteredChannels, selectedGameFilter]);
+  }, [serverCategories, filteredChannels, selectedGameFilter]);
 
   // Smart Channel Recommendation Engine
   const recommendedChannel = useMemo(() => {

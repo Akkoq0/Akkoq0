@@ -74,7 +74,9 @@ export const GhostNavbar = memo(function GhostNavbar() {
     (s) => s.channels.find((c) => c.id === s.activeChannelId)?.name,
   );
   const activeDMName = useAppStore(
-    (s) => s.friends.find((f) => f.friend_id === s.activeDMUserId)?.friend?.username,
+    (s) =>
+      s.friends.find((f) => f.friend_id === s.activeDMUserId)?.friend?.username ||
+      s.onlineMembers.find((m) => m.id === s.activeDMUserId)?.username,
   );
   const pendingCount = useAppStore(
     (s) => s.friends.reduce((n, f) => n + (f.status === 'pending' ? 1 : 0), 0),
@@ -346,6 +348,15 @@ export const GhostNavbar = memo(function GhostNavbar() {
           className="hidden sm:flex"
         >
           <IconUsers size={16} />
+        </CommandButton>
+
+        <CommandButton
+          label="Kadro Radarı & Oyuncu Listesi (R)"
+          onClick={toggleRadar}
+          active={isRadarOpen}
+          className="hidden lg:flex"
+        >
+          <IconRadar size={16} />
         </CommandButton>
 
         <button

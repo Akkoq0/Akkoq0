@@ -85,7 +85,7 @@ export const useAppStore = create<AppState>((set) => ({
   showUserSettings: false,
   showFriendsModal: false,
   collapsedCategories: new Set<string>(),
-  isRadarOpen: false,
+  isRadarOpen: true,
   isMobileSidebarOpen: false,
   isMobileRadarOpen: false,
   mobileTab: 'chat',
@@ -95,14 +95,16 @@ export const useAppStore = create<AppState>((set) => ({
   showMobileCustomizer: false,
 
   setActiveServer: (id) =>
-    set({
-      activeServerId: id,
-      activeChannelId: null,
-      activeDMUserId: null,
-      messages: [],
-      categories: [],
-      channels: [],
-      isMobileSidebarOpen: false,
+    set((state) => {
+      const serverChannels = state.channels.filter((c) => !c.server_id || c.server_id === id);
+      const firstText = serverChannels.find((c) => c.type === 'text');
+      return {
+        activeServerId: id,
+        activeChannelId: firstText ? firstText.id : null,
+        activeDMUserId: null,
+        messages: [],
+        isMobileSidebarOpen: false,
+      };
     }),
 
   setActiveChannel: (id) =>
@@ -118,13 +120,23 @@ export const useAppStore = create<AppState>((set) => ({
     set({ activeVoiceChannelId: id, isMobileSidebarOpen: false }),
 
   setActiveDMUser: (userId) =>
-    set({
-      activeDMUserId: userId,
-      activeChannelId: null,
-      messages: [],
-      isMobileSidebarOpen: false,
-      showFriendsModal: false,
-      mobileTab: 'chat',
+    set((state) => {
+      let nextActiveChannelId = state.activeChannelId;
+      if (userId === null && !nextActiveChannelId) {
+        const srvChannels = state.channels.filter(
+          (c) => !c.server_id || c.server_id === state.activeServerId,
+        );
+        const firstText = srvChannels.find((c) => c.type === 'text');
+        nextActiveChannelId = firstText ? firstText.id : null;
+      }
+      return {
+        activeDMUserId: userId,
+        activeChannelId: userId ? null : nextActiveChannelId,
+        messages: [],
+        isMobileSidebarOpen: false,
+        showFriendsModal: false,
+        mobileTab: 'chat',
+      };
     }),
 
   setServers: (servers) => set({ servers }),

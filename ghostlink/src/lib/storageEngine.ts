@@ -264,6 +264,16 @@ export class MevaStorageEngine {
     this.scheduleWrite(STORE_CHAT, channelId, bounded);
   }
 
+  public async appendChannelMessage(channelId: string, message: Message): Promise<void> {
+    if (!channelId || !message) return;
+    try {
+      const existing = (await this.loadChannelMessages(channelId)) || [];
+      const updated = [...existing.filter((m) => m.id !== message.id), message].slice(-MAX_MESSAGES_PER_CHANNEL);
+      this.saveChannelMessages(channelId, updated);
+      void this.flushPendingWrites();
+    } catch {}
+  }
+
   // ── Meva Pro Post-Match Acoustic & Comms Analytics ──
 
   public getProReport(): ProAnalyticsReport {

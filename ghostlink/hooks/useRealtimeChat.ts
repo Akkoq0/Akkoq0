@@ -40,19 +40,11 @@ export function useRealtimeChat(channelId: string | null) {
 
   const effectiveTargetId = activeDMUserId
     ? `dm:${activeDMUserId}`
-    : channelId || 'ch-2';
+    : channelId;
 
   useEffect(() => {
-    if (activeDMUserId) {
+    if (!effectiveTargetId) {
       setMessages([]);
-      let disposed = false;
-      void getMevaStorageEngine()
-        .loadChannelMessages(effectiveTargetId)
-        .then((persisted) => {
-          if (!disposed && persisted && persisted.length > 0) {
-            setMessages(persisted);
-          }
-        });
       return;
     }
 
@@ -100,7 +92,7 @@ export function useRealtimeChat(channelId: string | null) {
               const cue = wire.cue ?? inferCalloutCue(wire.content);
               if (cue) getMevaAudioEngine().playCalloutCue(cue);
             }
-            addMessage({
+            const incomingMsg: Message = {
               id: wire.id,
               channel_id: wire.channelId,
               author_id: envelope.from,
@@ -114,7 +106,9 @@ export function useRealtimeChat(channelId: string | null) {
                 activity: wire.role ?? 'P2P E2EE',
                 created_at: BASE_PROFILE_ISO,
               },
-            });
+            };
+            addMessage(incomingMsg);
+            void getMevaStorageEngine().appendChannelMessage(wire.channelId, incomingMsg);
           } catch {}
         });
     });
@@ -190,7 +184,7 @@ export function useRealtimeChat(channelId: string | null) {
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
         .trim()
         .slice(0, 2000);
-      if (!sanitized) return;
+      if (!sanitized || !effectiveTargetId) return;
 
       const msgId =
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -215,6 +209,7 @@ export function useRealtimeChat(channelId: string | null) {
       };
       addMessage(optimisticMsg);
       getMevaStorageEngine().recordTacticalMessage(sanitized);
+      void getMevaStorageEngine().appendChannelMessage(effectiveTargetId, optimisticMsg);
 
       // Encrypt with AES-256-GCM and transmit over WebRTC DataChannel / Mesh
       const isCallout = sanitized.startsWith('[');

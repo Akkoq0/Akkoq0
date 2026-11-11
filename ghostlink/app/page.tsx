@@ -272,6 +272,11 @@ export default function MevaHUDApp() {
         return;
       }
 
+      if (e.key.toLowerCase() === 'r' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        useAppStore.getState().toggleRadar();
+        return;
+      }
+
       if (e.code === vState.keybinds.stratBoardKey || e.code === 'KeyM' || e.key.toLowerCase() === 'm') {
         vState.toggleStratBoard();
       } else if (e.code === vState.keybinds.miniHudKey) {
@@ -299,19 +304,14 @@ export default function MevaHUDApp() {
     ]).then(([savedServers, savedCats, savedChans]) => {
       if (isCancelled) return;
       if (savedServers && savedServers.length > 0) {
-        setServers(savedServers);
-        setActiveServer(savedServers[0].id);
-
         if (savedCats && savedCats.length > 0) {
           setCategories(savedCats);
         }
         if (savedChans && savedChans.length > 0) {
           setChannels(savedChans);
-          const firstText = savedChans.find((c) => c.type === 'text');
-          if (firstText) setActiveChannel(firstText.id);
-          const firstVoice = savedChans.find((c) => c.type === 'voice');
-          if (firstVoice) setActiveVoiceChannel(firstVoice.id);
         }
+        setServers(savedServers);
+        setActiveServer(savedServers[0].id);
       } else {
         // Purge mock data: leave state empty so [+] Kendi Sunucunu Kur button is shown
         setServers([]);

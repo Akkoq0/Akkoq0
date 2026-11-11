@@ -199,6 +199,7 @@ export const StreamChatArea = memo(function StreamChatArea({
   onSelectPlayer,
   voiceControls,
 }: StreamChatAreaProps) {
+  const activeServerId = useAppStore((s) => s.activeServerId);
   const activeChannelId = useAppStore((s) => s.activeChannelId);
   const activeVoiceChannelId = useAppStore((s) => s.activeVoiceChannelId);
   const activeDMUserId = useAppStore((s) => s.activeDMUserId);
@@ -436,9 +437,20 @@ export const StreamChatArea = memo(function StreamChatArea({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, activeChannelId, activeDMUserId]);
 
-  const voiceChannels = channels.filter((c) => c.type === 'voice');
+  const voiceChannels = useMemo(() => {
+    return channels.filter(
+      (c) => c.type === 'voice' && (!activeServerId || !c.server_id || c.server_id === activeServerId),
+    );
+  }, [channels, activeServerId]);
   const activeTextChannel = channels.find((c) => c.id === activeChannelId);
-  const dmFriend = friends.find((f) => f.friend_id === activeDMUserId)?.friend;
+  const dmUser = useMemo(() => {
+    if (!activeDMUserId) return null;
+    const friendUser = friends.find((f) => f.friend_id === activeDMUserId)?.friend;
+    if (friendUser) return friendUser;
+    const memberUser = onlineMembers.find((m) => m.id === activeDMUserId);
+    if (memberUser) return memberUser;
+    return { id: activeDMUserId, username: 'Operatör' } as Profile;
+  }, [activeDMUserId, friends, onlineMembers]);
 
   const triggerSelfSpeakingPulse = useCallback(() => {
     setSpeakingPeers((prev) => ({ ...prev, 'usr-local': true }));
@@ -494,8 +506,8 @@ export const StreamChatArea = memo(function StreamChatArea({
       ? `Scrim #${activeVoiceChannelId.slice(6)}`
       : 'Taktik Lobi #1';
 
-  const chatTitle = dmFriend
-    ? `@${dmFriend.username}`
+  const chatTitle = dmUser
+    ? `@${dmUser.username}`
     : activeTextChannel
       ? `#${cleanLabel(activeTextChannel.name)}`
       : '#genel-sohbet';
@@ -1240,7 +1252,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                 <h3 className="text-[13.5px] font-extrabold text-[#F4EFF0] truncate">
                   {chatTitle}
                 </h3>
-                {dmFriend && (
+                {dmUser && (
                   <button
                     type="button"
                     onClick={() => setActiveDMUser(null)}
@@ -1668,7 +1680,7 @@ export const StreamChatArea = memo(function StreamChatArea({
               <span className="rounded-md px-2 py-0.5 bg-[#180B10] border border-[#6E121D]/45 text-[11px] font-bold text-[#F08C96] whitespace-nowrap">
                 {chatTitle}
               </span>
-              {dmFriend && (
+              {dmUser && (
                 <button
                   type="button"
                   onClick={() => setActiveDMUser(null)}

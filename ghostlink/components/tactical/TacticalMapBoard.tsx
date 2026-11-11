@@ -1602,12 +1602,39 @@ export const TacticalMapBoard: React.FC = () => {
     setLastSeqPoint(null);
     setSeqCounter(1);
     void broadcastStratPacket({ action: 'clear', mapId });
+    try {
+      const storage = getMevaStorageEngine();
+      void storage
+        .getRecord<Record<string, StratOperation[]>>(STORE_PREFS, 'tactical_map_drawings_cache')
+        .then((cached) => {
+          const updated = {
+            ...(cached || {}),
+            [mapId]: [],
+          };
+          storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
+          void storage.flushPendingWrites();
+        });
+    } catch {}
   };
 
   const handleClearPhase = () => {
     setOps((prev) => prev.filter((o) => !(o.mapId === mapId && o.phase === activePhase)));
     setRedoStack([]);
     void broadcastStratPacket({ action: 'clear', mapId, phase: activePhase });
+    try {
+      const storage = getMevaStorageEngine();
+      void storage
+        .getRecord<Record<string, StratOperation[]>>(STORE_PREFS, 'tactical_map_drawings_cache')
+        .then((cached) => {
+          const currentMapOps = (cached?.[mapId] || []).filter((o) => o.phase !== activePhase);
+          const updated = {
+            ...(cached || {}),
+            [mapId]: currentMapOps,
+          };
+          storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
+          void storage.flushPendingWrites();
+        });
+    } catch {}
   };
 
   const handleResetSequence = () => {
@@ -1694,6 +1721,7 @@ export const TacticalMapBoard: React.FC = () => {
     setMapId(next);
     setLastSeqPoint(null);
     setSeqCounter(1);
+    setRedoStack([]);
     void broadcastStratPacket({ action: 'switch-map', mapId: next });
   };
 
@@ -1748,6 +1776,7 @@ export const TacticalMapBoard: React.FC = () => {
     setSelectedGameTab(gameTabId);
     setLastSeqPoint(null);
     setSeqCounter(1);
+    setRedoStack([]);
 
     const meta = allGameTabs.find((g) => g.id === gameTabId) || DEFAULT_GAMES[0];
     const isFPS = meta.archetype === 'fps';
