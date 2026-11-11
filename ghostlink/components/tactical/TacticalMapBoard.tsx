@@ -909,12 +909,33 @@ export const TacticalMapBoard: React.FC = () => {
   const [showPresetModal, setShowPresetModal] = useState<boolean>(false);
   const [showCallouts, setShowCallouts] = useState<boolean>(true);
 
+  // Mobile Ergonomic State & Bottom Sheets
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [showMobileMapSelectorSheet, setShowMobileMapSelectorSheet] = useState<boolean>(false);
+  const [showMobileToolsSheet, setShowMobileToolsSheet] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        const mobile = window.innerWidth < 768;
+        setIsMobile(mobile);
+        if (mobile) {
+          setSidebarOpen(false);
+          setZoomDockCollapsed(true);
+        }
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // ── Tactical View & UI Customization States ──
   const [tacticalTheme, setTacticalTheme] = useState<TacticalThemeKey>('crimson');
   const [gridMode, setGridMode] = useState<TacticalGridMode>('standard');
   const [radarFilter, setRadarFilter] = useState<TacticalRadarFilter>('normal');
   const [showZoomDock, setShowZoomDock] = useState<boolean>(true);
-  const [zoomDockCollapsed, setZoomDockCollapsed] = useState<boolean>(false);
+  const [zoomDockCollapsed, setZoomDockCollapsed] = useState<boolean>(true);
   const [showCompassHud, setShowCompassHud] = useState<boolean>(true);
   const [showCoordinatesHud, setShowCoordinatesHud] = useState<boolean>(true);
   const [uiDensity, setUiDensity] = useState<TacticalUiDensity>('comfortable');
@@ -1987,8 +2008,61 @@ export const TacticalMapBoard: React.FC = () => {
           onChange={handleImportJSON}
         />
 
+        {/* ── MOBILE EXCLUSIVE UNIFIED COMPACT HEADER (< 768px) ── */}
+        <div className="md:hidden px-3 py-2 border-b border-[#2A1319] flex items-center justify-between gap-2 bg-[#090507] flex-shrink-0">
+          {/* Game & Map Quick Picker Pill */}
+          <button
+            type="button"
+            onClick={() => setShowMobileMapSelectorSheet(true)}
+            className="h-8 px-2.5 rounded-xl bg-[#180A0E] hover:bg-[#260E16] border border-[#8F1622]/80 flex items-center gap-1.5 text-xs font-black text-[#FAF2EE] shadow-sm max-w-[55vw] truncate active:scale-95"
+          >
+            <span>{activeGameMeta.icon || '🎯'}</span>
+            <span className="truncate">
+              {activeGameMeta.name}: {mapId === 'custom' ? customMapName : (MAP_BLUEPRINTS[mapId as Exclude<TacticalMapId, 'custom'>]?.title || mapId)}
+            </span>
+            <span className="text-[10px] text-[#C82333]">▾</span>
+          </button>
+
+          {/* Quick Actions (Callout, Theme, Close) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowCallouts((v) => !v)}
+              aria-label="Bölge İsimleri"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold border transition-colors ${
+                showCallouts
+                  ? 'bg-[#8F1622] text-white border-[#FF4655]'
+                  : 'bg-[#12080B] text-[#8E7E81] border-[#241116]'
+              }`}
+            >
+              🏷️
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowViewCustomizerModal(true)}
+              aria-label="Görünüm Ayarları"
+              className="w-8 h-8 rounded-xl bg-[#12080B] hover:bg-[#1E0B11] border border-[#241116] text-white flex items-center justify-center text-xs"
+            >
+              🎛️
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen(false);
+              }}
+              aria-label="Kapat"
+              className="w-8 h-8 rounded-xl bg-[#240A10] hover:bg-[#3D0F18] border border-[#8F1622] text-white flex items-center justify-center text-sm font-black active:scale-95"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
         {/* ── TOP HEADER LAYER 1: Game Tabs & Close Studio ── */}
-        <div className="px-3 sm:px-4 py-2 border-b border-[#2A1319] flex items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
+        <div className="hidden md:flex px-3 sm:px-4 py-2 border-b border-[#2A1319] items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
           <div className="flex items-center gap-1.5 flex-nowrap">
             <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
               OYUN:
@@ -2111,7 +2185,7 @@ export const TacticalMapBoard: React.FC = () => {
         </div>
 
         {/* ── TOP HEADER LAYER 2: Map Selector + Zoom Controls + Quick Export ── */}
-        <div className="px-3 sm:px-4 py-1.5 border-b border-[#241116] flex flex-wrap items-center justify-between gap-2 flex-shrink-0 bg-gradient-to-r from-[#1C0B10] via-[#0D090B] to-[#070607]">
+        <div className="hidden md:flex px-3 sm:px-4 py-1.5 border-b border-[#241116] flex-wrap items-center justify-between gap-2 flex-shrink-0 bg-gradient-to-r from-[#1C0B10] via-[#0D090B] to-[#070607]">
           {/* Map Selector Chips */}
           <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto">
             <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
@@ -2521,26 +2595,101 @@ export const TacticalMapBoard: React.FC = () => {
               </div>
             )}
 
-            {/* Mobile Bottom Quick-Toggle Bar */}
-            <div className="md:hidden absolute bottom-3 right-4 flex items-center gap-1.5 z-20">
+            {/* ── MOBILE FLOATING THUMB TOOL DOCK (Bottom, One-Handed) ── */}
+            <div className="md:hidden absolute bottom-2.5 inset-x-2.5 z-40 flex items-center justify-between px-2 py-1.5 rounded-2xl bg-[#0A0507]/95 backdrop-blur-xl border border-[#8F1622]/70 shadow-[0_12px_36px_rgba(0,0,0,0.9)]">
+              {/* 1. Quick Draw Pen */}
               <button
                 type="button"
-                onClick={() => setSidebarOpen((s) => !s)}
-                className="h-8 px-3 rounded-xl bg-[#8F1622] text-white text-xs font-black shadow-lg flex items-center gap-1.5"
-                style={{ backgroundColor: currentThemeConfig.primary }}
+                onClick={() => setTool('pen')}
+                aria-label="Serbest Çizim Kalemi"
+                className={`flex-1 h-9 mx-0.5 rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all active:scale-95 ${
+                  tool === 'pen'
+                    ? 'crimson-cta text-white shadow-md'
+                    : 'bg-[#14080B] text-[#9E8E91] border border-[#220D12]'
+                }`}
               >
-                <span>📐</span>
-                <span>Taktik Paneli</span>
+                <span className="text-sm">✏️</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">Çizim</span>
+              </button>
+
+              {/* 2. Arrow Tool */}
+              <button
+                type="button"
+                onClick={() => setTool('arrow')}
+                aria-label="Taktik Ok"
+                className={`flex-1 h-9 mx-0.5 rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all active:scale-95 ${
+                  tool === 'arrow'
+                    ? 'crimson-cta text-white shadow-md'
+                    : 'bg-[#14080B] text-[#9E8E91] border border-[#220D12]'
+                }`}
+              >
+                <span className="text-sm">↗️</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">Ok</span>
+              </button>
+
+              {/* 3. Utility (Smoke / Ping) */}
+              <button
+                type="button"
+                onClick={() => setTool(activeGameMeta.archetype === 'fps' ? 'smoke' : 'ward-yellow')}
+                aria-label="Yetenek ve Ekipman"
+                className={`flex-1 h-9 mx-0.5 rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all active:scale-95 ${
+                  tool === 'smoke' || tool === 'ward-yellow'
+                    ? 'crimson-cta text-white shadow-md'
+                    : 'bg-[#14080B] text-[#9E8E91] border border-[#220D12]'
+                }`}
+              >
+                <span className="text-sm">{activeGameMeta.archetype === 'fps' ? '⭕' : '👁️'}</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">
+                  {activeGameMeta.archetype === 'fps' ? 'Smoke' : 'Ward'}
+                </span>
+              </button>
+
+              {/* 4. Eraser */}
+              <button
+                type="button"
+                onClick={() => setTool('eraser')}
+                aria-label="Silgi"
+                className={`flex-1 h-9 mx-0.5 rounded-xl flex flex-col items-center justify-center text-xs font-bold transition-all active:scale-95 ${
+                  tool === 'eraser'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'bg-[#14080B] text-[#9E8E91] border border-[#220D12]'
+                }`}
+              >
+                <span className="text-sm">🧽</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">Silgi</span>
+              </button>
+
+              {/* 5. Undo */}
+              <button
+                type="button"
+                onClick={handleUndo}
+                disabled={ops.length === 0}
+                aria-label="Geri Al"
+                className="flex-1 h-9 mx-0.5 rounded-xl bg-[#14080B] disabled:opacity-40 text-[#FAF2EE] border border-[#220D12] flex flex-col items-center justify-center text-xs font-bold active:scale-95"
+              >
+                <span className="text-sm">⟲</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">Geri</span>
+              </button>
+
+              {/* 6. Expand Full Tools Sheet */}
+              <button
+                type="button"
+                onClick={() => setShowMobileToolsSheet(true)}
+                aria-label="Tüm Taktik Araçları"
+                className="flex-1 h-9 mx-0.5 rounded-xl bg-[#240C12] hover:bg-[#38121C] text-[#F08C96] border border-[#8F1622] flex flex-col items-center justify-center text-xs font-bold active:scale-95"
+              >
+                <span className="text-sm">📐</span>
+                <span className="text-[8px] font-black leading-none mt-0.5">Araçlar</span>
               </button>
             </div>
           </div>
 
-          {/* ── MODERN TACTICAL SIDEBAR (Right) ── */}
+          {/* ── MODERN TACTICAL SIDEBAR (Desktop Right) ── */}
           {sidebarOpen && (
             <aside
-              className={`w-full ${
+              className={`hidden md:flex w-full ${
                 uiDensity === 'compact' ? 'md:w-64 lg:w-72' : 'md:w-72 lg:w-80'
-              } bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all`}
+              } bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all`}
             >
               {/* Sidebar Header */}
               <div className="p-3 border-b border-[#1E0B11] flex items-center justify-between bg-[#0E070A]">
@@ -3265,6 +3414,278 @@ export const TacticalMapBoard: React.FC = () => {
           onSelectUiDensity={setUiDensity}
           onResetDefaults={handleResetTacticalViewDefaults}
         />
+
+        {/* ── MOBILE SHEET: GAME & MAP SELECTOR ── */}
+        {showMobileMapSelectorSheet && (
+          <div
+            className="fixed inset-0 z-50 exec-backdrop flex flex-col justify-end select-none font-sans"
+            onClick={() => setShowMobileMapSelectorSheet(false)}
+          >
+            <div
+              className="w-full bg-[#0D0609] border-t-2 border-[#8F1622] rounded-t-3xl p-4 space-y-4 shadow-2xl max-h-[80vh] overflow-y-auto animate-fade-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="w-12 h-1.5 rounded-full bg-[#3D141C]" />
+                <div className="w-full flex items-center justify-between pt-1">
+                  <span className="text-sm font-black text-[#FAF2EE] uppercase tracking-wider">
+                    Oyun & Harita Seçimi
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileMapSelectorSheet(false)}
+                    aria-label="Harita Seçimini Kapat"
+                    className="w-7 h-7 rounded-lg bg-[#180A0E] text-[#9E8E91] hover:text-white flex items-center justify-center text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Game selection chips */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  1. Espor Oyunu
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {allGameTabs.map((g) => {
+                    const isActive = selectedGameTab === g.id;
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => handleSwitchGameTab(g.id)}
+                        className={`py-2 px-1.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border transition-all ${
+                          isActive
+                            ? 'crimson-cta text-white border-[#FF4655] shadow-md'
+                            : 'bg-[#150A0E] text-[#A8989B] border-[#241116]'
+                        }`}
+                      >
+                        <span>{g.icon}</span>
+                        <span className="truncate">{g.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Map selection list */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  2. Harita Seçin ({availableMaps.length})
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {availableMaps.map((mKey) => {
+                    const spec = MAP_BLUEPRINTS[mKey as Exclude<TacticalMapId, 'custom'>];
+                    const title = spec?.title || mKey;
+                    const isActive = mapId === mKey;
+                    const mapOpsCount = ops.filter((o) => o.mapId === mKey).length;
+                    return (
+                      <button
+                        key={mKey}
+                        type="button"
+                        onClick={(e) => {
+                          handleSwitchMap(mKey, e);
+                          setShowMobileMapSelectorSheet(false);
+                        }}
+                        className={`p-2.5 rounded-xl text-left border flex items-center justify-between transition-all ${
+                          isActive
+                            ? 'crimson-cta text-white border-[#FF4655] shadow-md'
+                            : 'bg-[#14080B] text-[#FAF2EE] hover:bg-[#200C13] border-[#241116]'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <span className="block text-xs font-black truncate">{title}</span>
+                          <span className="block text-[9.5px] opacity-70">
+                            {spec?.gameTitle || 'ARENA'}
+                          </span>
+                        </div>
+                        {mapOpsCount > 0 && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-black/50 text-white font-mono">
+                            {mapOpsCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── MOBILE SHEET: FULL TACTICAL TOOLS & PHASES ── */}
+        {showMobileToolsSheet && (
+          <div
+            className="fixed inset-0 z-50 exec-backdrop flex flex-col justify-end select-none font-sans"
+            onClick={() => setShowMobileToolsSheet(false)}
+          >
+            <div
+              className="w-full bg-[#0D0609] border-t-2 border-[#8F1622] rounded-t-3xl p-4 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto animate-fade-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="w-12 h-1.5 rounded-full bg-[#3D141C]" />
+                <div className="w-full flex items-center justify-between pt-1">
+                  <span className="text-sm font-black text-[#FAF2EE] uppercase tracking-wider">
+                    Tüm Taktik Araçları
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileToolsSheet(false)}
+                    aria-label="Taktik Araçlarını Kapat"
+                    className="w-7 h-7 rounded-lg bg-[#180A0E] text-[#9E8E91] hover:text-white flex items-center justify-center text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* 1. Tactical Phase Selection */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  1. Aşama / Kademe
+                </span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: 1, label: 'Erken / Lvl 1' },
+                    { id: 2, label: 'Mid / Execute' },
+                    { id: 3, label: 'Late / Post' },
+                  ].map((ph) => (
+                    <button
+                      key={ph.id}
+                      type="button"
+                      onClick={() => {
+                        setActivePhase(ph.id as 1 | 2 | 3);
+                        void broadcastStratPacket({ action: 'switch-phase', phase: ph.id as 1 | 2 | 3 });
+                      }}
+                      className={`py-2 rounded-xl text-xs font-black border transition-all ${
+                        activePhase === ph.id
+                          ? 'crimson-cta text-white border-[#FF4655]'
+                          : 'bg-[#150A0E] text-[#9E8E91] border-[#241116]'
+                      }`}
+                    >
+                      {ph.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Game Specific Equipment */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  2. {activeGameMeta.name} Ekipmanları
+                </span>
+                {activeGameMeta.archetype === 'fps' && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'smoke', label: 'Smoke (Duman)', icon: '⭕' },
+                      { id: 'flash', label: 'Flash (Kör)', icon: '⚡' },
+                      { id: 'molly', label: 'Molly / Yanıcı', icon: '🔥' },
+                      { id: 'spike', label: 'Spike / C4', icon: '💣' },
+                      { id: 'defuse', label: 'İmha Kiti', icon: '✂️' },
+                      { id: 'audio-ping', label: 'Ses / Ayak İzi', icon: '🔊' },
+                      { id: 'sensor', label: 'Kapan / Tuzak', icon: '📡' },
+                      { id: 'danger', label: 'Tehlike Sinyali', icon: '⚠️' },
+                      { id: 'site-a', label: 'A Site (Bölge)', icon: '🅰️' },
+                      { id: 'site-b', label: 'B Site (Bölge)', icon: '🅱️' },
+                    ].map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          setTool(st.id as StratTool);
+                          setShowMobileToolsSheet(false);
+                        }}
+                        className={`h-9 px-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+                          tool === st.id
+                            ? 'crimson-cta text-white border-[#FF4655]'
+                            : 'bg-[#150A0E] text-[#A8989B] border-[#241116]'
+                        }`}
+                      >
+                        <span className="text-base">{st.icon}</span>
+                        <span className="truncate">{st.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {activeGameMeta.archetype === 'moba' && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { id: 'ward-yellow', label: 'Gözetleme Totemi', icon: '👁️' },
+                      { id: 'ward-pink', label: 'Kontrol Totemi', icon: '🔴' },
+                      { id: 'honeyfruit', label: 'Bal Suyu / Meyve', icon: '🍯' },
+                      { id: 'rune', label: 'Rün / Nehir Gücü', icon: '✨' },
+                      { id: 'boss', label: 'Baron / Roshan', icon: '🐉' },
+                      { id: 'gank', label: 'Gank / Tehlike', icon: '⚠️' },
+                    ].map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          setTool(st.id as StratTool);
+                          setShowMobileToolsSheet(false);
+                        }}
+                        className={`h-9 px-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+                          tool === st.id
+                            ? 'crimson-cta text-white border-[#FF4655]'
+                            : 'bg-[#150A0E] text-[#A8989B] border-[#241116]'
+                        }`}
+                      >
+                        <span className="text-base">{st.icon}</span>
+                        <span className="truncate">{st.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Team Pin Selector */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  3. Takım Jetonları (1-5)
+                </span>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[1, 2, 3, 4, 5].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPinNumber(num);
+                        setTool('pin-blue');
+                        setShowMobileToolsSheet(false);
+                      }}
+                      className="py-2 rounded-xl bg-[#0F2236] hover:bg-[#153454] border border-[#1E4E7A] text-cyan-300 text-xs font-black flex items-center justify-center shadow-xs"
+                    >
+                      P{num}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Clear Canvas Action */}
+              <div className="pt-2 border-t border-[#220D12] flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClear();
+                    setShowMobileToolsSheet(false);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-[#2D0B12] text-[#FF5A6B] text-xs font-black hover:bg-[#45101B] border border-[#8F1622]/60"
+                >
+                  🗑️ Haritayı Temizle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMobileToolsSheet(false)}
+                  className="px-5 py-2 rounded-xl crimson-cta text-white text-xs font-black shadow-md"
+                >
+                  Tamam
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </MevaErrorBoundary>
       </div>
     </div>

@@ -231,15 +231,31 @@ export const GhostNavbar = memo(function GhostNavbar() {
           </span>
         </div>
 
+        {/* Dedicated Mobile Tactical Map Trigger */}
+        <button
+          type="button"
+          onClick={toggleStratBoard}
+          aria-label="Taktik Harita ve Strateji Tahtası"
+          title="Taktik Harita ve Strateji Tahtası"
+          className={`lg:hidden rounded-xl h-8 px-2.5 flex items-center gap-1.5 text-[11px] font-black border transition-all active:scale-95 ${
+            showStratBoard
+              ? 'crimson-cta text-[#FAF2EE] shadow-[0_0_12px_rgba(200,35,51,0.4)]'
+              : 'bg-[#1C0A10] text-[#FAF2EE] border-[#8F1622]/80 hover:border-[#C82333]'
+          }`}
+        >
+          <span className="text-xs">🗺️</span>
+          <span>Taktik</span>
+        </button>
+
         {/* Dedicated Mobile Ergonomic Customizer Pill */}
         <button
           type="button"
           onClick={() => setShowMobileCustomizer(true)}
-          aria-label="Mobil Kontrol & Ergonomi Ayarları"
-          title="Mobil Kontrol & Ergonomi Ayarları"
-          className="lg:hidden rounded-xl h-8 px-2.5 bg-gradient-to-r from-[#2B0A13] to-[#17080D] border border-[#8F1622]/80 hover:border-[#C82333] flex items-center gap-1.5 text-[11px] font-black text-[#FAF2EE] shadow-[0_0_12px_rgba(200,35,51,0.3)] active:scale-95"
+          aria-label="Mobil Ayarlar"
+          title="Mobil Ayarlar"
+          className="lg:hidden rounded-xl h-8 px-2.5 bg-[#14080B] hover:bg-[#220D13] border border-[#2A1319] flex items-center gap-1 text-[11px] font-bold text-[#D8C9CC] active:scale-95"
         >
-          <span className="text-xs">📐</span>
+          <span className="text-xs">⚙️</span>
           <span>Ayar</span>
         </button>
 

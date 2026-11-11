@@ -300,8 +300,8 @@ export const TacticalVoiceOverlay: React.FC<TacticalVoiceOverlayProps> = memo(
       }
     };
 
-    // If overlay is disabled in settings, don't render
-    if (!enabled) return null;
+    // Only render overlay when enabled AND connected to an active voice channel
+    if (!enabled || !activeVoiceChannelId) return null;
 
     // Filter participants based on stealth mode
     const displayParticipants =
