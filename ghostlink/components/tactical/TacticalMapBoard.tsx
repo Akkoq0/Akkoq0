@@ -238,15 +238,15 @@ function drawCustomUploadedMap(
   }
 
   ctx.save();
-  ctx.fillStyle = '#C82333';
-  ctx.font = '900 11px sans-serif';
-  ctx.fillText('ÖZEL TAKTİK HARİTASI', 24, 28);
-  ctx.fillStyle = '#FAF2EE';
-  ctx.font = '800 15px sans-serif';
-  ctx.fillText(mapName.toUpperCase(), 24, 46);
-  ctx.fillStyle = '#00F0FF';
-  ctx.font = '700 9.5px monospace';
-  ctx.fillText('E2EE P2P SENKRONİZE · 840x480 CANVAS', 24, 60);
+  ctx.fillStyle = '#A82230';
+  ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText('Özel Taktik Haritası', 24, 28);
+  ctx.fillStyle = '#EDE7E9';
+  ctx.font = '600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(mapName, 24, 46);
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = '500 9px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText('E2EE P2P Senkronize · 840x480 Kanvas', 24, 60);
   ctx.restore();
 }
 
@@ -261,20 +261,24 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
     ctx.save();
     ctx.beginPath();
     ctx.arc(end.x, end.y, 28, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(160, 160, 175, 0.35)';
+    ctx.fillStyle = 'rgba(145, 148, 165, 0.18)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(230, 230, 245, 0.85)';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(185, 188, 205, 0.40)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([3, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
 
     ctx.beginPath();
     ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#FAF2EE';
+    ctx.fillStyle = 'rgba(20, 15, 18, 0.85)';
     ctx.fill();
-    ctx.fillStyle = '#0B0608';
-    ctx.font = '800 8.5px sans-serif';
+    ctx.strokeStyle = 'rgba(185, 188, 205, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#D6D4DC';
+    ctx.font = '600 8.5px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('S', end.x, end.y + 3);
     ctx.restore();
@@ -2093,8 +2097,8 @@ export const TacticalMapBoard: React.FC = () => {
         {/* ── TOP HEADER LAYER 1: Game Tabs & Close Studio ── */}
         <div className="hidden md:flex px-3 sm:px-4 py-2 border-b border-[#2A1319] items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
           <div className="flex items-center gap-1.5 flex-nowrap">
-            <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
-              OYUN:
+            <span className="text-[10px] font-semibold text-[#8E8083] uppercase px-1 tracking-wider whitespace-nowrap">
+              Oyun:
             </span>
             {allGameTabs.map((g) => {
               const isActive = selectedGameTab === g.id;
@@ -2103,10 +2107,10 @@ export const TacticalMapBoard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleSwitchGameTab(g.id)}
-                    className={`h-7 px-2.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all whitespace-nowrap border ${
+                    className={`h-7 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap border ${
                       isActive
-                        ? 'crimson-cta text-white shadow-[0_0_12px_rgba(200,35,51,0.5)] border-[#FF4655]'
-                        : 'bg-[#120A0D] text-[#A8989B] hover:text-[#FAF2EE] hover:bg-[#1F0C13] border-[#2A1319]'
+                        ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-[0_2px_8px_rgba(122,21,33,0.35)]'
+                        : 'bg-[#120A0D] text-[#A29497] hover:text-[#ECE5E7] hover:bg-[#1C0D12] border-[#261318]'
                     }`}
                   >
                     <span>{g.icon}</span>
@@ -2117,7 +2121,7 @@ export const TacticalMapBoard: React.FC = () => {
                       type="button"
                       onClick={(e) => handleDeleteCustomGame(g.id, e)}
                       title="Bu oyunu sil"
-                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-800 text-white text-[9px] font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-red-900/80 text-white text-[9px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       ×
                     </button>
@@ -2131,7 +2135,7 @@ export const TacticalMapBoard: React.FC = () => {
               type="button"
               onClick={() => setShowAddGameModal(true)}
               title="Yeni espor oyunu, haritaları ve mekaniklerini ekleyin"
-              className="h-7 px-2 rounded-lg bg-[#180B10] hover:bg-[#2E1218] border border-[#8F1622]/50 text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap flex-shrink-0"
+              className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#261016] border border-[#6B1822]/40 text-xs font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center gap-1 transition-colors whitespace-nowrap flex-shrink-0"
             >
               <IconPlus size={12} />
               <span>+ Oyun Ekle</span>
@@ -2144,7 +2148,7 @@ export const TacticalMapBoard: React.FC = () => {
               type="button"
               onClick={() => setShowPresetModal(true)}
               title="Profesyonel Espor Taktik ve Orman Rotası Şablonları"
-              className="h-7 px-2.5 rounded-lg bg-[#2E1218] hover:bg-[#451822] border border-[#C82333]/70 text-xs font-black text-[#FAF2EE] flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(200,35,51,0.3)] whitespace-nowrap"
+              className="h-7 px-2.5 rounded-lg bg-[#220D12] hover:bg-[#34131C] border border-[#7A1723]/60 text-xs font-semibold text-[#E58B94] hover:text-[#F5EAEB] flex items-center gap-1.5 transition-all shadow-[0_2px_8px_rgba(120,20,30,0.25)] whitespace-nowrap"
             >
               <span>📋</span>
               <span className="hidden sm:inline">Şablonlar</span>
@@ -2155,7 +2159,7 @@ export const TacticalMapBoard: React.FC = () => {
               type="button"
               onClick={() => setShowMapVetoModal(true)}
               title="Espor Harita Veto & Pick-Ban Matrisi (BO1/BO3/BO5)"
-              className="h-7 px-2 rounded-lg bg-[#180B10] hover:bg-[#2E1218] border border-[#8F1622]/60 text-xs font-bold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
+              className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#261016] border border-[#6B1822]/40 text-xs font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center gap-1 transition-colors whitespace-nowrap"
             >
               <span>⚖️</span>
               <span className="hidden sm:inline">Map Veto</span>
@@ -2217,8 +2221,8 @@ export const TacticalMapBoard: React.FC = () => {
         <div className="hidden md:flex px-3 sm:px-4 py-1.5 border-b border-[#241116] flex-wrap items-center justify-between gap-2 flex-shrink-0 bg-gradient-to-r from-[#1C0B10] via-[#0D090B] to-[#070607]">
           {/* Map Selector Chips */}
           <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto">
-            <span className="text-[10px] font-black text-[#8E7E81] uppercase px-1 tracking-wider whitespace-nowrap">
-              HARİTA:
+            <span className="text-[10px] font-semibold text-[#8E8083] uppercase px-1 tracking-wider whitespace-nowrap">
+              Harita:
             </span>
             {availableMaps.map((mKey) => {
               const spec = MAP_BLUEPRINTS[mKey as Exclude<TacticalMapId, 'custom'>];
@@ -2231,15 +2235,15 @@ export const TacticalMapBoard: React.FC = () => {
                   type="button"
                   onClick={(e) => handleSwitchMap(mKey, e)}
                   title={`${title} haritasına geç ve taktik çizimlerini yükle`}
-                  className={`rounded-lg h-6 px-2 text-[11px] font-extrabold border transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`rounded-lg h-6 px-2 text-[11px] font-medium border transition-all flex items-center gap-1 whitespace-nowrap ${
                     isActive
-                      ? 'crimson-cta text-[#F4EFF0] shadow-[0_0_12px_rgba(200,35,51,0.45)]'
-                      : 'bg-[#120A0D] hover:bg-[#1C0D12] text-[#B8AAAC] hover:text-[#FAF2EE] border-[#2A1319]'
+                      ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-[0_2px_8px_rgba(122,21,33,0.35)]'
+                      : 'bg-[#120A0D] hover:bg-[#1A0C11] text-[#A29497] hover:text-[#ECE5E7] border-[#261318]'
                   }`}
                 >
                   <span>{title}</span>
                   {mapOpsCount > 0 && (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-black/50 text-[#FAF2EE] tabular-nums font-mono">
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-black/60 text-[#D8CFD1] tabular-nums font-mono">
                       {mapOpsCount}
                     </span>
                   )}
@@ -2252,10 +2256,10 @@ export const TacticalMapBoard: React.FC = () => {
               <button
                 type="button"
                 onClick={(e) => handleSwitchMap('custom', e)}
-                className={`rounded-lg h-6 px-2 text-[11px] font-extrabold border transition-all whitespace-nowrap ${
+                className={`rounded-lg h-6 px-2 text-[11px] font-medium border transition-all whitespace-nowrap ${
                   mapId === 'custom'
-                    ? 'bg-cyan-950/90 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                    : 'bg-[#0E0709] hover:bg-cyan-950/40 text-cyan-400/80 border-[#2A1319]'
+                    ? 'bg-cyan-950/80 text-cyan-200 border-cyan-500/50 shadow-xs'
+                    : 'bg-[#0E0709] hover:bg-cyan-950/30 text-cyan-400/70 border-[#261318]'
                 }`}
               >
                 🗺️ {customMapName}
@@ -2270,7 +2274,7 @@ export const TacticalMapBoard: React.FC = () => {
                 fileInputRef.current?.click();
               }}
               title="Bilgisayarınızdan harita yükleyin (.png, .jpg, .webp)"
-              className="h-6 px-2 rounded-lg bg-[#1F0C13] hover:bg-[#3B141E] border border-[#8F1622]/60 text-[10.5px] font-extrabold text-[#F08C96] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
+              className="h-6 px-2 rounded-lg bg-[#160B0F] hover:bg-[#281017] border border-[#6B1822]/40 text-[10.5px] font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center gap-1 transition-colors whitespace-nowrap"
             >
               <IconPlus size={10} />
               <span>Harita Yükle</span>
@@ -2283,10 +2287,10 @@ export const TacticalMapBoard: React.FC = () => {
                 setShowCallouts((prev) => !prev);
               }}
               title="Resmi espor harita bölge ve callout isimlerini göster/gizle"
-              className={`h-6 px-2 rounded-lg text-[10.5px] font-extrabold flex items-center gap-1 border transition-all whitespace-nowrap ${
+              className={`h-6 px-2 rounded-lg text-[10.5px] font-medium flex items-center gap-1 border transition-all whitespace-nowrap ${
                 showCallouts
-                  ? 'bg-[#8F1622] text-[#FAF2EE] border-[#FF4655]'
-                  : 'bg-[#10070A] text-[#9E8E91] hover:text-[#FAF2EE] border-[#2A1016]'
+                  ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60'
+                  : 'bg-[#10070A] text-[#9E8E91] hover:text-[#ECE5E7] border-[#241016]'
               }`}
             >
               <span>🏷️</span>
@@ -2298,10 +2302,10 @@ export const TacticalMapBoard: React.FC = () => {
               type="button"
               onClick={() => setShowViewCustomizerModal(true)}
               title="Taktik tema, ızgara sıklığı, radar filtresi ve HUD katmanlarını özelleştirin"
-              className={`h-6 px-2 rounded-lg text-[10.5px] font-extrabold flex items-center gap-1 border transition-all whitespace-nowrap shadow-xs ${
+              className={`h-6 px-2 rounded-lg text-[10.5px] font-medium flex items-center gap-1 border transition-all whitespace-nowrap shadow-xs ${
                 showViewCustomizerModal
-                  ? 'bg-[#8F1622] text-[#FAF2EE] border-[#FF4655]'
-                  : 'bg-[#10070A] text-[#FAF2EE] hover:bg-[#1E0B11] border-[#2A1016]'
+                  ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60'
+                  : 'bg-[#10070A] text-[#EDE8EA] hover:bg-[#1A0C11] border-[#241016]'
               }`}
               style={
                 showViewCustomizerModal
@@ -2724,14 +2728,14 @@ export const TacticalMapBoard: React.FC = () => {
               <div className="p-3 border-b border-[#1E0B11] flex items-center justify-between bg-[#0E070A]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">🎯</span>
-                  <span className="text-xs font-black text-[#FAF2EE] uppercase tracking-wider">
-                    STRATBOOK KONTROLÜ
+                  <span className="text-xs font-semibold text-[#EDE8EA] tracking-wide">
+                    Stratbook Kontrolü
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(false)}
-                  className="md:hidden text-[#9E8E91] hover:text-white p-1"
+                  className="md:hidden text-[#9E8E91] hover:text-[#EDE8EA] p-1"
                 >
                   ✕
                 </button>
@@ -2741,8 +2745,8 @@ export const TacticalMapBoard: React.FC = () => {
                 {/* ── SECTION 0: ÇOKLU TAKTİK DEFTERLERİ (MULTI-STRATBOOK) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-                      STRATBOOK DEFTERLERİ
+                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                      Taktik Defterleri
                     </span>
                     <button
                       type="button"
@@ -2754,7 +2758,7 @@ export const TacticalMapBoard: React.FC = () => {
                           setActiveStratId(newId);
                         }
                       }}
-                      className="text-[9.5px] font-bold text-[#F08C96] hover:text-white"
+                      className="text-[9.5px] font-medium text-[#E58B94] hover:text-[#F5EAEB]"
                     >
                       + Ekle
                     </button>
@@ -2768,10 +2772,10 @@ export const TacticalMapBoard: React.FC = () => {
                           setActiveStratId(st.id);
                           setTimelineProgress(100);
                         }}
-                        className={`px-2 py-1 rounded text-[10px] font-bold whitespace-nowrap border transition-all ${
+                        className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap border transition-all ${
                           activeStratId === st.id
-                            ? 'bg-[#8F1622] text-white border-[#FF4655]'
-                            : 'bg-[#090507] text-[#8E7E81] hover:text-white border-[#1E0B11]'
+                            ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
+                            : 'bg-[#090507] text-[#8E8083] hover:text-[#EDE8EA] border-[#1E0B11]'
                         }`}
                       >
                         {st.name}
@@ -2783,10 +2787,10 @@ export const TacticalMapBoard: React.FC = () => {
                 {/* ── SECTION 0B: ZAMAN ÇİZELGESİ & REPLAY OYNATICI (TIMELINE) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-                      ZAMAN ÇİZELGESİ (REPLAY)
+                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                      Replay Zaman Çizelgesi
                     </span>
-                    <span className="text-[9.5px] font-mono text-[#F08C96]">%{timelineProgress}</span>
+                    <span className="text-[9.5px] font-mono font-medium text-[#E58B94]">%{timelineProgress}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -2795,7 +2799,7 @@ export const TacticalMapBoard: React.FC = () => {
                         if (timelineProgress >= 100) setTimelineProgress(0);
                         setIsPlayingTimeline((p) => !p);
                       }}
-                      className="h-6 px-2 rounded bg-[#1C0D12] hover:bg-[#2E1218] border border-[#3C141E] text-[10px] font-black text-[#FAF2EE] flex items-center gap-1"
+                      className="h-6 px-2 rounded bg-[#1C0D12] hover:bg-[#2A1017] border border-[#35131B] text-[10px] font-medium text-[#EDE8EA] flex items-center gap-1"
                     >
                       {isPlayingTimeline ? '⏸ Durdur' : '▶ Oynat'}
                     </button>
@@ -2808,7 +2812,7 @@ export const TacticalMapBoard: React.FC = () => {
                         setIsPlayingTimeline(false);
                         setTimelineProgress(Number(e.target.value));
                       }}
-                      className="flex-1 accent-[#C82333] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
+                      className="flex-1 accent-[#A82230] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
                     />
                     <button
                       type="button"
@@ -2817,7 +2821,7 @@ export const TacticalMapBoard: React.FC = () => {
                         setTimelineProgress(100);
                       }}
                       title="Canlı Konuma Git"
-                      className="h-6 px-1.5 rounded bg-[#0A0507] text-[9.5px] font-bold text-[#8E7E81] hover:text-white"
+                      className="h-6 px-1.5 rounded bg-[#0A0507] text-[9.5px] font-medium text-[#8E8083] hover:text-[#EDE8EA]"
                     >
                       Canlı
                     </button>
@@ -2829,11 +2833,11 @@ export const TacticalMapBoard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs">🔍</span>
-                      <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-                        UZAKLAŞMA & YAKINLAŞMA (ZOOM)
+                      <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                        Harita Yakınlaştırma (Zoom)
                       </span>
                     </div>
-                    <span className="text-[10px] font-mono font-black text-[#F08C96] bg-[#1E0B11] px-1.5 py-0.5 rounded border border-[#3C141E]">
+                    <span className="text-[10px] font-mono font-medium text-[#E58B94] bg-[#1E0B11] px-1.5 py-0.5 rounded border border-[#35131B]">
                       %{Math.round(zoomScale * 100)}
                     </span>
                   </div>
@@ -2845,10 +2849,10 @@ export const TacticalMapBoard: React.FC = () => {
                         key={lvl}
                         type="button"
                         onClick={() => handleSetZoomLevel(lvl)}
-                        className={`py-1 rounded text-[9.5px] font-mono font-bold transition-all text-center border ${
+                        className={`py-1 rounded text-[9.5px] font-mono font-medium transition-all text-center border ${
                           Math.abs(zoomScale - lvl) < 0.05
-                            ? 'bg-[#8F1622] text-white border-[#FF4655] shadow-xs'
-                            : 'bg-[#0A0507] text-[#8E7E81] hover:text-[#FAF2EE] border-[#1E0B11]'
+                            ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
+                            : 'bg-[#0A0507] text-[#8E8083] hover:text-[#EDE8EA] border-[#1E0B11]'
                         }`}
                       >
                         %{Math.round(lvl * 100)}
@@ -2862,7 +2866,7 @@ export const TacticalMapBoard: React.FC = () => {
                       type="button"
                       onClick={handleZoomOut}
                       title="Uzaklaştır (% -25)"
-                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#8F1622] text-[#FAF2EE] border border-[#2E151C] font-black text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
                     >
                       -
                     </button>
@@ -2873,13 +2877,13 @@ export const TacticalMapBoard: React.FC = () => {
                       step={0.05}
                       value={zoomScale}
                       onChange={(e) => handleSetZoomLevel(parseFloat(e.target.value))}
-                      className="flex-1 accent-[#C82333] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
+                      className="flex-1 accent-[#A82230] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
                     />
                     <button
                       type="button"
                       onClick={handleZoomIn}
                       title="Yakınlaştır (% +25)"
-                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#8F1622] text-[#FAF2EE] border border-[#2E151C] font-black text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
                     >
                       +
                     </button>
@@ -2890,7 +2894,7 @@ export const TacticalMapBoard: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleResetZoomPan}
-                      className="h-7 px-2 rounded-lg bg-[#180B0F] hover:bg-[#281015] border border-[#3C141E] text-[10px] font-bold text-[#F08C96] hover:text-white flex items-center justify-center gap-1 transition-all active:scale-95"
+                      className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#241016] border border-[#35131B] text-[10px] font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center justify-center gap-1 transition-all active:scale-95"
                     >
                       <span>⟲</span>
                       <span>Merkeze Al (1:1)</span>
@@ -2898,10 +2902,10 @@ export const TacticalMapBoard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
-                      className={`h-7 px-2 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                      className={`h-7 px-2 rounded-lg border text-[10px] font-medium flex items-center justify-center gap-1 transition-all active:scale-95 ${
                         tool === 'pan'
-                          ? 'bg-[#00F0FF] text-black border-[#00F0FF]'
-                          : 'bg-[#180B0F] text-[#8E7E81] hover:text-white border-[#3C141E]'
+                          ? 'bg-cyan-950/70 text-cyan-200 border-cyan-500/50'
+                          : 'bg-[#160B0F] text-[#8E8083] hover:text-[#EDE8EA] border-[#35131B]'
                       }`}
                     >
                       <span>✋</span>
@@ -2913,14 +2917,14 @@ export const TacticalMapBoard: React.FC = () => {
                 {/* ── SECTION 1: AŞAMA & KADEME YÖNETİMİ (PHASES) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-                      1. AŞAMA VE KADEME
+                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                      1. Taktik Aşaması
                     </span>
                     <button
                       type="button"
                       onClick={() => setShowAllPhases((s) => !s)}
-                      className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded transition-colors ${
-                        showAllPhases ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                      className={`text-[9.5px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                        showAllPhases ? 'bg-[#7A1521] text-[#F5EAEB]' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                       }`}
                     >
                       {showAllPhases ? 'Kümülatif (Tümü)' : 'Tek Aşama'}
@@ -2943,10 +2947,10 @@ export const TacticalMapBoard: React.FC = () => {
                             setActivePhase(ph.id as 1 | 2 | 3);
                             void broadcastStratPacket({ action: 'switch-phase', phase: ph.id as 1 | 2 | 3 });
                           }}
-                          className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold flex flex-col items-center justify-center border transition-all ${
+                          className={`py-1.5 px-1 rounded-lg text-[10px] font-medium flex flex-col items-center justify-center border transition-all ${
                             isActive
-                              ? 'crimson-cta text-white border-[#FF4655] shadow-xs'
-                              : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#FAF2EE] border-[#1E0B11]'
+                              ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
+                              : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#EDE8EA] border-[#1E0B11]'
                           }`}
                         >
                           <span>{ph.label}</span>
@@ -2960,8 +2964,8 @@ export const TacticalMapBoard: React.FC = () => {
                 {/* ── SECTION 2: OYUNA ÖZEL MEKANİKLER (STRICT ISOLATION) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
-                      2. {activeGameMeta.name.toUpperCase()} EKİPMANLARI
+                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                      2. {activeGameMeta.name} Ekipmanları
                     </span>
                   </div>
 
@@ -2985,10 +2989,10 @@ export const TacticalMapBoard: React.FC = () => {
                           key={st.id}
                           type="button"
                           onClick={() => setTool(st.id as StratTool)}
-                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                          className={`h-7 px-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all border ${
                             tool === st.id
-                              ? 'bg-[#8F1622] text-white border-[#FF4655] shadow-xs'
-                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                              ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
+                              : 'bg-[#0E070A] text-[#9E9093] hover:text-[#EDE8EA] border-[#201015]'
                           }`}
                         >
                           <span>{st.icon}</span>
@@ -3017,10 +3021,10 @@ export const TacticalMapBoard: React.FC = () => {
                           key={st.id}
                           type="button"
                           onClick={() => setTool(st.id as StratTool)}
-                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                          className={`h-7 px-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all border ${
                             tool === st.id
-                              ? 'bg-[#7E22CE] text-white border-purple-400 shadow-xs'
-                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                              ? 'bg-[#5B1D8C] text-[#F3E8FF] border-[#8B5CF6]/50 shadow-xs'
+                              : 'bg-[#0E070A] text-[#9E9093] hover:text-[#EDE8EA] border-[#201015]'
                           }`}
                         >
                           <span>{st.icon}</span>
@@ -3045,10 +3049,10 @@ export const TacticalMapBoard: React.FC = () => {
                           key={st.id}
                           type="button"
                           onClick={() => setTool(st.id as StratTool)}
-                          className={`h-7 px-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                          className={`h-7 px-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all border ${
                             tool === st.id
-                              ? 'bg-[#B45309] text-white border-amber-400 shadow-xs'
-                              : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                              ? 'bg-[#78350F] text-[#FEF3C7] border-[#F59E0B]/50 shadow-xs'
+                              : 'bg-[#0E070A] text-[#9E9093] hover:text-[#EDE8EA] border-[#201015]'
                           }`}
                         >
                           <span>{st.icon}</span>
@@ -3064,21 +3068,21 @@ export const TacticalMapBoard: React.FC = () => {
 
                 {/* ── SECTION 3: TAKIM JETONLARI & SIRALI ROTA ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
-                  <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block mb-1.5">
-                    3. TAKIM JETONLARI VE ROTA
+                  <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider block mb-1.5">
+                    3. Takım Jetonları ve Rota
                   </span>
 
                   {/* 1-5 Number Picker */}
                   <div className="flex items-center justify-between mb-2 bg-[#090507] p-1 rounded-lg border border-[#1E0B11]">
-                    <span className="text-[9.5px] font-black text-[#8E7E81] px-1">NUMARA:</span>
+                    <span className="text-[9.5px] font-medium text-[#8E8083] px-1">Numara:</span>
                     <div className="flex items-center gap-1">
                       {([1, 2, 3, 4, 5] as const).map((n) => (
                         <button
                           key={n}
                           type="button"
                           onClick={() => setSelectedPinNumber(n)}
-                          className={`w-5 h-5 rounded text-[10px] font-black transition-colors ${
-                            selectedPinNumber === n ? 'bg-[#FAF2EE] text-black shadow-xs' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                          className={`w-5 h-5 rounded text-[10px] font-semibold transition-colors ${
+                            selectedPinNumber === n ? 'bg-[#EDE8EA] text-[#0B0708] shadow-xs' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                           }`}
                         >
                           {n}
@@ -3091,8 +3095,8 @@ export const TacticalMapBoard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setTool('pin-blue')}
-                      className={`h-7 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all ${
-                        tool === 'pin-blue' ? 'bg-blue-600 text-white border-blue-400' : 'bg-[#0A0507] text-blue-400 border-[#1E0B11]'
+                      className={`h-7 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 border transition-all ${
+                        tool === 'pin-blue' ? 'bg-blue-600/80 text-white border-blue-400/60' : 'bg-[#0A0507] text-blue-400 border-[#1E0B11]'
                       }`}
                     >
                       <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9.5px] flex items-center justify-center font-bold">
@@ -3104,11 +3108,11 @@ export const TacticalMapBoard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setTool('pin-red')}
-                      className={`h-7 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all ${
-                        tool === 'pin-red' ? 'bg-red-600 text-white border-red-400' : 'bg-[#0A0507] text-red-400 border-[#1E0B11]'
+                      className={`h-7 px-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 border transition-all ${
+                        tool === 'pin-red' ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60' : 'bg-[#0A0507] text-[#E58B94] border-[#1E0B11]'
                       }`}
                     >
-                      <span className="w-4 h-4 rounded-full bg-red-600 text-white text-[9.5px] flex items-center justify-center font-bold">
+                      <span className="w-4 h-4 rounded-full bg-[#9E1B27] text-white text-[9.5px] flex items-center justify-center font-bold">
                         {selectedPinNumber}
                       </span>
                       <span className="text-[10px]">Düşman Pin</span>
@@ -3120,8 +3124,8 @@ export const TacticalMapBoard: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setTool('seq-path')}
-                      className={`flex-1 h-7 px-2 rounded text-xs font-black flex items-center justify-center gap-1.5 transition-all ${
-                        tool === 'seq-path' ? 'bg-sky-500 text-slate-950 font-black' : 'text-sky-400 hover:text-sky-200'
+                      className={`flex-1 h-7 px-2 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+                        tool === 'seq-path' ? 'bg-sky-500/80 text-slate-950 font-semibold' : 'text-sky-400 hover:text-sky-200'
                       }`}
                     >
                       <span className="w-4 h-4 rounded-full bg-sky-200 text-sky-950 text-[9.5px] flex items-center justify-center font-bold">
@@ -3134,7 +3138,7 @@ export const TacticalMapBoard: React.FC = () => {
                         type="button"
                         onClick={handleResetSequence}
                         title="Sayacı 1'e Sıfırla"
-                        className="text-[9.5px] font-bold text-[#F08C96] hover:text-white px-2 h-7 rounded hover:bg-[#1E0B11]"
+                        className="text-[9.5px] font-medium text-[#E58B94] hover:text-[#F5EAEB] px-2 h-7 rounded hover:bg-[#1E0B11]"
                       >
                         Sıfırla
                       </button>
@@ -3144,8 +3148,8 @@ export const TacticalMapBoard: React.FC = () => {
 
                 {/* ── SECTION 4: VEKTÖREL ÇİZİM & KALEM AYARLARI ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
-                  <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block mb-1.5">
-                    4. ÇİZİM ARAÇLARI VE RENK
+                  <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider block mb-1.5">
+                    4. Çizim Araçları ve Renk
                   </span>
 
                   <div className="grid grid-cols-4 gap-1 mb-2">
@@ -3164,10 +3168,10 @@ export const TacticalMapBoard: React.FC = () => {
                         type="button"
                         onClick={() => setTool(dt.id as StratTool)}
                         title={dt.label}
-                        className={`h-7 rounded flex flex-col items-center justify-center text-[10px] font-bold transition-all border ${
+                        className={`h-7 rounded flex flex-col items-center justify-center text-[10px] font-medium transition-all border ${
                           tool === dt.id
-                            ? 'bg-[#8F1622] text-white border-[#FF4655]'
-                            : 'bg-[#0A0507] text-[#A8989B] hover:text-[#FAF2EE] border-[#1E0B11]'
+                            ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60'
+                            : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#EDE8EA] border-[#1E0B11]'
                         }`}
                       >
                         <span className="text-xs">{dt.icon}</span>
@@ -3177,7 +3181,7 @@ export const TacticalMapBoard: React.FC = () => {
 
                   {/* Ink Swatches */}
                   <div className="flex items-center justify-between mb-2 bg-[#090507] p-1.5 rounded-lg border border-[#1E0B11]">
-                    <span className="text-[9.5px] font-black text-[#8E7E81]">RENK:</span>
+                    <span className="text-[9.5px] font-medium text-[#8E8083]">Renk:</span>
                     <div className="flex items-center gap-1">
                       {INK_SWATCHES.map((sw) => (
                         <button
@@ -3187,7 +3191,7 @@ export const TacticalMapBoard: React.FC = () => {
                           title={sw.label}
                           style={{ backgroundColor: sw.hex }}
                           className={`w-4 h-4 rounded-full transition-transform ${
-                            inkColor === sw.hex ? 'scale-125 ring-2 ring-white shadow-xs' : 'opacity-70 hover:opacity-100'
+                            inkColor === sw.hex ? 'scale-125 ring-2 ring-white/80 shadow-xs' : 'opacity-70 hover:opacity-100'
                           }`}
                         />
                       ))}
@@ -3196,15 +3200,15 @@ export const TacticalMapBoard: React.FC = () => {
 
                   {/* Stroke Width Slider */}
                   <div className="flex items-center justify-between bg-[#090507] p-1.5 rounded-lg border border-[#1E0B11]">
-                    <span className="text-[9.5px] font-black text-[#8E7E81]">KALINLIK:</span>
+                    <span className="text-[9.5px] font-medium text-[#8E8083]">Kalınlık:</span>
                     <div className="flex items-center gap-1">
                       {[2, 3, 5, 8].map((w) => (
                         <button
                           key={w}
                           type="button"
                           onClick={() => setLineWidth(w)}
-                          className={`px-1.5 py-0.5 rounded text-[9.5px] font-black ${
-                            lineWidth === w ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                          className={`px-1.5 py-0.5 rounded text-[9.5px] font-medium transition-colors ${
+                            lineWidth === w ? 'bg-[#7A1521] text-[#F5EAEB]' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                           }`}
                         >
                           {w}px

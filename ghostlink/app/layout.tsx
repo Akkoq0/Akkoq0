@@ -40,7 +40,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" className="dark">
-      <body className="font-sans antialiased bg-[#0B0708] text-[#F5EBE6] overflow-hidden">
+      <body className="font-sans antialiased bg-[#070607] text-[#EDE8EA] overflow-hidden">
         <div className="flex h-[100dvh] w-screen overflow-hidden">
           {children}
         </div>

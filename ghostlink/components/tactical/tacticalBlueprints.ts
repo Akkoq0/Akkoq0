@@ -357,31 +357,31 @@ export function drawRealisticArenaBlueprint(
 
   // 5. Stylized Esports Map Header & Compass HUD (Top Left & Top Right)
   ctx.save();
-  ctx.fillStyle = accent;
-  ctx.font = '900 11px sans-serif';
-  ctx.fillText(spec.gameTitle, 24, 28);
-  ctx.fillStyle = '#FAF2EE';
-  ctx.font = '800 15px sans-serif';
-  ctx.fillText(spec.title.toUpperCase(), 24, 46);
-  ctx.fillStyle = '#9E8E91';
-  ctx.font = '600 9.5px monospace';
-  ctx.fillText(spec.subtitle, 24, 60);
+  ctx.fillStyle = `${accent}B8`;
+  ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(spec.gameTitle, 24, 26);
+  ctx.fillStyle = '#EDE7E9';
+  ctx.font = '600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(spec.title, 24, 43);
+  ctx.fillStyle = '#8E8285';
+  ctx.font = '400 9px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillText(spec.subtitle, 24, 57);
 
   // Compass Rose (Top Right)
   if (showCompass) {
     const cx = LOGICAL_W - 55;
     const cy = 42;
     ctx.beginPath();
-    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-    ctx.strokeStyle = `${accent}66`;
+    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+    ctx.strokeStyle = `${accent}40`;
     ctx.stroke();
     ctx.fillStyle = accent;
-    ctx.font = '900 10px sans-serif';
+    ctx.font = '600 9.5px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('N', cx, cy - 8);
-    ctx.fillStyle = '#FAF2EE';
-    ctx.font = '700 8.5px monospace';
-    ctx.fillText(spec.compassHeading, cx, cy + 12);
+    ctx.fillText('N', cx, cy - 7);
+    ctx.fillStyle = '#EDE7E9';
+    ctx.font = '500 8px sans-serif';
+    ctx.fillText(spec.compassHeading, cx, cy + 10);
 
     // Directional Needle
     ctx.beginPath();
@@ -729,72 +729,85 @@ export function drawTeleporterLinksOverlay(ctx: CanvasRenderingContext2D, mapId:
 // Map Callouts Renderer (Clean Esports Typography & Badges)
 // ─────────────────────────────────────────────────────────
 
+function formatCalloutLabel(raw: string): string {
+  if (!raw) return '';
+  return raw.replace(/([A-ZÇĞİÖŞÜa-zçğıöşü0-9+:\/]+)/g, (word) => {
+    const upper = word.toUpperCase();
+    if (['CT', 'T', 'A', 'B', 'C4', 'MID', 'BO1', 'BO3', 'BO5', 'DPS', 'IGL', 'ARAM', 'CS2'].includes(upper)) {
+      return upper;
+    }
+    if (word.length <= 2 && word === upper) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLocaleLowerCase('tr-TR');
+  });
+}
+
 export function drawMapCalloutsOverlay(ctx: CanvasRenderingContext2D, mapId: TacticalMapId) {
   const callouts = MAP_CALLOUT_PRESETS[mapId];
   if (!callouts || callouts.length === 0) return;
 
   ctx.save();
+  ctx.font = '500 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif';
+
   for (const c of callouts) {
-    ctx.font = '800 9px monospace';
-    const textWidth = ctx.measureText(c.label).width;
-    const padX = 7;
-    const padY = 4;
-    const w = textWidth + padX * 2 + 10;
+    const displayLabel = formatCalloutLabel(c.label);
+    const textWidth = ctx.measureText(displayLabel).width;
+    const padX = 6;
+    const w = textWidth + padX * 2 + 8;
     const h = 18;
     const rx = c.x - w / 2;
     const ry = c.y - h / 2;
 
-    // Background pill
-    ctx.fillStyle = 'rgba(9, 6, 8, 0.88)';
+    // Background pill: soft dark glass
+    ctx.fillStyle = 'rgba(13, 9, 12, 0.88)';
     ctx.beginPath();
-    ctx.roundRect(rx, ry, w, h, 6);
+    ctx.roundRect(rx, ry, w, h, 5);
     ctx.fill();
 
-    let borderColor = 'rgba(184, 170, 172, 0.3)';
-    let dotColor = '#B8AAAC';
-    let textColor = '#FAF2EE';
+    let borderColor = 'rgba(160, 145, 148, 0.20)';
+    let dotColor = '#9E8E91';
+    let textColor = '#ECE5E7';
 
     if (c.type === 'site') {
-      borderColor = 'rgba(239, 68, 68, 0.85)';
-      dotColor = '#EF4444';
-      textColor = '#FEE2E2';
+      borderColor = 'rgba(215, 65, 78, 0.38)';
+      dotColor = '#E05362';
+      textColor = '#F8E8EA';
     } else if (c.type === 'portal') {
-      borderColor = 'rgba(34, 211, 238, 0.85)';
-      dotColor = '#22D3EE';
-      textColor = '#CFFAFE';
+      borderColor = 'rgba(45, 175, 205, 0.35)';
+      dotColor = '#38BDF8';
+      textColor = '#E0F2FE';
     } else if (c.type === 'objective') {
-      borderColor = 'rgba(192, 132, 252, 0.85)';
-      dotColor = '#C084FC';
-      textColor = '#F3E8FF';
+      borderColor = 'rgba(165, 115, 220, 0.35)';
+      dotColor = '#A78BFA';
+      textColor = '#EDE9FE';
     } else if (c.type === 'neutral') {
-      borderColor = 'rgba(52, 211, 153, 0.8)';
+      borderColor = 'rgba(52, 180, 130, 0.35)';
       dotColor = '#34D399';
       textColor = '#D1FAE5';
     } else if (c.type === 'spawn') {
-      borderColor = 'rgba(148, 163, 184, 0.4)';
+      borderColor = 'rgba(130, 145, 165, 0.25)';
       dotColor = '#94A3B8';
       textColor = '#CBD5E1';
     } else if (c.type === 'choke') {
-      borderColor = 'rgba(200, 35, 51, 0.55)';
-      dotColor = '#C82333';
-      textColor = '#FAF2EE';
+      borderColor = 'rgba(210, 60, 75, 0.35)';
+      dotColor = '#E11D48';
+      textColor = '#FDE8E8';
     }
 
     ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1;
     ctx.stroke();
 
     // Type indicator dot
     ctx.fillStyle = dotColor;
     ctx.beginPath();
-    ctx.arc(rx + 8, ry + h / 2, 3, 0, Math.PI * 2);
+    ctx.arc(rx + 6.5, ry + h / 2, 2.5, 0, Math.PI * 2);
     ctx.fill();
 
     // Label
     ctx.fillStyle = textColor;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(c.label, rx + 16, ry + h / 2 + 0.5);
+    ctx.fillText(displayLabel, rx + 13, ry + h / 2 + 0.5);
   }
   ctx.restore();
 }

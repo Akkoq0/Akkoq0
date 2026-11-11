@@ -151,18 +151,18 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
           e.preventDefault();
           e.stopPropagation();
         }}
-        className="w-full max-w-4xl bg-[#090507] rounded-2xl border border-[#8F1622]/70 shadow-[0_24px_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden"
+        className="w-full max-w-4xl bg-[#090507] rounded-2xl border border-[#4A141C]/60 shadow-[0_20px_60px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="p-3 sm:p-4 border-b border-[#241116] flex items-center justify-between bg-gradient-to-r from-[#1C0B10] via-[#0E0609] to-[#070406]">
-          <div className="flex items-center gap-2">
+        <div className="p-3 sm:p-4 border-b border-[#241116] flex items-center justify-between bg-gradient-to-r from-[#180A0E] via-[#0E0609] to-[#070406]">
+          <div className="flex items-center gap-2.5">
             <span className="text-lg">⚖️</span>
             <div>
-              <h2 className="text-sm font-black text-[#FAF2EE] uppercase tracking-wider">
-                ESPOR MAP VETO & PICK-BAN MODÜLÜ
+              <h2 className="text-sm font-semibold text-[#EDE8EA] tracking-wide">
+                Espor Harita Seçim & Veto (Pick-Ban)
               </h2>
-              <p className="text-[10px] text-[#9E8E91] font-mono">
-                Turnuva Standardı Sıralı Harita Seçim & Yasaklama Motoru
+              <p className="text-[11px] text-[#9E9093] font-normal">
+                Turnuva standardı sıralı harita seçim ve yasaklama motoru
               </p>
             </div>
           </div>
@@ -184,15 +184,15 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
           <div className="flex items-center gap-3">
             {/* Game Selector */}
             <div className="flex items-center gap-1 bg-[#060305] p-1 rounded-lg border border-[#241116]">
-              <span className="text-[9.5px] font-black text-[#8E7E81] px-1">OYUN:</span>
+              <span className="text-[10px] font-medium text-[#8E8083] px-1">Oyun:</span>
               <button
                 type="button"
                 onClick={() => {
                   setSelectedGame('cs2');
                   handleResetVeto();
                 }}
-                className={`px-2 py-0.5 rounded text-xs font-black transition-colors ${
-                  selectedGame === 'cs2' ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
+                  selectedGame === 'cs2' ? 'bg-[#7A1521] text-[#F5EAEB] border border-[#A82432]/50' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                 }`}
               >
                 CS2
@@ -203,8 +203,8 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
                   setSelectedGame('valorant');
                   handleResetVeto();
                 }}
-                className={`px-2 py-0.5 rounded text-xs font-black transition-colors ${
-                  selectedGame === 'valorant' ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
+                  selectedGame === 'valorant' ? 'bg-[#7A1521] text-[#F5EAEB] border border-[#A82432]/50' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                 }`}
               >
                 Valorant
@@ -213,7 +213,7 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
 
             {/* Format Selector */}
             <div className="flex items-center gap-1 bg-[#060305] p-1 rounded-lg border border-[#241116]">
-              <span className="text-[9.5px] font-black text-[#8E7E81] px-1">FORMAT:</span>
+              <span className="text-[10px] font-medium text-[#8E8083] px-1">Format:</span>
               {(['bo1', 'bo3', 'bo5'] as const).map((fmt) => (
                 <button
                   key={fmt}
@@ -222,8 +222,8 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
                     setFormat(fmt);
                     handleResetVeto();
                   }}
-                  className={`px-2 py-0.5 rounded text-xs font-black uppercase transition-colors ${
-                    format === fmt ? 'bg-[#8F1622] text-white' : 'text-[#8E7E81] hover:text-[#FAF2EE]'
+                  className={`px-2 py-0.5 rounded text-xs font-semibold uppercase transition-colors ${
+                    format === fmt ? 'bg-[#7A1521] text-[#F5EAEB] border border-[#A82432]/50' : 'text-[#8E8083] hover:text-[#EDE8EA]'
                   }`}
                 >
                   {fmt}
@@ -238,14 +238,14 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
               type="text"
               value={team1Name}
               onChange={(e) => setTeam1Name(e.target.value)}
-              className="px-2 py-1 rounded bg-[#060305] border border-[#241116] text-[11px] font-bold text-blue-400 w-32 focus:outline-hidden"
+              className="px-2 py-1 rounded bg-[#060305] border border-[#241116] text-[11px] font-medium text-blue-300 w-32 focus:outline-hidden"
             />
-            <span className="text-xs font-black text-[#8E7E81]">VS</span>
+            <span className="text-xs font-medium text-[#8E8083]">VS</span>
             <input
               type="text"
               value={team2Name}
               onChange={(e) => setTeam2Name(e.target.value)}
-              className="px-2 py-1 rounded bg-[#060305] border border-[#241116] text-[11px] font-bold text-red-400 w-32 focus:outline-hidden"
+              className="px-2 py-1 rounded bg-[#060305] border border-[#241116] text-[11px] font-medium text-rose-300 w-32 focus:outline-hidden"
             />
           </div>
         </div>
@@ -254,22 +254,22 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
         <div className="px-4 py-2 bg-[#12080B] border-b border-[#241116] flex items-center justify-between">
           {!isComplete && currentTurn ? (
             <div className="flex items-center gap-2">
-              <span className="animate-pulse w-2 h-2 rounded-full bg-[#C82333]" />
-              <span className="text-xs font-black text-[#FAF2EE]">
-                {currentTurn.team === 1 ? team1Name : team2Name} SIRASI:
+              <span className="animate-pulse w-2 h-2 rounded-full bg-[#A82230]" />
+              <span className="text-xs font-medium text-[#EDE8EA]">
+                {currentTurn.team === 1 ? team1Name : team2Name} Sırası:
               </span>
               <span
-                className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
-                  currentTurn.action === 'ban' ? 'bg-red-950 text-red-300 border border-red-700' : 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                className={`text-xs font-medium px-2 py-0.5 rounded-md ${
+                  currentTurn.action === 'ban' ? 'bg-red-950/70 text-red-300/90 border border-red-800/40' : 'bg-emerald-950/70 text-emerald-300/90 border border-emerald-800/40'
                 }`}
               >
-                {currentTurn.action === 'ban' ? 'HARİTA YASAKLA (BAN)' : 'HARİTA SEÇ (PICK)'}
+                {currentTurn.action === 'ban' ? 'Harita Yasakla (Ban)' : 'Harita Seç (Pick)'}
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-emerald-400 font-black text-xs">
+            <div className="flex items-center gap-2 text-emerald-300 font-medium text-xs">
               <span>✅</span>
-              <span>HARİTA VETO SÜRECİ TAMAMLANDI!</span>
+              <span>Harita veto süreci tamamlandı!</span>
             </div>
           )}
 
@@ -277,7 +277,7 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
             <button
               type="button"
               onClick={handleResetVeto}
-              className="text-[10.5px] font-bold text-[#F08C96] hover:text-white px-2 py-1 rounded hover:bg-[#1E0B11]"
+              className="text-[10.5px] font-medium text-[#E58B94] hover:text-[#F5EAEB] px-2 py-1 rounded hover:bg-[#1E0B11]"
             >
               Veto Sıfırla
             </button>
@@ -285,7 +285,7 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
               <button
                 type="button"
                 onClick={handleBroadcastVeto}
-                className="px-3 py-1 rounded-lg crimson-cta text-xs font-black text-white shadow-md flex items-center gap-1.5"
+                className="px-3 py-1 rounded-lg bg-[#7A1521] text-[#F5EAEB] border border-[#A82432]/60 text-xs font-semibold shadow-md flex items-center gap-1.5"
               >
                 <span>📢</span>
                 <span>Odaya Sonucu Bildir</span>
@@ -310,12 +310,12 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
                 onClick={() => !isBanned && !pickRecord && !isDecider && handleSelectMap(mKey)}
                 className={`relative rounded-xl overflow-hidden border p-3 flex flex-col justify-between transition-all aspect-[4/3] ${
                   isBanned
-                    ? 'bg-[#0E0608] opacity-50 border-red-900/60 grayscale cursor-not-allowed'
+                    ? 'bg-[#0E0608] opacity-50 border-red-900/40 grayscale cursor-not-allowed'
                     : pickRecord
-                    ? 'bg-emerald-950/40 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                    ? 'bg-emerald-950/30 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                     : isDecider
-                    ? 'bg-amber-950/40 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]'
-                    : 'bg-[#12080B] hover:bg-[#1C0D12] border-[#2A1319] hover:border-[#8F1622] cursor-pointer hover:scale-[1.02]'
+                    ? 'bg-amber-950/30 border-amber-400/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                    : 'bg-[#12080B] hover:bg-[#1A0C11] border-[#261318] hover:border-[#6B1822]/60 cursor-pointer hover:scale-[1.01]'
                 }`}
               >
                 {/* Background image if available */}
@@ -327,30 +327,30 @@ export const MapVetoModal: React.FC<MapVetoModalProps> = ({ isOpen, onClose }) =
                 )}
 
                 <div className="relative z-10 flex items-start justify-between">
-                  <span className="text-xs font-black text-white uppercase tracking-wider">{title}</span>
-                  {isBanned && <span className="text-red-500 font-black text-sm">❌</span>}
-                  {pickRecord && <span className="text-emerald-400 font-black text-sm">✓</span>}
-                  {isDecider && <span className="text-amber-400 font-black text-sm">★</span>}
+                  <span className="text-xs font-semibold text-[#EDE8EA]">{title}</span>
+                  {isBanned && <span className="text-red-400 font-bold text-sm">❌</span>}
+                  {pickRecord && <span className="text-emerald-400 font-bold text-sm">✓</span>}
+                  {isDecider && <span className="text-amber-400 font-bold text-sm">★</span>}
                 </div>
 
                 <div className="relative z-10">
                   {isBanned ? (
-                    <div className="text-[10px] font-mono font-bold text-red-400">
-                      YASAKLANDI ({banRecord?.team === 1 ? team1Name : team2Name})
+                    <div className="text-[10px] font-mono font-medium text-red-300">
+                      Yasaklandı ({banRecord?.team === 1 ? team1Name : team2Name})
                     </div>
                   ) : pickRecord ? (
-                    <div className="text-[10px] font-mono font-bold text-emerald-400">
-                      SEÇİLDİ ({pickRecord.team === 1 ? team1Name : team2Name})
+                    <div className="text-[10px] font-mono font-medium text-emerald-300">
+                      Seçildi ({pickRecord.team === 1 ? team1Name : team2Name})
                     </div>
                   ) : isDecider ? (
-                    <div className="text-[10px] font-mono font-bold text-amber-300">
-                      DECIDER (DÖNÜM NOKTASI)
+                    <div className="text-[10px] font-mono font-medium text-amber-200">
+                      Decider (Dönüm Noktası)
                     </div>
                   ) : (
-                    <div className="text-[10px] font-bold text-[#8E7E81] flex items-center justify-between">
+                    <div className="text-[10px] font-normal text-[#8E8083] flex items-center justify-between">
                       <span>Kalan Havuz</span>
-                      <span className="text-white bg-[#8F1622] px-1.5 py-0.5 rounded text-[9px] uppercase">
-                        {currentTurn?.action === 'ban' ? 'YASAKLA' : 'SEÇ'}
+                      <span className="text-[#F5EAEB] bg-[#7A1521] border border-[#A82432]/40 px-2 py-0.5 rounded-md text-[9.5px] font-medium">
+                        {currentTurn?.action === 'ban' ? 'Yasakla' : 'Seç'}
                       </span>
                     </div>
                   )}
