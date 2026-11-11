@@ -45,7 +45,16 @@ import {
   drawTeleporterLinksOverlay,
   getCachedCalloutsLayer,
   TacticalPresetStrat,
+  TacticalBlueprintOptions,
 } from './tacticalBlueprints';
+import {
+  TacticalViewCustomizerModal,
+  TacticalThemeKey,
+  TacticalGridMode,
+  TacticalRadarFilter,
+  TacticalUiDensity,
+  TACTICAL_THEME_CONFIG,
+} from './TacticalViewCustomizerModal';
 import { TacticalCoordinatesService } from '@/src/services/tacticalCoordinatesService';
 import {
   IconClose,
@@ -900,6 +909,19 @@ export const TacticalMapBoard: React.FC = () => {
   const [showPresetModal, setShowPresetModal] = useState<boolean>(false);
   const [showCallouts, setShowCallouts] = useState<boolean>(true);
 
+  // ── Tactical View & UI Customization States ──
+  const [tacticalTheme, setTacticalTheme] = useState<TacticalThemeKey>('crimson');
+  const [gridMode, setGridMode] = useState<TacticalGridMode>('standard');
+  const [radarFilter, setRadarFilter] = useState<TacticalRadarFilter>('normal');
+  const [showZoomDock, setShowZoomDock] = useState<boolean>(true);
+  const [zoomDockCollapsed, setZoomDockCollapsed] = useState<boolean>(false);
+  const [showCompassHud, setShowCompassHud] = useState<boolean>(true);
+  const [showCoordinatesHud, setShowCoordinatesHud] = useState<boolean>(true);
+  const [uiDensity, setUiDensity] = useState<TacticalUiDensity>('comfortable');
+  const [showViewCustomizerModal, setShowViewCustomizerModal] = useState<boolean>(false);
+
+  const currentThemeConfig = TACTICAL_THEME_CONFIG[tacticalTheme] || TACTICAL_THEME_CONFIG.crimson;
+
   // Timeline Playback Replay State (Adım 27-28)
   const [isPlayingTimeline, setIsPlayingTimeline] = useState<boolean>(false);
   const [timelineProgress, setTimelineProgress] = useState<number>(100);
@@ -975,8 +997,80 @@ export const TacticalMapBoard: React.FC = () => {
             }
           }
         });
+
+      void storage
+        .getRecord<{
+          theme?: TacticalThemeKey;
+          gridMode?: TacticalGridMode;
+          radarFilter?: TacticalRadarFilter;
+          showZoomDock?: boolean;
+          zoomDockCollapsed?: boolean;
+          showCompassHud?: boolean;
+          showCoordinatesHud?: boolean;
+          uiDensity?: TacticalUiDensity;
+        }>(STORE_PREFS, 'tactical_view_customization')
+        .then((savedView) => {
+          if (savedView) {
+            if (savedView.theme) setTacticalTheme(savedView.theme);
+            if (savedView.gridMode) setGridMode(savedView.gridMode);
+            if (savedView.radarFilter) setRadarFilter(savedView.radarFilter);
+            if (typeof savedView.showZoomDock === 'boolean') setShowZoomDock(savedView.showZoomDock);
+            if (typeof savedView.zoomDockCollapsed === 'boolean') setZoomDockCollapsed(savedView.zoomDockCollapsed);
+            if (typeof savedView.showCompassHud === 'boolean') setShowCompassHud(savedView.showCompassHud);
+            if (typeof savedView.showCoordinatesHud === 'boolean') setShowCoordinatesHud(savedView.showCoordinatesHud);
+            if (savedView.uiDensity) setUiDensity(savedView.uiDensity);
+          }
+        });
     } catch {}
   }, []);
+
+  const handleSelectTacticalTheme = useCallback((nextTheme: TacticalThemeKey) => {
+    setTacticalTheme(nextTheme);
+    const themeDef = TACTICAL_THEME_CONFIG[nextTheme];
+    if (themeDef) {
+      setInkColor(themeDef.defaultInk);
+    }
+  }, []);
+
+  const handleResetTacticalViewDefaults = useCallback(() => {
+    setTacticalTheme('crimson');
+    setInkColor('#C82333');
+    setGridMode('standard');
+    setRadarFilter('normal');
+    setShowCallouts(true);
+    setShowCompassHud(true);
+    setShowCoordinatesHud(true);
+    setShowZoomDock(true);
+    setZoomDockCollapsed(false);
+    setUiDensity('comfortable');
+  }, []);
+
+  // Persist tactical view customizations
+  useEffect(() => {
+    try {
+      const storage = getMevaStorageEngine();
+      storage.scheduleWrite(STORE_PREFS, 'tactical_view_customization', {
+        theme: tacticalTheme,
+        gridMode,
+        radarFilter,
+        showZoomDock,
+        zoomDockCollapsed,
+        showCompassHud,
+        showCoordinatesHud,
+        uiDensity,
+      });
+      void storage.flushPendingWrites();
+    } catch {}
+  }, [
+    tacticalTheme,
+    gridMode,
+    radarFilter,
+    showZoomDock,
+    zoomDockCollapsed,
+    showCompassHud,
+    showCoordinatesHud,
+    uiDensity,
+  ]);
 
   // Persist tactical drawings to IndexedDB per map (debounced 800ms for 60 FPS zero lag)
   useEffect(() => {
@@ -1081,9 +1175,14 @@ export const TacticalMapBoard: React.FC = () => {
         () => {
           redrawCurrentMapBlueprint();
         },
+        {
+          gridMode,
+          showCompass: showCompassHud,
+          accentColor: currentThemeConfig.primary,
+        },
       );
     }
-  }, [mapId, customMapName]);
+  }, [mapId, customMapName, gridMode, showCompassHud, currentThemeConfig.primary]);
 
   useEffect(() => {
     if (!open) return;
@@ -2090,6 +2189,26 @@ export const TacticalMapBoard: React.FC = () => {
               <span>🏷️</span>
               <span>Calloutlar</span>
             </button>
+
+            {/* [🎛️ Görünüm & Özelleştir] Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowViewCustomizerModal(true)}
+              title="Taktik tema, ızgara sıklığı, radar filtresi ve HUD katmanlarını özelleştirin"
+              className={`h-6 px-2 rounded-lg text-[10.5px] font-extrabold flex items-center gap-1 border transition-all whitespace-nowrap shadow-xs ${
+                showViewCustomizerModal
+                  ? 'bg-[#8F1622] text-[#FAF2EE] border-[#FF4655]'
+                  : 'bg-[#10070A] text-[#FAF2EE] hover:bg-[#1E0B11] border-[#2A1016]'
+              }`}
+              style={
+                showViewCustomizerModal
+                  ? { backgroundColor: currentThemeConfig.border, borderColor: currentThemeConfig.primary }
+                  : undefined
+              }
+            >
+              <span>🎛️</span>
+              <span>Görünüm</span>
+            </button>
           </div>
 
           {/* Zoom Controls & Export Actions */}
@@ -2180,7 +2299,9 @@ export const TacticalMapBoard: React.FC = () => {
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
           {/* ── CANVAS WORKSPACE (Left / Center) ── */}
           <div
-            className={`flex-1 flex items-center justify-center p-2 sm:p-4 bg-[#050304] overflow-hidden relative cursor-default ${
+            className={`flex-1 flex items-center justify-center ${
+              uiDensity === 'compact' ? 'p-1 sm:p-2' : 'p-2 sm:p-4'
+            } bg-[#050304] overflow-hidden relative cursor-default transition-all ${
               tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             onWheel={handleWheelZoom}
@@ -2194,12 +2315,22 @@ export const TacticalMapBoard: React.FC = () => {
               }}
               className="relative w-full max-w-[840px] aspect-[840/480] rounded-xl overflow-hidden border border-[#2E151C] shadow-[0_20px_60px_rgba(0,0,0,0.95)] touch-none flex-shrink-0"
             >
-              {/* Background 2D Radar Texture Layer */}
+              {/* Background 2D Radar Texture Layer with Live Radar Filter */}
               <canvas
                 ref={bgCanvasRef}
                 width={LOGICAL_W}
                 height={LOGICAL_H}
-                className="absolute inset-0 w-full h-full pointer-events-none"
+                style={{
+                  filter:
+                    radarFilter === 'high-contrast'
+                      ? 'contrast(1.28) saturate(1.18)'
+                      : radarFilter === 'oled-dark'
+                      ? 'brightness(0.85) contrast(1.35)'
+                      : radarFilter === 'tactical-thermal'
+                      ? 'hue-rotate(180deg) contrast(1.15) brightness(1.05)'
+                      : 'none',
+                }}
+                className="absolute inset-0 w-full h-full pointer-events-none transition-[filter]"
               />
               {/* Foreground Interactive Stratbook Layer */}
               <canvas
@@ -2215,101 +2346,180 @@ export const TacticalMapBoard: React.FC = () => {
             </div>
 
             {/* ── HIGH-TECH FLOATING TACTICAL ZOOM & NAVIGATION SIDEBAR ── */}
-            <div
-              className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
-              role="region"
-              aria-label="Taktik Zoom ve Pan Sidebarı"
-            >
-              {/* Badge & Current Zoom */}
-              <div className="flex flex-col items-center gap-0.5 pb-1 border-b border-[#241116] w-full px-0.5">
-                <span className="text-[8px] font-black tracking-widest text-[#F08C96] uppercase">ZOOM</span>
-                <span className="text-[10px] font-mono font-black text-[#FAF2EE]">
-                  %{Math.round(zoomScale * 100)}
-                </span>
-              </div>
-
-              {/* Zoom In (+) */}
-              <button
-                type="button"
-                onClick={handleZoomIn}
-                title="Yakınlaştır (+%25)"
-                aria-label="Yakınlaştır"
-                className="w-8 h-8 rounded-xl bg-[#140A0D] hover:bg-[#8F1622] text-[#FAF2EE] hover:text-white border border-[#2E151C] hover:border-[#FF4655] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
-              >
-                +
-              </button>
-
-              {/* Steppers: 300%, 200%, 150%, 100%, 75%, 50% */}
-              <div className="flex flex-col gap-1 w-full">
-                {[3.0, 2.0, 1.5, 1.0, 0.75, 0.5].map((lvl) => (
+            {showZoomDock && (
+              zoomDockCollapsed ? (
+                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20">
                   <button
-                    key={lvl}
                     type="button"
-                    onClick={() => handleSetZoomLevel(lvl)}
-                    title={`Haritayı %${Math.round(lvl * 100)} ölçeğine getir`}
-                    className={`w-full py-0.5 px-1 rounded-md text-[9px] font-mono font-bold transition-all text-center ${
-                      Math.abs(zoomScale - lvl) < 0.05
-                        ? 'bg-[#8F1622] text-white border border-[#FF4655] shadow-[0_0_8px_rgba(255,70,85,0.4)]'
-                        : 'bg-[#10070A] text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#1A0A0E] border border-transparent'
+                    onClick={() => setZoomDockCollapsed(false)}
+                    title="Zoom Kontrol Panelini Genişlet"
+                    aria-label="Zoom Panelini Genişlet"
+                    className="h-7 px-2.5 rounded-xl bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-xl text-[10px] font-mono font-black text-[#FAF2EE] hover:border-[#FF4655] flex items-center gap-1.5 transition-all active:scale-95"
+                    style={{ borderColor: currentThemeConfig.border }}
+                  >
+                    <span>🔍</span>
+                    <span>%{Math.round(zoomScale * 100)}</span>
+                    <span className="text-[8px] text-[#8E7E81]">▼</span>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
+                  role="region"
+                  aria-label="Taktik Zoom ve Pan Sidebarı"
+                  style={{ borderColor: currentThemeConfig.border }}
+                >
+                  {/* Badge, Current Zoom & Collapse Toggle */}
+                  <div className="flex items-center justify-between pb-1 border-b border-[#241116] w-full px-0.5">
+                    <span
+                      className="text-[8px] font-black tracking-widest uppercase"
+                      style={{ color: currentThemeConfig.accentText }}
+                    >
+                      ZOOM
+                    </span>
+                    <span className="text-[10px] font-mono font-black text-[#FAF2EE]">
+                      %{Math.round(zoomScale * 100)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setZoomDockCollapsed(true)}
+                      title="Paneli Küçült"
+                      aria-label="Zoom Panelini Küçült"
+                      className="text-[8px] text-[#8E7E81] hover:text-white p-0.5"
+                    >
+                      ▲
+                    </button>
+                  </div>
+
+                  {/* Zoom In (+) */}
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    title="Yakınlaştır (+%25)"
+                    aria-label="Yakınlaştır"
+                    className="w-8 h-8 rounded-xl bg-[#140A0D] text-[#FAF2EE] hover:text-white border border-[#2E151C] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
+                    style={{ borderColor: currentThemeConfig.border }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = currentThemeConfig.primary;
+                      e.currentTarget.style.borderColor = currentThemeConfig.hover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#140A0D';
+                      e.currentTarget.style.borderColor = currentThemeConfig.border;
+                    }}
+                  >
+                    +
+                  </button>
+
+                  {/* Steppers: 300%, 200%, 150%, 100%, 75%, 50% */}
+                  <div className="flex flex-col gap-1 w-full">
+                    {[3.0, 2.0, 1.5, 1.0, 0.75, 0.5].map((lvl) => {
+                      const isSelected = Math.abs(zoomScale - lvl) < 0.05;
+                      return (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => handleSetZoomLevel(lvl)}
+                          title={`Haritayı %${Math.round(lvl * 100)} ölçeğine getir`}
+                          className={`w-full py-0.5 px-1 rounded-md text-[9px] font-mono font-bold transition-all text-center ${
+                            isSelected
+                              ? 'text-white border shadow-xs'
+                              : 'bg-[#10070A] text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#1A0A0E] border border-transparent'
+                          }`}
+                          style={
+                            isSelected
+                              ? {
+                                  backgroundColor: currentThemeConfig.primary,
+                                  borderColor: currentThemeConfig.hover,
+                                  boxShadow: `0 0 8px ${currentThemeConfig.glow}`,
+                                }
+                              : undefined
+                          }
+                        >
+                          %{Math.round(lvl * 100)}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Zoom Out (-) */}
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    title="Uzaklaştır (-%25)"
+                    aria-label="Uzaklaştır"
+                    className="w-8 h-8 rounded-xl bg-[#140A0D] text-[#FAF2EE] hover:text-white border border-[#2E151C] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
+                    style={{ borderColor: currentThemeConfig.border }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = currentThemeConfig.primary;
+                      e.currentTarget.style.borderColor = currentThemeConfig.hover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#140A0D';
+                      e.currentTarget.style.borderColor = currentThemeConfig.border;
+                    }}
+                  >
+                    -
+                  </button>
+
+                  <div className="w-full h-px bg-[#241116] my-0.5" />
+
+                  {/* 1-Click Reset to 100% and (0,0) */}
+                  <button
+                    type="button"
+                    onClick={handleResetZoomPan}
+                    title="Ölçeği %100 yap ve haritayı merkeze al (1:1 Sıfırla)"
+                    aria-label="Ölçeği ve Konumu Sıfırla"
+                    className="w-8 h-8 rounded-xl bg-[#180B0F] hover:bg-[#2A1016] text-[#F08C96] hover:text-white border border-[#3C141E] flex items-center justify-center font-bold text-xs transition-all active:scale-95"
+                  >
+                    ⟲
+                  </button>
+
+                  {/* Pan Tool Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
+                    title={
+                      tool === 'pan'
+                        ? 'Kaydırma Modundan Çık (Çizim Moduna Dön)'
+                        : 'Haritayı Serbest Kaydır (Pan Modu)'
+                    }
+                    aria-label="Kaydırma Modu"
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition-all active:scale-95 border ${
+                      tool === 'pan'
+                        ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.5)]'
+                        : 'bg-[#140A0D] text-[#8E7E81] hover:text-white hover:bg-[#1E0B11] border-[#2E151C]'
                     }`}
                   >
-                    %{Math.round(lvl * 100)}
+                    ✋
                   </button>
-                ))}
-              </div>
-
-              {/* Zoom Out (-) */}
-              <button
-                type="button"
-                onClick={handleZoomOut}
-                title="Uzaklaştır (-%25)"
-                aria-label="Uzaklaştır"
-                className="w-8 h-8 rounded-xl bg-[#140A0D] hover:bg-[#8F1622] text-[#FAF2EE] hover:text-white border border-[#2E151C] hover:border-[#FF4655] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
-              >
-                -
-              </button>
-
-              <div className="w-full h-px bg-[#241116] my-0.5" />
-
-              {/* 1-Click Reset to 100% and (0,0) */}
-              <button
-                type="button"
-                onClick={handleResetZoomPan}
-                title="Ölçeği %100 yap ve haritayı merkeze al (1:1 Sıfırla)"
-                aria-label="Ölçeği ve Konumu Sıfırla"
-                className="w-8 h-8 rounded-xl bg-[#180B0F] hover:bg-[#2A1016] text-[#F08C96] hover:text-white border border-[#3C141E] flex items-center justify-center font-bold text-xs transition-all active:scale-95"
-              >
-                ⟲
-              </button>
-
-              {/* Pan Tool Toggle Button */}
-              <button
-                type="button"
-                onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
-                title={tool === 'pan' ? 'Kaydırma Modundan Çık (Çizim Moduna Dön)' : 'Haritayı Serbest Kaydır (Pan Modu)'}
-                aria-label="Kaydırma Modu"
-                className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition-all active:scale-95 border ${
-                  tool === 'pan'
-                    ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.5)]'
-                    : 'bg-[#140A0D] text-[#8E7E81] hover:text-white hover:bg-[#1E0B11] border-[#2E151C]'
-                }`}
-              >
-                ✋
-              </button>
-            </div>
+                </div>
+              )
+            )}
 
             {/* Floating Canvas HUD Overlay */}
-            <div className="absolute bottom-3 left-4 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
-              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
-                {tool.toUpperCase()}
-              </span>
-              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116]">
-                ÖLÇEK: %{Math.round(zoomScale * 100)}
-              </span>
-              <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] hidden sm:inline">
-                AŞAMA {activePhase} ({ops.filter((o) => o.mapId === mapId).length} ÇİZİM)
-              </span>
-            </div>
+            {showCoordinatesHud && (
+              <div className="absolute bottom-3 left-4 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
+                <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
+                  {tool.toUpperCase()}
+                </span>
+                <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116]">
+                  ÖLÇEK: %{Math.round(zoomScale * 100)}
+                </span>
+                <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] hidden sm:inline">
+                  AŞAMA {activePhase} ({ops.filter((o) => o.mapId === mapId).length} ÇİZİM)
+                </span>
+                <span
+                  className="bg-[#0B0608]/90 px-1.5 py-0.5 rounded border hidden md:inline text-[9px] uppercase font-bold"
+                  style={{
+                    color: currentThemeConfig.accentText,
+                    borderColor: currentThemeConfig.border,
+                  }}
+                >
+                  {currentThemeConfig.name}
+                </span>
+              </div>
+            )}
 
             {/* Mobile Bottom Quick-Toggle Bar */}
             <div className="md:hidden absolute bottom-3 right-4 flex items-center gap-1.5 z-20">
@@ -2317,6 +2527,7 @@ export const TacticalMapBoard: React.FC = () => {
                 type="button"
                 onClick={() => setSidebarOpen((s) => !s)}
                 className="h-8 px-3 rounded-xl bg-[#8F1622] text-white text-xs font-black shadow-lg flex items-center gap-1.5"
+                style={{ backgroundColor: currentThemeConfig.primary }}
               >
                 <span>📐</span>
                 <span>Taktik Paneli</span>
@@ -2327,7 +2538,9 @@ export const TacticalMapBoard: React.FC = () => {
           {/* ── MODERN TACTICAL SIDEBAR (Right) ── */}
           {sidebarOpen && (
             <aside
-              className="w-full md:w-72 lg:w-80 bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all"
+              className={`w-full ${
+                uiDensity === 'compact' ? 'md:w-64 lg:w-72' : 'md:w-72 lg:w-80'
+              } bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all`}
             >
               {/* Sidebar Header */}
               <div className="p-3 border-b border-[#1E0B11] flex items-center justify-between bg-[#0E070A]">
@@ -3030,6 +3243,27 @@ export const TacticalMapBoard: React.FC = () => {
           onClose={() => setShowPresetModal(false)}
           onApplyPreset={handleApplyPresetStrat}
           currentMapId={mapId}
+        />
+        <TacticalViewCustomizerModal
+          isOpen={showViewCustomizerModal}
+          onClose={() => setShowViewCustomizerModal(false)}
+          theme={tacticalTheme}
+          onSelectTheme={handleSelectTacticalTheme}
+          gridMode={gridMode}
+          onSelectGridMode={setGridMode}
+          radarFilter={radarFilter}
+          onSelectRadarFilter={setRadarFilter}
+          showCallouts={showCallouts}
+          onToggleCallouts={() => setShowCallouts((v) => !v)}
+          showCompassHud={showCompassHud}
+          onToggleCompassHud={() => setShowCompassHud((v) => !v)}
+          showZoomDock={showZoomDock}
+          onToggleZoomDock={() => setShowZoomDock((v) => !v)}
+          showCoordinatesHud={showCoordinatesHud}
+          onToggleCoordinatesHud={() => setShowCoordinatesHud((v) => !v)}
+          uiDensity={uiDensity}
+          onSelectUiDensity={setUiDensity}
+          onResetDefaults={handleResetTacticalViewDefaults}
         />
         </MevaErrorBoundary>
       </div>

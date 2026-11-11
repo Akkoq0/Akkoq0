@@ -228,14 +228,25 @@ export function preloadMapRadarImage(mapId: string, url: string, onLoaded?: () =
 // Detailed Topographical Renderers (NO SCHEMATIC BOXES)
 // ─────────────────────────────────────────────────────────
 
+export interface TacticalBlueprintOptions {
+  gridMode?: 'standard' | 'dense' | 'none';
+  showCompass?: boolean;
+  accentColor?: string;
+}
+
 export function drawRealisticArenaBlueprint(
   ctx: CanvasRenderingContext2D,
   mapId: Exclude<TacticalMapId, 'custom'>,
   onImageLoadedCallback?: () => void,
+  options?: TacticalBlueprintOptions,
 ) {
   ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
   const spec = MAP_BLUEPRINTS[mapId];
   if (!spec) return;
+
+  const accent = options?.accentColor || '#C82333';
+  const gridMode = options?.gridMode || 'standard';
+  const showCompass = options?.showCompass !== false;
 
   // 1. Base Layer: Deep Espresso & Obsidian Canvas
   const bgGrad = ctx.createRadialGradient(
@@ -300,50 +311,53 @@ export function drawRealisticArenaBlueprint(
     }
   }
 
-  // 3. High-Tech Tactical Radar Grid (60px step with crosshair intersections)
-  ctx.strokeStyle = 'rgba(143, 22, 34, 0.12)';
-  ctx.lineWidth = 1;
-  for (let x = 60; x < LOGICAL_W; x += 60) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, LOGICAL_H);
-    ctx.stroke();
-  }
-  for (let y = 60; y < LOGICAL_H; y += 60) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(LOGICAL_W, y);
-    ctx.stroke();
-  }
-
-  // Crosshairs (+) at every grid intersection
-  ctx.strokeStyle = 'rgba(200, 35, 51, 0.28)';
-  ctx.lineWidth = 1;
-  for (let x = 60; x < LOGICAL_W; x += 60) {
-    for (let y = 60; y < LOGICAL_H; y += 60) {
+  // 3. High-Tech Tactical Radar Grid (Configurable: standard, dense, or none)
+  if (gridMode !== 'none') {
+    const step = gridMode === 'dense' ? 30 : 60;
+    ctx.strokeStyle = `${accent}1F`;
+    ctx.lineWidth = 1;
+    for (let x = step; x < LOGICAL_W; x += step) {
       ctx.beginPath();
-      ctx.moveTo(x - 3.5, y);
-      ctx.lineTo(x + 3.5, y);
-      ctx.moveTo(x, y - 3.5);
-      ctx.lineTo(x, y + 3.5);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, LOGICAL_H);
       ctx.stroke();
     }
-  }
+    for (let y = step; y < LOGICAL_H; y += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(LOGICAL_W, y);
+      ctx.stroke();
+    }
 
-  // 4. Coordinates Labels (A-N, 1-7)
-  ctx.fillStyle = 'rgba(184, 170, 172, 0.35)';
-  ctx.font = '700 9px monospace';
-  const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
-  cols.forEach((c, idx) => {
-    ctx.fillText(c, idx * 60 + 26, 13);
-  });
-  for (let r = 1; r <= 7; r++) {
-    ctx.fillText(`${r}`, 6, r * 60 + 4);
+    // Crosshairs (+) at every grid intersection
+    ctx.strokeStyle = `${accent}44`;
+    ctx.lineWidth = 1;
+    for (let x = step; x < LOGICAL_W; x += step) {
+      for (let y = step; y < LOGICAL_H; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(x - 3.5, y);
+        ctx.lineTo(x + 3.5, y);
+        ctx.moveTo(x, y - 3.5);
+        ctx.lineTo(x, y + 3.5);
+        ctx.stroke();
+      }
+    }
+
+    // 4. Coordinates Labels (A-N, 1-7)
+    ctx.fillStyle = 'rgba(184, 170, 172, 0.35)';
+    ctx.font = '700 9px monospace';
+    const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+    cols.forEach((c, idx) => {
+      ctx.fillText(c, idx * 60 + 26, 13);
+    });
+    for (let r = 1; r <= 7; r++) {
+      ctx.fillText(`${r}`, 6, r * 60 + 4);
+    }
   }
 
   // 5. Stylized Esports Map Header & Compass HUD (Top Left & Top Right)
   ctx.save();
-  ctx.fillStyle = '#C82333';
+  ctx.fillStyle = accent;
   ctx.font = '900 11px sans-serif';
   ctx.fillText(spec.gameTitle, 24, 28);
   ctx.fillStyle = '#FAF2EE';
@@ -354,28 +368,30 @@ export function drawRealisticArenaBlueprint(
   ctx.fillText(spec.subtitle, 24, 60);
 
   // Compass Rose (Top Right)
-  const cx = LOGICAL_W - 55;
-  const cy = 42;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(200, 35, 51, 0.4)';
-  ctx.stroke();
-  ctx.fillStyle = '#FF4655';
-  ctx.font = '900 10px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('N', cx, cy - 8);
-  ctx.fillStyle = '#FAF2EE';
-  ctx.font = '700 8.5px monospace';
-  ctx.fillText(spec.compassHeading, cx, cy + 12);
+  if (showCompass) {
+    const cx = LOGICAL_W - 55;
+    const cy = 42;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+    ctx.strokeStyle = `${accent}66`;
+    ctx.stroke();
+    ctx.fillStyle = accent;
+    ctx.font = '900 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('N', cx, cy - 8);
+    ctx.fillStyle = '#FAF2EE';
+    ctx.font = '700 8.5px monospace';
+    ctx.fillText(spec.compassHeading, cx, cy + 12);
 
-  // Directional Needle
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 6);
-  ctx.lineTo(cx - 3, cy);
-  ctx.lineTo(cx + 3, cy);
-  ctx.closePath();
-  ctx.fillStyle = '#C82333';
-  ctx.fill();
+    // Directional Needle
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 6);
+    ctx.lineTo(cx - 3, cy);
+    ctx.lineTo(cx + 3, cy);
+    ctx.closePath();
+    ctx.fillStyle = accent;
+    ctx.fill();
+  }
   ctx.restore();
 }
 
