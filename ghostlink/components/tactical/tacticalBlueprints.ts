@@ -109,7 +109,7 @@ export const MAP_BLUEPRINTS: Record<Exclude<TacticalMapId, 'custom'>, MapMetaSpe
     gameTitle: 'CS2 TAKTİK ARENASI',
     subtitle: 'Fas Çölü · Rekabetçi Espor Standardı',
     compassHeading: 'N 02°E',
-    imageUrl: 'https://raw.githubusercontent.com/CSGO-Analysis/csgo-maps-overviews/master/overviews/de_mirage_radar.png',
+    imageUrl: 'https://raw.githubusercontent.com/2mlml/cs2-radar-images/master/de_mirage.png',
   },
   inferno: {
     title: 'Inferno',
@@ -117,7 +117,7 @@ export const MAP_BLUEPRINTS: Record<Exclude<TacticalMapId, 'custom'>, MapMetaSpe
     gameTitle: 'CS2 TAKTİK ARENASI',
     subtitle: 'Toskana, İtalya · Klasik Dar Geçitler & Muz',
     compassHeading: 'N 28°E',
-    imageUrl: 'https://raw.githubusercontent.com/CSGO-Analysis/csgo-maps-overviews/master/overviews/de_inferno_radar.png',
+    imageUrl: 'https://raw.githubusercontent.com/2mlml/cs2-radar-images/master/de_inferno.png',
   },
   dust2: {
     title: 'Dust II',
@@ -125,7 +125,7 @@ export const MAP_BLUEPRINTS: Record<Exclude<TacticalMapId, 'custom'>, MapMetaSpe
     gameTitle: 'CS2 TAKTİK ARENASI',
     subtitle: 'Kazablanka, Fas · İkonik Long A & B Tünel',
     compassHeading: 'N 05°E',
-    imageUrl: 'https://raw.githubusercontent.com/CSGO-Analysis/csgo-maps-overviews/master/overviews/de_dust2_radar.png',
+    imageUrl: 'https://raw.githubusercontent.com/2mlml/cs2-radar-images/master/de_dust2.png',
   },
   ancient: {
     title: 'Ancient',
@@ -133,7 +133,7 @@ export const MAP_BLUEPRINTS: Record<Exclude<TacticalMapId, 'custom'>, MapMetaSpe
     gameTitle: 'CS2 TAKTİK ARENASI',
     subtitle: 'Mezoamerika Harabeleri · Donut & Cheetah',
     compassHeading: 'N 31°W',
-    imageUrl: 'https://raw.githubusercontent.com/CSGO-Analysis/csgo-maps-overviews/master/overviews/de_mirage_radar.png',
+    imageUrl: 'https://raw.githubusercontent.com/2mlml/cs2-radar-images/master/de_ancient.png',
   },
   nuke: {
     title: 'Nuke',
@@ -141,7 +141,7 @@ export const MAP_BLUEPRINTS: Record<Exclude<TacticalMapId, 'custom'>, MapMetaSpe
     gameTitle: 'CS2 TAKTİK ARENASI (ÇİFT KATMAN)',
     subtitle: 'Nükleer Santral · Üst A & Alt B Reaktör Katı',
     compassHeading: 'N 08°E',
-    imageUrl: 'https://raw.githubusercontent.com/CSGO-Analysis/csgo-maps-overviews/master/overviews/de_nuke_radar.png',
+    imageUrl: 'https://raw.githubusercontent.com/2mlml/cs2-radar-images/master/de_nuke.png',
   },
 
   // ── LEAGUE OF LEGENDS ──
@@ -436,6 +436,54 @@ export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> =
     { id: 'asc-bmain', label: 'B ANA (B Main)', x: 330, y: 290, type: 'choke' },
   ],
 
+  // ── VALORANT: HAVEN ──
+  haven: [
+    { id: 'hvn-def', label: 'DEFENDER SPAWN', x: 420, y: 70, type: 'spawn' },
+    { id: 'hvn-atk', label: 'ATTACKER SPAWN', x: 420, y: 425, type: 'spawn' },
+    { id: 'hvn-site-a', label: 'A SITE', x: 540, y: 170, type: 'site' },
+    { id: 'hvn-site-b', label: 'B SITE', x: 420, y: 180, type: 'site' },
+    { id: 'hvn-site-c', label: 'C SITE', x: 300, y: 170, type: 'site' },
+    { id: 'hvn-along', label: 'A UZUN (A Long)', x: 570, y: 280, type: 'choke' },
+    { id: 'hvn-asewer', label: 'A KANAL (Sewer)', x: 490, y: 290, type: 'choke' },
+    { id: 'hvn-aheaven', label: 'A KULE (Heaven)', x: 540, y: 115, type: 'choke' },
+    { id: 'hvn-midyard', label: 'ORTA AVLU (Mid)', x: 420, y: 280, type: 'choke' },
+    { id: 'hvn-middoor', label: 'GARAJ KAPISI (Garage)', x: 360, y: 240, type: 'choke' },
+    { id: 'hvn-midwin', label: 'ORTA PENCERE (Window)', x: 420, y: 340, type: 'choke' },
+    { id: 'hvn-clong', label: 'C UZUN (C Long)', x: 265, y: 280, type: 'choke' },
+    { id: 'hvn-clink', label: 'C BAĞLANTI (C Link)', x: 335, y: 140, type: 'choke' },
+  ],
+
+  // ── VALORANT: SPLIT ──
+  split: [
+    { id: 'spl-def', label: 'DEFENDER SPAWN', x: 420, y: 75, type: 'spawn' },
+    { id: 'spl-atk', label: 'ATTACKER SPAWN', x: 420, y: 420, type: 'spawn' },
+    { id: 'spl-site-a', label: 'A SITE', x: 520, y: 190, type: 'site' },
+    { id: 'spl-site-b', label: 'B SITE', x: 320, y: 190, type: 'site' },
+    { id: 'spl-aropes', label: 'A HALATLAR (Ropes)', x: 470, y: 200, type: 'choke' },
+    { id: 'spl-midvent', label: 'HAVALANDIRMA (Vent)', x: 450, y: 240, type: 'choke' },
+    { id: 'spl-midmail', label: 'POSTA (Mail)', x: 380, y: 230, type: 'choke' },
+    { id: 'spl-btower', label: 'B KULE (B Tower)', x: 330, y: 145, type: 'choke' },
+    { id: 'spl-amain', label: 'A ANA (A Main)', x: 530, y: 295, type: 'choke' },
+    { id: 'spl-ascreens', label: 'EKRANLAR (Screens)', x: 510, y: 130, type: 'choke' },
+    { id: 'spl-bgarage', label: 'B GARAJ / ANA', x: 315, y: 295, type: 'choke' },
+    { id: 'spl-balley', label: 'B ARA SOKAK (Alley)', x: 275, y: 170, type: 'choke' },
+  ],
+
+  // ── VALORANT: LOTUS ──
+  lotus: [
+    { id: 'lot-def', label: 'DEFENDER SPAWN', x: 420, y: 75, type: 'spawn' },
+    { id: 'lot-atk', label: 'ATTACKER SPAWN', x: 420, y: 425, type: 'spawn' },
+    { id: 'lot-site-a', label: 'A SITE', x: 540, y: 170, type: 'site' },
+    { id: 'lot-site-b', label: 'B SITE', x: 420, y: 170, type: 'site' },
+    { id: 'lot-site-c', label: 'C SITE', x: 300, y: 170, type: 'site' },
+    { id: 'lot-atree', label: 'A AĞAÇ (Dönen Kapı)', x: 480, y: 215, type: 'portal' },
+    { id: 'lot-aroot', label: 'A HARABE (Root)', x: 545, y: 310, type: 'choke' },
+    { id: 'lot-bmain', label: 'B ANA (Main)', x: 420, y: 260, type: 'choke' },
+    { id: 'lot-cmound', label: 'C TEPE (Mound)', x: 320, y: 300, type: 'choke' },
+    { id: 'lot-chall', label: 'C KORİDOR (Hall)', x: 275, y: 150, type: 'choke' },
+    { id: 'lot-cbend', label: 'C KIVRIM (Bend)', x: 345, y: 230, type: 'choke' },
+  ],
+
   // ── LEAGUE OF LEGENDS: SIHIRDAR VADISI ──
   rift: [
     { id: 'lol-blue-base', label: 'MAVİ ÜS (Blue Base)', x: 240, y: 420, type: 'spawn' },
@@ -450,6 +498,19 @@ export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> =
     { id: 'lol-red-buff', label: 'KIRMIZI GÜÇLENDİRME (5)', x: 440, y: 335, type: 'neutral' },
     { id: 'lol-krugs', label: 'KAYACILLAR (6)', x: 465, y: 370, type: 'neutral' },
     { id: 'lol-mid', label: 'ORTA KORİDOR (Mid)', x: 420, y: 240, type: 'choke' },
+  ],
+
+  // ── LEAGUE OF LEGENDS: SONSUZ UÇURUM (ARAM) ──
+  aram: [
+    { id: 'aram-blue-nexus', label: 'MAVİ NEXUS (Blue Base)', x: 230, y: 410, type: 'spawn' },
+    { id: 'aram-red-nexus', label: 'KIRMIZI NEXUS (Red Base)', x: 610, y: 70, type: 'spawn' },
+    { id: 'aram-bridge', label: 'MERKEZ KÖPRÜ (Bridge)', x: 420, y: 240, type: 'choke' },
+    { id: 'aram-blue-inhib', label: 'MAVİ İNHİBİTÖR KULESİ', x: 310, y: 340, type: 'objective' },
+    { id: 'aram-red-inhib', label: 'KIRMIZI İNHİBİTÖR KULESİ', x: 530, y: 140, type: 'objective' },
+    { id: 'aram-relic-north', label: 'CAN PAKETİ (Kuzey Relic)', x: 460, y: 200, type: 'neutral' },
+    { id: 'aram-relic-south', label: 'CAN PAKETİ (Güney Relic)', x: 380, y: 280, type: 'neutral' },
+    { id: 'aram-bush', label: 'MERKEZ ÇALILIK', x: 430, y: 225, type: 'choke' },
+    { id: 'aram-hexgate', label: 'HEXTECH GEÇİDİ (Hexgate)', x: 270, y: 380, type: 'portal' },
   ],
 
   // ── DOTA 2: KADIMLER VADISI (7.33+ NEW FRONTIERS) ──
@@ -467,6 +528,47 @@ export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> =
     { id: 'dota-mid', label: 'ORTA NEHİR (River Runes)', x: 420, y: 240, type: 'choke' },
   ],
 
+  // ── PUBG: ERANGEL ──
+  erangel: [
+    { id: 'era-sosnovka', label: 'SOSNOVKA ASKERİ ÜS', x: 450, y: 400, type: 'site' },
+    { id: 'era-bridge', label: 'ASKERİ KÖPRÜ', x: 440, y: 330, type: 'choke' },
+    { id: 'era-pochinki', label: 'POCHINKI', x: 380, y: 245, type: 'site' },
+    { id: 'era-school', label: 'OKUL & HAVUZ', x: 450, y: 235, type: 'site' },
+    { id: 'era-rozhok', label: 'ROZHOK', x: 445, y: 195, type: 'choke' },
+    { id: 'era-yasnaya', label: 'YASNAYA POLYANA', x: 550, y: 190, type: 'site' },
+    { id: 'era-georgo', label: 'GEORGOPOL KONTEYNER', x: 280, y: 170, type: 'site' },
+    { id: 'era-mylta', label: 'MYLTA POWER', x: 590, y: 310, type: 'objective' },
+    { id: 'era-stalber', label: 'STALBER GÖZETLEME', x: 580, y: 110, type: 'objective' },
+    { id: 'era-primorsk', label: 'PRIMORSK', x: 280, y: 380, type: 'spawn' },
+  ],
+
+  // ── PUBG: MIRAMAR ──
+  miramar: [
+    { id: 'mir-losleones', label: 'LOS LEONES', x: 520, y: 330, type: 'site' },
+    { id: 'mir-pecado', label: 'PECADO ARENA', x: 390, y: 240, type: 'site' },
+    { id: 'mir-hacienda', label: 'HACIENDA DEL PATRÓN', x: 450, y: 180, type: 'site' },
+    { id: 'mir-sanmartin', label: 'SAN MARTIN', x: 410, y: 185, type: 'choke' },
+    { id: 'mir-elpozo', label: 'EL POZO', x: 260, y: 200, type: 'site' },
+    { id: 'mir-chumacera', label: 'CHUMACERA', x: 340, y: 310, type: 'choke' },
+    { id: 'mir-montenuevo', label: 'MONTE NUEVO', x: 280, y: 270, type: 'choke' },
+    { id: 'mir-puerto', label: 'PUERTO PARAISO', x: 570, y: 410, type: 'spawn' },
+    { id: 'mir-crater', label: 'KRATER ALANI', x: 360, y: 120, type: 'objective' },
+  ],
+
+  // ── PUBG: SANHOK ──
+  sanhok: [
+    { id: 'san-bootcamp', label: 'BOOTCAMP', x: 420, y: 220, type: 'site' },
+    { id: 'san-paradise', label: 'PARADISE RESORT', x: 490, y: 170, type: 'site' },
+    { id: 'san-ruins', label: 'RUINS (HARABELER)', x: 340, y: 270, type: 'site' },
+    { id: 'san-painan', label: 'PAI NAN KÖPRÜ', x: 390, y: 290, type: 'choke' },
+    { id: 'san-campa', label: 'CAMP ALPHA', x: 290, y: 170, type: 'spawn' },
+    { id: 'san-campb', label: 'CAMP BRAVO', x: 550, y: 210, type: 'spawn' },
+    { id: 'san-campc', label: 'CAMP CHARLIE', x: 490, y: 380, type: 'spawn' },
+    { id: 'san-quarry', label: 'QUARRY TAŞ OCAĞI', x: 470, y: 300, type: 'objective' },
+    { id: 'san-hatinh', label: 'HA TINH', x: 340, y: 130, type: 'site' },
+    { id: 'san-docks', label: 'DOCKS LİMAN', x: 560, y: 360, type: 'objective' },
+  ],
+
   // ── CS2: MIRAGE ──
   mirage: [
     { id: 'mrg-t', label: 'T BAŞLANGICI (T Spawn)', x: 250, y: 410, type: 'spawn' },
@@ -478,6 +580,10 @@ export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> =
     { id: 'mrg-palace', label: 'SARAY (Palace)', x: 540, y: 320, type: 'choke' },
     { id: 'mrg-aramp', label: 'A RAMPA (A Ramp)', x: 470, y: 340, type: 'choke' },
     { id: 'mrg-bapps', label: 'B APARTMANLAR', x: 280, y: 260, type: 'choke' },
+    { id: 'mrg-jungle', label: 'ORMAN (Jungle)', x: 460, y: 210, type: 'choke' },
+    { id: 'mrg-underpass', label: 'ALT TÜNEL (Underpass)', x: 380, y: 310, type: 'choke' },
+    { id: 'mrg-catwalk', label: 'KISA B (Catwalk)', x: 350, y: 230, type: 'choke' },
+    { id: 'mrg-stairs', label: 'MERDİVEN (Stairs)', x: 450, y: 240, type: 'choke' },
   ],
 
   // ── CS2: INFERNO ──
@@ -489,6 +595,61 @@ export const MAP_CALLOUT_PRESETS: Partial<Record<TacticalMapId, MapCallout[]>> =
     { id: 'inf-banana', label: 'MUZ (Banana)', x: 340, y: 280, type: 'choke' },
     { id: 'inf-apps', label: 'APARTMANLAR (Apps)', x: 440, y: 230, type: 'choke' },
     { id: 'inf-pit', label: 'ÇUKUR (Pit)', x: 540, y: 220, type: 'choke' },
+    { id: 'inf-boiler', label: 'KAZAN (Boiler / Alt Mid)', x: 430, y: 280, type: 'choke' },
+    { id: 'inf-arch', label: 'KEMER (Arch)', x: 490, y: 160, type: 'choke' },
+    { id: 'inf-library', label: 'KÜTÜPHANE (Library)', x: 530, y: 150, type: 'choke' },
+    { id: 'inf-church', label: 'İNŞAAT / KİLİSE', x: 400, y: 160, type: 'choke' },
+  ],
+
+  // ── CS2: DUST II ──
+  dust2: [
+    { id: 'd2-t', label: 'T BAŞLANGICI (T Spawn)', x: 230, y: 410, type: 'spawn' },
+    { id: 'd2-ct', label: 'CT BAŞLANGICI (CT Spawn)', x: 460, y: 160, type: 'spawn' },
+    { id: 'd2-site-a', label: 'A BOMBSITE', x: 530, y: 190, type: 'site' },
+    { id: 'd2-site-b', label: 'B BOMBSITE', x: 280, y: 160, type: 'site' },
+    { id: 'd2-along', label: 'UZUN A (A Long)', x: 580, y: 320, type: 'choke' },
+    { id: 'd2-pit', label: 'ÇUKUR (Pit)', x: 600, y: 400, type: 'choke' },
+    { id: 'd2-short', label: 'KISA A (Catwalk / Short)', x: 470, y: 220, type: 'choke' },
+    { id: 'd2-middoors', label: 'ORTA KAPILAR (Mid Doors)', x: 390, y: 240, type: 'choke' },
+    { id: 'd2-topmid', label: 'XBOX / YUKARI ORTA', x: 370, y: 310, type: 'choke' },
+    { id: 'd2-lowertun', label: 'ALT TÜNEL (Lower Tunnels)', x: 330, y: 260, type: 'choke' },
+    { id: 'd2-uppertun', label: 'ÜST TÜNEL (Upper Tunnels)', x: 270, y: 240, type: 'choke' },
+    { id: 'd2-bdoors', label: 'B KAPILARI (B Doors)', x: 330, y: 160, type: 'choke' },
+    { id: 'd2-bwindow', label: 'B PENCERE (B Window)', x: 320, y: 120, type: 'choke' },
+    { id: 'd2-goose', label: 'KAZ (Goose)', x: 540, y: 150, type: 'choke' },
+  ],
+
+  // ── CS2: ANCIENT ──
+  ancient: [
+    { id: 'anc-t', label: 'T BAŞLANGICI (T Spawn)', x: 420, y: 430, type: 'spawn' },
+    { id: 'anc-ct', label: 'CT BAŞLANGICI (CT Spawn)', x: 420, y: 80, type: 'spawn' },
+    { id: 'anc-site-a', label: 'A BOMBSITE', x: 530, y: 200, type: 'site' },
+    { id: 'anc-site-b', label: 'B BOMBSITE', x: 310, y: 200, type: 'site' },
+    { id: 'anc-mid', label: 'ORTA AVLU (Mid)', x: 420, y: 240, type: 'choke' },
+    { id: 'anc-donut', label: 'ÇÖREK (Donut)', x: 470, y: 210, type: 'choke' },
+    { id: 'anc-cave', label: 'MAĞARA (Cheetah / Cave)', x: 360, y: 210, type: 'choke' },
+    { id: 'anc-amain', label: 'A ANA GİRİŞ (A Main)', x: 520, y: 310, type: 'choke' },
+    { id: 'anc-bramp', label: 'B RAMPA (B Ramp)', x: 320, y: 310, type: 'choke' },
+    { id: 'anc-temple', label: 'TAPINAK (Temple)', x: 560, y: 160, type: 'choke' },
+    { id: 'anc-house', label: 'KIRMIZI EV (Red House)', x: 390, y: 320, type: 'choke' },
+    { id: 'anc-bshort', label: 'B KISA (B Short)', x: 340, y: 150, type: 'choke' },
+  ],
+
+  // ── CS2: NUKE ──
+  nuke: [
+    { id: 'nk-t', label: 'T BAŞLANGICI (T Spawn)', x: 240, y: 330, type: 'spawn' },
+    { id: 'nk-ct', label: 'CT BAŞLANGICI (CT Spawn)', x: 590, y: 220, type: 'spawn' },
+    { id: 'nk-site-a', label: 'A BOMBSITE (Üst Reaktör)', x: 430, y: 205, type: 'site' },
+    { id: 'nk-site-b', label: 'B BOMBSITE (Alt Reaktör)', x: 430, y: 255, type: 'site' },
+    { id: 'nk-outside', label: 'DIŞARI (Outside)', x: 380, y: 380, type: 'choke' },
+    { id: 'nk-secret', label: 'GİZLİ MERDİVEN (Secret)', x: 480, y: 370, type: 'choke' },
+    { id: 'nk-garage', label: 'GARAJ (Garage)', x: 530, y: 370, type: 'choke' },
+    { id: 'nk-hut', label: 'KULÜBE (Hut)', x: 380, y: 240, type: 'choke' },
+    { id: 'nk-squeaky', label: 'GICIRTILI KAPI (Squeaky)', x: 380, y: 170, type: 'choke' },
+    { id: 'nk-vent', label: 'HAVALANDIRMA (Vent)', x: 420, y: 175, type: 'choke' },
+    { id: 'nk-ramp', label: 'RAMPA (Ramp)', x: 490, y: 140, type: 'choke' },
+    { id: 'nk-heaven', label: 'BALKON (Heaven)', x: 480, y: 210, type: 'choke' },
+    { id: 'nk-lobby', label: 'T LOBİ (Lobby)', x: 320, y: 230, type: 'choke' },
   ],
 };
 
@@ -620,6 +781,30 @@ export function drawMapCalloutsOverlay(ctx: CanvasRenderingContext2D, mapId: Tac
     ctx.fillText(c.label, rx + 16, ry + h / 2 + 0.5);
   }
   ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────
+// Cached Callout & Teleport Blit Layer (Zero-lag 60 FPS)
+// ─────────────────────────────────────────────────────────
+
+const CALLOUTS_LAYER_CACHE: Partial<Record<TacticalMapId, HTMLCanvasElement>> = {};
+
+export function getCachedCalloutsLayer(mapId: TacticalMapId): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  if (CALLOUTS_LAYER_CACHE[mapId]) {
+    return CALLOUTS_LAYER_CACHE[mapId]!;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = LOGICAL_W;
+  canvas.height = LOGICAL_H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  drawTeleporterLinksOverlay(ctx, mapId);
+  drawMapCalloutsOverlay(ctx, mapId);
+
+  CALLOUTS_LAYER_CACHE[mapId] = canvas;
+  return canvas;
 }
 
 // ─────────────────────────────────────────────────────────

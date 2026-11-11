@@ -43,6 +43,7 @@ import {
   drawRealisticArenaBlueprint,
   drawMapCalloutsOverlay,
   drawTeleporterLinksOverlay,
+  getCachedCalloutsLayer,
   TacticalPresetStrat,
 } from './tacticalBlueprints';
 import { TacticalCoordinatesService } from '@/src/services/tacticalCoordinatesService';
@@ -977,22 +978,26 @@ export const TacticalMapBoard: React.FC = () => {
     } catch {}
   }, []);
 
-  // Persist tactical drawings to IndexedDB per map (bounded size)
+  // Persist tactical drawings to IndexedDB per map (debounced 800ms for 60 FPS zero lag)
   useEffect(() => {
     if (ops.length === 0) return;
-    try {
-      const storage = getMevaStorageEngine();
-      void storage
-        .getRecord<Record<string, StratOperation[]>>(STORE_PREFS, 'tactical_map_drawings_cache')
-        .then((cached) => {
-          const updated = {
-            ...(cached || {}),
-            [mapId]: ops.filter((o) => o.mapId === mapId).slice(-60),
-          };
-          storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
-          void storage.flushPendingWrites();
-        });
-    } catch {}
+    const timeoutId = setTimeout(() => {
+      try {
+        const storage = getMevaStorageEngine();
+        void storage
+          .getRecord<Record<string, StratOperation[]>>(STORE_PREFS, 'tactical_map_drawings_cache')
+          .then((cached) => {
+            const updated = {
+              ...(cached || {}),
+              [mapId]: ops.filter((o) => o.mapId === mapId).slice(-60),
+            };
+            storage.scheduleWrite(STORE_PREFS, 'tactical_map_drawings_cache', updated);
+            void storage.flushPendingWrites();
+          });
+      } catch {}
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
   }, [ops, mapId]);
 
   // Preload custom image object whenever customMapUrl changes
@@ -1048,10 +1053,15 @@ export const TacticalMapBoard: React.FC = () => {
         renderSingleOp(ctx, draftOpRef.current);
       }
 
-      // Render Teleporter Links & Map Callouts Overlay if enabled
+      // Render Teleporter Links & Map Callouts Overlay if enabled (Instant GPU blit via cached canvas)
       if (showCallouts && mapId !== 'custom') {
-        drawTeleporterLinksOverlay(ctx, mapId as TacticalMapId);
-        drawMapCalloutsOverlay(ctx, mapId as TacticalMapId);
+        const cachedLayer = getCachedCalloutsLayer(mapId as TacticalMapId);
+        if (cachedLayer) {
+          ctx.drawImage(cachedLayer, 0, 0);
+        } else {
+          drawTeleporterLinksOverlay(ctx, mapId as TacticalMapId);
+          drawMapCalloutsOverlay(ctx, mapId as TacticalMapId);
+        }
       }
     });
   }, [mapId, activePhase, showAllPhases, activeStratId, timelineProgress, showCallouts]);
@@ -1171,7 +1181,7 @@ export const TacticalMapBoard: React.FC = () => {
     panOffsetRef.current = { x, y };
     zoomScaleRef.current = scale;
     if (boardTransformRef.current) {
-      boardTransformRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+      boardTransformRef.current.style.transform = `translate3d(${x}px, ${y}px, 0px) scale(${scale})`;
     }
   };
 
@@ -2204,6 +2214,90 @@ export const TacticalMapBoard: React.FC = () => {
               />
             </div>
 
+            {/* ── HIGH-TECH FLOATING TACTICAL ZOOM & NAVIGATION SIDEBAR ── */}
+            <div
+              className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
+              role="region"
+              aria-label="Taktik Zoom ve Pan Sidebarı"
+            >
+              {/* Badge & Current Zoom */}
+              <div className="flex flex-col items-center gap-0.5 pb-1 border-b border-[#241116] w-full px-0.5">
+                <span className="text-[8px] font-black tracking-widest text-[#F08C96] uppercase">ZOOM</span>
+                <span className="text-[10px] font-mono font-black text-[#FAF2EE]">
+                  %{Math.round(zoomScale * 100)}
+                </span>
+              </div>
+
+              {/* Zoom In (+) */}
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                title="Yakınlaştır (+%25)"
+                aria-label="Yakınlaştır"
+                className="w-8 h-8 rounded-xl bg-[#140A0D] hover:bg-[#8F1622] text-[#FAF2EE] hover:text-white border border-[#2E151C] hover:border-[#FF4655] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
+              >
+                +
+              </button>
+
+              {/* Steppers: 300%, 200%, 150%, 100%, 75%, 50% */}
+              <div className="flex flex-col gap-1 w-full">
+                {[3.0, 2.0, 1.5, 1.0, 0.75, 0.5].map((lvl) => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => handleSetZoomLevel(lvl)}
+                    title={`Haritayı %${Math.round(lvl * 100)} ölçeğine getir`}
+                    className={`w-full py-0.5 px-1 rounded-md text-[9px] font-mono font-bold transition-all text-center ${
+                      Math.abs(zoomScale - lvl) < 0.05
+                        ? 'bg-[#8F1622] text-white border border-[#FF4655] shadow-[0_0_8px_rgba(255,70,85,0.4)]'
+                        : 'bg-[#10070A] text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#1A0A0E] border border-transparent'
+                    }`}
+                  >
+                    %{Math.round(lvl * 100)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Zoom Out (-) */}
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                title="Uzaklaştır (-%25)"
+                aria-label="Uzaklaştır"
+                className="w-8 h-8 rounded-xl bg-[#140A0D] hover:bg-[#8F1622] text-[#FAF2EE] hover:text-white border border-[#2E151C] hover:border-[#FF4655] font-black text-sm flex items-center justify-center transition-all shadow-md active:scale-95"
+              >
+                -
+              </button>
+
+              <div className="w-full h-px bg-[#241116] my-0.5" />
+
+              {/* 1-Click Reset to 100% and (0,0) */}
+              <button
+                type="button"
+                onClick={handleResetZoomPan}
+                title="Ölçeği %100 yap ve haritayı merkeze al (1:1 Sıfırla)"
+                aria-label="Ölçeği ve Konumu Sıfırla"
+                className="w-8 h-8 rounded-xl bg-[#180B0F] hover:bg-[#2A1016] text-[#F08C96] hover:text-white border border-[#3C141E] flex items-center justify-center font-bold text-xs transition-all active:scale-95"
+              >
+                ⟲
+              </button>
+
+              {/* Pan Tool Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
+                title={tool === 'pan' ? 'Kaydırma Modundan Çık (Çizim Moduna Dön)' : 'Haritayı Serbest Kaydır (Pan Modu)'}
+                aria-label="Kaydırma Modu"
+                className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition-all active:scale-95 border ${
+                  tool === 'pan'
+                    ? 'bg-[#00F0FF] text-black border-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.5)]'
+                    : 'bg-[#140A0D] text-[#8E7E81] hover:text-white hover:bg-[#1E0B11] border-[#2E151C]'
+                }`}
+              >
+                ✋
+              </button>
+            </div>
+
             {/* Floating Canvas HUD Overlay */}
             <div className="absolute bottom-3 left-4 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
               <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
@@ -2335,6 +2429,92 @@ export const TacticalMapBoard: React.FC = () => {
                       className="h-6 px-1.5 rounded bg-[#0A0507] text-[9.5px] font-bold text-[#8E7E81] hover:text-white"
                     >
                       Canlı
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── SECTION: UZAKLAŞMA & YAKINLAŞMA (ZOOM & PAN KONTROLÜ) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs">🔍</span>
+                      <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider">
+                        UZAKLAŞMA & YAKINLAŞMA (ZOOM)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono font-black text-[#F08C96] bg-[#1E0B11] px-1.5 py-0.5 rounded border border-[#3C141E]">
+                      %{Math.round(zoomScale * 100)}
+                    </span>
+                  </div>
+
+                  {/* Steppers Row */}
+                  <div className="grid grid-cols-6 gap-1">
+                    {[0.5, 0.75, 1.0, 1.5, 2.0, 3.0].map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => handleSetZoomLevel(lvl)}
+                        className={`py-1 rounded text-[9.5px] font-mono font-bold transition-all text-center border ${
+                          Math.abs(zoomScale - lvl) < 0.05
+                            ? 'bg-[#8F1622] text-white border-[#FF4655] shadow-xs'
+                            : 'bg-[#0A0507] text-[#8E7E81] hover:text-[#FAF2EE] border-[#1E0B11]'
+                        }`}
+                      >
+                        %{Math.round(lvl * 100)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Slider & Quick Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleZoomOut}
+                      title="Uzaklaştır (% -25)"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#8F1622] text-[#FAF2EE] border border-[#2E151C] font-black text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={3.0}
+                      step={0.05}
+                      value={zoomScale}
+                      onChange={(e) => handleSetZoomLevel(parseFloat(e.target.value))}
+                      className="flex-1 accent-[#C82333] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleZoomIn}
+                      title="Yakınlaştır (% +25)"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#8F1622] text-[#FAF2EE] border border-[#2E151C] font-black text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Reset & Pan Row */}
+                  <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={handleResetZoomPan}
+                      className="h-7 px-2 rounded-lg bg-[#180B0F] hover:bg-[#281015] border border-[#3C141E] text-[10px] font-bold text-[#F08C96] hover:text-white flex items-center justify-center gap-1 transition-all active:scale-95"
+                    >
+                      <span>⟲</span>
+                      <span>Merkeze Al (1:1)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
+                      className={`h-7 px-2 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 ${
+                        tool === 'pan'
+                          ? 'bg-[#00F0FF] text-black border-[#00F0FF]'
+                          : 'bg-[#180B0F] text-[#8E7E81] hover:text-white border-[#3C141E]'
+                      }`}
+                    >
+                      <span>✋</span>
+                      <span>{tool === 'pan' ? 'Kaydırmada' : 'Kaydır (Pan)'}</span>
                     </button>
                   </div>
                 </div>

@@ -142,10 +142,14 @@ export default function MevaHUDApp() {
       });
 
     // PWA Offline Service Worker Registration
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        void navigator.serviceWorker.register('/sw.js').catch(() => {});
-      });
+    if (typeof window !== 'undefined') {
+      (window as any).__toggleStratBoard = () => useVoiceSettingsStore.getState().toggleStratBoard();
+      (window as any).__openStratBoard = () => useVoiceSettingsStore.getState().setShowStratBoard(true);
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          void navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
     }
 
     return () => {
