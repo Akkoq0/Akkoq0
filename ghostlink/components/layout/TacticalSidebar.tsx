@@ -623,16 +623,16 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                     {/* Active Slot Beacon Indicator */}
                     {isVoice &&
                       isActive &&
-                      Object.values(slotBeacons).some(Boolean) && (
+                      Object.values(slotBeacons).some((b) => b?.beaconActive && b?.targetRole) && (
                         <div className="px-2.5 pb-1.5">
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#4A0D18] text-[#FF5A6B] border border-[#C82333]/50 animate-pulse flex items-center gap-1">
-                            <span>⚡ BEACON:</span>
+                            <span>⚡ ÇAĞRI:</span>
                             <span>
                               {Object.values(slotBeacons)
+                                .filter((b) => b?.beaconActive && b?.targetRole)
                                 .map((b) => b?.targetRole)
-                                .filter(Boolean)
                                 .join(', ')}{' '}
-                              Aranıyor
+                              Bekleniyor
                             </span>
                           </span>
                         </div>

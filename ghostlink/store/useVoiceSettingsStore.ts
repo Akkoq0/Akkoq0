@@ -107,7 +107,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   rogerBeepEnabled: true,
   rogerBeepStyle: 'classic-milsim',
   rogerBeepVolume: 0.75,
-  inGameOverlayEnabled: true,
+  inGameOverlayEnabled: false,
   inGameOverlayPosition: 'top-left',
   inGameOverlayMode: 'compact',
   inGameOverlayOpacity: 0.9,

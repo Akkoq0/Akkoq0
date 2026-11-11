@@ -627,13 +627,13 @@ export const StreamChatArea = memo(function StreamChatArea({
                 size={mobileComfort ? 'md' : 'sm'}
                 speaking={isSpeaking}
               />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="block text-[13.5px] lg:text-[13px] font-bold text-[#F4EFF0] group-hover:text-[#F29AA3] transition-colors whitespace-nowrap leading-tight">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="block text-[12.5px] font-bold text-[#F4EFF0] group-hover:text-[#F29AA3] transition-colors truncate leading-tight">
                     {displayName}
                   </span>
                   {isDuoPartner && (
-                    <span className="text-[9px] font-black px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)] animate-pulse">
+                    <span className="text-[9px] font-black px-1 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/60 shadow-[0_0_6px_rgba(6,182,212,0.4)] animate-pulse flex-shrink-0">
                       {isDuoTransmitting ? 'DUO CANLI' : 'DUO'}
                     </span>
                   )}
@@ -761,7 +761,7 @@ export const StreamChatArea = memo(function StreamChatArea({
           </div>
 
           {/* Row 4: High-Contrast Crimson/Bronze Gain Slider */}
-          <div className="flex items-center gap-2.5 pt-0.5">
+          <div className="flex items-center gap-2 pt-0.5 min-w-0">
             <input
               type="range"
               min={0}
@@ -778,10 +778,10 @@ export const StreamChatArea = memo(function StreamChatArea({
               }
               suppressHydrationWarning
               aria-label={`${displayName} ses seviyesi`}
-              className="exec-range flex-1"
+              className="exec-range flex-1 min-w-0"
             />
             <span
-              className={`text-[11.5px] lg:text-[11px] font-bold tabular-nums w-10 text-right ${
+              className={`text-[11px] font-bold tabular-nums text-right flex-shrink-0 ${
                 isBoosted ? 'text-[#F29AA3]' : 'text-[#B8AAAC]'
               }`}
             >
@@ -800,14 +800,15 @@ export const StreamChatArea = memo(function StreamChatArea({
         activeVoiceChannelId?.replace(/^scrim-/, '') ??
         'MEVA-8492';
 
-      if (beacon) {
+      if (beacon && beacon.beaconActive && beacon.targetRole) {
+        const role = beacon.targetRole;
         const link =
           typeof window !== 'undefined'
-            ? `${window.location.origin}/?room=${code}&role=${beacon.targetRole}`
+            ? `${window.location.origin}/?room=${code}&role=${role}`
             : code;
         void navigator.clipboard.writeText(link);
         setInviteCopied(true);
-        setBeaconToast(`🔗 ${beacon.targetRole} çağrı linki panoya kopyalandı!`);
+        setBeaconToast(`🔗 ${role} davet linki panoya kopyalandı!`);
         setTimeout(() => {
           setInviteCopied(false);
           setBeaconToast(null);
@@ -815,8 +816,8 @@ export const StreamChatArea = memo(function StreamChatArea({
       } else {
         const assignedRoles = new Set(
           Object.values(slotBeacons)
-            .map((b) => b?.targetRole)
-            .filter(Boolean),
+            .filter((b) => b?.beaconActive && b?.targetRole)
+            .map((b) => b.targetRole),
         );
         const candidateRole =
           activeGame.roles.find((r: GameRoleDef) => !assignedRoles.has(r.shortLabel))?.shortLabel ??
@@ -831,7 +832,7 @@ export const StreamChatArea = memo(function StreamChatArea({
             : code;
         void navigator.clipboard.writeText(link);
         setInviteCopied(true);
-        setBeaconToast(`⚡ [${candidateRole}] Slot Beacon sinyali bırakıldı & link kopyalandı!`);
+        setBeaconToast(`⚡ [${candidateRole}] Oyuncu davet linki kopyalandı!`);
         setTimeout(() => {
           setInviteCopied(false);
           setBeaconToast(null);
@@ -848,71 +849,79 @@ export const StreamChatArea = memo(function StreamChatArea({
 
     // Render empty slots up to 5 with Multi-Purpose Meva-native Slot Beacons
     for (let i = activeSquadOperators.length; i < 5; i++) {
-      const beacon = slotBeacons[i];
+      const rawBeacon = slotBeacons[i];
+      const isBeaconActive = Boolean(rawBeacon?.beaconActive && rawBeacon?.targetRole);
+      const beaconRole = isBeaconActive ? rawBeacon.targetRole : null;
 
       cards.push(
         <div
           key={`slot-${i}`}
           onClick={() => handleBeaconSlotClick(i)}
           onDoubleClick={() => handleBeaconSlotDoubleClick(i)}
-          title="Tek Tık: Beacon Sinyali Bırak / Davet Linki Kopyala · Çift Tık: Oyun Filtresi & Hızlı Eşleşme Ara"
-          className={`cockpit-pod rounded-xl cursor-pointer select-none transition-all duration-200 group ${
-            beacon
-              ? 'border-2 border-[#C82333] shadow-[0_0_24px_rgba(200,35,51,0.38)] bg-gradient-to-b from-[#2B0A13]/90 to-[#0F0609]/95 animate-pulse'
-              : 'border border-dashed border-[#3D1A22] bg-[#0E0709]/60 hover:border-[#8F1622]/80 hover:bg-[#160B0F]/80'
+          title={isBeaconActive ? "Davet linkini kopyala veya çağrıyı yönet" : "Oyuncu davet etmek için dokunun"}
+          className={`cockpit-pod rounded-xl cursor-pointer select-none transition-all duration-200 group flex flex-col justify-between items-center text-center ${
+            isBeaconActive
+              ? 'border-2 border-[#C82333]/90 shadow-[0_0_20px_rgba(200,35,51,0.22)] bg-gradient-to-b from-[#2B0A13]/90 to-[#0F0609]/95'
+              : 'border border-[#281318] bg-[#0E0709]/80 hover:border-[#6E141E]/70 hover:bg-[#140A0D]'
           } ${
             mobileComfort
-              ? 'p-3.5 gap-2.5 min-h-[140px]'
+              ? 'p-3.5 gap-2 min-h-[140px]'
               : 'p-3 gap-2 min-h-[130px]'
-          } flex flex-col justify-between items-center text-center`}
+          }`}
         >
           <div className="w-full flex items-center justify-between">
             <span
-              className={`text-[9.5px] font-extrabold tracking-wider px-2 py-0.5 rounded border ${
-                beacon
+              className={`text-[10px] font-bold tracking-wide px-2 py-0.5 rounded border ${
+                isBeaconActive
                   ? 'text-[#FF5A6B] bg-[#590C15]/70 border-[#C82333]/60'
-                  : 'text-[#A8989B] bg-[#160B0F] border-[#2A1319]'
+                  : 'text-[#8E7E81] bg-[#14080B] border-[#221014]'
               }`}
             >
-              ⚡ SLOT #{i + 1} {beacon ? 'BEACON' : 'BOŞ'}
+              {isBeaconActive ? `⚡ ${beaconRole} ÇAĞRISI` : `KOLTUK #${i + 1}`}
             </span>
-            {beacon ? (
+            {isBeaconActive ? (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   clearSlotBeacon(i);
                 }}
-                className="text-[#9E8E91] hover:text-[#FAF2EE] text-xs font-bold px-1"
+                className="w-5 h-5 rounded-md flex items-center justify-center text-[#9E8E91] hover:text-[#FAF2EE] hover:bg-[#3D0F18] transition-colors text-xs font-bold"
                 title="Çağrıyı Kaldır"
               >
                 ✕
               </button>
             ) : (
-              <span className="text-[10px] text-[#A8989B] group-hover:text-[#FF5A6B] transition-colors">
+              <span className="w-5 h-5 rounded-md flex items-center justify-center text-[12px] text-[#6E5E61] group-hover:text-[#FF5A6B] group-hover:bg-[#200D12] transition-all">
                 +
               </span>
             )}
           </div>
 
-          <div className="my-1">
+          <div className="my-1.5 flex flex-col items-center">
             <span className="text-[13px] font-extrabold text-[#FAF2EE] tracking-wide block">
-              {beacon ? `[ ⚡ ${beacon.targetRole} BEKLENİYOR ]` : '[ ⚡ BOŞ KOLTUK ]'}
+              {isBeaconActive ? `${beaconRole} Bekleniyor` : 'Boş Koltuk'}
             </span>
-            <span className="text-[10px] text-[#E07A86] font-semibold mt-0.5 block">
-              {beacon
-                ? `${activeGame.name} · Otomatik Kenetlenme Aktif`
-                : `${activeGame.name} · Tıkla Sinyal Bırak`}
+            <span className="text-[11px] text-[#A8989B] font-medium mt-0.5 block">
+              {isBeaconActive
+                ? `${activeGame.name} kadro sinyali yayında`
+                : 'Oyuncu davet etmek için dokun'}
             </span>
           </div>
 
-          <div className="w-full py-1.5 px-2 rounded-lg bg-[#140A0D] border border-[#2A1319] text-[10px] font-bold text-[#E08C96] group-hover:border-[#C82333]/60 group-hover:text-[#FAF2EE] transition-all flex items-center justify-center gap-1">
+          <div
+            className={`w-full py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all flex items-center justify-center gap-1.5 border ${
+              isBeaconActive
+                ? 'bg-[#3D0D16] border-[#8F1622]/60 text-[#FAF2EE] group-hover:bg-[#52121E]'
+                : 'bg-[#140A0D] border-[#261217] text-[#A8989B] group-hover:border-[#6E141E]/70 group-hover:text-[#FAF2EE]'
+            }`}
+          >
             <span>
-              {beacon
+              {isBeaconActive
                 ? inviteCopied
                   ? '✓ Link Kopyalandı'
-                  : 'Tek Tık: Link · Çift Tık: Eşleş'
-                : 'Tek Tık: Beacon · Çift Tık: Eşleş'}
+                  : '🔗 Davet Linki Kopyala'
+                : '+ Oyuncu Çağır'}
             </span>
           </div>
         </div>,
@@ -1571,40 +1580,42 @@ export const StreamChatArea = memo(function StreamChatArea({
 
       {/* 1. DESKTOP TOP STAGE: 5-OPERATOR EXECUTIVE VOICE MATRIX */}
       <section className="hidden lg:flex titanium-module rounded-xl px-4 py-3 flex-col gap-2.5 flex-shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0 flex-shrink-0">
             <span className="w-2 h-2 rounded-full bg-[#C82333] flex-shrink-0" />
-            <h2 className="text-[14px] font-extrabold tracking-tight text-[#F4EFF0]">
+            <h2 className="text-[14px] font-extrabold tracking-tight text-[#F4EFF0] whitespace-nowrap">
               Canlı Kadro Ses Matrisi
             </h2>
-            <span className="text-xs text-[#827376] font-semibold">
+            <span className="text-xs text-[#827376] font-semibold whitespace-nowrap">
               · {activeRoomName}
             </span>
-            <span className="inline-flex items-center rounded-md px-2.5 py-0.5 bg-[#190B10] border border-[#7A121D]/45 text-[11px] font-bold text-[#F08C96]">
+            <span className="inline-flex items-center rounded-md px-2.5 py-0.5 bg-[#190B10] border border-[#7A121D]/45 text-[11px] font-bold text-[#F08C96] whitespace-nowrap">
               {activeSquadOperators.length}/5 Aktif · 96 kbps Opus
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {voiceChannels.map((vc) => {
-              const isSelected =
-                vc.id === (activeVoiceChannelId ?? activeVoiceChannel?.id);
-              return (
-                <button
-                  key={vc.id}
-                  type="button"
-                  onClick={() => setActiveVoiceChannel(vc.id)}
-                  className={`rounded-lg h-7 px-2.5 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-[linear-gradient(160deg,rgba(138,20,32,0.34)_0%,rgba(16,9,11,0.85)_100%)] text-[#F4EFF0] border-[#961826]/55'
-                      : 'bg-[#11090B] text-[#8E7E81] hover:text-[#F4EFF0] border-[#281318] hover:border-[#451B24]'
-                  }`}
-                >
-                  <IconVoiceWave size={12} />
-                  <span>{cleanLabel(vc.name)}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-[460px] no-scrollbar py-0.5">
+              {voiceChannels.map((vc) => {
+                const isSelected =
+                  vc.id === (activeVoiceChannelId ?? activeVoiceChannel?.id);
+                return (
+                  <button
+                    key={vc.id}
+                    type="button"
+                    onClick={() => setActiveVoiceChannel(vc.id)}
+                    className={`rounded-lg h-7 px-2.5 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap ${
+                      isSelected
+                        ? 'bg-[linear-gradient(160deg,rgba(138,20,32,0.4)_0%,rgba(16,9,11,0.85)_100%)] text-[#FAF2EE] border-[#961826]/70 shadow-[0_0_10px_rgba(200,35,51,0.2)]'
+                        : 'bg-[#11090B] text-[#8E7E81] hover:text-[#FAF2EE] border-[#281318] hover:border-[#451B24]'
+                    }`}
+                  >
+                    <IconVoiceWave size={11} className={isSelected ? 'text-[#FF5A6B]' : 'text-[#6E5E61]'} />
+                    <span>{cleanLabel(vc.name)}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             <button
               type="button"
@@ -1638,7 +1649,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                   triggerSelfSpeakingPulse();
                 }
               }}
-              className={`rounded-lg h-7 px-3 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 ${
+              className={`rounded-lg h-7 px-3 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap ${
                 selfTransmitting
                   ? 'crimson-cta text-[#F4EFF0]'
                   : 'bg-[#150A0E] hover:bg-[#1E0C12] text-[#F4EFF0] hover:border-[#961826]/55 border-[#2E151C]'
@@ -1707,7 +1718,7 @@ export const StreamChatArea = memo(function StreamChatArea({
                     : 'bg-[#14090D] hover:bg-[#1E0C11] text-[#9E8E91] hover:text-[#F4EFF0] border-[#2A1319]'
                 }`}
               >
-                Ara · Etiket
+                Ara
               </button>
             </div>
 
@@ -1838,37 +1849,37 @@ export const StreamChatArea = memo(function StreamChatArea({
             </button>
           </div>
 
-          <div className="rounded-xl bg-[linear-gradient(90deg,#0D080A_0%,#190B10_50%,#0D080A_100%)] border border-[#2A1319] px-3 py-2 grid grid-cols-4 divide-x divide-[#241116] text-center flex-shrink-0">
-            <div className="px-1.5">
-              <span className="block text-[10px] font-medium text-[#827376]">
+          <div className="rounded-xl bg-[#0F080A] border border-[#241116] p-2 grid grid-cols-4 gap-1.5 flex-shrink-0">
+            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-[#140A0D] border border-[#200F14] min-w-0">
+              <span className="text-[10px] font-medium text-[#8E7E81] truncate w-full text-center">
                 Kodek
               </span>
-              <span className="block text-[12px] font-extrabold text-[#F4EFF0] mt-0.5 whitespace-nowrap">
-                Opus 48kHz
+              <span className="text-[11px] font-bold text-[#F4EFF0] mt-0.5 truncate w-full text-center">
+                Opus 48k
               </span>
             </div>
-            <div className="px-1.5">
-              <span className="block text-[10px] font-medium text-[#827376]">
+            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-[#140A0D] border border-[#200F14] min-w-0">
+              <span className="text-[10px] font-medium text-[#8E7E81] truncate w-full text-center">
                 Performans
               </span>
-              <span className="block text-[12px] font-extrabold text-[#F08C96] mt-0.5 whitespace-nowrap">
-                0 FPS Kaybı
+              <span className="text-[11px] font-bold text-[#34D399] mt-0.5 truncate w-full text-center">
+                0 Kayıp
               </span>
             </div>
-            <div className="px-1.5">
-              <span className="block text-[10px] font-medium text-[#827376]">
-                Yük
+            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-[#140A0D] border border-[#200F14] min-w-0">
+              <span className="text-[10px] font-medium text-[#8E7E81] truncate w-full text-center">
+                İşlemci
               </span>
-              <span className="block text-[12px] font-extrabold text-[#F4EFF0] mt-0.5 whitespace-nowrap">
-                %<CpuLoadBadge fallbackCpu={simMetrics.cpu} /> CPU
+              <span className="text-[11px] font-bold text-[#F4EFF0] mt-0.5 truncate w-full text-center">
+                %<CpuLoadBadge fallbackCpu={simMetrics.cpu} />
               </span>
             </div>
-            <div className="px-1.5">
-              <span className="block text-[10px] font-medium text-[#827376]">
-                Bağlantı
+            <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-[#140A0D] border border-[#200F14] min-w-0">
+              <span className="text-[10px] font-medium text-[#8E7E81] truncate w-full text-center">
+                P2P Ağ
               </span>
-              <span className="block text-[12px] font-extrabold text-[#F08C96] mt-0.5 whitespace-nowrap">
-                %{simMetrics.stability} P2P
+              <span className="text-[11px] font-bold text-[#F08C96] mt-0.5 truncate w-full text-center">
+                %{simMetrics.stability}
               </span>
             </div>
           </div>
