@@ -801,7 +801,17 @@ function renderSingleOp(ctx: CanvasRenderingContext2D, op: StratOperation) {
 // Main Component
 // ─────────────────────────────────────────────────────────
 
-export const TacticalMapBoard: React.FC = () => {
+export interface TacticalMapBoardProps {
+  embedded?: boolean;
+  onClose?: () => void;
+  initialMapId?: TacticalMapId;
+}
+
+export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
+  embedded = false,
+  onClose,
+  initialMapId,
+}) => {
   const open = useVoiceSettingsStore((s) => s.showStratBoard);
   const setOpen = useVoiceSettingsStore((s) => s.setShowStratBoard);
   const activeChannelId = useAppStore((s) => s.activeChannelId);
@@ -860,6 +870,12 @@ export const TacticalMapBoard: React.FC = () => {
 
   // Active map state
   const [mapId, setMapId] = useState<TacticalMapId>(availableMaps[0] || 'mirage');
+
+  useEffect(() => {
+    if (initialMapId) {
+      setMapId(initialMapId);
+    }
+  }, [initialMapId]);
 
   // Stratbook operations and phase states
   const [ops, setOps] = useState<StratOperation[]>([]);
@@ -2007,22 +2023,37 @@ export const TacticalMapBoard: React.FC = () => {
     );
   };
 
-  if (!open) return null;
+  const isVisible = embedded || open;
+  if (!isVisible) return null;
+
+  const handleClose = (e?: React.SyntheticEvent) => {
+    e?.preventDefault();
+    if (onClose) {
+      onClose();
+    } else {
+      setOpen(false);
+    }
+  };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center exec-backdrop p-1 sm:p-3 font-sans tabular-nums select-none"
-      onClick={(e) => {
-        e.preventDefault();
-        setOpen(false);
-      }}
+      className={
+        embedded
+          ? 'w-full h-full relative flex flex-col overflow-hidden font-sans tabular-nums select-none p-1 sm:p-2.5 pb-20'
+          : 'fixed inset-0 z-50 flex items-center justify-center exec-backdrop p-1 sm:p-3 font-sans tabular-nums select-none'
+      }
+      onClick={embedded ? undefined : handleClose}
     >
       <div
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
-        className="w-full max-w-[1500px] h-full max-h-[96dvh] rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_24px_90px_rgba(0,0,0,0.95)] border border-[#8F1622]/60"
+        className={
+          embedded
+            ? 'w-full h-full rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_16px_50px_rgba(0,0,0,0.85)] border border-[#8F1622]/60'
+            : 'w-full max-w-[1500px] h-full max-h-[96dvh] rounded-2xl exec-modal flex flex-col overflow-hidden shadow-[0_24px_90px_rgba(0,0,0,0.95)] border border-[#8F1622]/60'
+        }
       >
         <MevaErrorBoundary fallbackTitle="Taktik Masası Koruma Modu">
         {/* Hidden Inputs for File Upload & JSON Import */}
@@ -2082,10 +2113,7 @@ export const TacticalMapBoard: React.FC = () => {
 
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setOpen(false);
-              }}
+              onClick={handleClose}
               aria-label="Kapat"
               className="w-8 h-8 rounded-xl bg-[#240A10] hover:bg-[#3D0F18] border border-[#8F1622] text-white flex items-center justify-center text-sm font-black active:scale-95"
             >
@@ -2205,10 +2233,7 @@ export const TacticalMapBoard: React.FC = () => {
             {/* Close Studio Button */}
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setOpen(false);
-              }}
+              onClick={handleClose}
               aria-label="Kapat"
               className="rounded-xl w-7 h-7 flex items-center justify-center bg-[#140A0D] hover:bg-[#220D13] border border-[#2C141A] text-[#9E8E91] hover:text-[#F4EFF0] transition-colors flex-shrink-0"
             >

@@ -16,6 +16,10 @@ import { TacticalSidebar } from '@/components/layout/TacticalSidebar';
 import { StreamChatArea } from '@/components/chat/StreamChatArea';
 import { PlayerRadarHUD } from '@/components/hud/PlayerRadarHUD';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
+import { FloatingEsportDock } from '@/components/layout/FloatingEsportDock';
+import { EsportHubView } from '@/components/esport/EsportHubView';
+import { TacticalMapBoard, type TacticalMapId } from '@/components/tactical/TacticalMapBoard';
+import type { MainNavViewMode } from '@/types/esport';
 import { ScrimModal } from '@/components/ScrimModal';
 import { ThemeSettingsModal } from '@/components/ui/ThemeSettingsModal';
 import { MevaCommandSettingsModal } from '@/components/ui/MevaCommandSettingsModal';
@@ -121,6 +125,46 @@ export default function MevaHUDApp() {
     () => sanitizeWallpaperUrl(customWallpaper),
     [customWallpaper],
   );
+
+  // 3-Pane Navigation State (Ses Kokpiti | Esport Hub | Taktik Masası)
+  const [activeView, setActiveView] = useState<MainNavViewMode>('cockpit');
+  const [targetTacticalMapId, setTargetTacticalMapId] = useState<TacticalMapId | undefined>(undefined);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const viewIndex = activeView === 'cockpit' ? 0 : activeView === 'esport-hub' ? 1 : 2;
+
+  const handleSelectView = useCallback((view: MainNavViewMode) => {
+    setActiveView(view);
+    if (view === 'tactical') {
+      useVoiceSettingsStore.getState().setShowStratBoard(true);
+    } else {
+      useVoiceSettingsStore.getState().setShowStratBoard(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showStratBoard && activeView !== 'tactical') {
+      setActiveView('tactical');
+    }
+  }, [showStratBoard, activeView]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    const threshold = 65;
+    if (diff > threshold) {
+      if (activeView === 'cockpit') handleSelectView('esport-hub');
+      else if (activeView === 'esport-hub') handleSelectView('tactical');
+    } else if (diff < -threshold) {
+      if (activeView === 'tactical') handleSelectView('esport-hub');
+      else if (activeView === 'esport-hub') handleSelectView('cockpit');
+    }
+    setTouchStartX(null);
+  };
 
   useEffect(() => {
     useThemeStore.getState().applyCSSVariables();
@@ -278,7 +322,13 @@ export default function MevaHUDApp() {
       }
 
       if (e.code === vState.keybinds.stratBoardKey || e.code === 'KeyM' || e.key.toLowerCase() === 'm') {
-        vState.toggleStratBoard();
+        handleSelectView(activeView === 'tactical' ? 'cockpit' : 'tactical');
+      } else if (e.code === 'Digit1' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        handleSelectView('cockpit');
+      } else if (e.code === 'Digit2' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        handleSelectView('esport-hub');
+      } else if (e.code === 'Digit3' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        handleSelectView('tactical');
       } else if (e.code === vState.keybinds.miniHudKey) {
         vState.toggleMiniHud();
       } else if (e.code === vState.keybinds.muteKey) {
@@ -290,7 +340,7 @@ export default function MevaHUDApp() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleMute, toggleDeafen]);
+  }, [toggleMute, toggleDeafen, activeView, handleSelectView]);
 
   // Load clean state from IndexedDB (Zero mock data policy)
   useEffect(() => {
@@ -395,79 +445,117 @@ export default function MevaHUDApp() {
       {miniHudActive ? (
         <MiniHudOverlay username={user.username} voiceControls={voiceControls} />
       ) : (
-        <>
-          <div className="relative z-10 flex-1 flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5">
-            {/* Desktop Left Channel & Voice Hub */}
-            <div className="hidden lg:flex h-full flex-shrink-0">
-              <TacticalSidebar
-                username={user.username}
-                voiceControls={voiceControls}
-              />
-            </div>
-
-            {/* Mobile & Tablet Left Drawer */}
-            {isMobileSidebarOpen && (
-              <div
-                className="fixed inset-0 z-40 lg:hidden exec-backdrop flex"
-                onClick={() => setIsMobileSidebarOpen(false)}
-              >
-                <div
-                  className="w-[86vw] max-w-[320px] h-full shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
+        <div className="relative z-10 flex-1 flex flex-col overflow-hidden min-h-0">
+          {/* ── 3-PANE 60 FPS SLIDING VIEWDECK (Ses Kokpiti | Esport Hub | Taktik Masası) ── */}
+          <div
+            className="w-full flex-1 flex overflow-hidden min-h-0 relative"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <div
+              className="flex h-full transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform"
+              style={{
+                transform: `translate3d(-${viewIndex * 100}%, 0, 0)`,
+              }}
+            >
+              {/* PANE 1: SES KOKPİTİ (VOICE COCKPIT) */}
+              <div className="w-full min-w-full h-full flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5 flex-shrink-0">
+                {/* Desktop Left Channel & Voice Hub */}
+                <div className="hidden lg:flex h-full flex-shrink-0">
                   <TacticalSidebar
                     username={user.username}
                     voiceControls={voiceControls}
                   />
                 </div>
-              </div>
-            )}
 
-            {/* Center Tactical Bento Cockpit */}
-            <StreamChatArea
-              userId={user.id}
-              username={user.username}
-              onSelectPlayer={handleSelectPlayer}
-              voiceControls={voiceControls}
-            />
+                {/* Mobile & Tablet Left Drawer */}
+                {isMobileSidebarOpen && (
+                  <div
+                    className="fixed inset-0 z-40 lg:hidden exec-backdrop flex"
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                  >
+                    <div
+                      className="w-[86vw] max-w-[320px] h-full shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <TacticalSidebar
+                        username={user.username}
+                        voiceControls={voiceControls}
+                      />
+                    </div>
+                  </div>
+                )}
 
-            {/* Desktop Right Squad Roster */}
-            <div className="hidden lg:flex h-full flex-shrink-0">
-              <PlayerRadarHUD
-                onSelectPlayer={handleSelectPlayer}
-                onContextMenuPlayer={handleContextMenuPlayer}
-              />
-            </div>
+                {/* Center Tactical Bento Cockpit */}
+                <StreamChatArea
+                  userId={user.id}
+                  username={user.username}
+                  onSelectPlayer={handleSelectPlayer}
+                  voiceControls={voiceControls}
+                />
 
-            {/* Mobile & Tablet Right Drawer */}
-            {isMobileRadarOpen && (
-              <div
-                className="fixed inset-0 z-40 lg:hidden exec-backdrop flex justify-end"
-                onClick={() => setIsMobileRadarOpen(false)}
-              >
-                <div
-                  className="w-[86vw] max-w-[320px] h-full shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                {/* Desktop Right Squad Roster */}
+                <div className="hidden lg:flex h-full flex-shrink-0">
                   <PlayerRadarHUD
                     onSelectPlayer={handleSelectPlayer}
                     onContextMenuPlayer={handleContextMenuPlayer}
                   />
                 </div>
+
+                {/* Mobile & Tablet Right Drawer */}
+                {isMobileRadarOpen && (
+                  <div
+                    className="fixed inset-0 z-40 lg:hidden exec-backdrop flex justify-end"
+                    onClick={() => setIsMobileRadarOpen(false)}
+                  >
+                    <div
+                      className="w-[86vw] max-w-[320px] h-full shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <PlayerRadarHUD
+                        onSelectPlayer={handleSelectPlayer}
+                        onContextMenuPlayer={handleContextMenuPlayer}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* PANE 2: ESPORT HUB (HLTV / VLR.GG STYLE PLATFORM) */}
+              <div className="w-full min-w-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
+                <EsportHubView
+                  onOpenTacticalMap={(mapId) => {
+                    if (mapId) setTargetTacticalMapId(mapId as TacticalMapId);
+                    handleSelectView('tactical');
+                  }}
+                />
+              </div>
+
+              {/* PANE 3: TAKTİKSEL STRATEJİ MASASI (EMBEDDED 60 FPS MAP STUDIO) */}
+              <div className="w-full min-w-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
+                <TacticalMapBoard
+                  embedded
+                  initialMapId={targetTacticalMapId}
+                  onClose={() => handleSelectView('cockpit')}
+                />
+              </div>
+            </div>
           </div>
 
-          {/* 3. MOBILE COMMAND DOCK */}
-          <MobileBottomNav voiceControls={voiceControls} />
-        </>
+          {/* ── ESTETİK FLOATING ESPORT DOCK (ALT FAY HATTI) ── */}
+          <FloatingEsportDock
+            activeView={activeView}
+            onSelectView={handleSelectView}
+            voiceControls={voiceControls}
+          />
+        </div>
       )}
 
       {/* 4. MODALS & OVERLAYS (Conditional Zero-Footprint Rendering) */}
       {showScrimModal && <ScrimModal />}
       {showThemeModal && <ThemeSettingsModal />}
       {showCommandSettingsModal && <MevaCommandSettingsModal />}
-      {showStratBoard && <TacticalStratDrawer />}
+      {showStratBoard && activeView !== 'tactical' && <TacticalStratDrawer />}
       {showFriendsModal && <FriendsModal />}
       {showLobbyGate && (
         <LobbyGateModal
