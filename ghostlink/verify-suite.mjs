@@ -150,8 +150,8 @@ async function runQAAndBenchmarkSuite() {
   assert.equal(audioMod.EQ_PROFILE_CONFIGS.balanced.highpassHz, 85);
   assert.equal(audioMod.EQ_PROFILE_CONFIGS.balanced.presenceFreqHz, 3500);
   assert.equal(audioMod.EQ_PROFILE_CONFIGS.balanced.presenceQ, 1.15);
-  assert.equal(audioMod.IGL_DUCK_FACTOR, 0.70); // %30 IGL Priority Ducking
-  console.log('  ✔ WebAudio DSP Verified: 48kHz, HPF 85Hz, Low-Shelf 220Hz, Presence 3.5kHz (Q=1.15), -30% Ducking (0.70)');
+  assert.equal(audioMod.IGL_DUCK_FACTOR, 0.3); // %30 Level IGL Priority Ducking
+  console.log('  ✔ WebAudio DSP Verified: 48kHz, HPF 85Hz, Low-Shelf 220Hz, Presence 3.5kHz (Q=1.15), 30% IGL Ducking (0.30)');
 
   // 3.2 VAD Gürültü Kapısı, Klavye Filtresi ve PTT Gecikmesi (< 10ms)
   const vadMod = require('@/src/lib/vadEngine');

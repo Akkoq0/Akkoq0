@@ -78,6 +78,7 @@ const securityHeaders = [
 
 const nextConfig = {
   output: isStaticExport ? 'export' : undefined,
+  ...(isStaticExport ? { pageExtensions: ['tsx', 'jsx'] } : {}),
   images: { unoptimized: true },
   poweredByHeader: false,
   reactStrictMode: true,
