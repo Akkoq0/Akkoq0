@@ -8,6 +8,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { IconClose } from '@/components/ui/MevaIcons';
+import { getMevaTelemetryEngine } from '@/src/lib/telemetryEngine';
+import { useAppStore } from '@/lib/store';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { useRBACStore } from '@/store/useRBACStore';
 
 interface NetworkStressModalProps {
   isOpen: boolean;
@@ -15,24 +19,37 @@ interface NetworkStressModalProps {
 }
 
 export const NetworkStressModal: React.FC<NetworkStressModalProps> = ({ isOpen, onClose }) => {
-  const [ping, setPing] = useState(14);
-  const [jitter, setJitter] = useState(1.2);
-  const [packetLoss, setPacketLoss] = useState(0.0);
+  const netGuard = useAppStore((s) => s.netGuard);
+  const [ping, setPing] = useState(netGuard.bufferSizeMs || 12);
+  const [jitter, setJitter] = useState(netGuard.jitterMs || 0.4);
+  const [packetLoss, setPacketLoss] = useState(netGuard.packetLossPercent || 0.0);
   const [isStressTesting, setIsStressTesting] = useState(false);
   const [stressProgress, setStressProgress] = useState(0);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    const interval = setInterval(() => {
-      // Small realistic fluctuations around ultra-low latency
-      setPing(Math.round(12 + Math.random() * 4));
-      setJitter(Math.round((0.8 + Math.random() * 0.6) * 10) / 10);
-    }, 1500);
-    return () => clearInterval(interval);
+    const tel = getMevaTelemetryEngine();
+    const syncSnapshot = () => {
+      const snap = tel.getSummary();
+      const latestNet = useAppStore.getState().netGuard;
+      setPing(Math.max(1, snap.rttMs || latestNet.bufferSizeMs || 12));
+      setJitter(Math.round((latestNet.jitterMs || snap.jitterMs || 0.4) * 10) / 10);
+      setPacketLoss(Math.round((latestNet.packetLossPercent || snap.packetLossPercent || 0) * 10) / 10);
+    };
+    syncSnapshot();
+    const unsub = tel.subscribe(syncSnapshot);
+    const interval = setInterval(syncSnapshot, 1500);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, [isOpen]);
 
-  const runBurstStressTest = () => {
+  const runBurstStressTest = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    const tel = getMevaTelemetryEngine();
+    tel.setStressTest(true);
     setIsStressTesting(true);
     setStressProgress(0);
     setTestResult(null);
@@ -47,11 +64,22 @@ export const NetworkStressModal: React.FC<NetworkStressModalProps> = ({ isOpen, 
 
       if (sent >= total) {
         clearInterval(burstInterval);
+        tel.setStressTest(false);
+        const snap = tel.getSummary();
         const elapsed = Math.round(performance.now() - startTime);
         setIsStressTesting(false);
-        setTestResult(
-          `Stres Testi Başarılı: 500 P2P Paket ${elapsed}ms içinde iletildi. Kayıp: %0.0, Ortalama Gecikme: 14ms (60 FPS Doğrulandı).`,
-        );
+        const msg = `Stres Testi Başarılı: 500 P2P Paket ${elapsed}ms içinde iletildi. Kayıp: %${packetLoss.toFixed(1)}, Ort. RTT: ${snap.rttMs || ping}ms, Jitter: ${jitter}ms.`;
+        setTestResult(msg);
+        useNotificationStore.getState().pushNotification({
+          title: 'P2P Ağ Sağlık Testi Tamamlandı',
+          message: msg,
+          type: 'system',
+        });
+        useRBACStore.getState().recordAudit({
+          action: 'P2P Mesh Sağlık & Stres Testi Çalıştırıldı',
+          target: `${snap.rttMs || ping}ms RTT · %${packetLoss.toFixed(1)} Kayıp`,
+          severity: 'info',
+        });
       }
     }, 20);
   };

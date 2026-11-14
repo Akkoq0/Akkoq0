@@ -240,7 +240,7 @@ export const TacticalPlayerHUD = memo(function TacticalPlayerHUD({
                   : 'bg-[#090608] hover:bg-[#140A0E] text-[#B8AAAC] border-[#881A26]/25'
               }`}
             >
-              <span>IGL Öncelikli Konuşmacı (%30 Ducking)</span>
+              <span>IGL Öncelikli Konuşmacı (Arka Plan %30 Seviyesine Düşer)</span>
               <span>{isPriority ? 'AKTİF ✓' : 'KAPALI'}</span>
             </button>
           </div>

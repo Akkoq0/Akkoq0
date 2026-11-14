@@ -82,7 +82,7 @@ export const E2eeFingerprintPopover = memo(function E2eeFingerprintPopover({
               Yerel Oturum Parmak İzi (SHA-256)
             </span>
             <span className="rounded-md px-2 py-0.5 bg-[#7A121D]/30 border border-[#A61B29]/45 text-[10px] font-bold text-[#F08C96]">
-              DOĞRULANDI
+              {status.hardwareBound ? 'HARDWARE-BOUND' : 'DOĞRULANDI'}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2">
@@ -97,6 +97,14 @@ export const E2eeFingerprintPopover = memo(function E2eeFingerprintPopover({
               {copiedFp ? 'Kopyalandı' : 'Kopyala'}
             </button>
           </div>
+          {status.hardwareBound && (
+            <div className="pt-1.5 border-t border-[#1E0B11] flex items-center justify-between text-[10px]">
+              <span className="text-[#8E7F83]">Donanım Tabanlı Kök Parmak İzi (PBKDF2):</span>
+              <code className="font-mono font-bold text-emerald-400">
+                {status.hardwareFingerprint}
+              </code>
+            </div>
+          )}
         </div>
 
         {/* Crypto Packet Counters */}

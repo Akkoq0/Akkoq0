@@ -26,6 +26,14 @@ export type OverlayPosition =
 
 export type OverlayDisplayMode = 'stealth' | 'compact' | 'tactical-full';
 
+export type CommandSettingsTab =
+  | 'audio'
+  | 'gate'
+  | 'overlay'
+  | 'keybinds'
+  | 'theme_pro'
+  | 'lider_rbac';
+
 interface VoiceSettingsState {
   inputMode: VoiceInputMode;
   noiseGate: NoiseGateConfig;
@@ -33,6 +41,7 @@ interface VoiceSettingsState {
   inputDeviceId: string;
   outputDeviceId: string;
   showCommandSettingsModal: boolean;
+  commandSettingsTab: CommandSettingsTab;
   showStratBoard: boolean;
   miniHudActive: boolean;
   proAnalyticsEnabled: boolean;
@@ -51,6 +60,8 @@ interface VoiceSettingsState {
   setInputDeviceId: (deviceId: string) => void;
   setOutputDeviceId: (deviceId: string) => void;
   setShowCommandSettingsModal: (show: boolean) => void;
+  setCommandSettingsTab: (tab: CommandSettingsTab) => void;
+  openCommandSettingsAtTab: (tab: CommandSettingsTab) => void;
   setShowStratBoard: (show: boolean) => void;
   toggleStratBoard: () => void;
   setMiniHudActive: (active: boolean) => void;
@@ -101,6 +112,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   inputDeviceId: 'default',
   outputDeviceId: 'default',
   showCommandSettingsModal: false,
+  commandSettingsTab: 'audio',
   showStratBoard: false,
   miniHudActive: false,
   proAnalyticsEnabled: false,
@@ -150,6 +162,11 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set) => ({
   },
 
   setShowCommandSettingsModal: (show) => set({ showCommandSettingsModal: show }),
+
+  setCommandSettingsTab: (tab) => set({ commandSettingsTab: tab }),
+
+  openCommandSettingsAtTab: (tab) =>
+    set({ showCommandSettingsModal: true, commandSettingsTab: tab }),
 
   setShowStratBoard: (show) => set({ showStratBoard: show }),
 

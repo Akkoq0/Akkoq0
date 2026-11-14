@@ -34,6 +34,8 @@ export interface PeerCryptoSession {
 export interface CryptoStatusSnapshot {
   initialized: boolean;
   localFingerprint: string;
+  hardwareBound: boolean;
+  hardwareFingerprint: string;
   cipherSuite: string;
   encryptedCount: number;
   decryptedCount: number;
@@ -90,6 +92,9 @@ export class MevaCryptoEngine {
   private keyPair: CryptoKeyPair | null = null;
   private localPublicKeyB64 = '';
   private localFingerprint = '----·----·----·----';
+  private hardwareFingerprint = '----·----·----·----';
+  private hardwareSeedDigestB64 = '';
+  private hardwareBound = false;
   private initPromise: Promise<void> | null = null;
 
   private peerSessions = new Map<string, PeerCryptoSession>();
@@ -107,8 +112,45 @@ export class MevaCryptoEngine {
     return null;
   }
 
+  private getOrCreateHardwareSalt(): string {
+    const STORAGE_KEY = 'meva_hw_device_salt_v1';
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const existing = localStorage.getItem(STORAGE_KEY);
+        if (existing && existing.length >= 16) return existing;
+        const rnd = new Uint8Array(16);
+        globalThis.crypto?.getRandomValues?.(rnd);
+        const created = bytesToBase64(rnd);
+        localStorage.setItem(STORAGE_KEY, created);
+        return created;
+      } catch {}
+    }
+    return 'meva-ephemeral-hw-fallback';
+  }
+
+  private async computeHardwareEntropySeed(subtle: SubtleCrypto): Promise<void> {
+    if (this.hardwareSeedDigestB64) return;
+    const hwSalt = this.getOrCreateHardwareSalt();
+    const hwParts = [
+      typeof navigator !== 'undefined' ? String(navigator.hardwareConcurrency || 0) : '0',
+      typeof navigator !== 'undefined' ? String((navigator as { deviceMemory?: number }).deviceMemory || 0) : '0',
+      typeof navigator !== 'undefined' ? navigator.platform || 'unknown' : 'ssr',
+      typeof screen !== 'undefined' ? `${screen.width}x${screen.height}x${screen.colorDepth}` : '0x0',
+      typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' : 'UTC',
+      hwSalt,
+    ].join('|');
+
+    const encoded = new TextEncoder().encode(`meva-hw-root-v2::${hwParts}`);
+    const digest = await subtle.digest('SHA-256', toArrayBuffer(encoded));
+    const digestBytes = new Uint8Array(digest);
+    this.hardwareSeedDigestB64 = bytesToBase64(digestBytes);
+    this.hardwareFingerprint = formatFingerprintHex(digestBytes);
+    this.hardwareBound = true;
+  }
+
   /**
-   * Generates our session ECDH P-256 keypair and computes our SHA-256 fingerprint.
+   * Generates our session ECDH P-256 keypair, derives hardware-bound device seed,
+   * and computes our SHA-256 fingerprints.
    */
   public async initialize(): Promise<void> {
     if (this.keyPair) return;
@@ -117,6 +159,8 @@ export class MevaCryptoEngine {
     this.initPromise = (async () => {
       const subtle = this.getSubtle();
       if (!subtle) return;
+
+      await this.computeHardwareEntropySeed(subtle);
 
       const pair = await subtle.generateKey(
         { name: 'ECDH', namedCurve: 'P-256' },
@@ -210,10 +254,11 @@ export class MevaCryptoEngine {
     const subtle = this.getSubtle();
     if (!subtle) return null;
 
+    await this.computeHardwareEntropySeed(subtle);
     const enc = new TextEncoder();
     const keyMaterial = await subtle.importKey(
       'raw',
-      toArrayBuffer(enc.encode(`meva-e2ee-v1::${roomId}`)),
+      toArrayBuffer(enc.encode(`meva-e2ee-v2::${roomId}::${this.hardwareSeedDigestB64}`)),
       'PBKDF2',
       false,
       ['deriveKey'],
@@ -432,7 +477,9 @@ export class MevaCryptoEngine {
     return {
       initialized: Boolean(this.keyPair),
       localFingerprint: this.localFingerprint,
-      cipherSuite: 'ECDH P-256 · AES-256-GCM · 96-bit IV',
+      hardwareBound: this.hardwareBound,
+      hardwareFingerprint: this.hardwareFingerprint,
+      cipherSuite: 'ECDH P-256 · Hardware PBKDF2 · AES-256-GCM',
       encryptedCount: this.encryptedCount,
       decryptedCount: this.decryptedCount,
       peerSessions: Array.from(this.peerSessions.values()).map((s) => ({

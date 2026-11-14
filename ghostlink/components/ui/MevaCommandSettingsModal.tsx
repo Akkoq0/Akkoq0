@@ -12,8 +12,10 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
   useVoiceSettingsStore,
+  type CommandSettingsTab,
   type KeybindMap,
 } from '@/store/useVoiceSettingsStore';
+import { LeaderRbacAuditPanel } from '@/components/ui/LeaderRbacAuditPanel';
 import { useHUDStore } from '@/store/useHUDStore';
 import {
   useThemeStore,
@@ -43,7 +45,7 @@ import {
   IconVoiceWave,
 } from '@/components/ui/MevaIcons';
 
-type SettingsTab = 'audio' | 'gate' | 'overlay' | 'keybinds' | 'theme_pro';
+type SettingsTab = CommandSettingsTab;
 
 const KEYBIND_LABELS: ReadonlyArray<{
   key: keyof KeybindMap;
@@ -136,7 +138,19 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
   const setGlassOpacity = useThemeStore((s) => s.setGlassOpacity);
   const setBlurIntensity = useThemeStore((s) => s.setBlurIntensity);
 
-  const [tab, setTab] = useState<SettingsTab>('audio');
+  const commandSettingsTab = useVoiceSettingsStore((s) => s.commandSettingsTab);
+  const setCommandSettingsTab = useVoiceSettingsStore((s) => s.setCommandSettingsTab);
+  const [tab, setTabState] = useState<SettingsTab>(commandSettingsTab || 'audio');
+  const setTab = useCallback(
+    (nextTab: SettingsTab) => {
+      setTabState(nextTab);
+      setCommandSettingsTab(nextTab);
+    },
+    [setCommandSettingsTab],
+  );
+  useEffect(() => {
+    setTabState(commandSettingsTab);
+  }, [commandSettingsTab, open]);
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([]);
   const [outputs, setOutputs] = useState<MediaDeviceInfo[]>([]);
   const [vadSnap, setVadSnap] = useState<VadTelemetrySnapshot>(() =>
@@ -284,6 +298,7 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
               { id: 'overlay', label: 'Oyun İçi Overlay' },
               { id: 'keybinds', label: 'Kısayol Atayıcı' },
               { id: 'theme_pro', label: 'Tema & Meva Pro' },
+              { id: 'lider_rbac', label: '🛡️ Lider & RBAC / Denetim' },
             ] as const
           ).map((t) => (
             <button
@@ -443,7 +458,7 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
                 />
                 <ToggleCard
                   title="IGL Priority Ducking"
-                  desc="Takım kaptanı konuşurken diğer sesleri %30 kısar"
+                  desc="Takım kaptanı konuşurken arka plan seslerini %30 seviyesine indirir"
                   enabled={iglDuckingEnabled}
                   onToggle={() => setIglDuckingEnabled(!iglDuckingEnabled)}
                 />
@@ -1003,6 +1018,9 @@ export const MevaCommandSettingsModal = memo(function MevaCommandSettingsModal()
               </div>
             </>
           )}
+
+          {/* ── TAB 6: LEADER RBAC & AUDIT LOG ── */}
+          {tab === 'lider_rbac' && <LeaderRbacAuditPanel />}
         </div>
       </div>
     </div>

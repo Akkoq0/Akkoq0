@@ -40,19 +40,11 @@ export const EsportHubView = memo(function EsportHubView({
   const [newsFilter, setNewsFilter] = useState<NewsCategory | 'all'>('all');
   const [selectedMatch, setSelectedMatch] = useState<EsportMatch | null>(null);
 
-  const [liveNews, setLiveNews] = useState<EsportNewsItem[]>(
-    () => getCachedEsportHubBundle()?.news ?? [],
-  );
-  const [liveMatches, setLiveMatches] = useState<EsportMatch[]>(
-    () => getCachedEsportHubBundle()?.matches ?? [],
-  );
+  const [liveNews, setLiveNews] = useState<EsportNewsItem[]>([]);
+  const [liveMatches, setLiveMatches] = useState<EsportMatch[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [lastUpdatedText, setLastUpdatedText] = useState<string>(
-    () => getCachedEsportHubBundle()?.fetchedAtLabel ?? 'Yükleniyor...',
-  );
-  const [isLiveFeedConnected, setIsLiveFeedConnected] = useState<boolean>(
-    () => (getCachedEsportHubBundle()?.liveSourcesCount ?? 0) > 0,
-  );
+  const [lastUpdatedText, setLastUpdatedText] = useState<string>('Yükleniyor...');
+  const [isLiveFeedConnected, setIsLiveFeedConnected] = useState<boolean>(false);
 
   const loadLiveData = useCallback(async (forceRefresh = false) => {
     setIsRefreshing(true);
@@ -68,6 +60,13 @@ export const EsportHubView = memo(function EsportHubView({
   }, []);
 
   useEffect(() => {
+    const cached = getCachedEsportHubBundle();
+    if (cached) {
+      setLiveNews(cached.news);
+      setLiveMatches(cached.matches);
+      setLastUpdatedText(cached.fetchedAtLabel);
+      setIsLiveFeedConnected(cached.liveSourcesCount > 0);
+    }
     void loadLiveData(false);
     const intervalId = setInterval(() => {
       void loadLiveData(true);

@@ -8,6 +8,8 @@ import { memo, type ReactNode } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useVoiceSettingsStore } from '@/store/useVoiceSettingsStore';
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { useRBACStore, RBAC_ROLE_META } from '@/store/useRBACStore';
 import { cleanLabel, serverCode } from '@/lib/format';
 import { SignalBars } from '@/components/ui/HudPrimitives';
 import {
@@ -110,7 +112,18 @@ export const GhostNavbar = memo(function GhostNavbar() {
   const miniHudActive = useVoiceSettingsStore((s) => s.miniHudActive);
   const toggleStratBoard = useVoiceSettingsStore((s) => s.toggleStratBoard);
   const toggleMiniHud = useVoiceSettingsStore((s) => s.toggleMiniHud);
+  const openCommandSettingsAtTab = useVoiceSettingsStore(
+    (s) => s.openCommandSettingsAtTab,
+  );
   const setShowMobileCustomizer = useAppStore((s) => s.setShowMobileCustomizer);
+  const unreadNotifs = useNotificationStore(
+    (s) => s.notifications.reduce((cnt, n) => cnt + (n.read ? 0 : 1), 0),
+  );
+  const toggleNotificationDrawer = useNotificationStore((s) => s.toggleDrawer);
+  const localUserId = useRBACStore((s) => s.localUserId);
+  const localRbacRole = useRBACStore(
+    (s) => s.operatorRbacRoles[s.localUserId] ?? 'lider',
+  );
 
   const mobileTitle = activeDMName
     ? `@${activeDMName}`
@@ -372,6 +385,23 @@ export const GhostNavbar = memo(function GhostNavbar() {
           <span className="text-[10px]">⚡</span>
           <span>{subscriptionTier === 'pro' ? 'MEVA PRO' : 'TOPLULUK'}</span>
         </button>
+
+        <CommandButton
+          label={`Lider & RBAC Paneli (${RBAC_ROLE_META[localRbacRole]?.label ?? 'Lider'})`}
+          onClick={() => openCommandSettingsAtTab('lider_rbac')}
+          className="hidden sm:flex"
+        >
+          <IconShield size={16} className="text-[#F08C96]" />
+        </CommandButton>
+
+        <CommandButton
+          label="Bildirim Çekmecesi (Sağ Üst)"
+          onClick={() => toggleNotificationDrawer()}
+          badge={unreadNotifs}
+          className="flex"
+        >
+          <span className="text-sm">🔔</span>
+        </CommandButton>
 
         <CommandButton
           label="Görünüm ve Tema Ayarları"

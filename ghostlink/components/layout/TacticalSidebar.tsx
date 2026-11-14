@@ -47,6 +47,9 @@ import {
   IconShield,
 } from '@/components/ui/MevaIcons';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
+import { ConfirmActionModal } from '@/components/ui/ConfirmActionModal';
+import { useRBACStore } from '@/store/useRBACStore';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import type { VoiceControls, VoicePresence, Channel } from '@/types';
 
 interface TacticalSidebarProps {
@@ -144,7 +147,17 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   const setShowCommandSettingsModal = useVoiceSettingsStore(
     (s) => s.setShowCommandSettingsModal,
   );
+  const openCommandSettingsAtTab = useVoiceSettingsStore(
+    (s) => s.openCommandSettingsAtTab,
+  );
   const setShowStratBoard = useVoiceSettingsStore((s) => s.setShowStratBoard);
+
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const activeServer = servers.find((s) => s.id === activeServerId) ?? servers[0];
   const activeVoiceChannel = channels.find((c) => c.id === activeVoiceChannelId);
@@ -399,19 +412,51 @@ export const TacticalSidebar = memo(function TacticalSidebar({
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm(`"${activeServer.name}" sunucusunu ve tüm kanallarını silmek istediğinize emin misiniz?`)) {
-                  removeServer(activeServer.id);
-                  try {
-                    const storage = getMevaStorageEngine();
-                    const remaining = servers.filter((s) => s.id !== activeServer.id);
-                    storage.scheduleWrite(STORE_PREFS, 'custom_servers', remaining);
-                    void storage.flushPendingWrites();
-                  } catch {}
+              onClick={(e) => {
+                e.preventDefault();
+                openCommandSettingsAtTab('lider_rbac');
+              }}
+              className="rounded-lg h-7 px-1.5 bg-[#1C0F14] hover:bg-[#3B141C] border border-[#2E1218] text-[#F08C96] hover:text-[#FAF2EE] flex items-center justify-center transition-colors"
+              title="Lider Yetkileri (RBAC) & Denetim Kaydı"
+            >
+              <IconShield size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                const rbac = useRBACStore.getState();
+                if (!rbac.requirePermission('manageServer', 'Sunucuyu Sil', activeServer.name)) {
+                  return;
                 }
+                setPendingConfirm({
+                  title: 'Sunucuyu Kalıcı Olarak Sil',
+                  description: `"${activeServer.name}" sunucusunu, tüm ses/metin kanallarını ve kategorilerini silmek istediğinize emin misiniz?`,
+                  confirmLabel: 'Sunucuyu Sil',
+                  onConfirm: () => {
+                    removeServer(activeServer.id);
+                    rbac.recordAudit({
+                      action: 'Sunucu Silindi',
+                      target: activeServer.name,
+                      severity: 'critical',
+                    });
+                    useNotificationStore.getState().pushNotification({
+                      title: 'Sunucu Silindi',
+                      message: `"${activeServer.name}" karargahı lider onayıyla kaldırıldı.`,
+                      type: 'audit',
+                    });
+                    try {
+                      const storage = getMevaStorageEngine();
+                      const remaining = servers.filter((s) => s.id !== activeServer.id);
+                      storage.scheduleWrite(STORE_PREFS, 'custom_servers', remaining);
+                      void storage.flushPendingWrites();
+                    } catch {}
+                    setPendingConfirm(null);
+                  },
+                });
               }}
               className="rounded-lg h-7 px-1.5 bg-[#1C0F14] hover:bg-[#3B141C] border border-[#2E1218] text-[#8E7E81] hover:text-[#FF4655] flex items-center justify-center transition-colors"
-              title="Sunucuyu Güvenle Sil (Delete Hub)"
+              title="Sunucuyu Güvenle Sil (RBAC Korumalı)"
             >
               <IconTrash size={12} />
             </button>
@@ -872,18 +917,39 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 const ch = channelMenu.channel;
-                if (window.confirm(`"${cleanLabel(ch.name)}" kanalını silmek istediğinize emin misiniz?`)) {
-                  removeChannel(ch.id);
-                  try {
-                    const storage = getMevaStorageEngine();
-                    const remaining = channels.filter((c) => c.id !== ch.id);
-                    storage.scheduleWrite(STORE_PREFS, 'custom_channels', remaining);
-                    void storage.flushPendingWrites();
-                  } catch {}
-                }
                 setChannelMenu(null);
+                const rbac = useRBACStore.getState();
+                if (!rbac.requirePermission('manageChannels', 'Kanalı Sil', cleanLabel(ch.name))) {
+                  return;
+                }
+                setPendingConfirm({
+                  title: 'Frekans Kanalını Sil',
+                  description: `"#${cleanLabel(ch.name)}" kanalını kalıcı olarak kaldırmak istediğinize emin misiniz?`,
+                  confirmLabel: 'Kanalı Sil',
+                  onConfirm: () => {
+                    removeChannel(ch.id);
+                    rbac.recordAudit({
+                      action: 'Kanal Silindi',
+                      target: `#${cleanLabel(ch.name)}`,
+                      severity: 'warn',
+                    });
+                    useNotificationStore.getState().pushNotification({
+                      title: 'Kanal Kaldırıldı',
+                      message: `#${cleanLabel(ch.name)} kanalı silindi.`,
+                      type: 'audit',
+                    });
+                    try {
+                      const storage = getMevaStorageEngine();
+                      const remaining = channels.filter((c) => c.id !== ch.id);
+                      storage.scheduleWrite(STORE_PREFS, 'custom_channels', remaining);
+                      void storage.flushPendingWrites();
+                    } catch {}
+                    setPendingConfirm(null);
+                  },
+                });
               }}
               className="h-8 px-2.5 rounded-lg hover:bg-[#590C15] text-[#FF5A6B] hover:text-[#FAF2EE] flex items-center gap-2 text-left transition-colors"
             >
@@ -892,6 +958,17 @@ export const TacticalSidebar = memo(function TacticalSidebar({
             </button>
           </div>
         </div>
+      )}
+
+      {pendingConfirm && (
+        <ConfirmActionModal
+          isOpen={true}
+          title={pendingConfirm.title}
+          description={pendingConfirm.description}
+          confirmLabel={pendingConfirm.confirmLabel}
+          onConfirm={pendingConfirm.onConfirm}
+          onCancel={() => setPendingConfirm(null)}
+        />
       )}
     </aside>
   );

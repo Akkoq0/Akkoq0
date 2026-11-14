@@ -66,6 +66,18 @@ import { NetworkStressModal } from '../telemetry/NetworkStressModal';
 import { NotificationDrawer } from '../notifications/NotificationDrawer';
 import { EconomyTimerWidget } from './EconomyTimerWidget';
 import { MevaErrorBoundary } from '../ui/MevaErrorBoundary';
+import { ConfirmActionModal } from '../ui/ConfirmActionModal';
+import { useRBACStore } from '@/store/useRBACStore';
+import { useNotificationStore } from '@/store/useNotificationStore';
+
+function formatElapsedMsClock(ms: number): string {
+  const safe = Math.max(0, Math.round(ms));
+  const totalSec = Math.floor(safe / 1000);
+  const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const secs = String(totalSec % 60).padStart(2, '0');
+  const millis = String(safe % 1000).padStart(3, '0');
+  return `${mins}:${secs}.${millis}`;
+}
 
 export { GAME_MAP_POOLS };
 export type { TacticalMapId, TacticalGameCategory };
@@ -963,11 +975,12 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
 
   const currentThemeConfig = TACTICAL_THEME_CONFIG[tacticalTheme] || TACTICAL_THEME_CONFIG.crimson;
 
-  // Timeline Playback Replay State (Adım 27-28)
+  // Timeline Playback Replay State (Millisecond-exact replay)
   const [isPlayingTimeline, setIsPlayingTimeline] = useState<boolean>(false);
   const [timelineProgress, setTimelineProgress] = useState<number>(100);
+  const [timelineSpeed, setTimelineSpeed] = useState<0.5 | 1 | 2>(1);
 
-  // Multi-Stratbook Tabs State (Adım 10)
+  // Multi-Stratbook Tabs State (IndexedDB persisted)
   const [stratTabs, setStratTabs] = useState<Array<{ id: string; name: string }>>([
     { id: 'main', name: 'Ana Taktik' },
     { id: 'attack', name: 'A Hücumu' },
@@ -975,8 +988,33 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
     { id: 'eco', name: 'Eko / Tabanca' },
   ]);
   const [activeStratId, setActiveStratId] = useState<string>('main');
+  const [addingStratTab, setAddingStratTab] = useState<boolean>(false);
+  const [newStratTabName, setNewStratTabName] = useState<string>('');
+  const [pendingConfirmAction, setPendingConfirmAction] = useState<
+    'all' | 'phase' | { removeStratId: string; name: string } | null
+  >(null);
 
-  // Timeline Playback Interval (Adım 27-28)
+  const timelineMetrics = React.useMemo(() => {
+    const scoped = ops
+      .filter((op) => {
+        if (op.mapId !== mapId) return false;
+        if (op.stratId && activeStratId && op.stratId !== activeStratId) return false;
+        if (showAllPhases) return true;
+        return !op.phase || op.phase === activePhase;
+      })
+      .sort((a, b) => a.ts - b.ts);
+    if (scoped.length === 0) {
+      return { minTs: 0, maxTs: 0, totalSpanMs: 0, count: 0 };
+    }
+    const minTs = scoped[0].ts;
+    const maxTs = scoped[scoped.length - 1].ts;
+    const totalSpanMs = Math.max(scoped.length > 1 ? 500 : 0, maxTs - minTs);
+    return { minTs, maxTs, totalSpanMs, count: scoped.length };
+  }, [ops, mapId, activeStratId, showAllPhases, activePhase]);
+
+  const currentElapsedMs = Math.round((timelineProgress / 100) * timelineMetrics.totalSpanMs);
+
+  // Timeline Playback Interval (Millisecond chronological stepping)
   useEffect(() => {
     if (!isPlayingTimeline) return;
     const interval = setInterval(() => {
@@ -985,11 +1023,11 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           setIsPlayingTimeline(false);
           return 100;
         }
-        return Math.min(100, prev + 2);
+        return Math.min(100, Math.round((prev + 2 * timelineSpeed) * 10) / 10);
       });
-    }, 60);
+    }, 50);
     return () => clearInterval(interval);
-  }, [isPlayingTimeline]);
+  }, [isPlayingTimeline, timelineSpeed]);
 
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fgCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1018,6 +1056,14 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           if (saved?.url) {
             setCustomMapUrl(saved.url);
             if (saved.name) setCustomMapName(saved.name);
+          }
+        });
+
+      void storage
+        .getRecord<Array<{ id: string; name: string }>>(STORE_PREFS, 'tactical_strat_tabs')
+        .then((savedTabs) => {
+          if (Array.isArray(savedTabs) && savedTabs.length > 0) {
+            setStratTabs(savedTabs);
           }
         });
 
@@ -1164,16 +1210,23 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
       if (!ctx) return;
       ctx.clearRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-      let visibleOps = opsRef.current.filter((op) => {
-        if (op.mapId !== mapId) return false;
-        if (op.stratId && activeStratId && op.stratId !== activeStratId) return false;
-        if (showAllPhases) return true;
-        return !op.phase || op.phase === activePhase;
-      });
+      let visibleOps = opsRef.current
+        .filter((op) => {
+          if (op.mapId !== mapId) return false;
+          if (op.stratId && activeStratId && op.stratId !== activeStratId) return false;
+          if (showAllPhases) return true;
+          return !op.phase || op.phase === activePhase;
+        })
+        .sort((a, b) => a.ts - b.ts);
 
       if (timelineProgress < 100 && visibleOps.length > 0) {
-        const count = Math.max(1, Math.ceil((visibleOps.length * timelineProgress) / 100));
-        visibleOps = visibleOps.slice(0, count);
+        const minTs = visibleOps[0].ts;
+        const maxTs = visibleOps[visibleOps.length - 1].ts;
+        const spanMs = Math.max(visibleOps.length > 1 ? 500 : 0, maxTs - minTs);
+        const cutoffTs = minTs + (timelineProgress / 100) * spanMs;
+        visibleOps = visibleOps.filter((op, idx) =>
+          spanMs > 0 ? op.ts <= cutoffTs : idx <= Math.floor((visibleOps.length * timelineProgress) / 100),
+        );
       }
 
       for (const op of visibleOps) {
@@ -1347,6 +1400,14 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
     if (e.button === 1 || isSpacePressedRef.current || tool === 'pan') {
       isPanningRef.current = true;
       panStartRef.current = { x: e.clientX - panOffsetRef.current.x, y: e.clientY - panOffsetRef.current.y };
+      return;
+    }
+
+    if (
+      !useRBACStore
+        .getState()
+        .requirePermission('editTacticalBoard', 'Taktik Haritada Çizim', mapId)
+    ) {
       return;
     }
 
@@ -1617,13 +1678,23 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
     void broadcastStratPacket({ action: 'add', op: next });
   }, [redoStack, broadcastStratPacket]);
 
-  // Clear Map
-  const handleClear = () => {
+  // Clear Map (Confirmation modal + RBAC enforced + Audit Logged)
+  const executeClearAll = () => {
     setOps((prev) => prev.filter((o) => o.mapId !== mapId));
     setRedoStack([]);
     setLastSeqPoint(null);
     setSeqCounter(1);
     void broadcastStratPacket({ action: 'clear', mapId });
+    useRBACStore.getState().recordAudit({
+      action: 'Taktik Harita Tamamen Temizlendi',
+      target: mapId,
+      severity: 'critical',
+    });
+    useNotificationStore.getState().pushNotification({
+      title: 'Taktik Tahtası Sıfırlandı',
+      message: `${mapId.toUpperCase()} haritasındaki tüm çizimler temizlendi.`,
+      type: 'audit',
+    });
     try {
       const storage = getMevaStorageEngine();
       void storage
@@ -1639,10 +1710,22 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
     } catch {}
   };
 
-  const handleClearPhase = () => {
+  const handleClear = () => {
+    if (!useRBACStore.getState().requirePermission('clearTacticalBoard', 'Haritayı Sıfırla', mapId)) {
+      return;
+    }
+    setPendingConfirmAction('all');
+  };
+
+  const executeClearPhase = () => {
     setOps((prev) => prev.filter((o) => !(o.mapId === mapId && o.phase === activePhase)));
     setRedoStack([]);
     void broadcastStratPacket({ action: 'clear', mapId, phase: activePhase });
+    useRBACStore.getState().recordAudit({
+      action: `Aşama ${activePhase} Çizimleri Silindi`,
+      target: mapId,
+      severity: 'warn',
+    });
     try {
       const storage = getMevaStorageEngine();
       void storage
@@ -1657,6 +1740,13 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           void storage.flushPendingWrites();
         });
     } catch {}
+  };
+
+  const handleClearPhase = () => {
+    if (!useRBACStore.getState().requirePermission('clearTacticalBoard', 'Aşamayı Sil', `${mapId} P${activePhase}`)) {
+      return;
+    }
+    setPendingConfirmAction('phase');
   };
 
   const handleResetSequence = () => {
@@ -2187,7 +2277,13 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
             {/* Map Veto & Pick-Ban Button */}
             <button
               type="button"
-              onClick={() => setShowMapVetoModal(true)}
+              onClick={(e) => {
+                e.preventDefault();
+                if (!useRBACStore.getState().requirePermission('runMapVeto', 'Harita Veto Başlat', mapId)) {
+                  return;
+                }
+                setShowMapVetoModal(true);
+              }}
               title="Espor Harita Veto & Pick-Ban Matrisi (BO1/BO3/BO5)"
               className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#261016] border border-[#6B1822]/40 text-xs font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center gap-1 transition-colors whitespace-nowrap"
             >
@@ -2198,7 +2294,10 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
             {/* Network P2P Stress Test Button */}
             <button
               type="button"
-              onClick={() => setShowNetworkStressModal(true)}
+              onClick={(e) => {
+                e.preventDefault();
+                setShowNetworkStressModal(true);
+              }}
               title="P2P Mesh Ağı Gecikme ve Stres Testi Telemetrisi"
               className="h-7 px-2 rounded-lg bg-[#140A0D] hover:bg-[#240F15] border border-[#2C141A] text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors whitespace-nowrap"
             >
@@ -2209,7 +2308,11 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
             {/* Tactical Notifications Drawer Button */}
             <button
               type="button"
-              onClick={() => setShowNotificationDrawer(true)}
+              onClick={(e) => {
+                e.preventDefault();
+                useNotificationStore.getState().openDrawer();
+                setShowNotificationDrawer(true);
+              }}
               title="Taktik Bildirim ve Emir Merkezi"
               className="h-7 px-2 rounded-lg bg-[#140A0D] hover:bg-[#240F15] border border-[#2C141A] text-xs font-bold text-[#A8989B] hover:text-[#FAF2EE] flex items-center gap-1 transition-colors relative whitespace-nowrap"
             >
@@ -3105,59 +3208,125 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                 </div>
 
                 {/* ── ÇOKLU TAKTİK DEFTERLERİ (MULTI-STRATBOOK) ── */}
-                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
-                  <div className="flex items-center justify-between mb-1.5">
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
+                  <div className="flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
-                      Taktik Defterleri
+                      Rakip Stratbook Defterleri
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const name = prompt('Yeni taktik defteri adı (Örn: A Split Execute, Pistol Eco):');
-                        if (name && name.trim()) {
-                          const newId = `strat-${Date.now().toString(36)}`;
-                          setStratTabs((prev) => [...prev, { id: newId, name: name.trim() }]);
-                          setActiveStratId(newId);
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!useRBACStore.getState().requirePermission('manageStratbooks', 'Stratbook Ekle', mapId)) {
+                          return;
                         }
+                        setAddingStratTab((v) => !v);
                       }}
                       className="text-[9.5px] font-medium text-[#E58B94] hover:text-[#F5EAEB]"
                     >
-                      + Ekle
+                      {addingStratTab ? 'Kapat' : '+ Ekle'}
                     </button>
                   </div>
+                  {addingStratTab && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const clean = newStratTabName.trim().slice(0, 28);
+                        if (!clean) return;
+                        const newId = `strat-${Date.now().toString(36)}`;
+                        const updatedTabs = [...stratTabs, { id: newId, name: clean }];
+                        setStratTabs(updatedTabs);
+                        setActiveStratId(newId);
+                        setNewStratTabName('');
+                        setAddingStratTab(false);
+                        try {
+                          const storage = getMevaStorageEngine();
+                          storage.scheduleWrite(STORE_PREFS, 'tactical_strat_tabs', updatedTabs);
+                          void storage.flushPendingWrites();
+                        } catch {}
+                        useRBACStore.getState().recordAudit({
+                          action: 'Yeni Rakip Stratbook Eklendi',
+                          target: clean,
+                          severity: 'info',
+                        });
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <input
+                        type="text"
+                        value={newStratTabName}
+                        onChange={(e) => setNewStratTabName(e.target.value)}
+                        placeholder="Örn: NaVi Anti-Eco"
+                        maxLength={28}
+                        autoFocus
+                        className="flex-1 min-w-0 h-6 px-2 rounded bg-[#070305] border border-[#35131B] text-[10px] text-[#FAF2EE] outline-none focus:border-[#C82333]"
+                      />
+                      <button
+                        type="submit"
+                        className="h-6 px-2 rounded bg-[#8F1622] hover:bg-[#A61B29] text-[10px] font-bold text-white"
+                      >
+                        Kur
+                      </button>
+                    </form>
+                  )}
                   <div className="flex items-center gap-1 overflow-x-auto pb-1">
                     {stratTabs.map((st) => (
-                      <button
+                      <div
                         key={st.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveStratId(st.id);
-                          setTimelineProgress(100);
-                        }}
-                        className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap border transition-all ${
+                        className={`inline-flex items-center rounded border transition-all ${
                           activeStratId === st.id
                             ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
                             : 'bg-[#090507] text-[#8E8083] hover:text-[#EDE8EA] border-[#1E0B11]'
                         }`}
                       >
-                        {st.name}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setActiveStratId(st.id);
+                            setTimelineProgress(100);
+                          }}
+                          className="px-2 py-1 text-[10px] font-medium whitespace-nowrap"
+                        >
+                          {st.name}
+                        </button>
+                        {st.id !== 'main' && stratTabs.length > 1 && (
+                          <button
+                            type="button"
+                            title="Stratbook Sekmesini Sil"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!useRBACStore.getState().requirePermission('manageStratbooks', 'Stratbook Sil', st.name)) {
+                                return;
+                              }
+                              setPendingConfirmAction({ removeStratId: st.id, name: st.name });
+                            }}
+                            className="pr-1.5 text-[10px] opacity-65 hover:opacity-100 hover:text-white"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                {/* ── ZAMAN ÇİZELGESİ & REPLAY OYNATICI (TIMELINE) ── */}
+                {/* ── ZAMAN ÇİZELGESİ & MİLİSANİYE REPLAY OYNATICI ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-1">
                     <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
-                      Replay Zaman Çizelgesi
+                      Timeline Playback
                     </span>
-                    <span className="text-[9.5px] font-mono font-medium text-[#E58B94]">%{timelineProgress}</span>
+                    <span className="text-[9.5px] font-mono font-medium text-[#E58B94] tabular-nums">
+                      {formatElapsedMsClock(currentElapsedMs)} / {formatElapsedMsClock(timelineMetrics.totalSpanMs)} ms · %{Math.round(timelineProgress)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         if (timelineProgress >= 100) setTimelineProgress(0);
                         setIsPlayingTimeline((p) => !p);
                       }}
@@ -3178,7 +3347,19 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setTimelineSpeed((sp) => (sp === 1 ? 2 : sp === 2 ? 0.5 : 1));
+                      }}
+                      title="Replay Hızı"
+                      className="h-6 px-1.5 rounded bg-[#140A0D] border border-[#241116] text-[9.5px] font-mono text-[#F08C96]"
+                    >
+                      {timelineSpeed}x
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
                         setIsPlayingTimeline(false);
                         setTimelineProgress(100);
                       }}
@@ -3648,7 +3829,60 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
         {/* ── ENTERPRISE MODALS ── */}
         <MapVetoModal isOpen={showMapVetoModal} onClose={() => setShowMapVetoModal(false)} />
         <NetworkStressModal isOpen={showNetworkStressModal} onClose={() => setShowNetworkStressModal(false)} />
-        <NotificationDrawer isOpen={showNotificationDrawer} onClose={() => setShowNotificationDrawer(false)} />
+        <NotificationDrawer
+          isOpen={showNotificationDrawer}
+          onClose={() => {
+            setShowNotificationDrawer(false);
+            useNotificationStore.getState().closeDrawer();
+          }}
+        />
+        {pendingConfirmAction && (
+          <ConfirmActionModal
+            isOpen={true}
+            title={
+              pendingConfirmAction === 'all'
+                ? 'Tüm Haritayı Sıfırla'
+                : pendingConfirmAction === 'phase'
+                  ? `Aşama ${activePhase} Çizimlerini Sil`
+                  : `"${pendingConfirmAction.name}" Stratbook Sekmesini Sil`
+            }
+            description={
+              pendingConfirmAction === 'all'
+                ? `${mapId.toUpperCase()} haritasındaki tüm taktik çizimleri ve P2P senkronize pinler kalıcı olarak temizlenecek.`
+                : pendingConfirmAction === 'phase'
+                  ? `Aşama ${activePhase} katmanındaki tüm çizimler silinecek.`
+                  : `"${pendingConfirmAction.name}" stratbook sekmesi ve altındaki çizim katmanı kaldırılacak.`
+            }
+            confirmLabel="Onayla ve Sil"
+            onConfirm={() => {
+              if (pendingConfirmAction === 'all') {
+                executeClearAll();
+              } else if (pendingConfirmAction === 'phase') {
+                executeClearPhase();
+              } else {
+                const { removeStratId, name } = pendingConfirmAction;
+                const updatedTabs = stratTabs.filter((t) => t.id !== removeStratId);
+                setStratTabs(updatedTabs);
+                if (activeStratId === removeStratId) {
+                  setActiveStratId(updatedTabs[0]?.id || 'main');
+                }
+                setOps((prev) => prev.filter((o) => o.stratId !== removeStratId));
+                try {
+                  const storage = getMevaStorageEngine();
+                  storage.scheduleWrite(STORE_PREFS, 'tactical_strat_tabs', updatedTabs);
+                  void storage.flushPendingWrites();
+                } catch {}
+                useRBACStore.getState().recordAudit({
+                  action: 'Rakip Stratbook Silindi',
+                  target: name,
+                  severity: 'warn',
+                });
+              }
+              setPendingConfirmAction(null);
+            }}
+            onCancel={() => setPendingConfirmAction(null)}
+          />
+        )}
         <TacticalPresetsModal
           open={showPresetModal}
           onClose={() => setShowPresetModal(false)}

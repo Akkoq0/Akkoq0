@@ -54,6 +54,15 @@ export interface PersistedVoicePrefs {
   proAnalyticsEnabled: boolean;
 }
 
+export interface SessionRecoverySnapshot {
+  activeServerId: string | null;
+  activeChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  activeView: 'cockpit' | 'esport-hub' | 'tactical';
+  activeStratId?: string;
+  updatedAt: number;
+}
+
 export interface ProAnalyticsReport {
   sessionId: string;
   startedAt: number;
@@ -256,6 +265,14 @@ export class MevaStorageEngine {
     const list = await this.getRecord<Message[]>(STORE_CHAT, channelId);
     if (!Array.isArray(list) || list.length === 0) return null;
     return list;
+  }
+
+  public saveSessionRecoverySnapshot(snapshot: SessionRecoverySnapshot): void {
+    this.scheduleWrite(STORE_PREFS, 'meva_session_recovery', snapshot);
+  }
+
+  public async loadSessionRecoverySnapshot(): Promise<SessionRecoverySnapshot | null> {
+    return this.getRecord<SessionRecoverySnapshot>(STORE_PREFS, 'meva_session_recovery');
   }
 
   public saveChannelMessages(channelId: string, messages: Message[]): void {

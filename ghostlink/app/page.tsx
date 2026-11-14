@@ -46,6 +46,9 @@ import { MobileCustomizerSheet } from '@/components/mobile/MobileCustomizerSheet
 import { TacticalVoiceOverlay } from '@/components/hud/TacticalVoiceOverlay';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
+import { getMevaKeepAlive } from '@/lib/keepAlive';
+import { useRBACStore } from '@/store/useRBACStore';
+import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 import type {
   Profile,
   Server,
@@ -60,14 +63,14 @@ const DEFAULT_MEMBERS: Profile[] = [];
 export default function MevaHUDApp() {
   useGameBoost();
 
-  // Client-side Codespaces & session keep-alive heartbeat (every 45s)
+  // Client-side Codespaces & session keep-alive controller + RBAC hydration
   useEffect(() => {
-    const sendHeartbeat = () => {
-      void fetch(`/api/health?t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+    const keepAlive = getMevaKeepAlive();
+    const stopKeepAlive = keepAlive.start(45_000);
+    void useRBACStore.getState().hydrateRbac();
+    return () => {
+      stopKeepAlive();
     };
-    sendHeartbeat();
-    const timer = setInterval(sendHeartbeat, 45_000);
-    return () => clearInterval(timer);
   }, []);
 
   const [user, setUser] = useState<Profile>({
@@ -361,7 +364,8 @@ export default function MevaHUDApp() {
       storage.getRecord<Server[]>(STORE_PREFS, 'custom_servers'),
       storage.getRecord<ChannelCategory[]>(STORE_PREFS, 'custom_categories'),
       storage.getRecord<Channel[]>(STORE_PREFS, 'custom_channels'),
-    ]).then(([savedServers, savedCats, savedChans]) => {
+      storage.loadSessionRecoverySnapshot(),
+    ]).then(([savedServers, savedCats, savedChans, recoveredSession]) => {
       if (isCancelled) return;
       if (savedServers && savedServers.length > 0) {
         if (savedCats && savedCats.length > 0) {
@@ -371,12 +375,41 @@ export default function MevaHUDApp() {
           setChannels(savedChans);
         }
         setServers(savedServers);
-        setActiveServer(savedServers[0].id);
+        const restoredServerId =
+          recoveredSession?.activeServerId &&
+          savedServers.some((s) => s.id === recoveredSession.activeServerId)
+            ? recoveredSession.activeServerId
+            : savedServers[0].id;
+        setActiveServer(restoredServerId);
+
+        if (
+          recoveredSession?.activeChannelId &&
+          savedChans?.some((c) => c.id === recoveredSession.activeChannelId)
+        ) {
+          setActiveChannel(recoveredSession.activeChannelId);
+        }
+        if (
+          recoveredSession?.activeVoiceChannelId &&
+          savedChans?.some((c) => c.id === recoveredSession.activeVoiceChannelId)
+        ) {
+          setActiveVoiceChannel(recoveredSession.activeVoiceChannelId);
+        }
       } else {
         // Purge mock data: leave state empty so [+] Kendi Sunucunu Kur button is shown
         setServers([]);
         setCategories([]);
         setChannels([]);
+      }
+      if (
+        recoveredSession?.activeView &&
+        (recoveredSession.activeView === 'cockpit' ||
+          recoveredSession.activeView === 'esport-hub' ||
+          recoveredSession.activeView === 'tactical')
+      ) {
+        setActiveView(recoveredSession.activeView);
+        if (recoveredSession.activeView === 'tactical') {
+          useVoiceSettingsStore.getState().setShowStratBoard(true);
+        }
       }
       setOnlineMembers(DEFAULT_MEMBERS);
     });
@@ -393,6 +426,36 @@ export default function MevaHUDApp() {
     setActiveVoiceChannel,
     setOnlineMembers,
   ]);
+
+  const activeChannelId = useAppStore((s) => s.activeChannelId);
+
+  useEffect(() => {
+    useRBACStore.getState().setLocalActorIdentity(user.id, user.username);
+  }, [user.id, user.username]);
+
+  // IndexedDB instant session recovery persistence
+  useEffect(() => {
+    const storage = getMevaStorageEngine();
+    storage.saveSessionRecoverySnapshot({
+      activeServerId,
+      activeChannelId,
+      activeVoiceChannelId,
+      activeView,
+      updatedAt: Date.now(),
+    });
+  }, [activeServerId, activeChannelId, activeVoiceChannelId, activeView]);
+
+  useEffect(() => {
+    const handleFlush = () => {
+      void getMevaStorageEngine().flushPendingWrites();
+    };
+    window.addEventListener('pagehide', handleFlush);
+    window.addEventListener('beforeunload', handleFlush);
+    return () => {
+      window.removeEventListener('pagehide', handleFlush);
+      window.removeEventListener('beforeunload', handleFlush);
+    };
+  }, []);
 
   const handleSelectPlayer = useCallback((member: Profile) => {
     setSelectedPlayer(member);
@@ -678,6 +741,7 @@ export default function MevaHUDApp() {
         voiceControls={voiceControls}
       />
       <MobileCustomizerSheet />
+      <NotificationDrawer />
     </div>
   );
 }

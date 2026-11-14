@@ -114,7 +114,7 @@ interface SinkCapableAudioContext extends AudioContext {
 export const SMOOTH_TAU_SEC = 0.022;
 export const DUCK_ATTACK_TAU_SEC = 0.018;
 export const DUCK_RELEASE_TAU_SEC = 0.095;
-export const IGL_DUCK_FACTOR = 0.7; // 30% volume reduction when priority speaker talks
+export const IGL_DUCK_FACTOR = 0.3; // Drops background volume to 30% level when IGL priority speaker talks
 
 /**
  * Converts UI slider 0%–200% into a smooth perceptual logarithmic linear amplitude.
@@ -151,6 +151,7 @@ export class MevaAudioEngine {
 
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micHighpass: BiquadFilterNode | null = null;
+  private micNoiseLowpass: BiquadFilterNode | null = null;
   private micPresence: BiquadFilterNode | null = null;
   private micCompressor: DynamicsCompressorNode | null = null;
   private micAnalyser: AnalyserNode | null = null;
@@ -538,7 +539,7 @@ export class MevaAudioEngine {
   /**
    * Applies IGL Priority Speaker Ducking:
    * When any priority speaker (IGL) is actively speaking, non-priority peers
-   * smoothly duck by 30% (multiplier = 0.70), restoring smoothly when IGL stops.
+   * smoothly duck to 30% level (multiplier = 0.30), restoring smoothly when IGL stops.
    */
   public applyPriorityDucking(
     priorityPeerSpeaking: boolean,
@@ -696,6 +697,11 @@ export class MevaAudioEngine {
       highpass.frequency.value = 85;
       highpass.Q.value = 0.707;
 
+      const noiseLowpass = ctx.createBiquadFilter();
+      noiseLowpass.type = 'lowpass';
+      noiseLowpass.frequency.value = 7500;
+      noiseLowpass.Q.value = 0.707;
+
       const presence = ctx.createBiquadFilter();
       presence.type = 'peaking';
       presence.frequency.value = 3500;
@@ -714,12 +720,14 @@ export class MevaAudioEngine {
       analyser.smoothingTimeConstant = 0.48;
 
       source.connect(highpass);
-      highpass.connect(presence);
+      highpass.connect(noiseLowpass);
+      noiseLowpass.connect(presence);
       presence.connect(compressor);
       compressor.connect(analyser);
 
       this.micSource = source;
       this.micHighpass = highpass;
+      this.micNoiseLowpass = noiseLowpass;
       this.micPresence = presence;
       this.micCompressor = compressor;
       this.micAnalyser = analyser;
@@ -750,12 +758,14 @@ export class MevaAudioEngine {
     try {
       this.micSource?.disconnect();
       this.micHighpass?.disconnect();
+      this.micNoiseLowpass?.disconnect();
       this.micPresence?.disconnect();
       this.micCompressor?.disconnect();
       this.micAnalyser?.disconnect();
     } catch {}
     this.micSource = null;
     this.micHighpass = null;
+    this.micNoiseLowpass = null;
     this.micPresence = null;
     this.micCompressor = null;
     this.micAnalyser = null;

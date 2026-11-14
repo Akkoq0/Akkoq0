@@ -339,7 +339,7 @@ export const OperatorContextMenu = memo(function OperatorContextMenu({
             className="rounded-lg w-full py-1.5 px-2.5 bg-[#0E080A] hover:bg-[#170B0F] border border-[#261217] flex items-center justify-between text-[10.5px]"
           >
             <span className="text-[#B8AAAC] font-semibold">
-              IGL Priority Ducking (%30 Otomatik Kısma)
+              IGL Priority Ducking (Arka Plan %30)
             </span>
             <span
               className={`font-extrabold ${
