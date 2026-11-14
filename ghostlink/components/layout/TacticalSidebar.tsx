@@ -552,13 +552,17 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                   ? getGameById(channel.game_id)
                   : detectGameFromChannel(channel.name, channel.tags);
 
+                const hasLiveParticipants = isVoice && (isActive || occ > 0);
+
                 return (
                   <div
                     key={channel.id}
                     className={`rounded-xl border transition-all duration-150 ${
                       isActive
-                        ? 'bg-[linear-gradient(160deg,rgba(128,18,30,0.22)_0%,rgba(11,8,10,0.78)_100%)] border-[#961826]/45 shadow-sm'
-                        : 'border-transparent hover:bg-[#170B0F]/70 hover:border-[#2C141A]'
+                        ? 'bg-[linear-gradient(160deg,rgba(143,22,34,0.26)_0%,rgba(14,8,10,0.88)_100%)] border-[#8F1622]/70 shadow-[0_0_16px_rgba(143,22,34,0.34)]'
+                        : hasLiveParticipants
+                          ? 'bg-[#15090D]/80 border-[#6E141E]/50 shadow-[0_0_12px_rgba(143,22,34,0.18)] hover:border-[#8F1622]/70'
+                          : 'border-transparent hover:bg-[#170B0F]/70 hover:border-[#2C141A]'
                     }`}
                   >
                     <button
@@ -647,15 +651,19 @@ export const TacticalSidebar = memo(function TacticalSidebar({
                               ))}
                             </div>
                             <span
-                              className={`rounded px-1 text-[10px] font-bold tabular-nums ${
-                                isActive
-                                  ? 'text-[#F08C96]'
-                                  : occ > 0
-                                    ? 'text-[#B8AAAC]'
-                                    : 'text-[#6E5F62]'
+                              className={`rounded px-1.5 py-0.2 text-[10px] font-bold tabular-nums flex items-center gap-1 ${
+                                occ > 0 || isActive
+                                  ? 'bg-[#2B0C13]/85 text-[#F08C96] border border-[#6E141E]/50'
+                                  : 'text-[#6E5F62]'
                               }`}
                             >
-                              {occ}/{cap === 0 ? '5' : cap}
+                              {(occ > 0 || isActive) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              )}
+                              <span>
+                                {occ}/{cap === 0 ? '5' : cap}
+                                {occ > 0 || isActive ? ' Canlı' : ''}
+                              </span>
                             </span>
                           </div>
                         )}

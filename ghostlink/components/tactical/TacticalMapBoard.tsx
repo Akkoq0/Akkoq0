@@ -2429,24 +2429,14 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           </div>
         </div>
 
-        {/* ── MAIN STUDIO BODY: Canvas Area + Floating Left Toolbar + Collapsible Right Panel ── */}
+        {/* ── MAIN STUDIO BODY: 3 Isolated Flex Columns (Left Toolbar | Center Canvas | Right Panel) ── */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative w-full h-full min-h-0">
-          {/* ── CANVAS WORKSPACE (Full-Screen Centered 85% Map) ── */}
+          {/* ── COLUMN 1: DEDICATED LEFT VERTICAL TOOLBAR RAIL ── */}
           <div
-            style={{ containerType: 'size' }}
-            className={`flex-1 w-full h-full flex items-center justify-center md:pl-20 ${
-              uiDensity === 'compact' ? 'p-2' : 'p-3 sm:p-4'
-            } bg-[#050304] overflow-hidden relative cursor-default transition-all ${
-              tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : ''
-            }`}
-            onWheel={handleWheelZoom}
+            className="hidden md:flex flex-col gap-1.5 w-[76px] flex-shrink-0 z-20 bg-[#090507]/95 backdrop-blur-md border-r border-[#261117] p-1.5 items-center overflow-y-auto no-scrollbar"
+            role="toolbar"
+            aria-label="Taktik Çizim Araç Kulesi"
           >
-            {/* Floating Left Vertical Toolbar (Sol Dikey Yüzen Araç Kulesi) */}
-            <div
-              className="hidden md:flex flex-col gap-1.5 absolute left-3 top-1/2 -translate-y-1/2 z-30 bg-[#0B0608]/92 backdrop-blur-md border border-[#8F1622]/55 rounded-2xl p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.9)] max-h-[88%] overflow-y-auto no-scrollbar w-[74px] items-center"
-              role="toolbar"
-              aria-label="Taktik Çizim Araç Kulesi"
-            >
               <span className="text-[8px] font-black tracking-widest uppercase text-[#E58B94]">
                 PİN 1-5
               </span>
@@ -2630,6 +2620,16 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
               </div>
             </div>
 
+          {/* ── COLUMN 2: CENTER FLEX CANVAS WORKSPACE (Isolated Boundary) ── */}
+          <div
+            style={{ containerType: 'size' }}
+            className={`flex-1 min-w-0 h-full flex items-center justify-center ${
+              uiDensity === 'compact' ? 'p-2 sm:p-3' : 'p-3 sm:p-5'
+            } bg-[#050304] overflow-hidden relative cursor-default transition-all ${
+              tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
+            onWheel={handleWheelZoom}
+          >
             {/* Transform Container — Centered 85% viewport-fitted 840x480 Canvas */}
             <div
               ref={boardTransformRef}
@@ -2674,7 +2674,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
             {/* ── HIGH-TECH FLOATING TACTICAL ZOOM & NAVIGATION SIDEBAR ── */}
             {showZoomDock && (
               zoomDockCollapsed ? (
-                <div className="absolute top-3 left-3 md:left-24 z-20">
+                <div className="absolute top-3 left-3 z-20">
                   <button
                     type="button"
                     onClick={() => setZoomDockCollapsed(false)}
@@ -2690,7 +2690,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                 </div>
               ) : (
                 <div
-                  className="absolute top-3 left-3 md:left-24 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
+                  className="absolute top-3 left-3 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
                   role="region"
                   aria-label="Taktik Zoom ve Pan Sidebarı"
                   style={{ borderColor: currentThemeConfig.border }}
@@ -2825,7 +2825,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
 
             {/* Floating Canvas HUD Overlay */}
             {showCoordinatesHud && (
-              <div className="absolute bottom-3 left-4 md:left-24 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
+              <div className="absolute bottom-3 left-3 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
                 <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
                   {tool.toUpperCase()}
                 </span>

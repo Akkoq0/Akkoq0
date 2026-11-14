@@ -443,22 +443,36 @@ export const EsportHubView = memo(function EsportHubView({
             </div>
 
             {filteredMatches.length === 0 && (
-              <div className="p-6 rounded-2xl bg-[#0F070A]/75 border border-[#2D131A] flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-5 sm:p-6 rounded-2xl bg-[#0F070A]/80 backdrop-blur-md border border-[#8F1622]/45 shadow-[0_8px_28px_rgba(0,0,0,0.65)] flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#220B12] border border-[#6E141E] flex items-center justify-center text-xl flex-shrink-0">
-                    {activeGameMeta.icon}
+                  <div className="w-10 h-10 rounded-xl bg-[#220B12] border border-[#8F1622]/70 flex items-center justify-center text-xl flex-shrink-0">
+                    {isRefreshing ? <span className="animate-spin">🔄</span> : activeGameMeta.icon}
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-sm font-black text-[#FAF2EE]">
-                      {activeGameMeta.name} — {isRefreshing ? 'Canlı Fikstür Taranıyor...' : 'Canlı Maç Akışı & Resmi Portal'}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-black text-[#FAF2EE]">
+                        {isRefreshing ? 'Canlı Veri Güncelleniyor...' : `${activeGameMeta.name} — Canlı Veri Güncelleniyor...`}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-mono font-bold bg-[#2E0B12] text-[#FF7582] border border-[#6E141E] animate-pulse">
+                        HLTV.org · VLR.gg · OpenDota · LoL Esports
+                      </span>
+                    </div>
                     <p className="text-xs text-[#A8989B] max-w-xl leading-relaxed">
-                      Uydurma skor yerine gerçek RSS & Open API verisi kullanılmaktadır. Güncel{' '}
-                      <strong className="text-[#FAF2EE]">{activeGameMeta.name}</strong> turnuva maçları sağdaki canlı haber akışında listelenir; tüm canlı fikstür ve skorlara tek tıkla resmi portaldan ulaşabilirsiniz.
+                      Gerçek zamanlı RSS/API akışı doğrulanıyor. Resmi{' '}
+                      <strong className="text-[#FAF2EE]">{activeGameMeta.name}</strong> fikstürüne doğrudan erişebilir veya akışı anlık yenileyebilirsiniz.
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => void loadLiveData(true)}
+                    disabled={isRefreshing}
+                    className="h-9 px-3.5 rounded-xl bg-[#3A0F18] hover:bg-[#590C15] border border-[#8F1622] text-xs font-black text-[#FAF2EE] flex items-center gap-1.5 transition-all disabled:opacity-60"
+                  >
+                    <span className={isRefreshing ? 'inline-block animate-spin' : ''}>🔄</span>
+                    <span>Şimdi Yenile</span>
+                  </button>
                   <a
                     href={activeGameMeta.matchesPortalUrl}
                     target="_blank"
@@ -521,10 +535,23 @@ export const EsportHubView = memo(function EsportHubView({
               {/* News Items List (Live Clickable RSS Articles) */}
               <div className="flex flex-col divide-y divide-[#241116] max-h-[540px] overflow-y-auto no-scrollbar pr-1">
                 {filteredNews.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-[#8E7E81]">
-                    {isRefreshing
-                      ? 'Canlı RSS bültenleri çekiliyor...'
-                      : 'Bu filtreye uygun canlı haber bulunamadı. Şimdi Yenile butonuna basabilirsiniz.'}
+                  <div className="py-6 px-4 rounded-xl bg-[#14080D]/85 backdrop-blur-md border border-[#6E141E]/40 text-center flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-[#FAF2EE]">
+                      <span className="w-2 h-2 rounded-full bg-[#FF5A6B] animate-pulse" />
+                      <span>Canlı Veri Güncelleniyor...</span>
+                    </div>
+                    <span className="text-[10.5px] font-mono text-[#A8989B]">
+                      HLTV.org · VLR.gg · OpenDota · LoL Esports
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void loadLiveData(true)}
+                      disabled={isRefreshing}
+                      className="mt-1 h-7 px-3 rounded-lg bg-[#2E0B12] hover:bg-[#590C15] border border-[#8F1622] text-[11px] font-extrabold text-[#FAF2EE] flex items-center gap-1.5 transition-all disabled:opacity-60"
+                    >
+                      <span className={isRefreshing ? 'inline-block animate-spin' : ''}>🔄</span>
+                      <span>Şimdi Yenile</span>
+                    </button>
                   </div>
                 ) : (
                   filteredNews.map((news) => (

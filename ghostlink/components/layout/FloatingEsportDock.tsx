@@ -81,13 +81,13 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
         </div>
 
         {/* ── 2. MERKEZ SEKME GRUBU (CENTER NAVIGATION TABS) ── */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-1 justify-center max-w-[460px]">
+        <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 justify-center max-w-[480px]">
           {/* TAB 1: MEVA SUNUCU */}
           <button
             type="button"
             onClick={() => onSelectView('cockpit')}
             aria-current={activeView === 'cockpit' ? 'page' : undefined}
-            className={`relative flex-1 h-11 px-2 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-150 active:scale-95 border ${
+            className={`relative flex-1 min-w-0 h-11 px-2 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-150 active:scale-95 border overflow-hidden ${
               activeView === 'cockpit'
                 ? 'bg-[linear-gradient(165deg,rgba(143,22,34,0.38)_0%,rgba(16,9,12,0.95)_100%)] text-[#FAF2EE] border-[#C82333]/70 shadow-[0_0_16px_rgba(200,35,51,0.25)]'
                 : 'bg-[#12070A]/80 text-[#8E7E81] hover:text-[#FAF2EE] border-[#220D13] hover:border-[#4A141E]'
@@ -101,12 +101,16 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
             )}
             <IconVoiceWave
               size={15}
-              className={activeView === 'cockpit' ? 'text-[#FF5A6B]' : 'text-[#8E7E81]'}
+              className={`flex-shrink-0 ${activeView === 'cockpit' ? 'text-[#FF5A6B]' : 'text-[#8E7E81]'}`}
             />
-            <span className="hidden min-[480px]:inline truncate">Meva Sunucu</span>
-            <span className="min-[480px]:hidden">Sunucu</span>
+            <span className="hidden min-[400px]:inline whitespace-nowrap overflow-hidden text-ellipsis">
+              Meva Sunucu
+            </span>
+            <span className="min-[400px]:hidden whitespace-nowrap overflow-hidden text-ellipsis">
+              Meva Sunucu
+            </span>
             {inVoice && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0A0507] animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0A0507] animate-pulse flex-shrink-0" />
             )}
           </button>
 
@@ -115,7 +119,7 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
             type="button"
             onClick={() => onSelectView('esport-hub')}
             aria-current={activeView === 'esport-hub' ? 'page' : undefined}
-            className={`relative flex-[1.25] h-11 sm:h-12 px-2.5 sm:px-4 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-200 active:scale-95 border ${
+            className={`relative flex-[1.2] min-w-0 h-11 sm:h-12 px-2 sm:px-3.5 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-200 active:scale-95 border overflow-hidden ${
               activeView === 'esport-hub'
                 ? 'bg-gradient-to-r from-[#B81F2E] via-[#E02638] to-[#8F1622] text-[#FAF2EE] border-[#FAF2EE] shadow-[0_0_24px_rgba(224,38,56,0.6)] scale-[1.03]'
                 : 'bg-gradient-to-r from-[#3A0F17] via-[#52131F] to-[#250910] text-[#FF9EAA] hover:text-[#FAF2EE] border-[#8F1622]/80 hover:border-[#C82333] shadow-[0_0_14px_rgba(143,22,34,0.3)]'
@@ -128,11 +132,11 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
                 className="absolute inset-x-2 -bottom-[1px] h-[3px] rounded-full bg-[#FFF] shadow-[0_0_10px_#FFF,0_0_16px_#C82333]"
               />
             )}
-            <span className="text-base sm:text-lg animate-pulse">🏆</span>
-            <span className="tracking-wide uppercase text-[11.5px] sm:text-xs">
+            <span className="text-base sm:text-lg animate-pulse flex-shrink-0">🏆</span>
+            <span className="tracking-wide uppercase text-[11px] sm:text-xs whitespace-nowrap overflow-hidden text-ellipsis">
               Esport Hub
             </span>
-            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#0F0508]/80 text-[#FFD1D6] border border-[#FF5A6B]/50 hidden sm:inline">
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-[#0F0508]/80 text-[#FFD1D6] border border-[#FF5A6B]/50 hidden sm:inline flex-shrink-0">
               LIVE
             </span>
           </button>
@@ -142,7 +146,7 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
             type="button"
             onClick={() => onSelectView('tactical')}
             aria-current={activeView === 'tactical' ? 'page' : undefined}
-            className={`relative flex-1 h-11 px-2 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-150 active:scale-95 border ${
+            className={`relative flex-1 min-w-0 h-11 px-2 rounded-xl flex items-center justify-center gap-1.5 font-black text-xs transition-all duration-150 active:scale-95 border overflow-hidden ${
               activeView === 'tactical'
                 ? 'bg-[linear-gradient(165deg,rgba(143,22,34,0.38)_0%,rgba(16,9,12,0.95)_100%)] text-[#FAF2EE] border-[#C82333]/70 shadow-[0_0_16px_rgba(200,35,51,0.25)]'
                 : 'bg-[#12070A]/80 text-[#8E7E81] hover:text-[#FAF2EE] border-[#220D13] hover:border-[#4A141E]'
@@ -156,10 +160,14 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
             )}
             <IconMapBoard
               size={15}
-              className={activeView === 'tactical' ? 'text-[#FF5A6B]' : 'text-[#8E7E81]'}
+              className={`flex-shrink-0 ${activeView === 'tactical' ? 'text-[#FF5A6B]' : 'text-[#8E7E81]'}`}
             />
-            <span className="hidden min-[480px]:inline truncate">Taktik Masası</span>
-            <span className="min-[480px]:hidden">Taktik</span>
+            <span className="hidden min-[480px]:inline whitespace-nowrap overflow-hidden text-ellipsis">
+              Taktik Masası
+            </span>
+            <span className="min-[480px]:hidden whitespace-nowrap overflow-hidden text-ellipsis">
+              Taktik
+            </span>
           </button>
         </div>
 

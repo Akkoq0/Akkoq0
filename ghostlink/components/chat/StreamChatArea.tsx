@@ -1392,6 +1392,7 @@ export const StreamChatArea = memo(function StreamChatArea({
             {voiceChannels.map((vc) => {
               const isSelected =
                 vc.id === (activeVoiceChannelId ?? activeVoiceChannel?.id);
+              const liveCount = isSelected ? activeSquadOperators.length : 0;
               return (
                 <button
                   key={vc.id}
@@ -1399,12 +1400,21 @@ export const StreamChatArea = memo(function StreamChatArea({
                   onClick={() => setActiveVoiceChannel(vc.id)}
                   className={`rounded-xl h-9 px-3.5 text-[12px] font-bold border flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all ${
                     isSelected
-                      ? 'crimson-cta text-[#F4EFF0]'
+                      ? 'crimson-cta text-[#F4EFF0] border-[#8F1622]/80 shadow-[0_0_14px_rgba(143,22,34,0.38)]'
                       : 'bg-[#11090B] text-[#9E8E91] border-[#281318]'
                   }`}
                 >
                   <IconVoiceWave size={13} />
                   <span>{cleanLabel(vc.name)}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md border ${
+                      isSelected
+                        ? 'bg-[#2E0B12]/90 text-[#F08C96] border-[#C82333]/50'
+                        : 'bg-[#180C10] text-[#7D6E71] border-[#2C141A]'
+                    }`}
+                  >
+                    {liveCount}/5
+                  </span>
                 </button>
               );
             })}
@@ -1599,6 +1609,7 @@ export const StreamChatArea = memo(function StreamChatArea({
               {voiceChannels.map((vc) => {
                 const isSelected =
                   vc.id === (activeVoiceChannelId ?? activeVoiceChannel?.id);
+                const liveCount = isSelected ? activeSquadOperators.length : 0;
                 return (
                   <button
                     key={vc.id}
@@ -1606,12 +1617,21 @@ export const StreamChatArea = memo(function StreamChatArea({
                     onClick={() => setActiveVoiceChannel(vc.id)}
                     className={`rounded-lg h-7 px-2.5 text-[11px] font-bold border transition-all duration-150 flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap ${
                       isSelected
-                        ? 'bg-[linear-gradient(160deg,rgba(138,20,32,0.4)_0%,rgba(16,9,11,0.85)_100%)] text-[#FAF2EE] border-[#961826]/70 shadow-[0_0_10px_rgba(200,35,51,0.2)]'
+                        ? 'bg-[linear-gradient(160deg,rgba(143,22,34,0.34)_0%,rgba(16,9,11,0.9)_100%)] text-[#FAF2EE] border-[#8F1622]/80 shadow-[0_0_14px_rgba(143,22,34,0.38)]'
                         : 'bg-[#11090B] text-[#8E7E81] hover:text-[#FAF2EE] border-[#281318] hover:border-[#451B24]'
                     }`}
                   >
                     <IconVoiceWave size={11} className={isSelected ? 'text-[#FF5A6B]' : 'text-[#6E5E61]'} />
                     <span>{cleanLabel(vc.name)}</span>
+                    <span
+                      className={`text-[9.5px] font-mono px-1 rounded border ${
+                        isSelected
+                          ? 'bg-[#3B0E17] text-[#F08C96] border-[#8F1622]/60'
+                          : 'bg-[#160A0E] text-[#6E5E61] border-[#261117]'
+                      }`}
+                    >
+                      {liveCount}/5
+                    </span>
                   </button>
                 );
               })}
