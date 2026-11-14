@@ -1225,15 +1225,17 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
     }
   }, [mapId, customMapName, gridMode, showCompassHud, currentThemeConfig.primary]);
 
-  useEffect(() => {
-    if (!open) return;
-    redrawCurrentMapBlueprint();
-    scheduleOverlayPaint();
-  }, [open, mapId, customMapName, redrawCurrentMapBlueprint, scheduleOverlayPaint]);
+  const isBoardActive = embedded || open;
 
   useEffect(() => {
-    if (open) scheduleOverlayPaint();
-  }, [open, ops, scheduleOverlayPaint]);
+    if (!isBoardActive) return;
+    redrawCurrentMapBlueprint();
+    scheduleOverlayPaint();
+  }, [isBoardActive, mapId, customMapName, redrawCurrentMapBlueprint, scheduleOverlayPaint]);
+
+  useEffect(() => {
+    if (isBoardActive) scheduleOverlayPaint();
+  }, [isBoardActive, ops, scheduleOverlayPaint]);
 
   useEffect(() => {
     return () => {
@@ -2427,25 +2429,217 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           </div>
         </div>
 
-        {/* ── MAIN STUDIO BODY: Canvas Area + Modern Tactical Sidebar ── */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-          {/* ── CANVAS WORKSPACE (Left / Center) ── */}
+        {/* ── MAIN STUDIO BODY: Canvas Area + Floating Left Toolbar + Collapsible Right Panel ── */}
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative w-full h-full min-h-0">
+          {/* ── CANVAS WORKSPACE (Full-Screen Centered 85% Map) ── */}
           <div
-            className={`flex-1 flex items-center justify-center ${
-              uiDensity === 'compact' ? 'p-1 sm:p-2' : 'p-2 sm:p-4'
+            style={{ containerType: 'size' }}
+            className={`flex-1 w-full h-full flex items-center justify-center md:pl-20 ${
+              uiDensity === 'compact' ? 'p-2' : 'p-3 sm:p-4'
             } bg-[#050304] overflow-hidden relative cursor-default transition-all ${
               tool === 'pan' ? 'cursor-grab active:cursor-grabbing' : ''
             }`}
             onWheel={handleWheelZoom}
           >
-            {/* Transform Container with direct DOM translation for 60 FPS */}
+            {/* Floating Left Vertical Toolbar (Sol Dikey Yüzen Araç Kulesi) */}
+            <div
+              className="hidden md:flex flex-col gap-1.5 absolute left-3 top-1/2 -translate-y-1/2 z-30 bg-[#0B0608]/92 backdrop-blur-md border border-[#8F1622]/55 rounded-2xl p-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.9)] max-h-[88%] overflow-y-auto no-scrollbar w-[74px] items-center"
+              role="toolbar"
+              aria-label="Taktik Çizim Araç Kulesi"
+            >
+              <span className="text-[8px] font-black tracking-widest uppercase text-[#E58B94]">
+                PİN 1-5
+              </span>
+              <div className="grid grid-cols-5 gap-0.5 w-full">
+                {([1, 2, 3, 4, 5] as const).map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setSelectedPinNumber(n)}
+                    title={`Oyuncu Pin #${n}`}
+                    className={`h-4 rounded text-[9px] font-black transition-colors ${
+                      selectedPinNumber === n
+                        ? 'bg-[#EDE8EA] text-[#0B0708]'
+                        : 'bg-[#13080C] text-[#8E8083] hover:text-[#FAF2EE]'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-1 w-full">
+                <button
+                  type="button"
+                  onClick={() => setTool('pin-blue')}
+                  title={`Dost Oyuncu Pin #${selectedPinNumber}`}
+                  className={`h-7 rounded-lg text-[11px] font-black flex items-center justify-center border transition-all ${
+                    tool === 'pin-blue'
+                      ? 'bg-blue-600 text-white border-blue-400 shadow-sm'
+                      : 'bg-[#12080B] text-blue-400 hover:bg-[#1A0D13] border-[#261318]'
+                  }`}
+                >
+                  🔵{selectedPinNumber}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTool('pin-red')}
+                  title={`Düşman Oyuncu Pin #${selectedPinNumber}`}
+                  className={`h-7 rounded-lg text-[11px] font-black flex items-center justify-center border transition-all ${
+                    tool === 'pin-red'
+                      ? 'bg-[#9E1B27] text-white border-[#FF4655] shadow-sm'
+                      : 'bg-[#12080B] text-[#E58B94] hover:bg-[#1E0B11] border-[#261318]'
+                  }`}
+                >
+                  🔴{selectedPinNumber}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTool('seq-path')}
+                  title={`Sıralı Rota #${seqCounter}`}
+                  className={`col-span-2 h-6 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-1 border transition-all ${
+                    tool === 'seq-path'
+                      ? 'bg-sky-500 text-slate-950 border-sky-300'
+                      : 'bg-[#12080B] text-sky-400 hover:text-sky-200 border-[#261318]'
+                  }`}
+                >
+                  <span>〰️</span>
+                  <span>Rota #{seqCounter}</span>
+                </button>
+              </div>
+
+              <div className="w-full h-px bg-[#281219]" />
+
+              <span className="text-[8px] font-black tracking-widest uppercase text-[#9E8E91]">
+                ÇİZİM
+              </span>
+              <div className="grid grid-cols-2 gap-1 w-full">
+                {[
+                  { id: 'arrow', label: 'Ok (Saldırı)', icon: '➡️' },
+                  { id: 'dashed-arrow', label: 'Kesikli Ok (Rotasyon)', icon: '⇢' },
+                  { id: 'pen', label: 'Serbest Kalem', icon: '✏️' },
+                  { id: 'zone-circle', label: 'Daire Alan', icon: '◯' },
+                  { id: 'zone-box', label: 'Kutu Bölge', icon: '▢' },
+                  { id: 'text', label: 'Metin Notu', icon: '💬' },
+                  { id: 'pan', label: 'Harita Kaydır (Pan)', icon: '✋' },
+                  { id: 'eraser', label: 'Silgi', icon: '🧹' },
+                ].map((dt) => (
+                  <button
+                    key={dt.id}
+                    type="button"
+                    onClick={() => setTool(dt.id as StratTool)}
+                    title={dt.label}
+                    aria-label={dt.label}
+                    className={`h-7 rounded-lg flex items-center justify-center text-xs transition-all border ${
+                      tool === dt.id
+                        ? 'bg-[#8F1622] text-white border-[#FF4655] shadow-sm'
+                        : 'bg-[#12080B] text-[#B8A8AB] hover:text-white hover:bg-[#1D0C12] border-[#261318]'
+                    }`}
+                  >
+                    {dt.icon}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleUndo}
+                  disabled={ops.length === 0}
+                  title="Geri Al (Ctrl+Z)"
+                  aria-label="Geri Al"
+                  className="col-span-2 h-6 rounded-lg bg-[#12080B] hover:bg-[#1E0C12] disabled:opacity-40 text-[#FAF2EE] border border-[#261318] text-[9.5px] font-bold flex items-center justify-center gap-1"
+                >
+                  <span>↶</span>
+                  <span>Geri Al</span>
+                </button>
+              </div>
+
+              <div className="w-full h-px bg-[#281219]" />
+
+              <span className="text-[8px] font-black tracking-widest uppercase text-[#9E8E91]">
+                {activeGameMeta.archetype === 'moba'
+                  ? 'MOBA'
+                  : activeGameMeta.archetype === 'br'
+                    ? 'BR'
+                    : 'UTILITY'}
+              </span>
+              <div className="grid grid-cols-2 gap-1 w-full">
+                {(activeGameMeta.archetype === 'fps'
+                  ? [
+                      { id: 'smoke', label: 'Smoke', icon: '⭕' },
+                      { id: 'flash', label: 'Flash', icon: '⚡' },
+                      { id: 'molly', label: 'Molly / Yanıcı', icon: '🔥' },
+                      { id: 'spike', label: 'Spike / C4', icon: '💣' },
+                      { id: 'defuse', label: 'İmha', icon: '✂️' },
+                      { id: 'sensor', label: 'Sensör', icon: '📡' },
+                      { id: 'audio-ping', label: 'Ses Pini', icon: '🔊' },
+                      { id: 'danger', label: 'Tehlike', icon: '⚠️' },
+                    ]
+                  : activeGameMeta.archetype === 'moba'
+                    ? [
+                        { id: 'ward-yellow', label: 'Totem (Görüş)', icon: '👁️' },
+                        { id: 'ward-pink', label: 'Kontrol Totemi', icon: '🛡️' },
+                        { id: 'honeyfruit', label: 'Bal Suyu', icon: '🌿' },
+                        { id: 'rune', label: 'Nehir Rünü', icon: '💎' },
+                        { id: 'gank', label: 'Baskın (Gank)', icon: '⚔️' },
+                        { id: 'boss', label: 'Baron / Roshan', icon: '🐉' },
+                      ]
+                    : [
+                        { id: 'smoke', label: 'Smoke', icon: '⭕' },
+                        { id: 'airdrop', label: 'Air Drop', icon: '📦' },
+                        { id: 'flight', label: 'Uçak Rotası', icon: '✈️' },
+                        { id: 'vehicle', label: 'Araç', icon: '🚗' },
+                        { id: 'bluezone', label: 'Alan', icon: '🔵' },
+                        { id: 'danger', label: 'Tehlike', icon: '⚠️' },
+                      ]
+                ).map((eq) => (
+                  <button
+                    key={eq.id}
+                    type="button"
+                    onClick={() => setTool(eq.id as StratTool)}
+                    title={eq.label}
+                    aria-label={eq.label}
+                    className={`h-7 rounded-lg flex items-center justify-center text-xs transition-all border ${
+                      tool === eq.id
+                        ? activeGameMeta.archetype === 'moba'
+                          ? 'bg-[#5B1D8C] text-white border-[#8B5CF6]'
+                          : 'bg-[#8F1622] text-white border-[#FF4655]'
+                        : 'bg-[#12080B] text-[#B8A8AB] hover:text-white hover:bg-[#1D0C12] border-[#261318]'
+                    }`}
+                  >
+                    {eq.icon}
+                  </button>
+                ))}
+              </div>
+
+              <div className="w-full h-px bg-[#281219]" />
+
+              <div className="grid grid-cols-3 gap-1 py-0.5">
+                {INK_SWATCHES.slice(0, 6).map((sw) => (
+                  <button
+                    key={sw.hex}
+                    type="button"
+                    onClick={() => setInkColor(sw.hex)}
+                    title={sw.label}
+                    style={{ backgroundColor: sw.hex }}
+                    className={`w-3.5 h-3.5 rounded-full transition-transform ${
+                      inkColor === sw.hex
+                        ? 'scale-125 ring-2 ring-white'
+                        : 'opacity-70 hover:opacity-100'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Transform Container — Centered 85% viewport-fitted 840x480 Canvas */}
             <div
               ref={boardTransformRef}
               style={{
                 transformOrigin: 'center center',
                 willChange: 'transform',
+                width: 'min(85cqw, calc(85cqh * 1.75))',
+                aspectRatio: '840 / 480',
               }}
-              className="relative w-full max-w-[840px] aspect-[840/480] rounded-xl overflow-hidden border border-[#2E151C] shadow-[0_20px_60px_rgba(0,0,0,0.95)] touch-none flex-shrink-0"
+              className="relative mx-auto my-auto rounded-xl overflow-hidden border border-[#2E151C] shadow-[0_20px_60px_rgba(0,0,0,0.95)] touch-none flex-shrink-0"
             >
               {/* Background 2D Radar Texture Layer with Live Radar Filter */}
               <canvas
@@ -2480,7 +2674,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
             {/* ── HIGH-TECH FLOATING TACTICAL ZOOM & NAVIGATION SIDEBAR ── */}
             {showZoomDock && (
               zoomDockCollapsed ? (
-                <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20">
+                <div className="absolute top-3 left-3 md:left-24 z-20">
                   <button
                     type="button"
                     onClick={() => setZoomDockCollapsed(false)}
@@ -2496,7 +2690,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                 </div>
               ) : (
                 <div
-                  className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
+                  className="absolute top-3 left-3 md:left-24 z-20 bg-[#0B0608]/92 backdrop-blur-md border border-[#2A1016] shadow-[0_12px_40px_rgba(0,0,0,0.85)] rounded-2xl p-1.5 flex flex-col items-center gap-1.5 select-none transition-all"
                   role="region"
                   aria-label="Taktik Zoom ve Pan Sidebarı"
                   style={{ borderColor: currentThemeConfig.border }}
@@ -2631,7 +2825,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
 
             {/* Floating Canvas HUD Overlay */}
             {showCoordinatesHud && (
-              <div className="absolute bottom-3 left-4 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
+              <div className="absolute bottom-3 left-4 md:left-24 flex items-center gap-2 pointer-events-none text-[10px] font-mono text-[#8E7E81]">
                 <span className="bg-[#0B0608]/90 px-2 py-0.5 rounded border border-[#241116] text-[#FAF2EE]">
                   {tool.toUpperCase()}
                 </span>
@@ -2740,34 +2934,177 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                 <span className="text-[8px] font-black leading-none mt-0.5">Araçlar</span>
               </button>
             </div>
+            {/* Re-open Toggle when Right Tactical Panel is collapsed */}
+            {!sidebarOpen && (
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="hidden md:flex absolute right-3 top-3 z-30 h-8 px-3 rounded-xl bg-[#0B0608]/92 backdrop-blur-md border border-[#8F1622]/70 text-xs font-bold text-[#FAF2EE] hover:bg-[#1E0B11] items-center gap-1.5 shadow-xl transition-all"
+              >
+                <span>📐</span>
+                <span>Taktik Paneli Aç</span>
+              </button>
+            )}
           </div>
 
-          {/* ── MODERN TACTICAL SIDEBAR (Desktop Right) ── */}
+          {/* ── SAĞ DARALTILABİLİR TAKTİK PANELİ (Collapsible Right Panel) ── */}
           {sidebarOpen && (
             <aside
               className={`hidden md:flex w-full ${
                 uiDensity === 'compact' ? 'md:w-64 lg:w-72' : 'md:w-72 lg:w-80'
               } bg-[#0B0608] border-t md:border-t-0 md:border-l border-[#241116] flex-col flex-shrink-0 z-30 overflow-y-auto max-h-[45vh] md:max-h-none shadow-2xl transition-all`}
             >
-              {/* Sidebar Header */}
+              {/* Sidebar Header with Desktop + Mobile Collapse */}
               <div className="p-3 border-b border-[#1E0B11] flex items-center justify-between bg-[#0E070A]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs">🎯</span>
                   <span className="text-xs font-semibold text-[#EDE8EA] tracking-wide">
-                    Stratbook Kontrolü
+                    Taktik Kontrol Paneli
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(false)}
-                  className="md:hidden text-[#9E8E91] hover:text-[#EDE8EA] p-1"
+                  title="Taktik Panelini Daralt"
+                  className="text-[10.5px] font-bold text-[#9E8E91] hover:text-[#EDE8EA] px-2 py-0.5 rounded-lg bg-[#160A0E] border border-[#2C141A] transition-colors"
                 >
-                  ✕
+                  Daralt ✕
                 </button>
               </div>
 
-              <div className="p-3 space-y-3.5">
-                {/* ── SECTION 0: ÇOKLU TAKTİK DEFTERLERİ (MULTI-STRATBOOK) ── */}
+              <div className="p-3 space-y-3">
+                {/* ── QUICK FAZ GEÇİŞLERİ (Faz 1: Erken | Faz 2: Mid | Faz 3: Late) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                      Faz Geçişleri
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPhases((s) => !s)}
+                      className={`text-[9.5px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                        showAllPhases ? 'bg-[#7A1521] text-[#F5EAEB]' : 'text-[#8E8083] hover:text-[#EDE8EA]'
+                      }`}
+                    >
+                      {showAllPhases ? 'Tümü Görünür' : 'Tek Faz'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 1, label: 'Faz 1: Erken' },
+                      { id: 2, label: 'Faz 2: Mid' },
+                      { id: 3, label: 'Faz 3: Late' },
+                    ].map((ph) => {
+                      const isActive = activePhase === ph.id;
+                      const count = ops.filter((o) => o.mapId === mapId && o.phase === ph.id).length;
+                      return (
+                        <button
+                          key={ph.id}
+                          type="button"
+                          onClick={() => {
+                            setActivePhase(ph.id as 1 | 2 | 3);
+                            void broadcastStratPacket({ action: 'switch-phase', phase: ph.id as 1 | 2 | 3 });
+                          }}
+                          className={`py-1.5 px-1 rounded-lg text-[10px] font-semibold flex flex-col items-center justify-center border transition-all ${
+                            isActive
+                              ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
+                              : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#EDE8EA] border-[#1E0B11]'
+                          }`}
+                        >
+                          <span>{ph.label}</span>
+                          <span className="text-[8.5px] opacity-70">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── ZOOM KONTROLÜ (+ / - / %100 Sıfırla) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs">🔍</span>
+                      <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
+                        Zoom Kontrolü
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono font-medium text-[#E58B94] bg-[#1E0B11] px-1.5 py-0.5 rounded border border-[#35131B]">
+                      %{Math.round(zoomScale * 100)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleZoomOut}
+                      title="Uzaklaştır (-%25)"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={3.0}
+                      step={0.05}
+                      value={zoomScale}
+                      onChange={(e) => handleSetZoomLevel(parseFloat(e.target.value))}
+                      className="flex-1 accent-[#A82230] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleZoomIn}
+                      title="Yakınlaştır (+%25)"
+                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
+                    >
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetZoomPan}
+                      title="%100 Sıfırla"
+                      className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#241016] border border-[#35131B] text-[10px] font-bold text-[#E58B94] hover:text-[#F5EAEB] flex items-center justify-center flex-shrink-0"
+                    >
+                      %100 Sıfırla
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── KAYDET & DIŞA AKTAR (JSON / PNG) ── */}
+                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
+                  <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider block">
+                    Kaydet & Paylaş
+                  </span>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={handleExportPNG}
+                      className="h-7 px-1.5 rounded-lg bg-[#1A0B10] hover:bg-[#2E1019] border border-[#451722] text-[10px] font-bold text-[#FAF2EE] flex items-center justify-center gap-1"
+                    >
+                      <span>📥</span>
+                      <span>PNG</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportJSON}
+                      className="h-7 px-1.5 rounded-lg bg-[#1A0B10] hover:bg-[#2E1019] border border-[#451722] text-[10px] font-bold text-[#FAF2EE] flex items-center justify-center gap-1"
+                    >
+                      <span>💾</span>
+                      <span>JSON</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => jsonImportInputRef.current?.click()}
+                      className="h-7 px-1.5 rounded-lg bg-[#140A0D] hover:bg-[#241016] border border-[#2C141A] text-[10px] font-bold text-[#E58B94] hover:text-[#FAF2EE] flex items-center justify-center gap-1"
+                    >
+                      <span>📤</span>
+                      <span>Yükle</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── ÇOKLU TAKTİK DEFTERLERİ (MULTI-STRATBOOK) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
@@ -2809,7 +3146,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                   </div>
                 </div>
 
-                {/* ── SECTION 0B: ZAMAN ÇİZELGESİ & REPLAY OYNATICI (TIMELINE) ── */}
+                {/* ── ZAMAN ÇİZELGESİ & REPLAY OYNATICI (TIMELINE) ── */}
                 <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
@@ -2850,139 +3187,6 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                     >
                       Canlı
                     </button>
-                  </div>
-                </div>
-
-                {/* ── SECTION: UZAKLAŞMA & YAKINLAŞMA (ZOOM & PAN KONTROLÜ) ── */}
-                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs">🔍</span>
-                      <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
-                        Harita Yakınlaştırma (Zoom)
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono font-medium text-[#E58B94] bg-[#1E0B11] px-1.5 py-0.5 rounded border border-[#35131B]">
-                      %{Math.round(zoomScale * 100)}
-                    </span>
-                  </div>
-
-                  {/* Steppers Row */}
-                  <div className="grid grid-cols-6 gap-1">
-                    {[0.5, 0.75, 1.0, 1.5, 2.0, 3.0].map((lvl) => (
-                      <button
-                        key={lvl}
-                        type="button"
-                        onClick={() => handleSetZoomLevel(lvl)}
-                        className={`py-1 rounded text-[9.5px] font-mono font-medium transition-all text-center border ${
-                          Math.abs(zoomScale - lvl) < 0.05
-                            ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
-                            : 'bg-[#0A0507] text-[#8E8083] hover:text-[#EDE8EA] border-[#1E0B11]'
-                        }`}
-                      >
-                        %{Math.round(lvl * 100)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Slider & Quick Buttons */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleZoomOut}
-                      title="Uzaklaştır (% -25)"
-                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="range"
-                      min={0.5}
-                      max={3.0}
-                      step={0.05}
-                      value={zoomScale}
-                      onChange={(e) => handleSetZoomLevel(parseFloat(e.target.value))}
-                      className="flex-1 accent-[#A82230] h-1.5 bg-[#090507] rounded-lg cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleZoomIn}
-                      title="Yakınlaştır (% +25)"
-                      className="w-7 h-7 rounded-lg bg-[#180B0F] hover:bg-[#2A1017] text-[#EDE8EA] border border-[#2B141B] font-bold text-sm flex items-center justify-center flex-shrink-0 active:scale-95"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  {/* Reset & Pan Row */}
-                  <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                    <button
-                      type="button"
-                      onClick={handleResetZoomPan}
-                      className="h-7 px-2 rounded-lg bg-[#160B0F] hover:bg-[#241016] border border-[#35131B] text-[10px] font-medium text-[#E58B94] hover:text-[#F5EAEB] flex items-center justify-center gap-1 transition-all active:scale-95"
-                    >
-                      <span>⟲</span>
-                      <span>Merkeze Al (1:1)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTool((prev) => (prev === 'pan' ? 'arrow' : 'pan'))}
-                      className={`h-7 px-2 rounded-lg border text-[10px] font-medium flex items-center justify-center gap-1 transition-all active:scale-95 ${
-                        tool === 'pan'
-                          ? 'bg-cyan-950/70 text-cyan-200 border-cyan-500/50'
-                          : 'bg-[#160B0F] text-[#8E8083] hover:text-[#EDE8EA] border-[#35131B]'
-                      }`}
-                    >
-                      <span>✋</span>
-                      <span>{tool === 'pan' ? 'Kaydırmada' : 'Kaydır (Pan)'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* ── SECTION 1: AŞAMA & KADEME YÖNETİMİ (PHASES) ── */}
-                <div className="bg-[#12080B] p-2.5 rounded-xl border border-[#241116]">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-semibold text-[#8E8083] uppercase tracking-wider">
-                      1. Taktik Aşaması
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowAllPhases((s) => !s)}
-                      className={`text-[9.5px] font-medium px-1.5 py-0.5 rounded transition-colors ${
-                        showAllPhases ? 'bg-[#7A1521] text-[#F5EAEB]' : 'text-[#8E8083] hover:text-[#EDE8EA]'
-                      }`}
-                    >
-                      {showAllPhases ? 'Kümülatif (Tümü)' : 'Tek Aşama'}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-1">
-                    {[
-                      { id: 1, label: 'Erken / Lvl 1' },
-                      { id: 2, label: 'Mid / Execute' },
-                      { id: 3, label: 'Late / Post' },
-                    ].map((ph) => {
-                      const isActive = activePhase === ph.id;
-                      const count = ops.filter((o) => o.mapId === mapId && o.phase === ph.id).length;
-                      return (
-                        <button
-                          key={ph.id}
-                          type="button"
-                          onClick={() => {
-                            setActivePhase(ph.id as 1 | 2 | 3);
-                            void broadcastStratPacket({ action: 'switch-phase', phase: ph.id as 1 | 2 | 3 });
-                          }}
-                          className={`py-1.5 px-1 rounded-lg text-[10px] font-medium flex flex-col items-center justify-center border transition-all ${
-                            isActive
-                              ? 'bg-[#7A1521] text-[#F5EAEB] border-[#A82432]/60 shadow-xs'
-                              : 'bg-[#0A0507] text-[#9E8E91] hover:text-[#EDE8EA] border-[#1E0B11]'
-                          }`}
-                        >
-                          <span>{ph.label}</span>
-                          <span className="text-[8.5px] opacity-70">({count})</span>
-                        </button>
-                      );
-                    })}
                   </div>
                 </div>
 

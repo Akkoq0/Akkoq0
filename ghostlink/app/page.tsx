@@ -126,7 +126,7 @@ export default function MevaHUDApp() {
     [customWallpaper],
   );
 
-  // 3-Pane Navigation State (Ses Kokpiti | Esport Hub | Taktik Masası)
+  // 3-Pane Navigation State (Meva Sunucu | Esport Hub | Taktik Masası)
   const [activeView, setActiveView] = useState<MainNavViewMode>('cockpit');
   const [targetTacticalMapId, setTargetTacticalMapId] = useState<TacticalMapId | undefined>(undefined);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -446,20 +446,20 @@ export default function MevaHUDApp() {
         <MiniHudOverlay username={user.username} voiceControls={voiceControls} />
       ) : (
         <div className="relative z-10 flex-1 flex flex-col overflow-hidden min-h-0">
-          {/* ── 3-PANE 60 FPS SLIDING VIEWDECK (Ses Kokpiti | Esport Hub | Taktik Masası) ── */}
+          {/* ── 3-PANE 60 FPS SLIDING VIEWDECK (Meva Sunucu | Esport Hub | Taktik Masası) ── */}
           <div
             className="w-full flex-1 flex overflow-hidden min-h-0 relative"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
             <div
-              className="flex h-full transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform"
+              className="flex w-full min-w-0 h-full transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform"
               style={{
                 transform: `translate3d(-${viewIndex * 100}%, 0, 0)`,
               }}
             >
-              {/* PANE 1: SES KOKPİTİ (VOICE COCKPIT) */}
-              <div className="w-full min-w-full h-full flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5 flex-shrink-0">
+              {/* PANE 1: MEVA SUNUCU (SERVER HQ) */}
+              <div className="w-full min-w-full max-w-full basis-full h-full flex overflow-hidden min-h-0 lg:p-2.5 lg:gap-2.5 flex-shrink-0">
                 {/* Desktop Left Channel & Voice Hub */}
                 <div className="hidden lg:flex h-full flex-shrink-0">
                   <TacticalSidebar
@@ -522,7 +522,7 @@ export default function MevaHUDApp() {
               </div>
 
               {/* PANE 2: ESPORT HUB (HLTV / VLR.GG STYLE PLATFORM) */}
-              <div className="w-full min-w-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
+              <div className="w-full min-w-full max-w-full basis-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
                 <EsportHubView
                   onOpenTacticalMap={(mapId) => {
                     if (mapId) setTargetTacticalMapId(mapId as TacticalMapId);
@@ -532,7 +532,7 @@ export default function MevaHUDApp() {
               </div>
 
               {/* PANE 3: TAKTİKSEL STRATEJİ MASASI (EMBEDDED 60 FPS MAP STUDIO) */}
-              <div className="w-full min-w-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
+              <div className="w-full min-w-full max-w-full basis-full h-full flex flex-col overflow-hidden min-h-0 flex-shrink-0">
                 <TacticalMapBoard
                   embedded
                   initialMapId={targetTacticalMapId}

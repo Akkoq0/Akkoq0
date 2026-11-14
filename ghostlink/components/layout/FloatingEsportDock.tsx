@@ -82,7 +82,7 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
 
         {/* ── 2. MERKEZ SEKME GRUBU (CENTER NAVIGATION TABS) ── */}
         <div className="flex items-center gap-1 sm:gap-2 flex-1 justify-center max-w-[460px]">
-          {/* TAB 1: SES KOKPİTİ */}
+          {/* TAB 1: MEVA SUNUCU */}
           <button
             type="button"
             onClick={() => onSelectView('cockpit')}
@@ -103,8 +103,8 @@ export const FloatingEsportDock = memo(function FloatingEsportDock({
               size={15}
               className={activeView === 'cockpit' ? 'text-[#FF5A6B]' : 'text-[#8E7E81]'}
             />
-            <span className="hidden min-[480px]:inline truncate">Ses Kokpiti</span>
-            <span className="min-[480px]:hidden">Kokpit</span>
+            <span className="hidden min-[480px]:inline truncate">Meva Sunucu</span>
+            <span className="min-[480px]:hidden">Sunucu</span>
             {inVoice && (
               <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0A0507] animate-pulse" />
             )}

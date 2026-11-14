@@ -6,20 +6,24 @@
 // Live tournament schedules, real-time scorecards, map telemetry,
 // breaking news grid, and direct bridge to Tactical Stratboard.
 
-import { memo, useState, useMemo, useCallback } from 'react';
-import type { EsportGame, EsportMatch, NewsCategory } from '@/types/esport';
+import { memo, useState, useMemo, useCallback, useEffect } from 'react';
+import type {
+  EsportGame,
+  EsportMatch,
+  EsportNewsItem,
+  NewsCategory,
+} from '@/types/esport';
+import { ESPORT_GAMES, ESPORT_STANDINGS } from '@/lib/esportData';
 import {
-  ESPORT_GAMES,
-  ESPORT_MATCHES,
-  ESPORT_NEWS,
-  ESPORT_STANDINGS,
-} from '@/lib/esportData';
+  fetchLiveEsportHubData,
+  getCachedEsportHubBundle,
+} from '@/lib/esportDataService';
 import {
   IconSearch,
-  IconVoiceWave,
   IconMapBoard,
-  IconShield,
 } from '@/components/ui/MevaIcons';
+
+const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 interface EsportHubViewProps {
   onOpenTacticalMap?: (mapId?: string) => void;
@@ -36,9 +40,44 @@ export const EsportHubView = memo(function EsportHubView({
   const [newsFilter, setNewsFilter] = useState<NewsCategory | 'all'>('all');
   const [selectedMatch, setSelectedMatch] = useState<EsportMatch | null>(null);
 
-  // Filtered matches
+  const [liveNews, setLiveNews] = useState<EsportNewsItem[]>(
+    () => getCachedEsportHubBundle()?.news ?? [],
+  );
+  const [liveMatches, setLiveMatches] = useState<EsportMatch[]>(
+    () => getCachedEsportHubBundle()?.matches ?? [],
+  );
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdatedText, setLastUpdatedText] = useState<string>(
+    () => getCachedEsportHubBundle()?.fetchedAtLabel ?? 'Yükleniyor...',
+  );
+  const [isLiveFeedConnected, setIsLiveFeedConnected] = useState<boolean>(
+    () => (getCachedEsportHubBundle()?.liveSourcesCount ?? 0) > 0,
+  );
+
+  const loadLiveData = useCallback(async (forceRefresh = false) => {
+    setIsRefreshing(true);
+    try {
+      const bundle = await fetchLiveEsportHubData(forceRefresh);
+      setLiveNews(bundle.news);
+      setLiveMatches(bundle.matches);
+      setLastUpdatedText(bundle.fetchedAtLabel);
+      setIsLiveFeedConnected(bundle.liveSourcesCount > 0);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLiveData(false);
+    const intervalId = setInterval(() => {
+      void loadLiveData(true);
+    }, AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [loadLiveData]);
+
+  // Filtered matches from real-time service
   const filteredMatches = useMemo(() => {
-    return ESPORT_MATCHES.filter((m) => {
+    return liveMatches.filter((m) => {
       if (m.game !== selectedGame) return false;
       if (activeCategoryFilter === 'live' && m.status !== 'live') return false;
       if (activeCategoryFilter === 'upcoming' && m.status !== 'upcoming')
@@ -50,11 +89,11 @@ export const EsportHubView = memo(function EsportHubView({
       }
       return true;
     });
-  }, [selectedGame, activeCategoryFilter, searchQuery]);
+  }, [liveMatches, selectedGame, activeCategoryFilter, searchQuery]);
 
-  // Filtered news
+  // Filtered live RSS news
   const filteredNews = useMemo(() => {
-    return ESPORT_NEWS.filter((n) => {
+    const gameMatches = liveNews.filter((n) => {
       if (n.game !== 'all' && n.game !== selectedGame) return false;
       if (newsFilter !== 'all' && n.category !== newsFilter) return false;
       if (searchQuery.trim()) {
@@ -64,7 +103,10 @@ export const EsportHubView = memo(function EsportHubView({
       }
       return true;
     });
-  }, [selectedGame, newsFilter, searchQuery]);
+
+    // If LoL/global feed has general esports stories when filtered tightly, keep selected game first
+    return gameMatches;
+  }, [liveNews, selectedGame, newsFilter, searchQuery]);
 
   // Current Standings for selected game
   const currentStandings = useMemo(() => {
@@ -193,9 +235,26 @@ export const EsportHubView = memo(function EsportHubView({
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-[#A8989B]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-mono">P2P Telemetri Senkron</span>
+          <div className="flex items-center gap-2 text-[11px] text-[#A8989B] flex-shrink-0">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isLiveFeedConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <span className="font-mono whitespace-nowrap">
+              {isLiveFeedConnected ? 'CANLI RSS/API AKTİF' : 'BESLEME BEKLENİYOR'} · Son Güncelleme:{' '}
+              <strong className="text-[#FAF2EE]">{lastUpdatedText}</strong> (5 dk&apos;da bir otomatik)
+            </span>
+            <button
+              type="button"
+              onClick={() => void loadLiveData(true)}
+              disabled={isRefreshing}
+              title="Canlı espor haber ve maç verilerini şimdi yenile"
+              className="h-7 px-2.5 rounded-lg bg-[#1A0A0F] hover:bg-[#380E17] border border-[#6E141E] text-[10.5px] font-extrabold text-[#FAF2EE] flex items-center gap-1 transition-all disabled:opacity-60 active:scale-95"
+            >
+              <span className={isRefreshing ? 'inline-block animate-spin' : ''}>🔄</span>
+              <span>{isRefreshing ? 'Yenileniyor...' : 'Şimdi Yenile'}</span>
+            </button>
           </div>
         </div>
       </header>
@@ -345,25 +404,38 @@ export const EsportHubView = memo(function EsportHubView({
                       </div>
                     </div>
 
-                    {/* Bottom Status & Tactical Strat Bridge Button */}
-                    <div className="flex items-center justify-between text-xs pt-0.5">
-                      <span className="text-[11px] text-[#A8989B] truncate max-w-[60%]">
-                        {match.currentMap ? `📍 ${match.currentMap}` : 'Henüz Harita Seçilmedi'}
+                    {/* Bottom Status, External Match Link & Tactical Strat Bridge */}
+                    <div className="flex items-center justify-between gap-2 text-xs pt-0.5 flex-wrap">
+                      <span className="text-[11px] text-[#A8989B] truncate max-w-[46%]">
+                        {match.currentMap ? `📍 ${match.currentMap}` : 'Resmi Turnuva Kaydı'}
                       </span>
 
-                      {/* Taktik Masası Köprüsü */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLaunchTacticalMap(match.tacticalMapId);
-                        }}
-                        title={`${match.tournament} stratejisini taktik tahtasında çiz`}
-                        className="h-7 px-2.5 rounded-lg bg-[#2A0E15] hover:bg-[#590C15] text-[#FF7582] hover:text-[#FAF2EE] border border-[#6E141E] hover:border-[#C82333] font-bold text-[10.5px] transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-                      >
-                        <IconMapBoard size={12} />
-                        <span>Taktik Tahtasında İncele ↗</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <a
+                          href={match.matchUrl || activeGameMeta.matchesPortalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Maçın orijinal kaynak sayfasını yeni sekmede aç"
+                          className="h-7 px-2.5 rounded-lg bg-[#160A0E] hover:bg-[#261017] text-[#E08C96] hover:text-[#FAF2EE] border border-[#3D141D] font-bold text-[10.5px] transition-all flex items-center gap-1"
+                        >
+                          <span>Canlı Maç Sayfası ↗</span>
+                        </a>
+
+                        {/* Taktik Masası Köprüsü */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLaunchTacticalMap(match.tacticalMapId);
+                          }}
+                          title={`${match.tournament} stratejisini taktik tahtasında çiz`}
+                          className="h-7 px-2.5 rounded-lg bg-[#2A0E15] hover:bg-[#590C15] text-[#FF7582] hover:text-[#FAF2EE] border border-[#6E141E] hover:border-[#C82333] font-bold text-[10.5px] transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                        >
+                          <IconMapBoard size={12} />
+                          <span>Taktik Tahtasında İncele ↗</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -371,21 +443,39 @@ export const EsportHubView = memo(function EsportHubView({
             </div>
 
             {filteredMatches.length === 0 && (
-              <div className="py-12 rounded-2xl bg-[#0F070A]/60 border border-[#261016] text-center flex flex-col items-center justify-center gap-2">
-                <span className="text-3xl">🎯</span>
-                <span className="text-sm font-bold text-[#A8989B]">
-                  Seçilen kriterlere uygun turnuva maçı bulunamadı.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setActiveCategoryFilter('all');
-                  }}
-                  className="mt-1 px-3 py-1 rounded-lg bg-[#220B12] text-[#FF5A6B] border border-[#6E141E] text-xs font-bold"
-                >
-                  Filtreleri Sıfırla
-                </button>
+              <div className="p-6 rounded-2xl bg-[#0F070A]/75 border border-[#2D131A] flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#220B12] border border-[#6E141E] flex items-center justify-center text-xl flex-shrink-0">
+                    {activeGameMeta.icon}
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-black text-[#FAF2EE]">
+                      {activeGameMeta.name} — {isRefreshing ? 'Canlı Fikstür Taranıyor...' : 'Canlı Maç Akışı & Resmi Portal'}
+                    </h3>
+                    <p className="text-xs text-[#A8989B] max-w-xl leading-relaxed">
+                      Uydurma skor yerine gerçek RSS & Open API verisi kullanılmaktadır. Güncel{' '}
+                      <strong className="text-[#FAF2EE]">{activeGameMeta.name}</strong> turnuva maçları sağdaki canlı haber akışında listelenir; tüm canlı fikstür ve skorlara tek tıkla resmi portaldan ulaşabilirsiniz.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                  <a
+                    href={activeGameMeta.matchesPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="h-9 px-3.5 rounded-xl bg-[#2E0B12] hover:bg-[#590C15] border border-[#8F1622] text-xs font-black text-[#FAF2EE] flex items-center gap-1.5 transition-all"
+                  >
+                    <span>🌐 {activeGameMeta.portalLabel} ↗</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleLaunchTacticalMap(activeGameMeta.defaultMapId)}
+                    className="h-9 px-3.5 rounded-xl bg-[#160A0E] hover:bg-[#241016] border border-[#3D141D] text-xs font-bold text-[#E08C96] hover:text-[#FAF2EE] flex items-center gap-1.5 transition-all"
+                  >
+                    <IconMapBoard size={13} />
+                    <span>Taktik Masası</span>
+                  </button>
+                </div>
               </div>
             )}
           </section>
@@ -428,45 +518,58 @@ export const EsportHubView = memo(function EsportHubView({
                 </div>
               </div>
 
-              {/* News Items List */}
-              <div className="flex flex-col divide-y divide-[#241116] max-h-[520px] overflow-y-auto no-scrollbar pr-1">
-                {filteredNews.map((news) => (
-                  <article
-                    key={news.id}
-                    className="py-3 flex flex-col gap-1.5 group cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between text-[10px]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.2 rounded font-black uppercase text-[9px] bg-[#2E0B12] text-[#FF7582] border border-[#6E141E]">
-                          {news.source}
+              {/* News Items List (Live Clickable RSS Articles) */}
+              <div className="flex flex-col divide-y divide-[#241116] max-h-[540px] overflow-y-auto no-scrollbar pr-1">
+                {filteredNews.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[#8E7E81]">
+                    {isRefreshing
+                      ? 'Canlı RSS bültenleri çekiliyor...'
+                      : 'Bu filtreye uygun canlı haber bulunamadı. Şimdi Yenile butonuna basabilirsiniz.'}
+                  </div>
+                ) : (
+                  filteredNews.map((news) => (
+                    <a
+                      key={news.id}
+                      href={news.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-3 flex flex-col gap-1.5 group cursor-pointer hover:bg-[#17090E]/50 px-1.5 -mx-1.5 rounded-xl transition-colors"
+                    >
+                      <div className="flex items-center justify-between text-[10px] gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="px-1.5 py-0.2 rounded font-black uppercase text-[9px] bg-[#2E0B12] text-[#FF7582] border border-[#6E141E] flex-shrink-0">
+                            {news.source}
+                          </span>
+                          <span className="text-[#B8A8AB] font-mono truncate">
+                            {news.publishedAt}
+                          </span>
+                        </div>
+                        <span className="text-[9.5px] font-bold text-[#E08C96] group-hover:text-[#FF5A6B] flex-shrink-0">
+                          Kaynağa Git ↗
                         </span>
-                        <span className="text-[#8E7E81]">{news.publishedAt}</span>
                       </div>
-                      <span className="text-[10px] font-mono text-[#6E5E61]">
-                        {news.commentCount} Yorum
-                      </span>
-                    </div>
 
-                    <h4 className="text-[12.5px] font-extrabold text-[#FAF2EE] group-hover:text-[#FF7582] transition-colors leading-snug">
-                      {news.title}
-                    </h4>
+                      <h4 className="text-[12.5px] font-extrabold text-[#FAF2EE] group-hover:text-[#FF7582] transition-colors leading-snug">
+                        {news.title}
+                      </h4>
 
-                    <p className="text-[11px] text-[#A8989B] line-clamp-2 leading-relaxed">
-                      {news.summary}
-                    </p>
+                      <p className="text-[11px] text-[#A8989B] line-clamp-2 leading-relaxed">
+                        {news.summary}
+                      </p>
 
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      {news.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[9.5px] font-mono text-[#E08C96] bg-[#14080B] px-1 rounded border border-[#251015]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {news.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[9.5px] font-mono text-[#E08C96] bg-[#14080B] px-1 rounded border border-[#251015]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </a>
+                  ))
+                )}
               </div>
             </div>
 
@@ -631,6 +734,14 @@ export const EsportHubView = memo(function EsportHubView({
 
             {/* Modal Actions */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#261016]">
+              <a
+                href={selectedMatch.matchUrl || activeGameMeta.matchesPortalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-9 px-3.5 rounded-xl bg-[#190A0F] hover:bg-[#2E0F18] border border-[#6E141E] text-[#FAF2EE] text-xs font-bold flex items-center gap-1.5 transition-all"
+              >
+                <span>Canlı Maç Sayfası ↗</span>
+              </a>
               <button
                 type="button"
                 onClick={() => {

@@ -38,6 +38,7 @@ export interface EsportMatch {
   format: 'Bo1' | 'Bo3' | 'Bo5';
   status: MatchStatus;
   timeLabel: string;
+  matchUrl?: string;
   streamUrl?: string;
   streamViewerCount?: string;
   team1: EsportTeam;
@@ -56,9 +57,11 @@ export interface EsportNewsItem {
   categoryLabel: string;
   title: string;
   summary: string;
-  source: 'HLTV.org' | 'VLR.gg' | 'LoL Esports' | 'Valve' | 'Liquipedia' | 'Meva Intel';
+  source: string;
   author: string;
   publishedAt: string;
+  publishedIso?: string;
+  url: string;
   readMinutes: number;
   commentCount: number;
   featured?: boolean;

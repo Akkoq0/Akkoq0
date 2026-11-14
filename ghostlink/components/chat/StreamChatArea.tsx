@@ -1094,8 +1094,8 @@ export const StreamChatArea = memo(function StreamChatArea({
 
   if (servers.length === 0) {
     return (
-      <main className="flex-1 h-full min-h-0 flex flex-col items-center justify-center overflow-y-auto min-w-0 p-4 sm:p-6 select-none bg-[radial-gradient(ellipse_at_center,rgba(143,22,34,0.12)_0%,rgba(7,5,7,0.98)_70%)] font-sans">
-        <div className="max-w-xl w-full flex flex-col items-center text-center space-y-4 sm:space-y-6 my-auto">
+      <main className="flex-1 h-full min-h-0 flex flex-col items-center justify-center overflow-y-auto overflow-x-hidden min-w-0 w-full p-4 sm:p-6 pb-28 select-none bg-[radial-gradient(ellipse_at_center,rgba(143,22,34,0.12)_0%,rgba(7,5,7,0.98)_70%)] font-sans">
+        <div className="max-w-2xl w-full mx-auto flex flex-col items-center text-center space-y-4 sm:space-y-6 my-auto rounded-3xl bg-[#0E070A]/55 backdrop-blur-md border border-[#2A1319] shadow-[0_24px_70px_rgba(0,0,0,0.6)] px-4 py-6 sm:px-8 sm:py-8">
           {/* Logo & Clean Status */}
           <div className="flex flex-col items-center gap-2.5">
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-[#180A0E] border-2 border-[#8F1622] shadow-[0_0_28px_rgba(200,35,51,0.3)] flex items-center justify-center text-[#C82333] transition-transform hover:scale-105">

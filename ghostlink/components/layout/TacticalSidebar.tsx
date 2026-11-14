@@ -160,6 +160,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
     y: number;
   } | null>(null);
   const [copiedChannelId, setCopiedChannelId] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isLongPressRef = useRef(false);
 
@@ -303,7 +304,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
 
   if (servers.length === 0 || !activeServer) {
     return (
-      <aside className="w-full lg:w-[264px] h-full flex flex-col justify-between overflow-hidden select-none titanium-module lg:rounded-xl font-sans">
+      <aside className="w-full lg:w-[264px] h-full flex flex-col justify-between overflow-hidden select-none titanium-module backdrop-blur-md lg:rounded-xl font-sans">
         {/* Minimalist Top Header */}
         <div className="px-3.5 pt-3 pb-2.5 flex items-center justify-between border-b border-[#2A1319] bg-[linear-gradient(135deg,rgba(230,36,50,0.1)_0%,transparent_60%)]">
           <div>
@@ -370,7 +371,7 @@ export const TacticalSidebar = memo(function TacticalSidebar({
   }
 
   return (
-    <aside className="w-full lg:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module lg:rounded-xl font-sans">
+    <aside className="w-full lg:w-[264px] h-full flex flex-col overflow-hidden select-none titanium-module backdrop-blur-md lg:rounded-xl font-sans">
       {/* ── Top Header ── */}
       <div className="relative px-3.5 pt-3 pb-2.5 flex-shrink-0 bg-[linear-gradient(135deg,rgba(230,36,50,0.14)_0%,transparent_55%)]">
         <span
@@ -423,6 +424,47 @@ export const TacticalSidebar = memo(function TacticalSidebar({
               <IconClose size={14} />
             </button>
           </div>
+        </div>
+
+        {/* Active Voice Preview & Quick Invite Code */}
+        <div className="mt-2.5 grid grid-cols-[1fr_auto] gap-1.5">
+          <div className="min-w-0 rounded-lg px-2.5 py-1.5 bg-[#0E070A]/70 backdrop-blur-md border border-[#2A1319]">
+            <span className="block text-[9.5px] font-semibold text-[#8E7E81]">Aktif Ses</span>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span
+                className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  activeVoiceChannel ? 'bg-emerald-400 animate-pulse' : 'bg-[#4A3A3E]'
+                }`}
+              />
+              <span className="truncate text-[11.5px] font-bold text-[#F4EFF0]">
+                {activeVoiceChannel ? cleanLabel(activeVoiceChannel.name) : 'Bağlı değil'}
+              </span>
+              {activeVoiceChannel && (
+                <span className="text-[10px] font-mono text-[#F08C96] flex-shrink-0">
+                  {squadCount}/{voiceCapacity}
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const code = activeServer?.invite_code;
+              if (!code) return;
+              void navigator.clipboard?.writeText(code);
+              setInviteCopied(true);
+              setTimeout(() => setInviteCopied(false), 1800);
+            }}
+            title="Sunucu davet kodunu kopyala"
+            className="rounded-lg px-2.5 bg-[#1A0A0F]/80 backdrop-blur-md hover:bg-[#3A0F18] border border-[#6E141E]/60 hover:border-[#C82333] flex flex-col items-center justify-center transition-colors"
+          >
+            <span className="text-[9.5px] font-semibold text-[#8E7E81]">
+              {inviteCopied ? 'Kopyalandı' : 'Davet Kodu'}
+            </span>
+            <span className="text-[11px] font-mono font-bold text-[#F08C96]">
+              {inviteCopied ? '✓' : activeServer?.invite_code?.slice(0, 8) || '—'}
+            </span>
+          </button>
         </div>
 
         {/* Quick Game Filter Pills */}
