@@ -60,6 +60,16 @@ const DEFAULT_MEMBERS: Profile[] = [];
 export default function MevaHUDApp() {
   useGameBoost();
 
+  // Client-side Codespaces & session keep-alive heartbeat (every 45s)
+  useEffect(() => {
+    const sendHeartbeat = () => {
+      void fetch(`/api/health?t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+    };
+    sendHeartbeat();
+    const timer = setInterval(sendHeartbeat, 45_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [user, setUser] = useState<Profile>({
     id: 'usr-local',
     username: 'Operatör',

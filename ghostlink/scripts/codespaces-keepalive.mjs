@@ -15,10 +15,30 @@ import fs from 'fs';
 import path from 'path';
 
 const HEARTBEAT_FILE = '/workspaces/Akkoq0/.codespaces-heartbeat';
-const HEALTH_URL = 'http://127.0.0.1:3000/';
+const HEALTH_URL = 'http://127.0.0.1:3000/api/health';
+const FALLBACK_URL = 'http://127.0.0.1:3000/';
 const INTERVAL_MS = 40_000; // 40 seconds
 
 let beatCount = 0;
+
+function pingEndpoint(url, onFallback) {
+  http
+    .get(url, (res) => {
+      res.resume();
+      if (beatCount % 5 === 0) {
+        console.log(`[Codespaces Keep-Alive] Beat #${beatCount} — HTTP ${res.statusCode} (${url}) at ${new Date().toISOString()}`);
+      }
+    })
+    .on('error', (err) => {
+      if (onFallback) {
+        onFallback();
+        return;
+      }
+      if (beatCount % 5 === 0) {
+        console.log(`[Codespaces Keep-Alive] Beat #${beatCount} — Health check warning: ${err.message} at ${new Date().toISOString()}`);
+      }
+    });
+}
 
 function pingHealth() {
   beatCount++;
@@ -39,19 +59,8 @@ function pingHealth() {
     // Ignore file write errors
   }
 
-  // 2. Perform HTTP ping to keep Next.js event loop active
-  http
-    .get(HEALTH_URL, (res) => {
-      res.resume();
-      if (beatCount % 5 === 0) {
-        console.log(`[Codespaces Keep-Alive] Beat #${beatCount} — HTTP ${res.statusCode} at ${now}`);
-      }
-    })
-    .on('error', (err) => {
-      if (beatCount % 5 === 0) {
-        console.log(`[Codespaces Keep-Alive] Beat #${beatCount} — Health check warning: ${err.message} at ${now}`);
-      }
-    });
+  // 2. Perform HTTP ping to keep Next.js event loop and Codespaces container active
+  pingEndpoint(HEALTH_URL, () => pingEndpoint(FALLBACK_URL));
 }
 
 console.log('[Codespaces Keep-Alive] Starting daemon on PID', process.pid);

@@ -8,6 +8,8 @@ export async function GET() {
     service: 'Meva HUD',
     version: '2.5.0',
     protocol: 'WebRTC P2P Mesh + Opus 48kHz',
+    keepAlive: true,
+    codespacesActive: true,
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
     features: {
