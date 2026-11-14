@@ -134,29 +134,32 @@ export const EsportHubView = memo(function EsportHubView({
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8F1622] to-[#3B0E17] border border-[#C82333]/70 flex items-center justify-center text-xl shadow-[0_0_20px_rgba(200,35,51,0.35)] flex-shrink-0">
               🏆
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-xl font-black tracking-tight text-[#FAF2EE]">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-xl font-black tracking-tight text-[#FAF2EE] whitespace-nowrap">
                   ESPORT COMMAND HUB
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-black bg-[#4A0D18] text-[#FF5A6B] border border-[#C82333]/50 animate-pulse">
+                <span className="px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-mono font-black bg-[#4A0D18] text-[#FF5A6B] border border-[#C82333]/50 animate-pulse whitespace-nowrap flex-shrink-0">
                   ● CANLI TELEMETRİ
                 </span>
               </div>
-              <p className="text-[11.5px] text-[#A8989B] font-medium">
-                HLTV & VLR.gg Standartlarında Canlı Maç Skorları, Turnuva Fikstürü & Taktik Köprüsü
+              <p className="text-[11px] sm:text-[11.5px] text-[#A8989B] font-medium leading-snug mt-0.5">
+                HLTV &amp; VLR.gg Standartlarında Canlı Maç Skorları, Turnuva Fikstürü &amp; Taktik Köprüsü
               </p>
             </div>
           </div>
 
           {/* Quick Search Bar */}
-          <div className="relative min-w-[220px] sm:min-w-[280px]">
+          <div className="relative w-full sm:w-auto sm:min-w-[260px]">
             <input
+              id="esport-hub-search"
+              name="esportSearch"
               type="text"
+              aria-label="Takım, turnuva veya harita ara"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Takım, turnuva veya harita ara..."
-              className="w-full h-9 pl-8 pr-3 rounded-xl bg-[#12070A]/90 border border-[#2D141B] hover:border-[#8F1622]/60 focus:border-[#C82333] text-xs font-semibold text-[#FAF2EE] placeholder-[#6E5E62] focus:outline-none transition-colors"
+              className="w-full h-9 pl-8 pr-8 rounded-xl bg-[#12070A]/90 border border-[#2D141B] hover:border-[#8F1622]/60 focus:border-[#C82333] text-xs font-semibold text-[#FAF2EE] placeholder-[#6E5E62] focus:outline-none transition-colors"
             />
             <IconSearch
               size={13}
@@ -206,8 +209,8 @@ export const EsportHubView = memo(function EsportHubView({
         </div>
 
         {/* View Category Sub-Tabs */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#241116] pb-2 text-xs font-bold overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#241116] pb-2 text-xs font-bold">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
             {[
               { id: 'all', label: 'Tüm Modüller' },
               { id: 'live', label: '🔴 Canlı Maçlar' },
@@ -223,10 +226,10 @@ export const EsportHubView = memo(function EsportHubView({
                     tab.id as 'all' | 'live' | 'upcoming' | 'news' | 'standings',
                   )
                 }
-                className={`px-3 py-1.5 rounded-lg transition-all ${
+                className={`h-9 px-3 rounded-xl inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 transition-all active:scale-95 ${
                   activeCategoryFilter === tab.id
                     ? 'bg-[#380E17] text-[#FAF2EE] border border-[#8F1622]'
-                    : 'text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#150A0E]'
+                    : 'bg-[#11070A] text-[#8E7E81] hover:text-[#FAF2EE] hover:bg-[#150A0E] border border-[#220E14]'
                 }`}
               >
                 {tab.label}

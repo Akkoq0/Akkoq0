@@ -140,7 +140,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
       />
 
       {/* ── LEFT: Brand + Server Tabs ── */}
-      <div className="flex items-center gap-2.5 lg:gap-3 min-w-0 flex-1">
+      <div className="flex items-center gap-2 lg:gap-3 min-w-0 flex-1 overflow-hidden">
         <button
           type="button"
           onClick={() => setIsMobileSidebarOpen(true)}
@@ -150,18 +150,22 @@ export const GhostNavbar = memo(function GhostNavbar() {
           <IconMevaMark size={16} />
         </button>
 
-        {/* Mobile context (spacious & unclipped) */}
+        {/* Mobile context (zero overlap, fluid flex truncation) */}
         <button
           type="button"
           onClick={() => setIsMobileSidebarOpen(true)}
-          className="lg:hidden flex flex-col items-start justify-center min-w-0 py-0.5"
+          className="lg:hidden flex flex-col items-start justify-center min-w-0 flex-1 overflow-hidden py-0.5 text-left"
         >
-          {activeServerName && (
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#C82333] leading-none">
+          {activeServerName ? (
+            <span className="text-[9.5px] font-semibold uppercase tracking-wider text-[#C82333] leading-none truncate w-full">
               {activeServerName}
             </span>
+          ) : (
+            <span className="text-[9.5px] font-bold uppercase tracking-wider text-[#C82333] leading-none truncate w-full">
+              MEVA HUD
+            </span>
           )}
-          <span className="text-[14px] font-bold text-[#F4EFF0] truncate max-w-[48vw] leading-tight mt-0.5">
+          <span className="text-[13px] font-bold text-[#F4EFF0] truncate w-full leading-tight mt-0.5">
             {mobileTitle}
           </span>
         </button>
@@ -246,32 +250,31 @@ export const GhostNavbar = memo(function GhostNavbar() {
           </span>
         </div>
 
-        {/* Dedicated Mobile Tactical Map Trigger */}
+        {/* Mobile Quick Lobi Gate */}
         <button
           type="button"
-          onClick={toggleStratBoard}
-          aria-label="Taktik Harita ve Strateji Tahtası"
-          title="Taktik Harita ve Strateji Tahtası"
-          className={`lg:hidden rounded-xl h-8 px-2.5 flex items-center gap-1.5 text-[11px] font-black border transition-all active:scale-95 ${
-            showStratBoard
-              ? 'crimson-cta text-[#FAF2EE] shadow-[0_0_12px_rgba(200,35,51,0.4)]'
-              : 'bg-[#1C0A10] text-[#FAF2EE] border-[#8F1622]/80 hover:border-[#C82333]'
+          onClick={() => setShowLobbyGate(true)}
+          aria-label="Taktik Lobi"
+          title="Taktik Lobi Kur veya Katıl"
+          className={`lg:hidden rounded-xl w-8 h-8 flex items-center justify-center border transition-all active:scale-95 ${
+            activeScrim
+              ? 'bg-[#2A0E16] border-[#C82333]/65 text-[#F5B5BC]'
+              : 'bg-[#1C0A10] border-[#8F1622]/70 text-[#FAF2EE]'
           }`}
         >
-          <span className="text-xs">🗺️</span>
-          <span>Taktik</span>
+          <IconBolt size={14} className="text-[#F5B5BC]" />
         </button>
 
         {/* Dedicated Mobile Ergonomic Customizer Pill */}
         <button
           type="button"
           onClick={() => setShowMobileCustomizer(true)}
-          aria-label="Mobil Ayarlar"
-          title="Mobil Ayarlar"
-          className="lg:hidden rounded-xl h-8 px-2.5 bg-[#14080B] hover:bg-[#220D13] border border-[#2A1319] flex items-center gap-1 text-[11px] font-bold text-[#D8C9CC] active:scale-95"
+          aria-label="Mobil Ergonomi ve Ayarlar"
+          title="Mobil Ergonomi ve Ayarlar"
+          className="lg:hidden rounded-xl w-8 h-8 sm:w-auto sm:px-2.5 bg-[#14080B] hover:bg-[#220D13] border border-[#2A1319] flex items-center justify-center gap-1 text-[11px] font-bold text-[#D8C9CC] active:scale-95"
         >
-          <span className="text-xs">⚙️</span>
-          <span>Ayar</span>
+          <span className="text-xs">📐</span>
+          <span className="hidden sm:inline">Ergonomi</span>
         </button>
 
         <button
@@ -389,7 +392,7 @@ export const GhostNavbar = memo(function GhostNavbar() {
         <CommandButton
           label={`Lider & RBAC Paneli (${RBAC_ROLE_META[localRbacRole]?.label ?? 'Lider'})`}
           onClick={() => openCommandSettingsAtTab('lider_rbac')}
-          className="hidden sm:flex"
+          className="flex"
         >
           <IconShield size={16} className="text-[#F08C96]" />
         </CommandButton>

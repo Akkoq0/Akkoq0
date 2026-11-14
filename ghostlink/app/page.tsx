@@ -43,6 +43,7 @@ import { ScrimScheduleModal } from '@/components/scrim/ScrimScheduleModal';
 import { ShortcutsHelpModal } from '@/components/modal/ShortcutsHelpModal';
 import { MevaProLicenseModal } from '@/components/modal/MevaProLicenseModal';
 import { MobileCustomizerSheet } from '@/components/mobile/MobileCustomizerSheet';
+import { MobileThumbCommandPill } from '@/components/mobile/MobileThumbCommandPill';
 import { TacticalVoiceOverlay } from '@/components/hud/TacticalVoiceOverlay';
 import { type TacticalRole } from '@/store/useHUDStore';
 import { getMevaStorageEngine, STORE_PREFS } from '@/src/lib/storageEngine';
@@ -614,6 +615,12 @@ export default function MevaHUDApp() {
               </div>
             </div>
           </div>
+
+          {/* ── MOBİL BAŞPARMAK HIZLI KOMUT KAPSÜLÜ (SAĞ / SOL EL ADAPTİF) ── */}
+          <MobileThumbCommandPill
+            activeView={activeView}
+            voiceControls={voiceControls}
+          />
 
           {/* ── ESTETİK FLOATING ESPORT DOCK (ALT FAY HATTI) ── */}
           <FloatingEsportDock

@@ -71,6 +71,7 @@ a,
 input,
 select {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .no-scrollbar {

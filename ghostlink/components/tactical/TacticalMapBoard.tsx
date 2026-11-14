@@ -2214,6 +2214,80 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           </div>
         </div>
 
+        {/* ── MOBILE STUDIO QUICK STRIP (< 768px): PHASES, STRATBOOK, TIMELINE & VETO ── */}
+        <div className="md:hidden px-2.5 py-1.5 border-b border-[#241116] bg-[#0B0608]/95 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
+          {([1, 2, 3] as const).map((ph) => {
+            const count = ops.filter((o) => o.mapId === mapId && o.phase === ph).length;
+            const isActive = activePhase === ph;
+            return (
+              <button
+                key={ph}
+                type="button"
+                onClick={() => {
+                  setActivePhase(ph);
+                  void broadcastStratPacket({ action: 'switch-phase', phase: ph });
+                }}
+                className={`h-7 px-2.5 rounded-lg text-[10.5px] font-black whitespace-nowrap flex-shrink-0 border transition-all active:scale-95 ${
+                  isActive
+                    ? 'crimson-cta text-white border-[#FF4655]'
+                    : 'bg-[#14080C] text-[#9E8E91] border-[#261217]'
+                }`}
+              >
+                Faz {ph}{count > 0 ? ` (${count})` : ''}
+              </button>
+            );
+          })}
+
+          <span aria-hidden className="w-px h-4 bg-[#261217] flex-shrink-0" />
+
+          <button
+            type="button"
+            onClick={() => {
+              if (timelineProgress >= 100) setTimelineProgress(0);
+              setIsPlayingTimeline((p) => !p);
+            }}
+            className={`h-7 px-2.5 rounded-lg text-[10.5px] font-black whitespace-nowrap flex-shrink-0 border flex items-center gap-1 active:scale-95 ${
+              isPlayingTimeline
+                ? 'bg-[#7A1521] text-white border-[#C82333]'
+                : 'bg-[#14080C] text-[#E58B94] border-[#2E141B]'
+            }`}
+          >
+            <span>{isPlayingTimeline ? '⏸' : '▶'}</span>
+            <span>{isPlayingTimeline ? `%${Math.round(timelineProgress)}` : 'Replay'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const idx = stratTabs.findIndex((s) => s.id === activeStratId);
+              const next = stratTabs[(idx + 1) % Math.max(1, stratTabs.length)];
+              if (next) {
+                setActiveStratId(next.id);
+                setTimelineProgress(100);
+              }
+            }}
+            className="h-7 px-2.5 rounded-lg bg-[#14080C] border border-[#2E141B] text-[10.5px] font-bold text-[#FAF2EE] whitespace-nowrap flex-shrink-0 active:scale-95"
+          >
+            📑 {stratTabs.find((s) => s.id === activeStratId)?.name ?? 'Ana Taktik'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowMapVetoModal(true)}
+            className="h-7 px-2.5 rounded-lg bg-[#14080C] border border-[#2E141B] text-[10.5px] font-bold text-[#F08C96] whitespace-nowrap flex-shrink-0 active:scale-95"
+          >
+            ⚖️ Veto
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowPresetModal(true)}
+            className="h-7 px-2.5 rounded-lg bg-[#14080C] border border-[#2E141B] text-[10.5px] font-bold text-[#D4C4C7] whitespace-nowrap flex-shrink-0 active:scale-95"
+          >
+            📋 Şablon
+          </button>
+        </div>
+
         {/* ── TOP HEADER LAYER 1: Game Tabs & Close Studio ── */}
         <div className="hidden md:flex px-3 sm:px-4 py-2 border-b border-[#2A1319] items-center justify-between gap-2 bg-[#090507] overflow-x-auto flex-shrink-0">
           <div className="flex items-center gap-1.5 flex-nowrap">
@@ -3919,6 +3993,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           >
             <div
               className="w-full bg-[#0D0609] border-t-2 border-[#8F1622] rounded-t-3xl p-4 space-y-4 shadow-2xl max-h-[80vh] overflow-y-auto animate-fade-in"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 78px)' }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center gap-1.5">
@@ -4018,6 +4093,7 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
           >
             <div
               className="w-full bg-[#0D0609] border-t-2 border-[#8F1622] rounded-t-3xl p-4 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto animate-fade-in"
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 78px)' }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col items-center gap-1.5">
@@ -4159,7 +4235,56 @@ export const TacticalMapBoard: React.FC<TacticalMapBoardProps> = ({
                 </div>
               </div>
 
-              {/* 4. Clear Canvas Action */}
+              {/* 4. Stratbooks & Export Quick Controls */}
+              <div className="space-y-2 pt-2 border-t border-[#220D12]">
+                <span className="text-[10px] font-black text-[#8E7E81] uppercase tracking-wider block">
+                  4. Stratbook &amp; Dışa Aktarım
+                </span>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {stratTabs.map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveStratId(st.id);
+                        setTimelineProgress(100);
+                      }}
+                      className={`h-8 px-3 rounded-xl text-[11px] font-bold whitespace-nowrap flex-shrink-0 border ${
+                        activeStratId === st.id
+                          ? 'crimson-cta text-white border-[#FF4655]'
+                          : 'bg-[#150A0E] text-[#9E8E91] border-[#241116]'
+                      }`}
+                    >
+                      {st.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleExportPNG}
+                    className="h-8 rounded-xl bg-[#160A0E] border border-[#3B1520] text-[11px] font-bold text-[#FAF2EE]"
+                  >
+                    📥 PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJSON}
+                    className="h-8 rounded-xl bg-[#160A0E] border border-[#3B1520] text-[11px] font-bold text-[#FAF2EE]"
+                  >
+                    💾 JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNetworkStressModal(true)}
+                    className="h-8 rounded-xl bg-[#160A0E] border border-[#3B1520] text-[11px] font-bold text-[#F08C96]"
+                  >
+                    📡 Ağ Testi
+                  </button>
+                </div>
+              </div>
+
+              {/* 5. Clear Canvas Action */}
               <div className="pt-2 border-t border-[#220D12] flex items-center justify-between">
                 <button
                   type="button"
