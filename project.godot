@@ -26,6 +26,8 @@ SeasonManager="*res://core/season_manager.gd"
 TotemManager="*res://core/totem_manager.gd"
 CombatCalculator="*res://core/combat_calculator.gd"
 IntelligenceManager="*res://core/intelligence_manager.gd"
+DiplomacyManager="*res://core/diplomacy_manager.gd"
+
 
 
 [debug]

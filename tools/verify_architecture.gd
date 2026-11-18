@@ -234,6 +234,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as SupplyConvoyData).get_validation_errors())
 		elif res is DiplomacyRules:
 			errors.append_array((res as DiplomacyRules).get_validation_errors())
+		elif res is DynastyProfile:
+			errors.append_array((res as DynastyProfile).get_validation_errors())
 	return errors
 
 

@@ -80,3 +80,11 @@ signal outbreak_epidemic_started(army_id: int, speed_multiplier: float, daily_at
 signal epidemic_daily_attrition_ticked(army_id: int, remaining_troops: int, casualties: int)
 signal epidemic_purified_at_kurgan(army_id: int, shrine_building_id: StringName, kut_spent: float)
 
+# --- Phase 5 Dynasty Diplomacy, Coalition Wars, Council Matrix & Khagan Glory
+signal dynasty_stance_changed(dynasty_id: StringName, previous_stance: GameEnums.DynastyAttitude, new_stance: GameEnums.DynastyAttitude, trust_index: float)
+signal coalition_war_declared(coalition_dynasties: PackedStringArray, player_kut: float)
+signal council_decree_enacted(player_id: int, choice: GameEnums.CouncilDilemmaChoice, resulting_kut: float, income_multiplier: float, speed_multiplier: float, loot_multiplier: float)
+signal kagan_glory_changed(army_id: int, previous_glory: float, new_glory: float, reason: StringName)
+signal rogue_warband_joined_by_glory(army_id: int, bey_id: StringName, joined_troops: int, glory_score: float)
+
+

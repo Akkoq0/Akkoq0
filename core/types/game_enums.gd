@@ -92,6 +92,21 @@ enum EpidemicState {
 	PURIFIED = 2, ## Kurgan / Şifahane Arınma Ritüeli Tamamlandı
 }
 
+## Neighboring dynasty attitude derived from the Phase 5 Threat Matrix.
+enum DynastyAttitude {
+	ALLY = 0, ## Müttefik
+	NEUTRAL = 1, ## Tarafsız
+	THREATENING = 2, ## Tehditkar
+	HOSTILE = 3, ## Düşman
+}
+
+## Strategic crisis dilemma options presented when Ak Sakallılar Konseyi convenes (Kut < 30).
+enum CouncilDilemmaChoice {
+	TRADITION = 0, ## Töreye Bağlılık: +Kut, -Ekonomik Gelir, -Ordu Hızı
+	EXPANSION = 1, ## Yağma ve Sefer Serbestisi: +Askeri Moral, +Ganimet, -Hanedan Diplomasisi
+	SACRIFICE = 2, ## Hazine Fedakarlığı: -Çelik, -Altın/Gümüş, +Halk Sadakati / Kut
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -100,4 +115,5 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
 

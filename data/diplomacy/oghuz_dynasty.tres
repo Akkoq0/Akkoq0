@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DynastyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/diplomacy/dynasty_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+dynasty_id = &"oghuz"
+display_name = "Oğuz Beylikleri"
+ambition = 0.72
+discipline = 0.82
+trust_index = 54.0
+base_military_power = 1100.0
+ally_threshold = 25.0
+neutral_threshold = 50.0
+threatening_threshold = 72.0
+coalition_kut_threshold = 30.0
