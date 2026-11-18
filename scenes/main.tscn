@@ -1,0 +1,88 @@
+[gd_scene load_steps=19 format=3]
+
+[ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://world/macro/macro_world_generator.gd" id="2_macro_gen"]
+[ext_resource type="Resource" path="res://data/world/macro_world_config.tres" id="3_macro_cfg"]
+[ext_resource type="Script" path="res://world/macro/macro_world_renderer.gd" id="4_macro_ren"]
+[ext_resource type="Resource" path="res://data/world/macro_render_profile.tres" id="5_macro_prof"]
+[ext_resource type="Resource" path="res://data/ores/ore_registry.tres" id="6_ores"]
+[ext_resource type="Script" path="res://core/components/layer_visibility_component.gd" id="7_vis"]
+[ext_resource type="Script" path="res://world/micro/micro_zone_generator.gd" id="8_micro_gen"]
+[ext_resource type="Resource" path="res://data/world/micro_zone_config.tres" id="9_micro_cfg"]
+[ext_resource type="Script" path="res://world/micro/micro_zone_renderer.gd" id="10_micro_ren"]
+[ext_resource type="Resource" path="res://data/world/micro_render_profile.tres" id="11_micro_prof"]
+[ext_resource type="Script" path="res://buildings/supply_depot_node.gd" id="12_depot"]
+[ext_resource type="Resource" path="res://data/buildings/ger_camp.tres" id="13_ger"]
+[ext_resource type="Script" path="res://units/army_registry.gd" id="14_army_reg"]
+[ext_resource type="PackedScene" path="res://units/army.tscn" id="15_army_scene"]
+[ext_resource type="Script" path="res://camera/dual_layer_camera.gd" id="16_cam"]
+[ext_resource type="Resource" path="res://data/camera/camera_profile.tres" id="17_cam_prof"]
+[ext_resource type="Script" path="res://input/player_command_input.gd" id="18_input"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.383022, 0.321394, 0, 0.642788, 0.766044, -0.5, -0.663414, 0.55667, 0, 24, 0)
+
+[node name="MacroWorldGenerator" type="Node" parent="."]
+script = ExtResource("2_macro_gen")
+config = ExtResource("3_macro_cfg")
+generate_on_ready = true
+
+[node name="MacroWorldRenderer" type="Node3D" parent="."]
+script = ExtResource("4_macro_ren")
+ore_registry = ExtResource("6_ores")
+render_profile = ExtResource("5_macro_prof")
+
+[node name="LayerVisibilityComponent" type="Node" parent="MacroWorldRenderer"]
+script = ExtResource("7_vis")
+visible_layers = 1
+initial_layer = 0
+
+[node name="MicroZoneGenerator" type="Node" parent="."]
+script = ExtResource("8_micro_gen")
+config = ExtResource("9_micro_cfg")
+
+[node name="MicroZoneRenderer" type="Node3D" parent="."]
+script = ExtResource("10_micro_ren")
+render_profile = ExtResource("11_micro_prof")
+
+[node name="LayerVisibilityComponent" type="Node" parent="MicroZoneRenderer"]
+script = ExtResource("7_vis")
+visible_layers = 2
+initial_layer = 0
+
+[node name="SupplyDepotNode" type="Node3D" parent="."]
+script = ExtResource("12_depot")
+depot_id = 1
+owner_id = 1
+building_data = ExtResource("13_ger")
+
+[node name="ArmyRegistry" type="Node3D" parent="."]
+script = ExtResource("14_army_reg")
+
+[node name="VanguardArmy" parent="ArmyRegistry" instance=ExtResource("15_army_scene")]
+
+[node name="DualLayerCamera" type="Node3D" parent="." node_paths=PackedStringArray("camera", "cloud_veil")]
+script = ExtResource("16_cam")
+profile = ExtResource("17_cam_prof")
+camera = NodePath("Camera3D")
+cloud_veil = NodePath("CloudOverlay/CloudVeil")
+
+[node name="Camera3D" type="Camera3D" parent="DualLayerCamera"]
+current = true
+
+[node name="CloudOverlay" type="CanvasLayer" parent="DualLayerCamera"]
+
+[node name="CloudVeil" type="ColorRect" parent="DualLayerCamera/CloudOverlay"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="PlayerCommandInput" type="Node" parent="."]
+script = ExtResource("18_input")
+controlled_army_id = 1
