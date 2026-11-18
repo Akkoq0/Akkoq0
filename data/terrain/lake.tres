@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TerrainData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/terrain/terrain_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+terrain_type = 7
+display_name = "Lake (Göl)"
+allowed_layers = 3
+is_passable = false
+is_buildable = false
+movement_multiplier = 0.0
+defense_multiplier = 1.0
+supply_attrition_multiplier = 1.0
+debug_color = Color(0.14, 0.36, 0.68, 1)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"silver_gold"
+display_name = "Altın-Gümüş (Silver & Gold)"
+description = "Precious bullion mined from mountain veins and alluvial riverbeds for tribute and trade."
+tier = 3
+base_value = 6.0
+starting_amount = 120
+is_strategic = true
+weight_per_unit = 5.5
+extraction_rate_per_minute = 8.0
+spawn_terrains = Array[int]([2, 3, 4])
+spawn_chance = 0.25
+deposit_min_amount = 250
+deposit_max_amount = 700
+debug_color = Color(0.95, 0.82, 0.28, 1)

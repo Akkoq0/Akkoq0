@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="TotemRoster" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://data/totems/totem_roster.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/totems/bozkurt.tres" id="2_bozkurt"]
+[ext_resource type="Resource" path="res://data/totems/tugrul.tres" id="3_tugrul"]
+[ext_resource type="Resource" path="res://data/totems/erlik.tres" id="4_erlik"]
+[ext_resource type="Resource" path="res://data/totems/ulgen.tres" id="5_ulgen"]
+[ext_resource type="Resource" path="res://data/totems/umay.tres" id="6_umay"]
+[ext_resource type="Resource" path="res://data/totems/kayra.tres" id="7_kayra"]
+[ext_resource type="Resource" path="res://data/totems/mergen.tres" id="8_mergen"]
+[ext_resource type="Resource" path="res://data/totems/kizagan.tres" id="9_kizagan"]
+
+[resource]
+script = ExtResource("1_script")
+totems = Array[Resource]([ExtResource("2_bozkurt"), ExtResource("3_tugrul"), ExtResource("4_erlik"), ExtResource("5_ulgen"), ExtResource("6_umay"), ExtResource("7_kayra"), ExtResource("8_mergen"), ExtResource("9_kizagan")])
+expected_totem_count = 8
+point_budget = 100
+max_points_per_stat = 45
+offense_bonus_per_point = 0.015
+defense_bonus_per_point = 0.015
+mobility_bonus_per_point = 0.012
+health_per_vitality_point = 25.0
+aura_radius_per_point = 1.5
+economy_bonus_per_point = 0.015

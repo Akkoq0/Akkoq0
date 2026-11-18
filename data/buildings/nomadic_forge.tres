@@ -1,0 +1,53 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://data/buildings/building_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_stone"]
+[ext_resource type="Resource" path="res://data/ores/iron.tres" id="4_iron"]
+[ext_resource type="Resource" path="res://data/ores/coal.tres" id="5_coal"]
+[ext_resource type="Resource" path="res://data/ores/silver_gold.tres" id="6_silver_gold"]
+
+[sub_resource type="Resource" id="Resource_cost_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 80
+
+[sub_resource type="Resource" id="Resource_cost_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_iron")
+amount = 40
+
+[sub_resource type="Resource" id="Resource_upkeep_coal"]
+script = ExtResource("2_amount")
+ore = ExtResource("5_coal")
+amount = 6
+
+[sub_resource type="Resource" id="Resource_prod_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_iron")
+amount = 10
+
+[sub_resource type="Resource" id="Resource_prod_bullion"]
+script = ExtResource("2_amount")
+ore = ExtResource("6_silver_gold")
+amount = 3
+
+[resource]
+script = ExtResource("1_script")
+id = &"nomadic_forge"
+display_name = "Göçebe Demirci Ocağı (Nomadic Forge)"
+description = "Wagon-mounted bellows and anvil that can be packed onto ox-carts when the clan migrates."
+category = 1
+allowed_terrains = Array[int]([0, 6])
+footprint = Vector2i(2, 3)
+max_health = 850
+build_time_sec = 28.0
+is_nomadic_movable = true
+pack_time_sec = 10.0
+unpack_time_sec = 12.0
+packed_weight = 220.0
+relocation_cost_ratio = 0.20
+construction_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost_stone"), SubResource("Resource_cost_iron")])
+upkeep_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_upkeep_coal")])
+production_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_prod_iron"), SubResource("Resource_prod_bullion")])
+supply_radius_m = 0.0

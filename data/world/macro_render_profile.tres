@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WorldRenderProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/world/world_render_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+height_scale_m = 3.5
+base_thickness_m = 0.4
+cell_gap_ratio = 0.06
+ore_marker_scale = 0.22

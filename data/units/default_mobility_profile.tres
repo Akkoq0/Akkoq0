@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MobilityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/units/mobility_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+min_speed_factor = 0.55
+load_exponent = 1.4
+overload_penalty = 0.65
+arrival_tolerance_m = 0.4
+acceleration = 24.0
+turn_rate_rad = 8.0

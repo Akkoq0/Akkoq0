@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"stone"
+display_name = "Bozkır Taşı (Stone)"
+description = "Foundational masonry stone cut from steppe outcrops and foothills."
+tier = 1
+base_value = 1.0
+starting_amount = 500
+is_strategic = false
+weight_per_unit = 3.0
+extraction_rate_per_minute = 30.0
+spawn_terrains = Array[int]([0, 6, 2])
+spawn_chance = 0.65
+deposit_min_amount = 800
+deposit_max_amount = 2000
+debug_color = Color(0.62, 0.6, 0.56, 1)

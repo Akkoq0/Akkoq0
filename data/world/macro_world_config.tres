@@ -1,0 +1,82 @@
+[gd_resource type="Resource" script_class="MacroWorldConfig" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://data/world/macro_world_config.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/terrain/terrain_rule.gd" id="2_rule"]
+[ext_resource type="Resource" path="res://data/terrain/lake.tres" id="3_lake"]
+[ext_resource type="Resource" path="res://data/terrain/mountain.tres" id="4_mountain"]
+[ext_resource type="Resource" path="res://data/terrain/hills.tres" id="5_hills"]
+[ext_resource type="Resource" path="res://data/terrain/tundra.tres" id="6_tundra"]
+[ext_resource type="Resource" path="res://data/terrain/desert.tres" id="7_desert"]
+[ext_resource type="Resource" path="res://data/terrain/forest.tres" id="8_forest"]
+[ext_resource type="Resource" path="res://data/terrain/steppe.tres" id="9_steppe"]
+[ext_resource type="Resource" path="res://data/ores/ore_registry.tres" id="10_ores"]
+
+[sub_resource type="Resource" id="Resource_rule_lake"]
+script = ExtResource("2_rule")
+terrain = ExtResource("3_lake")
+min_elevation = 0.0
+max_elevation = 0.22
+min_moisture = 0.55
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_mountain"]
+script = ExtResource("2_rule")
+terrain = ExtResource("4_mountain")
+min_elevation = 0.78
+max_elevation = 1.0
+min_moisture = 0.0
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_tundra"]
+script = ExtResource("2_rule")
+terrain = ExtResource("6_tundra")
+min_elevation = 0.66
+max_elevation = 0.78
+min_moisture = 0.5
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_hills"]
+script = ExtResource("2_rule")
+terrain = ExtResource("5_hills")
+min_elevation = 0.62
+max_elevation = 0.78
+min_moisture = 0.0
+max_moisture = 0.5
+
+[sub_resource type="Resource" id="Resource_rule_desert"]
+script = ExtResource("2_rule")
+terrain = ExtResource("7_desert")
+min_elevation = 0.0
+max_elevation = 0.62
+min_moisture = 0.0
+max_moisture = 0.26
+
+[sub_resource type="Resource" id="Resource_rule_forest"]
+script = ExtResource("2_rule")
+terrain = ExtResource("8_forest")
+min_elevation = 0.22
+max_elevation = 0.66
+min_moisture = 0.62
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_steppe"]
+script = ExtResource("2_rule")
+terrain = ExtResource("9_steppe")
+min_elevation = 0.0
+max_elevation = 1.0
+min_moisture = 0.0
+max_moisture = 1.0
+
+[resource]
+script = ExtResource("1_script")
+world_seed = 1337
+grid_size = Vector2i(8, 8)
+region_size_m = 16.0
+elevation_frequency = 0.14
+elevation_octaves = 3
+moisture_frequency = 0.12
+moisture_octaves = 3
+moisture_seed_offset = 7919
+terrain_rules = Array[ExtResource("2_rule")]([SubResource("Resource_rule_lake"), SubResource("Resource_rule_mountain"), SubResource("Resource_rule_tundra"), SubResource("Resource_rule_hills"), SubResource("Resource_rule_desert"), SubResource("Resource_rule_forest"), SubResource("Resource_rule_steppe")])
+fallback_terrain = ExtResource("9_steppe")
+ore_registry = ExtResource("10_ores")

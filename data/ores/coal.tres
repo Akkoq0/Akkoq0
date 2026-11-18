@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"coal"
+display_name = "Kömür (Coal)"
+description = "High-heat fuel feeding nomadic forges and winter braziers."
+tier = 2
+base_value = 2.0
+starting_amount = 200
+is_strategic = false
+weight_per_unit = 2.2
+extraction_rate_per_minute = 22.0
+spawn_terrains = Array[int]([1, 6, 5])
+spawn_chance = 0.5
+deposit_min_amount = 600
+deposit_max_amount = 1500
+debug_color = Color(0.2, 0.2, 0.22, 1)

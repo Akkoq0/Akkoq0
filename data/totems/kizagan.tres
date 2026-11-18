@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TotemData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data/totems/totem_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/iron.tres" id="3_ore1"]
+[ext_resource type="Resource" path="res://data/ores/sulfur.tres" id="4_ore2"]
+
+[sub_resource type="Resource" id="Resource_cost1"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_ore1")
+amount = 50
+
+[sub_resource type="Resource" id="Resource_cost2"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_ore2")
+amount = 20
+
+[resource]
+script = ExtResource("1_script")
+id = &"kizagan"
+display_name = "Kızağan (Red Bridle of War)"
+lore = "Blood-mantled patron of shock cavalry; trades endurance for overwhelming charge damage."
+offense_points = 42
+defense_points = 14
+mobility_points = 22
+vitality_points = 12
+aura_points = 6
+economy_points = 4
+summon_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost1"), SubResource("Resource_cost2")])
+summon_cooldown_sec = 50.0
+preferred_season = 1
+native_terrain = 0
+debug_color = Color(0.92, 0.34, 0.22, 1)

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TotemData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data/totems/totem_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_ore1"]
+[ext_resource type="Resource" path="res://data/ores/jade.tres" id="4_ore2"]
+
+[sub_resource type="Resource" id="Resource_cost1"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_ore1")
+amount = 80
+
+[sub_resource type="Resource" id="Resource_cost2"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_ore2")
+amount = 12
+
+[resource]
+script = ExtResource("1_script")
+id = &"umay"
+display_name = "Umay Ana (Hearth-Mother of Life)"
+lore = "Guardian of cradles and fertile pastures; sustains vitality and multiplies clan harvests."
+offense_points = 6
+defense_points = 20
+mobility_points = 8
+vitality_points = 26
+aura_points = 16
+economy_points = 24
+summon_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost1"), SubResource("Resource_cost2")])
+summon_cooldown_sec = 45.0
+preferred_season = 0
+native_terrain = 3
+debug_color = Color(0.42, 0.86, 0.58, 1)

@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data/buildings/building_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_stone"]
+[ext_resource type="Resource" path="res://data/ores/coal.tres" id="4_coal"]
+
+[sub_resource type="Resource" id="Resource_cost_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 60
+
+[sub_resource type="Resource" id="Resource_upkeep_coal"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_coal")
+amount = 2
+
+[sub_resource type="Resource" id="Resource_prod_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 16
+
+[resource]
+script = ExtResource("1_script")
+id = &"ger_camp"
+display_name = "Keçe Oba (Nomadic Ger Camp)"
+description = "Packable felt-tent encampment that shelters clan herders and acts as a mobile supply depot."
+category = 0
+allowed_terrains = Array[int]([0, 1, 6])
+footprint = Vector2i(2, 2)
+max_health = 650
+build_time_sec = 18.0
+is_nomadic_movable = true
+pack_time_sec = 6.0
+unpack_time_sec = 6.0
+packed_weight = 120.0
+relocation_cost_ratio = 0.15
+construction_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost_stone")])
+upkeep_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_upkeep_coal")])
+production_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_prod_stone")])
+supply_radius_m = 25.0

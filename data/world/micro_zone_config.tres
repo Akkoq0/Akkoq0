@@ -1,0 +1,74 @@
+[gd_resource type="Resource" script_class="MicroZoneConfig" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://data/world/micro_zone_config.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/terrain/terrain_rule.gd" id="2_rule"]
+[ext_resource type="Resource" path="res://data/terrain/lake.tres" id="3_lake"]
+[ext_resource type="Resource" path="res://data/terrain/river.tres" id="4_river"]
+[ext_resource type="Resource" path="res://data/terrain/mountain.tres" id="5_mountain"]
+[ext_resource type="Resource" path="res://data/terrain/hills.tres" id="6_hills"]
+[ext_resource type="Resource" path="res://data/terrain/forest.tres" id="7_forest"]
+[ext_resource type="Resource" path="res://data/terrain/steppe.tres" id="8_steppe"]
+[ext_resource type="Resource" path="res://data/ores/ore_registry.tres" id="9_ores"]
+
+[sub_resource type="Resource" id="Resource_rule_lake"]
+script = ExtResource("2_rule")
+terrain = ExtResource("3_lake")
+min_elevation = 0.0
+max_elevation = 0.18
+min_moisture = 0.65
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_river"]
+script = ExtResource("2_rule")
+terrain = ExtResource("4_river")
+min_elevation = 0.18
+max_elevation = 0.36
+min_moisture = 0.62
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_mountain"]
+script = ExtResource("2_rule")
+terrain = ExtResource("5_mountain")
+min_elevation = 0.80
+max_elevation = 1.0
+min_moisture = 0.0
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_hills"]
+script = ExtResource("2_rule")
+terrain = ExtResource("6_hills")
+min_elevation = 0.64
+max_elevation = 0.80
+min_moisture = 0.0
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_forest"]
+script = ExtResource("2_rule")
+terrain = ExtResource("7_forest")
+min_elevation = 0.25
+max_elevation = 0.68
+min_moisture = 0.58
+max_moisture = 1.0
+
+[sub_resource type="Resource" id="Resource_rule_steppe"]
+script = ExtResource("2_rule")
+terrain = ExtResource("8_steppe")
+min_elevation = 0.0
+max_elevation = 1.0
+min_moisture = 0.0
+max_moisture = 1.0
+
+[resource]
+script = ExtResource("1_script")
+grid_size = Vector2i(16, 16)
+tile_size_m = 1.0
+detail_frequency = 0.22
+detail_octaves = 2
+moisture_seed_offset = 3571
+detail_strength = 0.18
+settlement_clearing_radius_tiles = 3.2
+clearing_terrain = ExtResource("8_steppe")
+terrain_rules = Array[ExtResource("2_rule")]([SubResource("Resource_rule_lake"), SubResource("Resource_rule_river"), SubResource("Resource_rule_mountain"), SubResource("Resource_rule_hills"), SubResource("Resource_rule_forest"), SubResource("Resource_rule_steppe")])
+fallback_terrain = ExtResource("8_steppe")
+ore_registry = ExtResource("9_ores")
+ore_nodes_per_deposit = 3

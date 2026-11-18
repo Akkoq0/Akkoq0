@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="TotemData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data/totems/totem_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_ore1"]
+[ext_resource type="Resource" path="res://data/ores/meteoric_iron.tres" id="4_ore2"]
+
+[sub_resource type="Resource" id="Resource_cost1"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_ore1")
+amount = 100
+
+[sub_resource type="Resource" id="Resource_cost2"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_ore2")
+amount = 6
+
+[resource]
+script = ExtResource("1_script")
+id = &"kayra"
+display_name = "Kayra Han (Primordial Axis)"
+lore = "Unshakeable creator spirit of the world-tree; turns fortified ground into an iron bulwark."
+offense_points = 16
+defense_points = 24
+mobility_points = 10
+vitality_points = 20
+aura_points = 18
+economy_points = 12
+summon_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost1"), SubResource("Resource_cost2")])
+summon_cooldown_sec = 55.0
+preferred_season = 2
+native_terrain = 2
+debug_color = Color(0.68, 0.58, 0.88, 1)

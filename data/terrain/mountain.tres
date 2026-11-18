@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TerrainData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/terrain/terrain_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+terrain_type = 2
+display_name = "Mountain (Dağ)"
+allowed_layers = 3
+is_passable = true
+is_buildable = false
+movement_multiplier = 0.55
+defense_multiplier = 1.5
+supply_attrition_multiplier = 1.4
+debug_color = Color(0.48, 0.46, 0.44, 1)

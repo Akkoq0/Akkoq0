@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/units/unit_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"horse_archer"
+display_name = "Atlı Okçu (Horse Archer)"
+attack = 18.0
+defense = 10.0
+max_health = 110.0
+base_speed = 14.0
+weight = 8.0
+carry_capacity = 24.0
+supply_consumption_per_minute = 1.2

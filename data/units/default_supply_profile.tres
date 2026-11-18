@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="SupplyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/units/supply_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+max_supply_range_m = 15.0
+supply_capacity = 120.0
+resupply_rate_per_sec = 8.0
+low_supply_threshold = 0.25
+report_step_ratio = 0.05

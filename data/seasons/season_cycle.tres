@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="SeasonCycle" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://data/seasons/season_cycle.gd" id="1_script"]
+[ext_resource type="Resource" path="res://data/seasons/spring.tres" id="2_spring"]
+[ext_resource type="Resource" path="res://data/seasons/summer.tres" id="3_summer"]
+[ext_resource type="Resource" path="res://data/seasons/autumn.tres" id="4_autumn"]
+[ext_resource type="Resource" path="res://data/seasons/winter.tres" id="5_winter"]
+
+[resource]
+script = ExtResource("1_script")
+seasons = Array[Resource]([ExtResource("2_spring"), ExtResource("3_summer"), ExtResource("4_autumn"), ExtResource("5_winter")])
+starting_index = 0

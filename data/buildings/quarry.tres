@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://data/buildings/building_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_stone"]
+[ext_resource type="Resource" path="res://data/ores/iron.tres" id="4_iron"]
+[ext_resource type="Resource" path="res://data/ores/coal.tres" id="5_coal"]
+
+[sub_resource type="Resource" id="Resource_cost_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 120
+
+[sub_resource type="Resource" id="Resource_cost_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_iron")
+amount = 30
+
+[sub_resource type="Resource" id="Resource_upkeep_coal"]
+script = ExtResource("2_amount")
+ore = ExtResource("5_coal")
+amount = 4
+
+[sub_resource type="Resource" id="Resource_prod_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 35
+
+[sub_resource type="Resource" id="Resource_prod_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_iron")
+amount = 8
+
+[resource]
+script = ExtResource("1_script")
+id = &"quarry"
+display_name = "Taş ve Maden Ocağı (Deep Quarry)"
+description = "Permanent terraced excavation cut into rocky hills; high yield but cannot be relocated."
+category = 1
+allowed_terrains = Array[int]([6, 0])
+footprint = Vector2i(3, 3)
+max_health = 1400
+build_time_sec = 35.0
+is_nomadic_movable = false
+pack_time_sec = 0.0
+unpack_time_sec = 0.0
+packed_weight = 0.0
+relocation_cost_ratio = 0.0
+construction_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost_stone"), SubResource("Resource_cost_iron")])
+upkeep_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_upkeep_coal")])
+production_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_prod_stone"), SubResource("Resource_prod_iron")])
+supply_radius_m = 0.0

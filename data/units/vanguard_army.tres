@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="ArmyTemplate" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://data/units/army_template.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/units/unit_stack.gd" id="2_stack"]
+[ext_resource type="Resource" path="res://data/units/horse_archer.tres" id="3_archer"]
+[ext_resource type="Resource" path="res://data/units/heavy_lancer.tres" id="4_lancer"]
+[ext_resource type="Resource" path="res://data/units/supply_ox.tres" id="5_ox"]
+[ext_resource type="Resource" path="res://data/units/default_mobility_profile.tres" id="6_mobility"]
+[ext_resource type="Resource" path="res://data/units/default_supply_profile.tres" id="7_supply"]
+
+[sub_resource type="Resource" id="Resource_stack_archer"]
+script = ExtResource("2_stack")
+unit = ExtResource("3_archer")
+count = 12
+
+[sub_resource type="Resource" id="Resource_stack_lancer"]
+script = ExtResource("2_stack")
+unit = ExtResource("4_lancer")
+count = 6
+
+[sub_resource type="Resource" id="Resource_stack_ox"]
+script = ExtResource("2_stack")
+unit = ExtResource("5_ox")
+count = 2
+
+[resource]
+script = ExtResource("1_script")
+id = &"vanguard_army"
+display_name = "Öncü Tümen (Steppe Vanguard)"
+stacks = Array[ExtResource("2_stack")]([SubResource("Resource_stack_archer"), SubResource("Resource_stack_lancer"), SubResource("Resource_stack_ox")])
+mobility_profile = ExtResource("6_mobility")
+supply_profile = ExtResource("7_supply")

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"jade"
+display_name = "Yeşim (Jade)"
+description = "Sacred nephrite stone used in totemic rites and khaganate seals."
+tier = 4
+base_value = 10.0
+starting_amount = 60
+is_strategic = true
+weight_per_unit = 3.5
+extraction_rate_per_minute = 5.0
+spawn_terrains = Array[int]([2, 3, 1])
+spawn_chance = 0.18
+deposit_min_amount = 150
+deposit_max_amount = 450
+debug_color = Color(0.18, 0.78, 0.52, 1)

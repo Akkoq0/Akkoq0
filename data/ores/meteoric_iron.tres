@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"meteoric_iron"
+display_name = "Gök Demiri (Meteoric Iron)"
+description = "Sky-fallen siderite blessed by Tengri; forged into mythic blades and totem anchors."
+tier = 5
+base_value = 25.0
+starting_amount = 30
+is_strategic = true
+weight_per_unit = 6.5
+extraction_rate_per_minute = 2.5
+spawn_terrains = Array[int]([0, 5, 4])
+spawn_chance = 0.08
+deposit_min_amount = 60
+deposit_max_amount = 200
+debug_color = Color(0.56, 0.38, 0.92, 1)

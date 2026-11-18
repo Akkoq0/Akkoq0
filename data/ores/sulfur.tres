@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"sulfur"
+display_name = "Kükürt (Sulfur)"
+description = "Volatile yellow mineral harvested from arid fumaroles and thermal vents."
+tier = 3
+base_value = 5.0
+starting_amount = 80
+is_strategic = true
+weight_per_unit = 2.8
+extraction_rate_per_minute = 10.0
+spawn_terrains = Array[int]([4, 2, 5])
+spawn_chance = 0.22
+deposit_min_amount = 200
+deposit_max_amount = 600
+debug_color = Color(0.9, 0.86, 0.18, 1)

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"iron"
+display_name = "Demir (Iron)"
+description = "Smeltable iron ore essential for lamellar armor, lances, and arrowheads."
+tier = 2
+base_value = 2.5
+starting_amount = 250
+is_strategic = true
+weight_per_unit = 4.5
+extraction_rate_per_minute = 18.0
+spawn_terrains = Array[int]([6, 2])
+spawn_chance = 0.45
+deposit_min_amount = 500
+deposit_max_amount = 1400
+debug_color = Color(0.45, 0.5, 0.55, 1)

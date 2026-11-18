@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="SeasonData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/seasons/season_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+season_type = 0
+display_name = "Bahar (Spring)"
+duration_sec = 45.0
+movement_multiplier = 1.05
+production_multiplier = 1.15
+attrition_multiplier = 0.85
+defense_multiplier = 1.0
+ambient_tint = Color(0.82, 0.96, 0.78, 1)

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="TerrainData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/terrain/terrain_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+terrain_type = 1
+display_name = "Forest (Orman)"
+allowed_layers = 3
+is_passable = true
+is_buildable = true
+movement_multiplier = 0.8
+defense_multiplier = 1.25
+supply_attrition_multiplier = 1.0
+debug_color = Color(0.2, 0.45, 0.22, 1)
