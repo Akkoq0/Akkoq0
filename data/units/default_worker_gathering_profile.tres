@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="WorkerGatheringProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/units/worker_gathering_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+worker_title = "Oymak İşçileri"
+walk_speed_m_per_sec = 12.0
+caravan_haul_speed_m_per_sec = 8.0
+harvest_duration_sec = 2.0
+carry_capacity_per_trip = 20
+arrival_tolerance_m = 0.75
+forest_wood_deposit_ore_id = &"coal"
