@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AIBehaviorProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/ai_behavior_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"steppe_warlord_ai"
+base_gather_rate_per_tick = 55.0
+forge_upgrade_resource_threshold = 100.0
+base_raid_readiness_threshold = 190.0
+ambition_raid_threshold_reduction = 70.0
+high_discipline_crescent_threshold = 0.75
+medium_discipline_feigned_retreat_threshold = 0.55
+high_ambition_camp_assault_threshold = 0.75
+rogue_warband_default_ambition = 0.85
+rogue_warband_default_discipline = 0.6

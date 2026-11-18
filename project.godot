@@ -29,6 +29,8 @@ IntelligenceManager="*res://core/intelligence_manager.gd"
 DiplomacyManager="*res://core/diplomacy_manager.gd"
 CouncilEventEngine="*res://core/council_event_engine.gd"
 BuildingPlacementManager="*res://core/building_placement_manager.gd"
+AICommander="*res://core/ai_commander.gd"
+
 
 
 
