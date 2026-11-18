@@ -39,6 +39,13 @@ var _volley_resolved_signal_received: bool = false
 var _noble_captives_signal_received: bool = false
 var _captive_labor_signal_received: bool = false
 var _slave_revolt_signal_received: bool = false
+var _sovereignty_evolved_signal_received: bool = false
+var _emergent_chain_signal_received: bool = false
+var _inter_faction_conflict_signal_received: bool = false
+var _player_intervened_signal_received: bool = false
+var _outpost_relocated_signal_received: bool = false
+var _force_detached_signal_received: bool = false
+var _forces_merged_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -72,10 +79,13 @@ func _run_suite() -> void:
 	_test_phase7_pasture_ecology_and_sefer_arabasi_migration()
 	_test_phase7_vectorial_wind_and_atmospheric_ballistics()
 	_test_phase7_tore_captive_labor_and_revolt_risk()
+	_test_phase8_dynamic_sovereignty_path_evolution()
+	_test_phase8_emergent_causality_and_inter_faction_wars()
+	_test_phase8_free_outpost_migration_and_modular_forces()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics + Phase 8 Emergent Sandbox validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -1129,6 +1139,138 @@ func _test_phase7_tore_captive_labor_and_revolt_risk() -> void:
 	EventBus.slave_revolt_triggered.disconnect(_on_slave_revolt_triggered)
 
 
+func _test_phase8_dynamic_sovereignty_path_evolution() -> void:
+	_sovereignty_evolved_signal_received = false
+	EventBus.sovereignty_alignment_evolved.connect(_on_sovereignty_alignment_evolved)
+
+	var s_profile: SovereigntyProfileData = SovereigntyPathEngine.get_profile()
+	_expect(s_profile != null and s_profile.get_validation_errors().is_empty(),
+		"SovereigntyPathEngine loaded SovereigntyProfileData (res://data/sovereignty/sovereignty_profile_data.tres) cleanly.")
+	_expect(not SovereigntyPathEngine.is_any_path_locked(3),
+		"Zero quest lock-in: no sovereignty path ever locks out alternative playstyles.")
+
+	# 1. Start as Ulu Kağan & Töre Koruyucusu (high Kut = 90, Töre decrees)
+	var ulu_cmd: EvaluateSovereigntyPathCommand = EvaluateSovereigntyPathCommand.new(3, 90.0, 20.0)
+	ulu_cmd.reset_counters_before_apply = true
+	ulu_cmd.add_tore_actions = 4
+	_expect(CommandBus.dispatch(ulu_cmd) and ulu_cmd.active_alignment == GameEnums.SovereigntyAlignment.ULU_KAGAN_TORE_GUARDIAN,
+		"High Kut and Töre council harmony align player with ULU_KAGAN_TORE_GUARDIAN.")
+
+	# 2. Pivot freely to Bozkır Akıncısı & Yağma Beyi via raids, Toy distributions, and high glory
+	var raider_cmd: EvaluateSovereigntyPathCommand = EvaluateSovereigntyPathCommand.new(3, 60.0, 88.0)
+	raider_cmd.reset_counters_before_apply = true
+	raider_cmd.add_raid_actions = 5
+	raider_cmd.add_toy_actions = 3
+	_expect(CommandBus.dispatch(raider_cmd) and _sovereignty_evolved_signal_received and raider_cmd.active_alignment == GameEnums.SovereigntyAlignment.STEPPE_RAIDER_WARLORD,
+		"Frequent raids, Toy loot distribution, and high glory evolve alignment to STEPPE_RAIDER_WARLORD.")
+
+	# 3. Pivot freely to Göçebe Tüccar & Demirci Hanedanı via 7-ore refining, tax/trade, and Sefer Arabası migrations
+	var merchant_cmd: EvaluateSovereigntyPathCommand = EvaluateSovereigntyPathCommand.new(3, 65.0, 30.0)
+	merchant_cmd.reset_counters_before_apply = true
+	merchant_cmd.add_refining_actions = 6
+	merchant_cmd.add_trade_actions = 4
+	merchant_cmd.add_migration_actions = 3
+	_expect(CommandBus.dispatch(merchant_cmd) and merchant_cmd.active_alignment == GameEnums.SovereigntyAlignment.NOMADIC_MERCHANT_FORGEMASTER,
+		"7-ore refining, regional trade, and Sefer Arabası migrations evolve alignment to NOMADIC_MERCHANT_FORGEMASTER.")
+
+	# 4. Pivot freely to Asi / Bağımsız Oymak via council defiance and low-Kut autonomy
+	var rebel_cmd: EvaluateSovereigntyPathCommand = EvaluateSovereigntyPathCommand.new(3, 18.0, 20.0)
+	rebel_cmd.reset_counters_before_apply = true
+	rebel_cmd.add_defiance_actions = 6
+	_expect(CommandBus.dispatch(rebel_cmd) and rebel_cmd.active_alignment == GameEnums.SovereigntyAlignment.REBEL_INDEPENDENT_CLAN,
+		"Defying council authority and low-Kut autonomy evolve alignment to REBEL_INDEPENDENT_CLAN without locking future paths.")
+
+	EventBus.sovereignty_alignment_evolved.disconnect(_on_sovereignty_alignment_evolved)
+
+
+func _test_phase8_emergent_causality_and_inter_faction_wars() -> void:
+	_emergent_chain_signal_received = false
+	_inter_faction_conflict_signal_received = false
+	_player_intervened_signal_received = false
+	EventBus.emergent_causal_chain_triggered.connect(_on_emergent_chain_triggered)
+	EventBus.inter_faction_conflict_erupted.connect(_on_inter_faction_conflict_erupted)
+	EventBus.player_intervened_in_faction_conflict.connect(_on_player_intervened)
+
+	var e_rules: EmergentWorldRules = EmergentWorldEngine.get_rules()
+	_expect(e_rules != null and e_rules.get_validation_errors().is_empty(),
+		"EmergentWorldEngine loaded EmergentWorldRules (res://data/world/emergent_world_rules.tres) cleanly.")
+
+	# 1. Multi-variable causal chain: Overgrazed Pasture + Zud Winter + Severed Supply Line
+	var chain_cmd: EvaluateEmergentWorldCommand = EvaluateEmergentWorldCommand.new(Vector2i(4, 2), true, true, true)
+	chain_cmd.quiver_ammo = 4.0
+	chain_cmd.hostile_neighbor_present = true
+	chain_cmd.captured_slave_workers = 160
+	chain_cmd.clan_population = 120
+	chain_cmd.kut_score = 24.0
+	_expect(CommandBus.dispatch(chain_cmd) and _emergent_chain_signal_received,
+		"EvaluateEmergentWorldCommand triggers emergent causal chains from combined world variables.")
+	_expect(chain_cmd.triggered_chain_ids.size() == 3 and chain_cmd.rogue_warband_split_triggered and chain_cmd.yilki_herd_attrition_ratio > 0.0,
+		"Overgrazed pasture + Zud winter + severed supply line triggers Yılkı herd attrition and Yersiz Yurtsuz Çeriler split.")
+	_expect(chain_cmd.available_responses.has("kurgan_purification_ritual") and chain_cmd.available_responses.has("migrate_to_fertile_basin") and chain_cmd.available_responses.has("raid_rival_supply_convoy"),
+		"Emergent chain offers open-ended sandbox responses (Kurgan ritual, migration, or rival convoy raid) without forced quests.")
+
+	# 2. Autonomous Inter-Faction Conflict between Kıpçak and Karluk:
+	#    Option A: Neutral trade profiteering (+80 Silver/Gold)
+	var bullion_before: int = ResourceManager.get_amount(1, &"silver_gold")
+	var trade_intervene: InterveneFactionConflictCommand = InterveneFactionConflictCommand.new(
+		1, &"kipchak", &"karluk", Vector2i(5, 3), &"fertile_pasture", GameEnums.EmergentInterventionStance.NEUTRAL_TRADE_PROFITEER)
+	_expect(CommandBus.dispatch(trade_intervene) and _inter_faction_conflict_signal_received and _player_intervened_signal_received,
+		"Neighboring dynasties (Kıpçak vs Karluk) wage autonomous pasture war; player can stay neutral and trade weapons/ores.")
+	_expect(ResourceManager.get_amount(1, &"silver_gold") == bullion_before + 80,
+		"Neutral war trade profiteering deposits +80 Silver/Gold into treasury.")
+
+	#    Option B: Wait for mutual exhaustion (0.45) and strike both sides opportunistically
+	var strike_both: InterveneFactionConflictCommand = InterveneFactionConflictCommand.new(
+		1, &"oghuz", &"kipchak", Vector2i(6, 4), &"seven_ore_vein", GameEnums.EmergentInterventionStance.OPPORTUNISTIC_STRIKE_BOTH)
+	_expect(CommandBus.dispatch(strike_both) and strike_both.mutual_exhaustion_ratio >= 0.45 and strike_both.reward_value_gained > 400.0,
+		"Opportunistic double-strike after mutual faction exhaustion yields maximum Toy loot reward (420.0).")
+
+	EventBus.emergent_causal_chain_triggered.disconnect(_on_emergent_chain_triggered)
+	EventBus.inter_faction_conflict_erupted.disconnect(_on_inter_faction_conflict_erupted)
+	EventBus.player_intervened_in_faction_conflict.disconnect(_on_player_intervened)
+
+
+func _test_phase8_free_outpost_migration_and_modular_forces() -> void:
+	_outpost_relocated_signal_received = false
+	_force_detached_signal_received = false
+	_forces_merged_signal_received = false
+	EventBus.nomadic_outpost_relocated.connect(_on_nomadic_outpost_relocated)
+	EventBus.force_detached_from_army.connect(_on_force_detached)
+	EventBus.forces_merged_into_army.connect(_on_forces_merged)
+
+	# 1. Free multi-region nomadic camp & forward forge relocation via Sefer Arabası
+	var reloc_main: RelocateNomadicOutpostCommand = RelocateNomadicOutpostCommand.new(1, &"main_otag", Vector2i(3, 7))
+	var reloc_forge: RelocateNomadicOutpostCommand = RelocateNomadicOutpostCommand.new(1, &"forward_steel_forge", Vector2i(6, 2))
+	_expect(CommandBus.dispatch(reloc_main) and CommandBus.dispatch(reloc_forge) and _outpost_relocated_signal_received,
+		"Player freely relocates main Otağ and deploys a forward steel forge across different macro regions.")
+	_expect(CommandBus.get_nomadic_outpost_coord(&"main_otag") == Vector2i(3, 7) and CommandBus.get_nomadic_outpost_coord(&"forward_steel_forge") == Vector2i(6, 2) and CommandBus.get_nomadic_outpost_count() >= 2,
+		"CommandBus tracks multiple simultaneous nomadic outposts across the steppe.")
+
+	# 2. Modular Force Splitting & Merging via ModularForceComponent
+	var mod_force: ModularForceComponent = ModularForceComponent.new()
+	add_child(mod_force)
+	mod_force.configure(50, 1000)
+
+	var split_recon: SplitDetachForceCommand = mod_force.split_detachment(51, 250, GameEnums.DetachmentRole.FAST_CAVALRY_RECON_RAIDER)
+	var split_escort: SplitDetachForceCommand = mod_force.split_detachment(52, 150, GameEnums.DetachmentRole.SUPPLY_ESCORT_GUARD)
+	_expect(_force_detached_signal_received and split_recon.remaining_parent_riders == 750 and split_escort.remaining_parent_riders == 600,
+		"Splitting 250 fast cavalry raiders and 150 supply escorts leaves 600 riders in the main vanguard army.")
+	_expect(is_equal_approx(split_recon.speed_bonus_multiplier, 1.35) and mod_force.get_active_detachment_count() == 2,
+		"Fast cavalry recon/raider detachment gains 1.35x speed multiplier.")
+
+	var merge_recon: MergeForcesCommand = mod_force.merge_detachment(51)
+	var merge_escort: MergeForcesCommand = mod_force.merge_detachment(52)
+	_expect(_forces_merged_signal_received and merge_recon.merged_total_riders == 850 and merge_escort.merged_total_riders == 1000,
+		"Merging detached forces back on the field restores the full 1000-rider army with exact conservation.")
+	_expect(mod_force.get_active_detachment_count() == 0 and CommandBus.get_army_rider_count(50) == 1000,
+		"All detachments re-merged cleanly into parent army 50.")
+
+	EventBus.nomadic_outpost_relocated.disconnect(_on_nomadic_outpost_relocated)
+	EventBus.force_detached_from_army.disconnect(_on_force_detached)
+	EventBus.forces_merged_into_army.disconnect(_on_forces_merged)
+	mod_force.free()
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -1272,6 +1414,35 @@ func _on_captive_labor_assigned(_p_id: int, _slaves: int, _pop: int, _t_disc: fl
 
 func _on_slave_revolt_triggered(_p_id: int, _slaves: int, _pop: int, _risk: float) -> void:
 	_slave_revolt_signal_received = true
+
+
+func _on_sovereignty_alignment_evolved(_p_id: int, _prev: GameEnums.SovereigntyAlignment, _next: GameEnums.SovereigntyAlignment, _score: float) -> void:
+	_sovereignty_evolved_signal_received = true
+
+
+func _on_emergent_chain_triggered(_c_id: StringName, _coord: Vector2i, _sev: float, _opts: PackedStringArray) -> void:
+	_emergent_chain_signal_received = true
+
+
+func _on_inter_faction_conflict_erupted(_att: StringName, _def: StringName, _coord: Vector2i, _drv: StringName) -> void:
+	_inter_faction_conflict_signal_received = true
+
+
+func _on_player_intervened(_p_id: int, _att: StringName, _def: StringName, _st: GameEnums.EmergentInterventionStance, _rew: float) -> void:
+	_player_intervened_signal_received = true
+
+
+func _on_nomadic_outpost_relocated(_p_id: int, _o_id: StringName, _from: Vector2i, _to: Vector2i) -> void:
+	_outpost_relocated_signal_received = true
+
+
+func _on_force_detached(_p_id: int, _d_id: int, _role: GameEnums.DetachmentRole, _riders: int, _spd: float) -> void:
+	_force_detached_signal_received = true
+
+
+func _on_forces_merged(_t_id: int, _d_id: int, _tot: int) -> void:
+	_forces_merged_signal_received = true
+
 
 
 
