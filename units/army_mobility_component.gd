@@ -133,6 +133,11 @@ func set_terrain(terrain: TerrainData) -> void:
 	_terrain_multiplier = terrain.get_effective_movement_multiplier() if terrain != null else 1.0
 
 
+## Applies the movement multiplier of the active season.
+func set_season(season: SeasonData) -> void:
+	_season_multiplier = season.movement_multiplier if season != null else 1.0
+
+
 func get_total_weight() -> float:
 	return _unit_weight + _cargo_weight
 
@@ -151,9 +156,12 @@ func is_moving() -> bool:
 
 ## Desired cruising speed with weight, Yılkı remount, terrain, season, epidemic, and council multipliers applied.
 func get_target_speed() -> float:
+	if _base_speed <= 0.0 or _terrain_multiplier <= 0.0 or _season_multiplier <= 0.0:
+		return 0.0
 	var weighted: float = calculate_weighted_speed(_base_speed, get_total_weight(), _carry_capacity, _profile)
 	var remount_mult: float = calculate_remount_speed_multiplier(_remount_horse_ratio, _profile)
-	return weighted * remount_mult * _terrain_multiplier * _season_multiplier * _epidemic_multiplier * _council_speed_multiplier
+	var raw_speed: float = weighted * remount_mult * _terrain_multiplier * _season_multiplier * _epidemic_multiplier * _council_speed_multiplier
+	return maxf(raw_speed, _base_speed * 0.12)
 
 
 func _physics_process(delta: float) -> void:
@@ -190,7 +198,7 @@ func _face(direction: Vector3, delta: float) -> void:
 
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
-	_season_multiplier = season.movement_multiplier if season != null else 1.0
+	set_season(season)
 
 
 func _on_council_decree_enacted(_player_id: int, _choice: GameEnums.CouncilDilemmaChoice, _kut: float, _income_mult: float, speed_mult: float, _loot_mult: float) -> void:

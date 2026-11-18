@@ -75,6 +75,17 @@ func get_target_formation_entropy() -> float:
 	return _target_entropy
 
 
+## Clears accumulated target entropy, fatigue, and encirclement lock to start a fresh battle cycle.
+func reset_tactical_engagement_cycle(reset_to_recon: bool = true) -> void:
+	_target_entropy = 0.0
+	_target_fatigue = 0.0
+	_target_armor_collapse = 0.0
+	_is_escape_vector_sealed = false
+	_last_flank_angle_rad = 0.0
+	if reset_to_recon and _phase != GameEnums.TuranTacticPhase.RECON_DUST_SCREEN:
+		advance_to_phase(GameEnums.TuranTacticPhase.RECON_DUST_SCREEN)
+
+
 ## Deterministically transitions the FSM to `next_phase`.
 func advance_to_phase(next_phase: GameEnums.TuranTacticPhase) -> void:
 	if next_phase == _phase:
@@ -115,7 +126,10 @@ func execute_whistling_arrow_volley(target: CombatantStats = null) -> Dictionary
 	}
 	if doctrine == null:
 		return result
-	if _phase == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN:
+	if _phase == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION and _quiver_ammo > 0.0:
+		reset_tactical_engagement_cycle(false)
+		advance_to_phase(GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT)
+	elif _phase == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN:
 		advance_to_phase(GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT)
 	if _quiver_ammo <= 0.0:
 		EventBus.quiver_ammo_depleted.emit(_army_id)
@@ -159,6 +173,8 @@ func calculate_lure_overextension(pursuer_ambition: float, pursuer_discipline: f
 	}
 	if doctrine == null:
 		return out
+	if _phase == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION:
+		reset_tactical_engagement_cycle(false)
 	if _phase != GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE:
 		advance_to_phase(GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE)
 
@@ -299,6 +315,8 @@ func rest_and_resupply_tactical_readiness(rest_duration_sec: float, ammo_resuppl
 	_own_fatigue = maxf(_own_fatigue - maxf(rest_duration_sec, 0.0) * 4.0, 0.0)
 	_quiver_ammo = clampf(_quiver_ammo + maxf(ammo_resupplied, 0.0), 0.0, 100.0)
 	_remount_horse_ratio = clampf(_remount_horse_ratio + maxf(remount_restored, 0.0), 0.0, 1.0)
+	if _phase == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION and _quiver_ammo > 0.0:
+		reset_tactical_engagement_cycle(true)
 	return compute_maneuver_execution_efficiency(terrain)
 
 

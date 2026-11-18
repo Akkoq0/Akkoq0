@@ -152,6 +152,7 @@ func _apply_kut_delta(delta: float, reason: StringName) -> void:
 	var max_kut: float = _kut_rules.max_kut if _kut_rules != null else 100.0
 	var critical: float = _kut_rules.critical_kut_threshold if _kut_rules != null else 30.0
 	var previous: float = _kut_score
+	var was_council_active: bool = _council_active
 	_kut_score = clampf(_kut_score + delta, 0.0, max_kut)
 	if not is_equal_approx(previous, _kut_score):
 		EventBus.kut_changed.emit(previous, _kut_score, reason)
@@ -160,7 +161,8 @@ func _apply_kut_delta(delta: float, reason: StringName) -> void:
 		var skirmish: bool = _kut_rules.trigger_civil_skirmish_on_critical if _kut_rules != null else true
 		_council_active = true
 		_legitimacy_multiplier = clampf(1.0 - penalty, 0.0, 1.0)
-		EventBus.ak_sakallilar_council_convened.emit(_kut_score, penalty, skirmish)
+		if not was_council_active:
+			EventBus.ak_sakallilar_council_convened.emit(_kut_score, penalty, skirmish)
 	else:
 		_council_active = false
 		_legitimacy_multiplier = 1.0
@@ -172,6 +174,8 @@ func _on_zud_starvation_ticked(_food_remaining: int, _season: SeasonData) -> voi
 
 func _on_combat_resolved(result: CombatResult) -> void:
 	if result == null:
+		return
+	if is_zero_approx(result.damage_to_defender) and is_zero_approx(result.damage_to_attacker) and not result.defender_routed:
 		return
 	if result.is_attacker_destroyed() and not result.is_defender_destroyed():
 		record_battle_outcome(false)

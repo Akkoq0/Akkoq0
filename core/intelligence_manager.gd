@@ -10,6 +10,7 @@ const REASON_ENVOY_ASSASSINATED: StringName = &"envoy_assassinated"
 var _rules: DiplomacyRules = null
 var _army_reports: Dictionary[int, EspionageReport] = {}
 var _stances: Dictionary[StringName, GameEnums.DiplomaticStance] = {}
+var _assassinated_envoys: Dictionary[StringName, bool] = {}
 
 
 func _ready() -> void:
@@ -49,6 +50,12 @@ func get_diplomatic_stance(faction_a: int, faction_b: int) -> GameEnums.Diplomat
 ## True when `faction_a` and `faction_b` are locked in Total War (Büyük Yağma).
 func is_total_war_active(faction_a: int, faction_b: int) -> bool:
 	return get_diplomatic_stance(faction_a, faction_b) == GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID
+
+
+## Restores a diplomatic truce between `faction_a` and `faction_b` after a war concludes.
+func establish_truce(faction_a: int, faction_b: int) -> void:
+	var key: StringName = _pair_key(faction_a, faction_b)
+	_stances[key] = GameEnums.DiplomaticStance.TRUCE
 
 
 func _handle_dispatch_spy(command: GameCommand) -> bool:
@@ -97,9 +104,14 @@ func _handle_assassinate_envoy(command: GameCommand) -> bool:
 		return command.reject("AssassinateEnvoyCommand requires a non-empty envoy_id.")
 	if assassinate.instigator_faction_id == assassinate.target_faction_id:
 		return command.reject("Cannot assassinate own faction's envoy.")
+	if is_total_war_active(assassinate.instigator_faction_id, assassinate.target_faction_id):
+		return command.reject("Factions are already in Total War (Büyük Yağma); no active envoy to assassinate.")
+	if _assassinated_envoys.has(assassinate.envoy_id):
+		return command.reject("Envoy '%s' has already been assassinated." % assassinate.envoy_id)
 
 	var key: StringName = _pair_key(assassinate.instigator_faction_id, assassinate.target_faction_id)
 	_stances[key] = GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID
+	_assassinated_envoys[assassinate.envoy_id] = true
 
 	var kut_cmd: ModifyKutCommand = ModifyKutCommand.new(_rules.envoy_assassination_kut_gain, REASON_ENVOY_ASSASSINATED)
 	CommandBus.dispatch(kut_cmd)

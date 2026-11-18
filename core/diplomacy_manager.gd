@@ -33,6 +33,7 @@ func _ready() -> void:
 	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
 	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
 	EventBus.kagan_glory_changed.connect(_on_kagan_glory_changed)
+	EventBus.season_changed.connect(_on_season_changed)
 
 
 func _exit_tree() -> void:
@@ -118,8 +119,21 @@ func get_espionage_deterrence_bonus() -> float:
 	return _espionage_deterrence_bonus
 
 
+func get_spy_exposure_penalty() -> float:
+	return _spy_exposure_penalty
+
+
 func get_recent_assassination_infamy() -> float:
 	return _recent_assassination_infamy
+
+
+## Gradually cools temporary diplomatic infamy, spy exposure penalty, and aging
+## intelligence deterrence across seasonal cycles so old actions don't freeze late-game diplomacy.
+func step_seasonal_diplomatic_decay(cycles: int = 1) -> void:
+	var n: float = float(maxi(cycles, 1))
+	_recent_assassination_infamy = maxf(_recent_assassination_infamy - 6.0 * n, 0.0)
+	_spy_exposure_penalty = maxf(_spy_exposure_penalty - 4.0 * n, 0.0)
+	_espionage_deterrence_bonus = maxf(_espionage_deterrence_bonus - 3.0 * n, 0.0)
 
 
 ## Evaluates all rival dynasties and triggers `EventBus.coalition_war_declared`
@@ -127,6 +141,8 @@ func get_recent_assassination_infamy() -> float:
 func evaluate_all_dynasties(player_kut: float, player_army_size: float, raid_frequency: float) -> bool:
 	_player_army_size = maxf(player_army_size, 0.0)
 	_raid_frequency = maxf(raid_frequency, 0.0)
+	var was_coalition_active: bool = _coalition_war_active
+	var prev_members: PackedStringArray = _coalition_members
 	var members: PackedStringArray = PackedStringArray()
 	for dynasty_id: StringName in _profiles:
 		var profile: DynastyProfile = _profiles[dynasty_id]
@@ -137,7 +153,8 @@ func evaluate_all_dynasties(player_kut: float, player_army_size: float, raid_fre
 	if not members.is_empty():
 		_coalition_war_active = true
 		_coalition_members = members
-		EventBus.coalition_war_declared.emit(_coalition_members, player_kut)
+		if not was_coalition_active or members != prev_members:
+			EventBus.coalition_war_declared.emit(_coalition_members, player_kut)
 		return true
 	_coalition_war_active = false
 	_coalition_members = PackedStringArray()
@@ -205,8 +222,8 @@ func _load_profile(path: String) -> void:
 	_stances[profile.dynasty_id] = GameEnums.DynastyAttitude.NEUTRAL
 
 
-func _on_kut_changed(_previous_kut: float, new_kut: float, _reason: StringName) -> void:
-	if new_kut < 30.0:
+func _on_kut_changed(previous_kut: float, new_kut: float, _reason: StringName) -> void:
+	if new_kut < 30.0 or (previous_kut < 30.0 and new_kut >= 30.0):
 		evaluate_all_dynasties(new_kut, _player_army_size, _raid_frequency)
 
 
@@ -225,3 +242,7 @@ func _on_envoy_assassinated(_instigator_id: int, _target_id: int, _envoy_id: Str
 
 func _on_kagan_glory_changed(_army_id: int, _previous_glory: float, new_glory: float, _reason: StringName) -> void:
 	_tracked_kagan_glory = clampf(new_glory, 0.0, 100.0)
+
+
+func _on_season_changed(_season: SeasonData, _cycle_index: int) -> void:
+	step_seasonal_diplomatic_decay(1)

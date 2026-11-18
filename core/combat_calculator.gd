@@ -47,6 +47,13 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 	result.attacker_id = attacker.entity_id
 	result.defender_id = defender.entity_id
 
+	if attacker.health <= 0.0 or defender.health <= 0.0:
+		result.attacker_remaining_health = maxf(attacker.health, 0.0)
+		result.defender_remaining_health = maxf(defender.health, 0.0)
+		result.defender_remaining_cohesion = clampf(defender.cohesion, 0.0, 100.0)
+		result.defender_remaining_morale = clampf(defender.morale, 0.0, 100.0)
+		return result
+
 	# --- Phase 4 Battle Fatigue accumulation & lance momentum decay ----------
 	if attacker.combat_duration_sec > 0.0:
 		attacker.fatigue = clampf(attacker.fatigue + attacker.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
@@ -161,6 +168,8 @@ func _handle_sulfur_fire_trap(command: GameCommand) -> bool:
 		return command.reject("Expected SulfurFireTrapCommand.")
 	if _rules == null or trap.target == null:
 		return command.reject("SulfurFireTrapCommand requires valid target and rules.")
+	if trap.target.health <= 0.0:
+		return command.reject("Target army is already destroyed.")
 	if _sulfur_ore != null:
 		var cost_entry: ResourceAmount = ResourceAmount.new()
 		cost_entry.ore = _sulfur_ore

@@ -12,6 +12,7 @@ const DIPLOMACY_RULES_PATH: String = "res://data/diplomacy/diplomacy_rules.tres"
 const DOCTRINE_PATH: String = "res://data/tactics/crescent_encirclement.tres"
 const WINTER_SEASON_PATH: String = "res://data/seasons/winter.tres"
 const SIK_ORMAN_TERRAIN_PATH: String = "res://data/terrain/forest.tres"
+const MAX_TRANSITION_HISTORY: int = 256
 
 var _calibration: CausalFrictionCalibration = null
 var _kut_rules: KutRules = null
@@ -84,6 +85,8 @@ func verify_calibration_parity() -> PackedStringArray:
 func _emit_transition(archetype: GameEnums.CausalChainArchetype, step_id: StringName, cause_src: StringName, effect_tgt: StringName, magnitude: float, pressure: float, is_recovery: bool = false) -> void:
 	var rec: CausalTransitionRecord = CausalTransitionRecord.new(
 		archetype, step_id, cause_src, effect_tgt, magnitude, pressure, is_recovery)
+	while _transition_history.size() >= MAX_TRANSITION_HISTORY:
+		_transition_history.pop_front()
 	_transition_history.append(rec)
 	EventBus.causal_transition_recorded.emit(rec)
 
@@ -112,15 +115,16 @@ func _handle_step_continuous_simulation(command: GameCommand) -> bool:
 			false)
 		emitted_count += 1
 	else:
+		var prev_eco: float = _ecological_pressure
 		var eco_rec: float = dec_rate * dt
 		_ecological_pressure = clampf(_ecological_pressure - eco_rec, 0.0, 100.0)
-		if eco_rec > 0.0:
+		if prev_eco > _ecological_pressure:
 			_emit_transition(
 				GameEnums.CausalChainArchetype.ECOLOGICAL_LOGISTICS_COLLAPSE,
 				&"continuous_ecological_recovery",
 				&"sefer_arabasi_migration",
 				&"pasture_ecology",
-				eco_rec,
+				prev_eco - _ecological_pressure,
 				_ecological_pressure,
 				true)
 			emitted_count += 1
@@ -141,19 +145,22 @@ func _handle_step_continuous_simulation(command: GameCommand) -> bool:
 			false)
 		emitted_count += 1
 	else:
+		var prev_log: float = _logistics_strain
+		var prev_remount: float = _continuous_remount_ratio
 		var log_rec: float = dec_rate * dt
 		_logistics_strain = clampf(_logistics_strain - log_rec, 0.0, 100.0)
 		var remount_gain: float = _calibration.remount_recovery_per_sec_when_supplied * dt
 		_continuous_remount_ratio = clampf(_continuous_remount_ratio + remount_gain, 0.15, 1.0)
-		_emit_transition(
-			GameEnums.CausalChainArchetype.ECOLOGICAL_LOGISTICS_COLLAPSE,
-			&"continuous_logistics_and_yilki_recovery",
-			&"supply_convoy_connected",
-			&"turan_tactics_mobility",
-			remount_gain,
-			_logistics_strain,
-			true)
-		emitted_count += 1
+		if prev_log > _logistics_strain or _continuous_remount_ratio > prev_remount:
+			_emit_transition(
+				GameEnums.CausalChainArchetype.ECOLOGICAL_LOGISTICS_COLLAPSE,
+				&"continuous_logistics_and_yilki_recovery",
+				&"supply_convoy_connected",
+				&"turan_tactics_mobility",
+				maxf(remount_gain, prev_log - _logistics_strain),
+				_logistics_strain,
+				true)
+			emitted_count += 1
 
 	# 3. Morale & Panic Pressure: feeds from logistics strain and combat vs rest
 	if not step_cmd.is_resting_out_of_combat and _logistics_strain >= 20.0:

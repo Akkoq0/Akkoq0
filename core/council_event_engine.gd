@@ -38,10 +38,12 @@ func _ready() -> void:
 	_steel_ore = ResourceLoader.load(STEEL_ORE_PATH) as OreData
 	_silver_gold_ore = ResourceLoader.load(SILVER_GOLD_ORE_PATH) as OreData
 	EventBus.ak_sakallilar_council_convened.connect(_on_council_convened)
+	EventBus.kut_changed.connect(_on_kut_changed)
 	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
 	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
 	EventBus.kagan_glory_changed.connect(_on_kagan_glory_changed)
 	EventBus.coalition_war_declared.connect(_on_coalition_war_declared)
+	EventBus.season_changed.connect(_on_season_changed)
 	CommandBus.register_handler(EnactCouncilDecreeCommand.ID, _handle_enact_decree)
 
 
@@ -115,7 +117,7 @@ func _handle_enact_decree(command: GameCommand) -> bool:
 			return command.reject("Insufficient Steel or Silver/Gold for Hazine Fedakarlığı: %s" % spend_cmd.rejection_reason)
 		var kut_sac_cmd: ModifyKutCommand = ModifyKutCommand.new(_crisis_event.sacrifice_kut_gain, REASON_COUNCIL_SACRIFICE)
 		CommandBus.dispatch(kut_sac_cmd)
-		_popular_loyalty_bonus += _crisis_event.sacrifice_popular_loyalty_bonus
+		_popular_loyalty_bonus = clampf(_popular_loyalty_bonus + _crisis_event.sacrifice_popular_loyalty_bonus, 0.0, 100.0)
 		decree.kut_delta_applied = _crisis_event.sacrifice_kut_gain
 		decree.popular_loyalty_bonus = _popular_loyalty_bonus
 
@@ -143,7 +145,8 @@ func _handle_enact_decree(command: GameCommand) -> bool:
 func evaluate_council_crisis_severity_with_context(current_kut: float = -1.0, active_coalition_override: bool = false, recent_espionage_override: bool = false, glory_override: float = -1.0) -> Dictionary[StringName, float]:
 	var active_kut: float = current_kut if current_kut >= 0.0 else GameManager.get_kut_score()
 	var active_glory: float = glory_override if glory_override >= 0.0 else _tracked_glory_score
-	var has_coalition: bool = active_coalition_override or _active_coalition_pressure or DiplomacyManager.is_coalition_war_active()
+	_active_coalition_pressure = DiplomacyManager.is_coalition_war_active()
+	var has_coalition: bool = active_coalition_override or _active_coalition_pressure
 	var has_espionage: bool = recent_espionage_override or _espionage_advantage_count > 0
 
 	var base_kut_deficit: float = clampf((30.0 - active_kut) * 2.2, 0.0, 66.0)
@@ -177,8 +180,27 @@ func get_assassination_count() -> int:
 	return _assassination_count
 
 
+## Gradually cools temporary assassination backlash and stale espionage forewarning across seasons,
+## and normalizes post-crisis emergency decree modifiers once the Ak Sakallılar crisis has ended.
+func step_seasonal_council_decay(cycles: int = 1) -> void:
+	var n: int = maxi(cycles, 1)
+	_assassination_count = maxi(_assassination_count - n, 0)
+	_espionage_advantage_count = maxi(_espionage_advantage_count - n, 0)
+	if not GameManager.is_ak_sakallilar_council_active():
+		_active_income_multiplier = 1.0
+		_active_speed_multiplier = 1.0
+		_active_morale_bonus = 0.0
+		_active_loot_multiplier = 1.0
+
+
 func _on_council_convened(_current_kut: float, _legitimacy_penalty: float, _trigger_skirmish: bool) -> void:
 	_crisis_dilemma_pending = true
+
+
+func _on_kut_changed(_previous_kut: float, new_kut: float, _reason: StringName) -> void:
+	_active_coalition_pressure = DiplomacyManager.is_coalition_war_active()
+	if new_kut >= 30.0:
+		_crisis_dilemma_pending = false
 
 
 func _on_espionage_mission_completed(report: EspionageReport) -> void:
@@ -196,3 +218,7 @@ func _on_kagan_glory_changed(_army_id: int, _previous_glory: float, new_glory: f
 
 func _on_coalition_war_declared(_members: PackedStringArray, _player_kut: float) -> void:
 	_active_coalition_pressure = true
+
+
+func _on_season_changed(_season: SeasonData, _cycle_index: int) -> void:
+	step_seasonal_council_decay(1)

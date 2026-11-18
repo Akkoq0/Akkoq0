@@ -66,6 +66,7 @@ func _handle_step_intrigue(command: GameCommand) -> bool:
 		return command.reject("StepKinshipIntrigueCommand requires valid rules and non-empty bey_id.")
 
 	var lord: KinshipLordRecord = get_or_create_lord(cmd.bey_id)
+	var prev_stage: GameEnums.IntriguePlotStage = lord.plot_stage
 	if cmd.ambition_override >= 0.0:
 		lord.ambition = clampf(cmd.ambition_override, 0.0, 100.0)
 
@@ -75,27 +76,33 @@ func _handle_step_intrigue(command: GameCommand) -> bool:
 	if cmd.low_kut_crisis:
 		lord.grievance = clampf(lord.grievance + _rules.low_kut_grievance_gain, 0.0, 100.0)
 		lord.loyalty = clampf(lord.loyalty - _rules.low_kut_grievance_gain * 0.6, 0.0, 100.0)
+	if not cmd.unfair_toy_share and not cmd.low_kut_crisis:
+		lord.grievance = clampf(lord.grievance - 8.0, 0.0, 100.0)
+		lord.loyalty = clampf(lord.loyalty + 5.0, 0.0, 100.0)
 
 	var next_stage: GameEnums.IntriguePlotStage = _rules.classify_plot_stage(lord.loyalty, lord.ambition, lord.grievance)
 	lord.plot_stage = next_stage
 
 	if next_stage == GameEnums.IntriguePlotStage.FACTION_PLOT_BREWING:
-		EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
+		if next_stage != prev_stage:
+			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
 	elif next_stage == GameEnums.IntriguePlotStage.DEFECTION_OR_SABOTAGE:
-		lord.defected_troops = _rules.base_defected_troops
-		lord.supply_sabotaged = true
+		if next_stage != prev_stage:
+			lord.defected_troops = _rules.base_defected_troops
+			lord.supply_sabotaged = true
+			if cmd.target_army_id_for_sabotage > 0:
+				CommandBus.dispatch(InterdictSupplyLineCommand.new(cmd.target_army_id_for_sabotage, 1, lord.bey_id))
+			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
+			EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, true, 0.0)
 		cmd.defected_troops = lord.defected_troops
-		cmd.supply_sabotaged = true
-		if cmd.target_army_id_for_sabotage > 0:
-			CommandBus.dispatch(InterdictSupplyLineCommand.new(cmd.target_army_id_for_sabotage, 1, lord.bey_id))
-		EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
-		EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, true, 0.0)
+		cmd.supply_sabotaged = lord.supply_sabotaged
 	elif next_stage == GameEnums.IntriguePlotStage.INTERNAL_UPRISING:
-		lord.defected_troops = _rules.base_defected_troops * 2
+		if next_stage != prev_stage:
+			lord.defected_troops = _rules.base_defected_troops * 2
+			CommandBus.dispatch(ModifyKutCommand.new(-_rules.uprising_kut_drain, &"kinship_internal_uprising"))
+			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
+			EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, false, _rules.uprising_kut_drain)
 		cmd.defected_troops = lord.defected_troops
-		CommandBus.dispatch(ModifyKutCommand.new(-_rules.uprising_kut_drain, &"kinship_internal_uprising"))
-		EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
-		EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, false, _rules.uprising_kut_drain)
 
 	cmd.resulting_loyalty = lord.loyalty
 	cmd.resulting_grievance = lord.grievance

@@ -178,8 +178,15 @@ func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_
 	return out
 
 
+## Restores the destroyed front-line elite vanguard after reinforcement at camp.
+func restore_elite_vanguard() -> void:
+	_is_elite_vanguard_alive = true
+	_is_in_cascade_rout = false
+	_is_staggered_hold = false
+
+
 ## Recovers battle fatigue and rallies morale/cohesion when resting out of combat
-## with supply support (`supply_ratio`).
+## with supply support (`supply_ratio`). Clears `cascade_rout` once rallied.
 func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
 	var dt: float = maxf(rest_sec, 0.0)
 	var sup: float = clampf(supply_ratio, 0.1, 1.0)
@@ -189,4 +196,11 @@ func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
 	_current_cohesion = clampf(_current_cohesion + dt * 2.5 * sup * commander_bonus, 0.0, 100.0)
 	if _battle_fatigue < 35.0 and _current_morale >= 35.0:
 		_is_staggered_hold = false
+	if rules != null:
+		var rally_morale: float = minf(rules.rout_morale_threshold + 15.0, 85.0)
+		var rally_cohesion: float = minf(rules.rout_cohesion_threshold + 15.0, 85.0)
+		if _current_morale >= rally_morale and _current_cohesion >= rally_cohesion and _battle_fatigue < 45.0:
+			_is_in_cascade_rout = false
+	elif _current_morale >= 45.0 and _current_cohesion >= 45.0 and _battle_fatigue < 45.0:
+		_is_in_cascade_rout = false
 	return _battle_fatigue

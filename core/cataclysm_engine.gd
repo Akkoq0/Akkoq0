@@ -66,6 +66,8 @@ func _handle_evaluate_cataclysm(command: GameCommand) -> bool:
 		return true
 
 	var data: CataclysmEventData = _catalog[chosen_type]
+	var existing: CataclysmEventData = get_active_region_cataclysm(cmd.region_coord)
+	var already_active_same: bool = existing != null and existing.cataclysm_type == chosen_type
 	_active_region_cataclysms[cmd.region_coord] = data
 	cmd.event_data = data
 	cmd.pasture_yield_multiplier = data.pasture_yield_multiplier
@@ -75,17 +77,18 @@ func _handle_evaluate_cataclysm(command: GameCommand) -> bool:
 	cmd.refugee_influx_count = data.refugee_influx_count
 	cmd.open_response_options = data.open_response_options
 
-	if data.kut_shock_drain > 0.0:
-		CommandBus.dispatch(ModifyKutCommand.new(-data.kut_shock_drain, data.cataclysm_id))
+	if not already_active_same:
+		if data.kut_shock_drain > 0.0:
+			CommandBus.dispatch(ModifyKutCommand.new(-data.kut_shock_drain, data.cataclysm_id))
 
-	EventBus.cataclysm_erupted.emit(
-		data.cataclysm_id,
-		data.cataclysm_type,
-		cmd.region_coord,
-		data.pasture_yield_multiplier,
-		data.caravan_speed_multiplier,
-		data.structural_wear_ratio,
-		data.refugee_influx_count)
+		EventBus.cataclysm_erupted.emit(
+			data.cataclysm_id,
+			data.cataclysm_type,
+			cmd.region_coord,
+			data.pasture_yield_multiplier,
+			data.caravan_speed_multiplier,
+			data.structural_wear_ratio,
+			data.refugee_influx_count)
 	return true
 
 
