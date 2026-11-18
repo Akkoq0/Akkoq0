@@ -67,6 +67,9 @@ static func _check_static_typing(scripts: PackedStringArray) -> PackedStringArra
 	var inferred_token: String = ":" + "="
 
 	for path: String in scripts:
+		var loaded_script: Script = ResourceLoader.load(path) as Script
+		if loaded_script == null or not loaded_script.can_instantiate():
+			errors.append("Script failed to compile under strict Godot 4.7 typing: %s" % path)
 		var source: String = FileAccess.get_file_as_string(path)
 		var lines: PackedStringArray = source.split("\n")
 		for i: int in range(lines.size()):

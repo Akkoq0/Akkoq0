@@ -3,6 +3,8 @@ extends Node
 ## Input (rank 3). Translates InputMap actions into `CommandBus` dispatches.
 ## Never touches game systems directly.
 
+const RAY_PARALLEL_EPSILON: float = 0.0001
+
 @export var controlled_army_id: int = 1
 
 
@@ -27,7 +29,9 @@ func _project_mouse_to_ground() -> Vector3:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
 	var origin: Vector3 = active_camera.project_ray_origin(mouse)
 	var direction: Vector3 = active_camera.project_ray_normal(mouse)
-	var hit: Variant = Plane.PLANE_XZ.intersects_ray(origin, direction)
-	if hit == null:
+	if absf(direction.y) <= RAY_PARALLEL_EPSILON:
 		return Vector3.INF
-	return hit as Vector3
+	var distance: float = -origin.y / direction.y
+	if distance < 0.0:
+		return Vector3.INF
+	return origin + direction * distance
