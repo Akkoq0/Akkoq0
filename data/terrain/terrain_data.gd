@@ -1,8 +1,11 @@
 class_name TerrainData
 extends Resource
-## Data layer (rank 1). Gameplay stats for a single strictly-typed terrain.
+## Data layer (rank 1). Gameplay stats for a single strictly-typed terrain,
+## including Phase 3 tactical steppe terrain classes (`Bereket Havzası`,
+## `Hakimiyet Platosu`, `Sık Orman`, `Damarlı Yamaç`).
 
 @export var terrain_type: GameEnums.TerrainType = GameEnums.TerrainType.STEPPE
+@export var terrain_class: GameEnums.TerrainClass = GameEnums.TerrainClass.BEREKET_HAVZASI
 @export var display_name: String = ""
 ## Which world layers may contain this terrain (bit 0 = Macro, bit 1 = Micro).
 @export_flags("Macro", "Micro") var allowed_layers: int = 0
@@ -16,6 +19,16 @@ extends Resource
 @export_range(0.0, 4.0, 0.01) var defense_multiplier: float = 1.0
 ## Multiplier applied to supply consumption while out of supply.
 @export_range(0.0, 8.0, 0.01) var supply_attrition_multiplier: float = 1.0
+
+@export_group("Tactical Combat Synergy")
+## Cavalry charge momentum multiplier (`Bereket Havzası` > 1.0).
+@export_range(0.5, 3.0, 0.01) var cavalry_momentum_multiplier: float = 1.0
+## High-altitude bow range and arrow damage multiplier (`Hakimiyet Platosu` > 1.0).
+@export_range(0.5, 3.0, 0.01) var ranged_elevation_bonus_multiplier: float = 1.0
+## Ambush concealment factor (`Sık Orman` & `Damarlı Yamaç` > 0.0).
+@export_range(0.0, 1.0, 0.01) var ambush_concealment_bonus: float = 0.0
+## Chokepoint defense multiplier (`Damarlı Yamaç` > 1.0).
+@export_range(1.0, 3.0, 0.01) var chokepoint_defense_multiplier: float = 1.0
 
 @export_group("Presentation")
 @export var debug_color: Color = Color.WHITE

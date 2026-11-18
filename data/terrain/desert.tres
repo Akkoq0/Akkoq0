@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 4
+terrain_class = 0
 display_name = "Desert (Çöl)"
 allowed_layers = 1
 is_passable = true
@@ -12,4 +13,8 @@ is_buildable = true
 movement_multiplier = 0.75
 defense_multiplier = 0.9
 supply_attrition_multiplier = 1.75
+cavalry_momentum_multiplier = 1.05
+ranged_elevation_bonus_multiplier = 1.0
+ambush_concealment_bonus = 0.05
+chokepoint_defense_multiplier = 1.0
 debug_color = Color(0.84, 0.72, 0.42, 1)

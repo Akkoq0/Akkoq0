@@ -43,18 +43,27 @@ signal bey_rebelled_as_rogue_warband(bey_id: StringName, warband_title: String, 
 signal totem_summoned(player_id: int, totem_id: StringName, position: Vector3)
 signal totem_roster_validated(is_valid: bool, errors: PackedStringArray)
 
-# --- Armies -----------------------------------------------------------------
+# --- Armies & 5-Stage Turan Tactics FSM -------------------------------------
 signal army_spawned(army_id: int, owner_id: int, position: Vector3)
 signal army_despawned(army_id: int)
 signal army_move_ordered(army_id: int, destination: Vector3)
 signal army_destination_reached(army_id: int, position: Vector3)
 signal army_supply_changed(army_id: int, supply_ratio: float, is_connected: bool)
+signal turan_phase_changed(army_id: int, previous_phase: GameEnums.TuranTacticPhase, new_phase: GameEnums.TuranTacticPhase)
+signal feigned_retreat_lured(army_id: int, pursuer_id: int, overextension_m: float, formation_entropy: float, armor_collapse_ratio: float)
+signal formation_entropy_critical(army_id: int, formation_entropy: float, armor_collapse_ratio: float)
+signal crescent_trap_sprung(army_id: int, target_id: int, flank_angle_rad: float, is_escape_vector_sealed: bool)
+signal quiver_ammo_depleted(army_id: int)
 
-# --- Supply network ---------------------------------------------------------
+# --- Supply network, Interdiction & Yılkı Sacrifice -------------------------
 signal supply_depot_registered(depot_id: int, owner_id: int, position: Vector3, radius_m: float)
 signal supply_depot_unregistered(depot_id: int)
 ## Late joiners (e.g. freshly spawned armies) ask depots to re-announce.
 signal supply_depots_resync_requested()
+signal supply_line_severed(army_id: int, depot_id: int, raider_id: StringName, captured_loot_value: float)
+signal yilki_horses_sacrificed_for_ration(army_id: int, remaining_remount_ratio: float, morale_drop: float, kut_penalty: float)
 
-# --- Combat -----------------------------------------------------------------
+# --- Combat & Triple Collapse -----------------------------------------------
 signal combat_resolved(result: CombatResult)
+signal sulfur_fire_trap_detonated(player_id: int, target_id: int, area_damage: float, cohesion_drop: float, morale_drop: float)
+signal army_routed(army_id: int, is_annihilated: bool, captured_toy_loot_value: float)

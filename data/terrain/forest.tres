@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 1
-display_name = "Forest (Orman)"
+terrain_class = 2
+display_name = "Forest — Sık Orman (Orman)"
 allowed_layers = 3
 is_passable = true
 is_buildable = true
 movement_multiplier = 0.8
 defense_multiplier = 1.25
 supply_attrition_multiplier = 1.0
+cavalry_momentum_multiplier = 0.85
+ranged_elevation_bonus_multiplier = 0.95
+ambush_concealment_bonus = 0.65
+chokepoint_defense_multiplier = 1.15
 debug_color = Color(0.2, 0.45, 0.22, 1)

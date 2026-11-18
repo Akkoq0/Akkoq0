@@ -1,6 +1,7 @@
 class_name CombatResult
 extends RefCounted
-## Core model (rank 2). Outcome of one combat exchange.
+## Core model (rank 2). Outcome of one exchange under the Phase 3 **Triple
+## Collapse Model** (Physical Casualties + Formation Cohesion + Battle Will).
 
 var attacker_id: int = 0
 var defender_id: int = 0
@@ -8,6 +9,17 @@ var damage_to_defender: float = 0.0
 var damage_to_attacker: float = 0.0
 var defender_remaining_health: float = 0.0
 var attacker_remaining_health: float = 0.0
+
+## Phase 3 vectorial & Triple Collapse outcomes.
+var engagement_angle: GameEnums.CombatEngagementAngle = GameEnums.CombatEngagementAngle.FRONT
+var directional_damage_multiplier: float = 1.0
+var cohesion_damage_to_defender: float = 0.0
+var morale_damage_to_defender: float = 0.0
+var defender_remaining_cohesion: float = 100.0
+var defender_remaining_morale: float = 100.0
+var defender_routed: bool = false
+var defender_annihilated_in_crescent: bool = false
+var captured_toy_loot_value: float = 0.0
 
 
 ## True when the defender has no health left.

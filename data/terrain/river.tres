@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 3
-display_name = "River (Irmak)"
+terrain_class = 0
+display_name = "River — Bereket Havzası (Irmak)"
 allowed_layers = 2
 is_passable = true
 is_buildable = false
 movement_multiplier = 0.7
 defense_multiplier = 1.15
 supply_attrition_multiplier = 0.85
+cavalry_momentum_multiplier = 0.9
+ranged_elevation_bonus_multiplier = 1.0
+ambush_concealment_bonus = 0.15
+chokepoint_defense_multiplier = 1.2
 debug_color = Color(0.24, 0.56, 0.82, 1)

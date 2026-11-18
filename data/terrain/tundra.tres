@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 5
-display_name = "Tundra (Buzul Bozkırı)"
+terrain_class = 1
+display_name = "Tundra — Hakimiyet Platosu (Buzul Bozkırı)"
 allowed_layers = 1
 is_passable = true
 is_buildable = true
 movement_multiplier = 0.7
 defense_multiplier = 1.05
 supply_attrition_multiplier = 1.6
+cavalry_momentum_multiplier = 0.95
+ranged_elevation_bonus_multiplier = 1.15
+ambush_concealment_bonus = 0.1
+chokepoint_defense_multiplier = 1.1
 debug_color = Color(0.76, 0.82, 0.86, 1)

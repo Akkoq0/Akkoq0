@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 2
-display_name = "Mountain (Dağ)"
+terrain_class = 3
+display_name = "Mountain — Damarlı Yamaç (Dağ)"
 allowed_layers = 3
 is_passable = true
 is_buildable = false
 movement_multiplier = 0.55
 defense_multiplier = 1.5
 supply_attrition_multiplier = 1.4
+cavalry_momentum_multiplier = 0.75
+ranged_elevation_bonus_multiplier = 1.2
+ambush_concealment_bonus = 0.55
+chokepoint_defense_multiplier = 1.45
 debug_color = Color(0.48, 0.46, 0.44, 1)

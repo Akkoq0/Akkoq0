@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 0
-display_name = "Steppe (Bozkır)"
+terrain_class = 0
+display_name = "Steppe — Bereket Havzası (Bozkır)"
 allowed_layers = 3
 is_passable = true
 is_buildable = true
 movement_multiplier = 1.15
 defense_multiplier = 1.0
 supply_attrition_multiplier = 0.9
+cavalry_momentum_multiplier = 1.3
+ranged_elevation_bonus_multiplier = 1.0
+ambush_concealment_bonus = 0.05
+chokepoint_defense_multiplier = 1.0
 debug_color = Color(0.55, 0.68, 0.32, 1)

@@ -5,11 +5,16 @@
 [resource]
 script = ExtResource("1_script")
 terrain_type = 6
-display_name = "Hills (Tepeler)"
+terrain_class = 1
+display_name = "Hills — Hakimiyet Platosu (Tepeler)"
 allowed_layers = 3
 is_passable = true
 is_buildable = true
 movement_multiplier = 0.85
 defense_multiplier = 1.2
 supply_attrition_multiplier = 1.1
+cavalry_momentum_multiplier = 1.0
+ranged_elevation_bonus_multiplier = 1.28
+ambush_concealment_bonus = 0.35
+chokepoint_defense_multiplier = 1.25
 debug_color = Color(0.58, 0.54, 0.36, 1)
