@@ -220,6 +220,14 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as MacroWorldConfig).get_validation_errors())
 		elif res is MicroZoneConfig:
 			errors.append_array((res as MicroZoneConfig).get_validation_errors())
+		elif res is RefiningRecipe:
+			errors.append_array((res as RefiningRecipe).get_validation_errors())
+		elif res is EconomyRules:
+			errors.append_array((res as EconomyRules).get_validation_errors())
+		elif res is KutRules:
+			errors.append_array((res as KutRules).get_validation_errors())
+		elif res is ToyDistributionRules:
+			errors.append_array((res as ToyDistributionRules).get_validation_errors())
 	return errors
 
 
