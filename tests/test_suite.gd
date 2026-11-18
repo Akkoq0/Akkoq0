@@ -46,6 +46,14 @@ var _player_intervened_signal_received: bool = false
 var _outpost_relocated_signal_received: bool = false
 var _force_detached_signal_received: bool = false
 var _forces_merged_signal_received: bool = false
+var _cataclysm_erupted_signal_received: bool = false
+var _cataclysm_subsided_signal_received: bool = false
+var _kinship_plot_signal_received: bool = false
+var _internal_betrayal_signal_received: bool = false
+var _kinship_resolved_signal_received: bool = false
+var _battle_wounded_signal_received: bool = false
+var _wounded_recovered_signal_received: bool = false
+var _veteran_shock_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -82,10 +90,13 @@ func _run_suite() -> void:
 	_test_phase8_dynamic_sovereignty_path_evolution()
 	_test_phase8_emergent_causality_and_inter_faction_wars()
 	_test_phase8_free_outpost_migration_and_modular_forces()
+	_test_phase9_steppe_cataclysms_and_natural_destruction()
+	_test_phase9_kinship_intrigue_and_internal_betrayal()
+	_test_phase9_wounded_pool_and_veteran_attrition()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics + Phase 8 Emergent Sandbox validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics + Phase 8 Emergent Sandbox + Phase 9 Cataclysms & Kinship Intrigue validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -1271,6 +1282,139 @@ func _test_phase8_free_outpost_migration_and_modular_forces() -> void:
 	mod_force.free()
 
 
+func _test_phase9_steppe_cataclysms_and_natural_destruction() -> void:
+	_cataclysm_erupted_signal_received = false
+	_cataclysm_subsided_signal_received = false
+	EventBus.cataclysm_erupted.connect(_on_cataclysm_erupted)
+	EventBus.cataclysm_subsided.connect(_on_cataclysm_subsided)
+
+	# 1. Kara Zud ve Buz Kapanı (is_zud_winter = true, temp <= -15C, pasture_depleted = true)
+	var zud_data: CataclysmEventData = CataclysmEngine.get_cataclysm_data(GameEnums.CataclysmType.KARA_ZUD_ICE_TRAP)
+	_expect(zud_data != null and zud_data.get_validation_errors().is_empty(),
+		"CataclysmEngine loaded Kara Zud ve Buz Kapanı (res://data/cataclysms/kara_zud_ice_trap.tres) cleanly.")
+	var zud_cmd: EvaluateCataclysmCommand = EvaluateCataclysmCommand.new(Vector2i(2, 2), true, -24.0, true, 0.1, 6.0, 0.0)
+	_expect(CommandBus.dispatch(zud_cmd) and _cataclysm_erupted_signal_received and zud_cmd.triggered_type == GameEnums.CataclysmType.KARA_ZUD_ICE_TRAP,
+		"Harsh Zud winter (-24C) and depleted pasture trigger KARA_ZUD_ICE_TRAP cataclysm.")
+	_expect(is_equal_approx(zud_cmd.pasture_yield_multiplier, 0.15) and is_equal_approx(zud_cmd.caravan_speed_multiplier, 0.35),
+		"Kara Zud freezes pastures (0.15x yield) and slows/derails supply caravans (0.35x speed).")
+	_expect(zud_cmd.open_response_options.size() >= 3 and CataclysmEngine.get_active_region_cataclysm(Vector2i(2, 2)) == zud_data,
+		"Kara Zud offers multiple open-ended survival choices without linear quest lock-in.")
+
+	# 2. Bozkır Yangını ve Kurak Rüzgar (drought >= 0.75, wind >= 10 m/s)
+	var fire_cmd: EvaluateCataclysmCommand = EvaluateCataclysmCommand.new(Vector2i(4, 5), false, 34.0, false, 0.85, 14.5, 0.0)
+	_expect(CommandBus.dispatch(fire_cmd) and fire_cmd.triggered_type == GameEnums.CataclysmType.STEPPE_WILDFIRE_SCORCH,
+		"Severe drought (0.85) and gale steppe wind (14.5 m/s) trigger STEPPE_WILDFIRE_SCORCH.")
+	_expect(is_equal_approx(fire_cmd.pasture_yield_multiplier, 0.10) and is_equal_approx(fire_cmd.forest_concealment_loss_ratio, 0.65),
+		"Steppe wildfire scorches pastures (0.10x) and burns 65% of Sık Orman ambush concealment.")
+
+	# 3. Büyük Göç Dalgası ve Yıkım Depremi / Sel Taşkını (river_slope_quake_hazard >= 0.75)
+	var quake_cmd: EvaluateCataclysmCommand = EvaluateCataclysmCommand.new(Vector2i(7, 3), false, 16.0, false, 0.2, 5.0, 0.88)
+	_expect(CommandBus.dispatch(quake_cmd) and quake_cmd.triggered_type == GameEnums.CataclysmType.GREAT_FLOOD_QUAKE_EXODUS,
+		"High river/fault hazard (0.88) triggers GREAT_FLOOD_QUAKE_EXODUS.")
+	_expect(is_equal_approx(quake_cmd.structural_wear_ratio, 0.45) and quake_cmd.refugee_influx_count == 180,
+		"Great flood/quake inflicts 45% structural_wear on regional buildings and generates +180 refugee_influx.")
+
+	CataclysmEngine.clear_region_cataclysm(Vector2i(2, 2))
+	_expect(_cataclysm_subsided_signal_received and CataclysmEngine.get_active_region_cataclysm(Vector2i(2, 2)) == null,
+		"clear_region_cataclysm removes active cataclysm and emits cataclysm_subsided.")
+
+	EventBus.cataclysm_erupted.disconnect(_on_cataclysm_erupted)
+	EventBus.cataclysm_subsided.disconnect(_on_cataclysm_subsided)
+
+
+func _test_phase9_kinship_intrigue_and_internal_betrayal() -> void:
+	_kinship_plot_signal_received = false
+	_internal_betrayal_signal_received = false
+	_kinship_resolved_signal_received = false
+	EventBus.kinship_plot_escalated.connect(_on_kinship_plot_escalated)
+	EventBus.internal_betrayal_triggered.connect(_on_internal_betrayal_triggered)
+	EventBus.kinship_crisis_resolved.connect(_on_kinship_crisis_resolved)
+
+	var k_rules: KinshipIntrigueRules = KinshipIntrigueManager.get_rules()
+	_expect(k_rules != null and k_rules.get_validation_errors().is_empty(),
+		"KinshipIntrigueManager loaded KinshipIntrigueRules (res://data/governance/kinship_intrigue_rules.tres) cleanly.")
+
+	# 1. Unfair Toy/Ülüş share + low Kut escalates Bey into FACTION_PLOT_BREWING
+	var plot_cmd: StepKinshipIntrigueCommand = StepKinshipIntrigueCommand.new(&"inel_tigin_bey", true, true, 65.0, 1)
+	_expect(CommandBus.dispatch(plot_cmd) and _kinship_plot_signal_received and plot_cmd.resulting_stage == GameEnums.IntriguePlotStage.FACTION_PLOT_BREWING,
+		"Unfair Toy/Ülüş distribution pushes Bey into secret FACTION_PLOT_BREWING (faction_plot).")
+
+	# 2. Continued neglect escalates moderate-ambition Bey (65.0) to DEFECTION_OR_SABOTAGE (pulling 180 troops & sabotaging supply line)
+	var defect_cmd: StepKinshipIntrigueCommand = StepKinshipIntrigueCommand.new(&"inel_tigin_bey", true, false, 65.0, 1)
+	_expect(CommandBus.dispatch(defect_cmd) and _internal_betrayal_signal_received and defect_cmd.resulting_stage == GameEnums.IntriguePlotStage.DEFECTION_OR_SABOTAGE,
+		"Repeated Toy neglect escalates faction plot to DEFECTION_OR_SABOTAGE.")
+	_expect(defect_cmd.defected_troops == 180 and defect_cmd.supply_sabotaged,
+		"Defecting Bey pulls 180 troops from the army and sabotages the supply line.")
+
+	# 3. High-ambition surge (82.0 >= 75.0) + low-Kut crisis escalates Bey to full INTERNAL_UPRISING (360 troops)
+	var uprising_cmd: StepKinshipIntrigueCommand = StepKinshipIntrigueCommand.new(&"inel_tigin_bey", true, true, 82.0, 1)
+	_expect(CommandBus.dispatch(uprising_cmd) and uprising_cmd.resulting_stage == GameEnums.IntriguePlotStage.INTERNAL_UPRISING and uprising_cmd.defected_troops == 360,
+		"High ambition and low-Kut crisis trigger INTERNAL_UPRISING with 360 rebel troops.")
+
+	# 4. Player resolves intrigue via open-ended choices (Bestow Title & Ülüş vs Loyal Guard Suppression vs Kinship Negotiation)
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 200))
+	var resolve_bestow: ResolveKinshipIntrigueCommand = ResolveKinshipIntrigueCommand.new(1, &"inel_tigin_bey", GameEnums.IntrigueResolutionAction.BESTOW_TITLE_AND_TOY_SHARE)
+	_expect(CommandBus.dispatch(resolve_bestow) and _kinship_resolved_signal_received and resolve_bestow.resulting_stage == GameEnums.IntriguePlotStage.LOYAL_CALM,
+		"Bestowing title and Toy share spends treasury bullion and restores Bey to LOYAL_CALM.")
+	_expect(resolve_bestow.restored_loyalty >= 55.0 and KinshipIntrigueManager.get_lord_plot_stage(&"inel_tigin_bey") == GameEnums.IntriguePlotStage.LOYAL_CALM,
+		"KinshipLordRecord loyalty is restored and active plot stage cleared.")
+
+	EventBus.kinship_plot_escalated.disconnect(_on_kinship_plot_escalated)
+	EventBus.internal_betrayal_triggered.disconnect(_on_internal_betrayal_triggered)
+	EventBus.kinship_crisis_resolved.disconnect(_on_kinship_crisis_resolved)
+
+
+func _test_phase9_wounded_pool_and_veteran_attrition() -> void:
+	_battle_wounded_signal_received = false
+	_wounded_recovered_signal_received = false
+	_veteran_shock_signal_received = false
+	EventBus.battle_wounded_recorded.connect(_on_battle_wounded_recorded)
+	EventBus.wounded_troops_recovered.connect(_on_wounded_troops_recovered)
+	EventBus.veteran_casualty_shock_applied.connect(_on_veteran_casualty_shock_applied)
+
+	var casualty_comp: AttritionCasualtyComponent = AttritionCasualtyComponent.new()
+	add_child(casualty_comp)
+	casualty_comp.configure(77, 200, 0.80)
+	_expect(casualty_comp.profile != null and casualty_comp.profile.get_validation_errors().is_empty(),
+		"AttritionCasualtyComponent loaded default_attrition_casualty_profile.tres cleanly.")
+
+	# 1. Battle casualties split into wounded_pool (45%) and immediate dead (55%), slowing army movement and eroding veteran core
+	var report: Dictionary = casualty_comp.record_battle_casualties(60, 1.35, 0.22)
+	_expect(_battle_wounded_signal_received and _veteran_shock_signal_received,
+		"record_battle_casualties emits battle_wounded_recorded and veteran_casualty_shock_applied.")
+	_expect(casualty_comp.get_wounded_pool() == 27 and casualty_comp.get_permanent_dead() == 33 and casualty_comp.get_active_troops() == 140,
+		"60 fallen soldiers split into 27 wounded_pool survivors and 33 immediate dead, leaving 140 active troops.")
+	_expect(casualty_comp.get_wounded_speed_multiplier() < 1.0 and casualty_comp.get_veteran_ratio() < 0.80 and casualty_comp.get_tactical_efficiency_multiplier() < 1.0,
+		"Carrying wounded slows army movement, and losing veteran core + commander fatigue reduces tactical efficiency.")
+	_expect(report.has("wounded_added"), "record_battle_casualties returns detailed casualty breakdown dictionary.")
+
+	# 2. Field healer & camp supply treatment recovers wounded soldiers back to the ranks
+	var heal_report: Dictionary = casualty_comp.tick_wounded_treatment(true)
+	_expect(_wounded_recovered_signal_received and casualty_comp.get_active_troops() == 151 and casualty_comp.get_wounded_pool() == 16,
+		"Healer/supply support recovers 11 wounded soldiers back into active troops (140 -> 151).")
+	_expect(heal_report.has("recovered"), "tick_wounded_treatment returns treatment report.")
+
+	# 3. Neglecting wounded without supply/healer turns wounded into permanent losses
+	casualty_comp.tick_wounded_treatment(false)
+	_expect(casualty_comp.get_wounded_pool() == 10 and casualty_comp.get_permanent_dead() == 39,
+		"Without healer/supply support, 6 neglected wounded soldiers perish into permanent losses (33 -> 39).")
+
+	# 4. Reinforcing with raw recruits dilutes veteran ratio and lowers cohesion cap until acclimated
+	var vet_before_recruits: float = casualty_comp.get_veteran_ratio()
+	casualty_comp.reinforce_with_raw_recruits(90)
+	_expect(casualty_comp.get_active_troops() == 241 and casualty_comp.get_veteran_ratio() < vet_before_recruits and casualty_comp.get_effective_cohesion_cap() < 100.0,
+		"Reinforcing with 90 raw recruits dilutes veteran ratio and lowers immediate cohesion cap (< 100.0).")
+	var cap_before_drill: float = casualty_comp.get_effective_cohesion_cap()
+	casualty_comp.tick_cohesion_acclimation(4.0)
+	_expect(casualty_comp.get_effective_cohesion_cap() > cap_before_drill,
+		"Field acclimation gradually restores cohesion cap and relieves commander fatigue.")
+
+	EventBus.battle_wounded_recorded.disconnect(_on_battle_wounded_recorded)
+	EventBus.wounded_troops_recovered.disconnect(_on_wounded_troops_recovered)
+	EventBus.veteran_casualty_shock_applied.disconnect(_on_veteran_casualty_shock_applied)
+	casualty_comp.free()
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -1442,6 +1586,38 @@ func _on_force_detached(_p_id: int, _d_id: int, _role: GameEnums.DetachmentRole,
 
 func _on_forces_merged(_t_id: int, _d_id: int, _tot: int) -> void:
 	_forces_merged_signal_received = true
+
+
+func _on_cataclysm_erupted(_c_id: StringName, _c_type: GameEnums.CataclysmType, _coord: Vector2i, _p_mult: float, _c_mult: float, _wear: float, _ref: int) -> void:
+	_cataclysm_erupted_signal_received = true
+
+
+func _on_cataclysm_subsided(_c_id: StringName, _coord: Vector2i) -> void:
+	_cataclysm_subsided_signal_received = true
+
+
+func _on_kinship_plot_escalated(_b_id: StringName, _st: GameEnums.IntriguePlotStage, _loy: float, _amb: float, _grv: float) -> void:
+	_kinship_plot_signal_received = true
+
+
+func _on_internal_betrayal_triggered(_b_id: StringName, _st: GameEnums.IntriguePlotStage, _trp: int, _sab: bool, _kut: float) -> void:
+	_internal_betrayal_signal_received = true
+
+
+func _on_kinship_crisis_resolved(_b_id: StringName, _act: GameEnums.IntrigueResolutionAction, _loy: float) -> void:
+	_kinship_resolved_signal_received = true
+
+
+func _on_battle_wounded_recorded(_a_id: int, _new_w: int, _tot_w: int, _spd: float) -> void:
+	_battle_wounded_signal_received = true
+
+
+func _on_wounded_troops_recovered(_a_id: int, _rec: int, _rem_w: int) -> void:
+	_wounded_recovered_signal_received = true
+
+
+func _on_veteran_casualty_shock_applied(_a_id: int, _v_ratio: float, _tac: float, _coh: float) -> void:
+	_veteran_shock_signal_received = true
 
 
 
