@@ -28,11 +28,30 @@ extends Resource
 @export_range(0, 100000) var starting_food_reserve: int = 120
 @export_range(0, 100000) var winter_food_consumption_per_cycle: int = 60
 
+@export_group("Phase 4 Zud Epidemic & Kurgan Purification")
+## Base probability of Bozkır Vebası (`outbreak_epidemic`) when Food <= 0 during Winter/Zud.
+@export_range(0.0, 1.0, 0.01) var epidemic_outbreak_base_chance: float = 0.65
+## Additional outbreak probability inside a closed/isolated camp during Zud starvation.
+@export_range(0.0, 1.0, 0.01) var closed_camp_epidemic_bonus_chance: float = 0.25
+## Movement speed multiplier applied to plague-stricken armies (0.50 = speed halved).
+@export_range(0.1, 1.0, 0.01) var epidemic_speed_multiplier: float = 0.50
+## Daily fractional troop attrition suffered while infected by the steppe plague.
+@export_range(0.005, 0.50, 0.005) var epidemic_daily_troop_attrition_ratio: float = 0.08
+## Kut cost required to perform a purification ritual at a Kurgan Shrine (`kurgan_shrine.tres`) or infirmary.
+@export_range(1.0, 100.0, 0.5) var kurgan_purification_kut_cost: float = 12.0
+@export var kurgan_shrine_building_id: StringName = &"kurgan_shrine"
+
 
 ## Computes Kut drain for the Nth consecutive battle defeat (N >= 1).
 func compute_battle_loss_drain(consecutive_losses: int) -> float:
 	var streak: int = maxi(consecutive_losses, 1)
 	return battle_loss_base_kut_drain + float(streak - 1) * consecutive_loss_escalation
+
+
+## Computes total probability (`0..1`) of a Zud steppe plague outbreak when Food <= 0.
+func compute_epidemic_outbreak_chance(is_closed_camp: bool) -> float:
+	var bonus: float = closed_camp_epidemic_bonus_chance if is_closed_camp else 0.0
+	return clampf(epidemic_outbreak_base_chance + bonus, 0.0, 1.0)
 
 
 ## Returns schema violations (empty when valid).
@@ -42,4 +61,9 @@ func get_validation_errors() -> PackedStringArray:
 		errors.append("KutRules: max_kut must be > 0.")
 	if critical_kut_threshold <= 0.0 or critical_kut_threshold >= max_kut:
 		errors.append("KutRules: critical_kut_threshold must lie in (0, max_kut).")
+	if epidemic_speed_multiplier <= 0.0 or epidemic_speed_multiplier > 1.0:
+		errors.append("KutRules: epidemic_speed_multiplier must lie in (0, 1].")
+	if kurgan_purification_kut_cost <= 0.0:
+		errors.append("KutRules: kurgan_purification_kut_cost must be > 0.")
 	return errors
+

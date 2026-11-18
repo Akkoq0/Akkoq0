@@ -33,6 +33,8 @@ func _ready() -> void:
 	mobility.movement_blocked.connect(_on_movement_blocked)
 	supply.supply_changed.connect(_on_supply_changed)
 	supply.remount_horse_ratio_changed.connect(_on_remount_horse_ratio_changed)
+	EventBus.outbreak_epidemic_started.connect(_on_outbreak_epidemic_started)
+	EventBus.epidemic_purified_at_kurgan.connect(_on_epidemic_purified_at_kurgan)
 	_is_operational = true
 	EventBus.army_spawned.emit(army_id, owner_id, global_position)
 
@@ -122,3 +124,14 @@ func _on_supply_changed(supply_ratio: float, is_connected: bool) -> void:
 
 func _on_remount_horse_ratio_changed(new_ratio: float) -> void:
 	mobility.set_remount_horse_ratio(new_ratio)
+
+
+func _on_outbreak_epidemic_started(infected_army_id: int, speed_multiplier: float, _daily_attrition_ratio: float) -> void:
+	if infected_army_id == army_id:
+		mobility.set_epidemic_speed_multiplier(speed_multiplier)
+
+
+func _on_epidemic_purified_at_kurgan(purified_army_id: int, _shrine_building_id: StringName, _kut_spent: float) -> void:
+	if purified_army_id == army_id:
+		mobility.set_epidemic_speed_multiplier(1.0)
+

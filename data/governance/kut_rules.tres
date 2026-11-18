@@ -15,3 +15,10 @@ legitimacy_loss_penalty = 0.25
 trigger_civil_skirmish_on_critical = true
 starting_food_reserve = 120
 winter_food_consumption_per_cycle = 60
+epidemic_outbreak_base_chance = 0.65
+closed_camp_epidemic_bonus_chance = 0.25
+epidemic_speed_multiplier = 0.50
+epidemic_daily_troop_attrition_ratio = 0.08
+kurgan_purification_kut_cost = 12.0
+kurgan_shrine_building_id = &"kurgan_shrine"
+

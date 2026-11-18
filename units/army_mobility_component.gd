@@ -30,6 +30,7 @@ var _cargo_weight: float = 0.0
 var _remount_horse_ratio: float = 1.0
 var _terrain_multiplier: float = 1.0
 var _season_multiplier: float = 1.0
+var _epidemic_multiplier: float = 1.0
 var _destination: Vector3 = Vector3.ZERO
 var _has_destination: bool = false
 var _current_speed: float = 0.0
@@ -81,6 +82,7 @@ func configure(template: ArmyTemplate) -> bool:
 	_unit_weight = template.get_total_unit_weight()
 	_carry_capacity = template.get_total_carry_capacity()
 	_remount_horse_ratio = _profile.optimal_remount_horse_ratio
+	_epidemic_multiplier = 1.0
 	return true
 
 
@@ -114,6 +116,15 @@ func get_remount_horse_ratio() -> float:
 	return _remount_horse_ratio
 
 
+## Sets the Zud epidemic speed multiplier (`0.50` when plague-stricken, `1.0` when healthy).
+func set_epidemic_speed_multiplier(mult: float) -> void:
+	_epidemic_multiplier = clampf(mult, 0.1, 1.0)
+
+
+func get_epidemic_speed_multiplier() -> float:
+	return _epidemic_multiplier
+
+
 ## Applies the movement multiplier of the terrain currently under the army.
 func set_terrain(terrain: TerrainData) -> void:
 	_terrain_multiplier = terrain.get_effective_movement_multiplier() if terrain != null else 1.0
@@ -135,11 +146,11 @@ func is_moving() -> bool:
 	return _has_destination
 
 
-## Desired cruising speed with weight, Yılkı remount, terrain, and season multipliers applied.
+## Desired cruising speed with weight, Yılkı remount, terrain, season, and epidemic multipliers applied.
 func get_target_speed() -> float:
 	var weighted: float = calculate_weighted_speed(_base_speed, get_total_weight(), _carry_capacity, _profile)
 	var remount_mult: float = calculate_remount_speed_multiplier(_remount_horse_ratio, _profile)
-	return weighted * remount_mult * _terrain_multiplier * _season_multiplier
+	return weighted * remount_mult * _terrain_multiplier * _season_multiplier * _epidemic_multiplier
 
 
 func _physics_process(delta: float) -> void:
