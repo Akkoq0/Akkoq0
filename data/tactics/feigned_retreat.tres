@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="TacticalDoctrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/tactics/tactical_doctrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"feigned_retreat"
+display_name = "Kurt Oyunu / Sahte Ricat (Feigned Retreat)"
+description = "Classic Turan tactical withdrawal that stretches pursuing formations until their armor cohesion collapses by up to 45%."
+doctrine_type = 1
+dust_screen_vision_reduction_ratio = 0.45
+deceptive_army_size_multiplier = 1.65
+optimal_skirmish_range_m = 48.0
+quiver_ammo_consumption_per_volley = 8.0
+whistling_arrow_physical_damage = 18.0
+whistling_arrow_cohesion_damage = 14.0
+whistling_arrow_morale_damage = 11.0
+entropy_gain_per_meter = 0.008
+fatigue_gain_per_meter = 0.006
+critical_entropy_threshold = 0.6
+max_armor_collapse_ratio = 0.45
+lure_ambition_weight = 1.35
+min_crescent_flank_angle_rad = 2.042035
+ambush_terrain_classes = Array[int]([2, 3])
+encirclement_cohesion_shock = 28.0
+boru_charge_mass_factor = 1.45
+boru_steel_shock_multiplier = 1.35
+boru_meteoric_iron_shock_multiplier = 1.5

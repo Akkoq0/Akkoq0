@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="TacticalDoctrineData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/tactics/tactical_doctrine_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"steppe_ambush"
+display_name = "Bozkır Pususu (Steppe Ambush)"
+description = "Concealed flankers in Sık Orman and Damarlı Yamaç spring shut on overextended columns."
+doctrine_type = 3
+dust_screen_vision_reduction_ratio = 0.6
+deceptive_army_size_multiplier = 0.55
+optimal_skirmish_range_m = 42.0
+quiver_ammo_consumption_per_volley = 7.0
+whistling_arrow_physical_damage = 20.0
+whistling_arrow_cohesion_damage = 18.0
+whistling_arrow_morale_damage = 15.0
+entropy_gain_per_meter = 0.009
+fatigue_gain_per_meter = 0.007
+critical_entropy_threshold = 0.55
+max_armor_collapse_ratio = 0.45
+lure_ambition_weight = 1.4
+min_crescent_flank_angle_rad = 2.042035
+ambush_terrain_classes = Array[int]([2, 3])
+encirclement_cohesion_shock = 36.0
+boru_charge_mass_factor = 1.55
+boru_steel_shock_multiplier = 1.4
+boru_meteoric_iron_shock_multiplier = 1.6

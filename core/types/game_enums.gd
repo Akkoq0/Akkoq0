@@ -22,6 +22,14 @@ enum TerrainType {
 	LAKE = 7,
 }
 
+## Tactical steppe terrain archetypes for combat & ambush bonuses.
+enum TerrainClass {
+	BEREKET_HAVZASI = 0, ## Open fertile basin: cavalry charge momentum bonus.
+	HAKIMIYET_PLATOSU = 1, ## High plateau: elevated bow range & arrow damage bonus.
+	SIK_ORMAN = 2, ## Dense forest: ambush concealment & Crescent trap seal.
+	DAMARLI_YAMAC = 3, ## Veined rocky slope: chokepoint defense & trap seal.
+}
+
 ## High-level application state machine.
 enum GameState {
 	BOOT = 0,
@@ -36,7 +44,38 @@ enum SeasonType {
 	SPRING = 0, ## Bahar
 	SUMMER = 1, ## Yaz
 	AUTUMN = 2, ## Güz
-	WINTER = 3, ## Kış
+	WINTER = 3, ## Kış / Zud
+}
+
+## 5-stage deterministic Turan Tactic finite state machine phases.
+enum TuranTacticPhase {
+	RECON_DUST_SCREEN = 0, ## Keşif ve Toz Perdesi
+	WHISTLING_ARROW_HARASSMENT = 1, ## Islıklı Ok Yağmuru & Vur-Kaç
+	FEIGNED_RETREAT_LURE = 2, ## Sahte Ricat & Bozkır Çekimi
+	CRESCENT_ENCIRCLEMENT_TRAP = 3, ## Hilal Kapanı & Pusu Kıskacı
+	BORU_SHOCK_ANNIHILATION = 4, ## Börü Ağır Kargı İmhası
+}
+
+## High-level nomadic military doctrines.
+enum TacticalDoctrineType {
+	STANDARD_CHARGE = 0,
+	FEIGNED_RETREAT = 1,
+	CRESCENT_ENCIRCLEMENT = 2,
+	STEPPE_AMBUSH = 3,
+}
+
+## Vectorial engagement sector derived from attack vs facing dot product.
+enum CombatEngagementAngle {
+	FRONT = 0, ## 1.0x damage, 1.0x cohesion destruction.
+	FLANK = 1, ## 1.45x damage, 2.0x cohesion destruction.
+	REAR = 2, ## 2.1x damage, 2.0x cohesion destruction + instant panic.
+}
+
+## Operational connectivity state of an army's supply corridor.
+enum SupplyLineStatus {
+	CONNECTED = 0,
+	UNCONNECTED = 1,
+	ISOLATED = 2, ## Active convoy interdicted / severed by raiders.
 }
 
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
