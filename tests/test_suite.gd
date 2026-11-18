@@ -31,6 +31,14 @@ var _worker_started_signal_received: bool = false
 var _worker_delivered_signal_received: bool = false
 var _ai_phase_changed_signal_received: bool = false
 var _ai_raid_launched_signal_received: bool = false
+var _pasture_depleted_signal_received: bool = false
+var _camp_migrated_signal_received: bool = false
+var _overgrazing_rebellion_signal_received: bool = false
+var _wind_changed_signal_received: bool = false
+var _volley_resolved_signal_received: bool = false
+var _noble_captives_signal_received: bool = false
+var _captive_labor_signal_received: bool = false
+var _slave_revolt_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -61,10 +69,13 @@ func _run_suite() -> void:
 	_test_phase6_micro_building_placement_and_collision()
 	_test_phase6_worker_gathering_caravan_pipeline()
 	_test_phase6_ai_commander_and_raider_loop()
+	_test_phase7_pasture_ecology_and_sefer_arabasi_migration()
+	_test_phase7_vectorial_wind_and_atmospheric_ballistics()
+	_test_phase7_tore_captive_labor_and_revolt_risk()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -981,6 +992,143 @@ func _test_phase6_ai_commander_and_raider_loop() -> void:
 	EventBus.ai_raid_launched.disconnect(_on_ai_raid_launched)
 
 
+func _test_phase7_pasture_ecology_and_sefer_arabasi_migration() -> void:
+	_pasture_depleted_signal_received = false
+	_camp_migrated_signal_received = false
+	_overgrazing_rebellion_signal_received = false
+	EventBus.pasture_depleted_starving_livestock.connect(_on_pasture_depleted)
+	EventBus.camp_migrated_by_sefer_arabasi.connect(_on_camp_migrated)
+	EventBus.overgrazing_rebellion_triggered.connect(_on_overgrazing_rebellion)
+
+	var p_data: PastureData = PastureEcologyManager.get_pasture_data()
+	_expect(p_data != null and p_data.get_validation_errors().is_empty(),
+		"PastureEcologyManager loaded PastureData (res://data/world/pasture_data.tres) cleanly.")
+
+	var region_a: Vector2i = Vector2i(2, 5)
+	var region_b: Vector2i = Vector2i(3, 6)
+	_expect(is_equal_approx(PastureEcologyManager.get_region_pasture_capacity(region_a), 100.0),
+		"Fresh macro region starts at 100.0 pasture capacity.")
+
+	# 1. Graze 700 Yılkı & sheep (700 * 0.08 = 56.0 depletion -> 44.0 remaining, still LUSH)
+	var graze1: GrazePastureCommand = GrazePastureCommand.new(1, region_a, 700, 1.0)
+	_expect(CommandBus.dispatch(graze1) and is_equal_approx(graze1.remaining_capacity, 44.0),
+		"Grazing 700 livestock depletes pasture capacity by 56.0 according to pasture_depletion_rate (0.08).")
+	_expect(not graze1.starving_livestock and is_equal_approx(graze1.meat_milk_production_multiplier, 1.0),
+		"Meat and milk production remain at 100% while pasture is not depleted.")
+
+	# 2. Overgraze to 0.0 -> starving_livestock, meat/milk stops (0.0), mandatory Sefer Arabası migration
+	var graze2: GrazePastureCommand = GrazePastureCommand.new(1, region_a, 700, 1.0)
+	_expect(CommandBus.dispatch(graze2) and is_zero_approx(graze2.remaining_capacity),
+		"Sustained grazing exhausts regional pasture capacity to 0.0.")
+	_expect(_pasture_depleted_signal_received and graze2.starving_livestock and graze2.migration_required,
+		"Overgrazing triggers starving_livestock, halts meat/milk production (0.0), and requires Sefer Arabası migration.")
+	_expect(is_zero_approx(PastureEcologyManager.get_meat_milk_production_multiplier(1)),
+		"PastureEcologyManager reports 0.0 meat/milk production multiplier during livestock starvation.")
+
+	# 3. Refusing to migrate triggers clan and army rebellion
+	var kut_before: float = GameManager.get_kut_score()
+	var graze3: GrazePastureCommand = GrazePastureCommand.new(1, region_a, 700, 1.0)
+	_expect(CommandBus.dispatch(graze3) and graze3.rebellion_triggered and _overgrazing_rebellion_signal_received,
+		"Remaining in a depleted pasture without migrating triggers clan and army rebellion.")
+	_expect(GameManager.get_kut_score() < kut_before and PastureEcologyManager.is_overgrazing_rebellion_active(1),
+		"Overgrazing rebellion drains Khagan's Kut score.")
+
+	# 4. Relocating camp via Sefer Arabası to fresh waterside pasture restores production and ends rebellion
+	var migrate_cmd: MigrateCampToPastureCommand = MigrateCampToPastureCommand.new(1, region_b)
+	_expect(CommandBus.dispatch(migrate_cmd) and _camp_migrated_signal_received,
+		"MigrateCampToPastureCommand relocates camp via Sefer Arabası to fresh waterside region (3, 6).")
+	_expect(not PastureEcologyManager.is_livestock_starving(1) and not PastureEcologyManager.is_overgrazing_rebellion_active(1) and is_equal_approx(PastureEcologyManager.get_meat_milk_production_multiplier(1), 1.0),
+		"Sefer Arabası migration clears starving_livestock, ends rebellion, and restores 100% meat/milk production.")
+
+	EventBus.pasture_depleted_starving_livestock.disconnect(_on_pasture_depleted)
+	EventBus.camp_migrated_by_sefer_arabasi.disconnect(_on_camp_migrated)
+	EventBus.overgrazing_rebellion_triggered.disconnect(_on_overgrazing_rebellion)
+
+
+func _test_phase7_vectorial_wind_and_atmospheric_ballistics() -> void:
+	_wind_changed_signal_received = false
+	_volley_resolved_signal_received = false
+	EventBus.wind_weather_changed.connect(_on_wind_weather_changed)
+	EventBus.atmospheric_volley_resolved.connect(_on_atmospheric_volley_resolved)
+
+	var b_rules: BallisticsRules = BallisticsEngine.get_rules()
+	_expect(b_rules != null and b_rules.get_validation_errors().is_empty(),
+		"BallisticsEngine loaded BallisticsRules (res://data/combat/ballistics_rules.tres) cleanly.")
+
+	# 1. Tailwind (Arkadan Esen Rüzgar): wind blowing North (0, 0, -8), archers shooting North (0, 0, -1)
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -8.0), 16.0, false)
+	_expect(_wind_changed_signal_received, "set_steppe_wind_weather emits wind_weather_changed.")
+
+	var tailwind_cmd: EvaluateAtmosphericVolleyCommand = EvaluateAtmosphericVolleyCommand.new(1, Vector3(0.0, 0.0, -1.0), 12.0, 8.0)
+	_expect(CommandBus.dispatch(tailwind_cmd) and _volley_resolved_signal_received,
+		"EvaluateAtmosphericVolleyCommand resolves tailwind volley.")
+	_expect(tailwind_cmd.result.weather_state == GameEnums.WindWeatherState.TAILWIND_BREEZE,
+		"Aligned wind vector (dot = 1.0) classifies as TAILWIND_BREEZE.")
+	_expect(is_equal_approx(tailwind_cmd.result.range_multiplier, 1.25) and is_equal_approx(tailwind_cmd.result.effective_range_m, 150.0),
+		"Tailwind increases arrow range by +25% (120m -> 150m).")
+	_expect(tailwind_cmd.result.accuracy_multiplier > 1.0,
+		"Tailwind increases formation hit accuracy (1.20x).")
+
+	# 2. Pre-Zud Headwind / Crosswind Gale Storm (Önden/Yandan Esen Şiddetli Fırtına):
+	#    wind blowing South-East (12, 0, 12), temperature -12 C, archers shooting North (0, 0, -1)
+	BallisticsEngine.set_steppe_wind_weather(Vector3(12.0, 0.0, 12.0), -12.0, true)
+	var storm_cmd: EvaluateAtmosphericVolleyCommand = EvaluateAtmosphericVolleyCommand.new(1, Vector3(0.0, 0.0, -1.0), 12.0, 8.0)
+	_expect(CommandBus.dispatch(storm_cmd) and storm_cmd.result.weather_state == GameEnums.WindWeatherState.PRE_ZUD_GALE_STORM,
+		"Severe headwind/crosswind before Zud classifies as PRE_ZUD_GALE_STORM.")
+	_expect(storm_cmd.result.range_multiplier < 1.0 and storm_cmd.result.accuracy_multiplier < 1.0,
+		"Pre-Zud gale storm reduces bow range (0.70x) and accuracy (0.65x).")
+	_expect(storm_cmd.effective_morale_shock < tailwind_cmd.effective_morale_shock and storm_cmd.effective_quiver_ammo_cost > tailwind_cmd.effective_quiver_ammo_cost,
+		"Pre-Zud gale storm weakens whistling arrow morale shock (0.60x) and increases quiver ammo consumption (1.35x).")
+
+	EventBus.wind_weather_changed.disconnect(_on_wind_weather_changed)
+	EventBus.atmospheric_volley_resolved.disconnect(_on_atmospheric_volley_resolved)
+
+
+func _test_phase7_tore_captive_labor_and_revolt_risk() -> void:
+	_noble_captives_signal_received = false
+	_captive_labor_signal_received = false
+	_slave_revolt_signal_received = false
+	EventBus.noble_captives_ransomed_or_exchanged.connect(_on_noble_captives_processed)
+	EventBus.captive_labor_assigned.connect(_on_captive_labor_assigned)
+	EventBus.slave_revolt_triggered.connect(_on_slave_revolt_triggered)
+
+	var c_rules: CaptiveLaborRules = CaptiveLaborManager.get_rules()
+	_expect(c_rules != null and c_rules.get_validation_errors().is_empty(),
+		"CaptiveLaborManager loaded CaptiveLaborRules (res://data/governance/captive_labor_rules.tres) cleanly.")
+
+	# 1. Soylular ve Beyler: Ransom into Silver/Gold treasury & Envoy Exchange
+	var bullion_before: int = ResourceManager.get_amount(2, &"silver_gold")
+	var ransom_cmd: ProcessNobleCaptivesCommand = ProcessNobleCaptivesCommand.new(2, 3, ProcessNobleCaptivesCommand.MODE_RANSOM)
+	_expect(CommandBus.dispatch(ransom_cmd) and _noble_captives_signal_received,
+		"ProcessNobleCaptivesCommand ransoms 3 captured enemy nobles.")
+	_expect(ransom_cmd.bullion_gained == 105 and ResourceManager.get_amount(2, &"silver_gold") == bullion_before + 105,
+		"Ransoming 3 enemy nobles deposits +105 Silver/Gold bullion into treasury.")
+
+	var exchange_cmd: ProcessNobleCaptivesCommand = ProcessNobleCaptivesCommand.new(2, 2, ProcessNobleCaptivesCommand.MODE_ENVOY_EXCHANGE)
+	_expect(CommandBus.dispatch(exchange_cmd) and is_equal_approx(exchange_cmd.diplomatic_trust_gained, 24.0),
+		"Exchanging 2 captured nobles for diplomatic envoys yields +24.0 trust credit.")
+
+	# 2. Sıradan Askerler ve Esirler: 30% discount on Quarry & NomadicForge construction time & production costs
+	var labor_safe_cmd: AssignCaptiveLaborCommand = AssignCaptiveLaborCommand.new(2, 30, 120)
+	_expect(CommandBus.dispatch(labor_safe_cmd) and _captive_labor_signal_received,
+		"AssignCaptiveLaborCommand assigns 30 captive workers to Quarry and NomadicForge.")
+	_expect(is_equal_approx(labor_safe_cmd.discount_ratio, 0.30) and is_equal_approx(labor_safe_cmd.construction_time_multiplier, 0.70) and is_equal_approx(labor_safe_cmd.production_cost_multiplier, 0.70),
+		"Full captive labor pool reduces construction_time and raw material production costs by 30% (0.70x multiplier).")
+	_expect(is_zero_approx(labor_safe_cmd.slave_revolt_risk) and not labor_safe_cmd.revolt_triggered,
+		"No slave revolt risk when captive workers (30) do not exceed core clan population (120).")
+
+	# 3. Slave Revolt Risk when captive workers exceed core clan population (150 > 120)
+	var labor_revolt_cmd: AssignCaptiveLaborCommand = AssignCaptiveLaborCommand.new(2, 120, 120)
+	_expect(CommandBus.dispatch(labor_revolt_cmd) and labor_revolt_cmd.revolt_triggered and _slave_revolt_signal_received,
+		"Exceeding core clan population (150 captives > 120 clan pop) triggers slave_revolt_risk and emits slave_revolt_triggered.")
+	_expect(labor_revolt_cmd.slave_revolt_risk > 0.0 and CaptiveLaborManager.get_slave_revolt_risk(2) > 0.0,
+		"CaptiveLaborManager computes positive slave_revolt_risk when captives outnumber clan population.")
+
+	EventBus.noble_captives_ransomed_or_exchanged.disconnect(_on_noble_captives_processed)
+	EventBus.captive_labor_assigned.disconnect(_on_captive_labor_assigned)
+	EventBus.slave_revolt_triggered.disconnect(_on_slave_revolt_triggered)
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -1092,5 +1240,38 @@ func _on_ai_commander_phase_changed(_agent_id: StringName, _prev: GameEnums.AICo
 
 func _on_ai_raid_launched(_agent_id: StringName, _rogue: bool, _target: StringName, _army_id: int, _phase: GameEnums.TuranTacticPhase, _amb: float, _disc: float) -> void:
 	_ai_raid_launched_signal_received = true
+
+
+func _on_pasture_depleted(_coord: Vector2i, _herd: int, _mig: bool) -> void:
+	_pasture_depleted_signal_received = true
+
+
+func _on_camp_migrated(_p_id: int, _from: Vector2i, _to: Vector2i, _cap: float) -> void:
+	_camp_migrated_signal_received = true
+
+
+func _on_overgrazing_rebellion(_p_id: int, _coord: Vector2i, _kut: float) -> void:
+	_overgrazing_rebellion_signal_received = true
+
+
+func _on_wind_weather_changed(_wind: Vector3, _temp: float, _state: GameEnums.WindWeatherState) -> void:
+	_wind_changed_signal_received = true
+
+
+func _on_atmospheric_volley_resolved(_s_id: int, _rng: float, _acc: float, _mor: float, _ammo: float) -> void:
+	_volley_resolved_signal_received = true
+
+
+func _on_noble_captives_processed(_p_id: int, _cnt: int, _mode: StringName, _bul: int, _tr: float) -> void:
+	_noble_captives_signal_received = true
+
+
+func _on_captive_labor_assigned(_p_id: int, _slaves: int, _pop: int, _t_disc: float, _c_disc: float) -> void:
+	_captive_labor_signal_received = true
+
+
+func _on_slave_revolt_triggered(_p_id: int, _slaves: int, _pop: int, _risk: float) -> void:
+	_slave_revolt_signal_received = true
+
 
 
