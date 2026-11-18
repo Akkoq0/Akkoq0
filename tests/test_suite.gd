@@ -26,6 +26,11 @@ var _coalition_war_signal_received: bool = false
 var _council_decree_signal_received: bool = false
 var _glory_changed_signal_received: bool = false
 var _warband_joined_by_glory_signal_received: bool = false
+var _building_placed_signal_received: bool = false
+var _worker_started_signal_received: bool = false
+var _worker_delivered_signal_received: bool = false
+var _ai_phase_changed_signal_received: bool = false
+var _ai_raid_launched_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -53,10 +58,13 @@ func _run_suite() -> void:
 	_test_phase5_dynasty_threat_matrix_and_coalition_war()
 	_test_phase5_ak_sakallilar_council_dilemmas()
 	_test_phase5_kagan_glory_and_warband_recruitment()
+	_test_phase6_micro_building_placement_and_collision()
+	_test_phase6_worker_gathering_caravan_pipeline()
+	_test_phase6_ai_commander_and_raider_loop()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -785,6 +793,194 @@ func _test_phase5_kagan_glory_and_warband_recruitment() -> void:
 	glory_comp.free()
 
 
+func _test_phase6_micro_building_placement_and_collision() -> void:
+	_building_placed_signal_received = false
+	EventBus.building_placed_on_micro_grid.connect(_on_building_placed_on_micro_grid)
+
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var zone: MicroZoneState = MicroZoneState.new(Vector2i(2, 2), Vector2i(16, 16), 1.0, Vector3.ZERO)
+	for y: int in range(16):
+		for x: int in range(16):
+			var tile: MicroTile = MicroTile.new(Vector2i(x, y), 0.35, steppe)
+			tile.is_settlement_clearing = true
+			zone.set_tile(tile)
+	BuildingPlacementManager.set_active_zone(zone)
+
+	var ger: BuildingData = BuildingPlacementManager.get_building_data(&"ger_camp")
+	var forge: BuildingData = BuildingPlacementManager.get_building_data(&"nomadic_forge")
+	var quarry: BuildingData = BuildingPlacementManager.get_building_data(&"quarry")
+	var kurgan: BuildingData = BuildingPlacementManager.get_building_data(&"kurgan_shrine")
+	_expect(ger != null and forge != null and quarry != null and kurgan != null,
+		"BuildingPlacementManager registers ger_camp, nomadic_forge, quarry, and kurgan_shrine.")
+
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"stone", 500))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"iron", 120))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"jade", 40))
+	var stone_before: int = ResourceManager.get_amount(1, &"stone")
+	var iron_before: int = ResourceManager.get_amount(1, &"iron")
+	var jade_before: int = ResourceManager.get_amount(1, &"jade")
+
+	# 1. Place GerCamp (2x2 footprint) at (1, 1)
+	var place_ger: PlaceBuildingCommand = PlaceBuildingCommand.new(1, ger, Vector2i(1, 1), zone)
+	_expect(CommandBus.dispatch(place_ger) and _building_placed_signal_received,
+		"PlaceBuildingCommand places ger_camp at grid (1, 1) and emits building_placed_on_micro_grid.")
+	_expect(ResourceManager.get_amount(1, &"stone") == stone_before - 60,
+		"GerCamp placement deducts 60 Stone construction cost from treasury.")
+
+	# 2. Collision check: overlapping placement at (1, 1) or (2, 2) must be rejected
+	_expect(not BuildingPlacementManager.can_place_at_grid(zone, forge, Vector2i(1, 1)),
+		"can_place_at_grid blocks overlapping building placement at occupied origin (1, 1).")
+	_expect(not BuildingPlacementManager.can_place_at_grid(zone, forge, Vector2i(2, 2)),
+		"can_place_at_grid blocks partial footprint overlap at (2, 2).")
+	var overlap_cmd: PlaceBuildingCommand = PlaceBuildingCommand.new(1, forge, Vector2i(2, 2), zone)
+	_expect(not CommandBus.dispatch(overlap_cmd),
+		"PlaceBuildingCommand rejects overlapping building placement without deducting resources.")
+
+	# 3. Mouse world-click grid snapping for NomadicForge (2x3) near tile (4, 1)
+	var place_forge: PlaceBuildingCommand = PlaceBuildingCommand.new(1, forge, Vector2i.ZERO, zone)
+	place_forge.use_world_click = true
+	place_forge.world_click_position = zone.tile_to_world(Vector2i(4, 1)) + Vector3(0.24, 0.0, -0.19)
+	_expect(CommandBus.dispatch(place_forge) and place_forge.snapped_grid_coord == Vector2i(4, 1),
+		"Mouse world-click position snaps accurately to micro grid (4, 1) for nomadic_forge.")
+
+	# 4. Place Quarry (3x3) at (7, 1) and KurganShrine (3x3) at (11, 1)
+	var place_quarry: PlaceBuildingCommand = PlaceBuildingCommand.new(1, quarry, Vector2i(7, 1), zone)
+	var place_kurgan: PlaceBuildingCommand = PlaceBuildingCommand.new(1, kurgan, Vector2i(11, 1), zone)
+	_expect(CommandBus.dispatch(place_quarry) and CommandBus.dispatch(place_kurgan),
+		"Quarry and KurganShrine place cleanly on non-overlapping micro grid coordinates.")
+	_expect(BuildingPlacementManager.get_placed_building_count() == 4,
+		"All 4 buildings (ger_camp, nomadic_forge, quarry, kurgan_shrine) are active on the micro grid.")
+	_expect(ResourceManager.get_amount(1, &"stone") == stone_before - 410 and ResourceManager.get_amount(1, &"iron") == iron_before - 70 and ResourceManager.get_amount(1, &"jade") == jade_before - 15,
+		"Total construction costs (410 Stone, 70 Iron, 15 Jade) deducted accurately from treasury.")
+
+	EventBus.building_placed_on_micro_grid.disconnect(_on_building_placed_on_micro_grid)
+
+
+func _test_phase6_worker_gathering_caravan_pipeline() -> void:
+	_worker_started_signal_received = false
+	_worker_delivered_signal_received = false
+	EventBus.worker_gathering_started.connect(_on_worker_gathering_started)
+	EventBus.worker_caravan_delivered.connect(_on_worker_caravan_delivered)
+
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var stone_ore: OreData = ResourceLoader.load("res://data/ores/stone.tres") as OreData
+	var iron_ore: OreData = ResourceLoader.load("res://data/ores/iron.tres") as OreData
+	var coal_ore: OreData = ResourceLoader.load("res://data/ores/coal.tres") as OreData
+
+	var zone: MicroZoneState = MicroZoneState.new(Vector2i(4, 4), Vector2i(16, 16), 1.0, Vector3.ZERO)
+	for y: int in range(16):
+		for x: int in range(16):
+			zone.set_tile(MicroTile.new(Vector2i(x, y), 0.35, steppe))
+
+	var stone_tile: MicroTile = zone.get_tile(Vector2i(3, 1))
+	stone_tile.ore = stone_ore
+	stone_tile.ore_amount = 50
+
+	var iron_tile: MicroTile = zone.get_tile(Vector2i(1, 4))
+	iron_tile.ore = iron_ore
+	iron_tile.ore_amount = 45
+
+	var coal_tile: MicroTile = zone.get_tile(Vector2i(4, 4))
+	coal_tile.ore = coal_ore
+	coal_tile.ore_amount = 40
+
+	var forest_tile: MicroTile = MicroTile.new(Vector2i(2, 3), 0.40, forest)
+	zone.set_tile(forest_tile)
+
+	var ger_world_pos: Vector3 = zone.tile_to_world(Vector2i(1, 1))
+	var worker: WorkerGatheringComponent = WorkerGatheringComponent.new()
+	add_child(worker)
+	worker.configure(101, 1, ger_world_pos)
+
+	var iron_before: int = ResourceManager.get_amount(1, &"iron")
+	_expect(worker.assign_nearest_gather_job(zone, &"iron") and _worker_started_signal_received,
+		"Oymak İşçileri worker detachment locates nearest Iron vein at (1, 4) and begins marching.")
+	_expect(worker.get_state() == GameEnums.WorkerGatherState.WALKING_TO_RESOURCE,
+		"Worker enters WALKING_TO_RESOURCE state.")
+
+	# March 3.0m at 4.0m/s -> 1.0s reaches the Iron vein and enters HARVESTING
+	worker.tick_gathering(1.0)
+	_expect(worker.get_state() == GameEnums.WorkerGatherState.HARVESTING,
+		"Worker reaches Iron vein and enters HARVESTING state.")
+
+	# Harvest for 2.0s -> extracts 20 Iron and transitions to HAULING_TO_GER_CAMP
+	worker.tick_gathering(2.1)
+	_expect(worker.get_state() == GameEnums.WorkerGatherState.HAULING_TO_GER_CAMP and worker.get_carried_amount() == 20 and iron_tile.ore_amount == 25,
+		"Worker extracts 20 Iron from vein and transitions to physical caravan hauling.")
+
+	# Haul 3.0m back to GerCamp at 3.0m/s -> deposits into GerCamp stockpile
+	worker.tick_gathering(1.2)
+	_expect(_worker_delivered_signal_received and worker.get_state() == GameEnums.WorkerGatherState.IDLE,
+		"Caravan arrives at GerCamp, emits worker_caravan_delivered, and returns to IDLE.")
+	_expect(ResourceManager.get_amount(1, &"iron") == iron_before + 20 and worker.get_total_delivered(&"iron") == 20,
+		"Delivered Iron cargo (+20) is deposited into the player's GerCamp treasury.")
+
+	# Gather Wood timber from Forest tile at (2, 3)
+	_expect(worker.assign_nearest_gather_job(zone, &"wood"),
+		"Oymak İşçileri locates nearest Forest timber zone for Wood gathering.")
+	worker.tick_gathering(1.0)
+	worker.tick_gathering(2.1)
+	worker.tick_gathering(1.2)
+	_expect(worker.get_total_delivered(&"wood") == 20,
+		"Oymak İşçileri harvests and hauls 20 Wood from Forest tile to GerCamp.")
+
+	EventBus.worker_gathering_started.disconnect(_on_worker_gathering_started)
+	EventBus.worker_caravan_delivered.disconnect(_on_worker_caravan_delivered)
+	worker.free()
+
+
+func _test_phase6_ai_commander_and_raider_loop() -> void:
+	_ai_phase_changed_signal_received = false
+	_ai_raid_launched_signal_received = false
+	EventBus.ai_commander_phase_changed.connect(_on_ai_commander_phase_changed)
+	EventBus.ai_raid_launched.connect(_on_ai_raid_launched)
+
+	var ai_profile: AIBehaviorProfile = AICommander.get_behavior_profile()
+	_expect(ai_profile != null and ai_profile.get_validation_errors().is_empty(),
+		"AICommander loaded AIBehaviorProfile (res://data/ai/ai_behavior_profile.tres) cleanly.")
+
+	# 1. Rival dynasty Kıpçak (ambition = 0.85, discipline = 0.68):
+	#    GATHER_RESOURCES -> UPGRADE_FORGE -> LAUNCH_RAID
+	_expect(AICommander.get_agent_phase(&"kipchak") == GameEnums.AICommanderPhase.GATHER_RESOURCES,
+		"Rival dynasty Kıpçak starts in GATHER_RESOURCES phase.")
+
+	var step1: StepAICommanderCommand = StepAICommanderCommand.new(&"kipchak", false, 1, 1)
+	_expect(CommandBus.dispatch(step1),
+		"StepAICommanderCommand advances Kıpçak resource gathering.")
+	_expect(_ai_phase_changed_signal_received and AICommander.get_agent_phase(&"kipchak") == GameEnums.AICommanderPhase.UPGRADE_FORGE,
+		"Kıpçak transitions from GATHER_RESOURCES to UPGRADE_FORGE once forge threshold is met.")
+
+	var step2: StepAICommanderCommand = StepAICommanderCommand.new(&"kipchak", false, 1, 1)
+	_expect(CommandBus.dispatch(step2),
+		"Kıpçak upgrades nomadic forge and reaches raid readiness threshold.")
+	_expect(AICommander.is_agent_forge_upgraded(&"kipchak") and AICommander.get_agent_phase(&"kipchak") == GameEnums.AICommanderPhase.LAUNCH_RAID,
+		"Kıpçak completes UPGRADE_FORGE and enters LAUNCH_RAID phase.")
+	_expect(_ai_raid_launched_signal_received and step2.raid_launched,
+		"Entering LAUNCH_RAID dispatches a Turan formation raid and emits ai_raid_launched.")
+	_expect(step2.chosen_turan_phase == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE and step2.raid_target_type == &"ger_camp",
+		"High-ambition Kıpçak (0.85, discipline 0.68) deterministically selects FEIGNED_RETREAT_LURE against player GerCamp.")
+
+	# 2. High-discipline Karluk dynasty (ambition = 0.55, discipline = 0.78) selects CRESCENT_ENCIRCLEMENT_TRAP
+	var karluk_cmd: StepAICommanderCommand = null
+	for _i: int in range(5):
+		karluk_cmd = StepAICommanderCommand.new(&"karluk", false, 1, 1)
+		CommandBus.dispatch(karluk_cmd)
+	_expect(karluk_cmd != null and karluk_cmd.raid_launched and karluk_cmd.chosen_turan_phase == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"High-discipline Karluk (0.78) deterministically selects CRESCENT_ENCIRCLEMENT_TRAP formation.")
+
+	# 3. Roaming rogue warband (Yersiz Yurtsuz Çeriler) raids player supply lines
+	var rogue_cmd: StepAICommanderCommand = null
+	for _i: int in range(4):
+		rogue_cmd = StepAICommanderCommand.new(&"kulan_bey", true, 1, 1)
+		CommandBus.dispatch(rogue_cmd)
+	_expect(rogue_cmd != null and rogue_cmd.raid_launched and rogue_cmd.raid_target_type == &"supply_line",
+		"Rogue warband progresses through AI loop and launches raid targeting player supply lines.")
+
+	EventBus.ai_commander_phase_changed.disconnect(_on_ai_commander_phase_changed)
+	EventBus.ai_raid_launched.disconnect(_on_ai_raid_launched)
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -876,5 +1072,25 @@ func _on_kagan_glory_changed(_army_id: int, _prev: float, _next: float, _reason:
 
 func _on_warband_joined_by_glory(_army_id: int, _bey_id: StringName, _troops: int, _glory: float) -> void:
 	_warband_joined_by_glory_signal_received = true
+
+
+func _on_building_placed_on_micro_grid(_inst_id: int, _player_id: int, _b_id: StringName, _z_id: StringName, _coord: Vector2i, _pos: Vector3) -> void:
+	_building_placed_signal_received = true
+
+
+func _on_worker_gathering_started(_w_id: int, _p_id: int, _res_id: StringName, _coord: Vector2i, _pos: Vector3) -> void:
+	_worker_started_signal_received = true
+
+
+func _on_worker_caravan_delivered(_w_id: int, _p_id: int, _res_id: StringName, _amt: int, _pos: Vector3) -> void:
+	_worker_delivered_signal_received = true
+
+
+func _on_ai_commander_phase_changed(_agent_id: StringName, _prev: GameEnums.AICommanderPhase, _next: GameEnums.AICommanderPhase) -> void:
+	_ai_phase_changed_signal_received = true
+
+
+func _on_ai_raid_launched(_agent_id: StringName, _rogue: bool, _target: StringName, _army_id: int, _phase: GameEnums.TuranTacticPhase, _amb: float, _disc: float) -> void:
+	_ai_raid_launched_signal_received = true
 
 
