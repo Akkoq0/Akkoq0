@@ -164,6 +164,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 	if SeasonManager.is_army_infected(army_id):
 		CommandBus.dispatch(PurifyEpidemicCommand.new(army_id, &"kurgan_shrine"))
 	CataclysmEngine.clear_region_cataclysm(region_band[0])
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
 	DiplomacyManager.step_seasonal_diplomatic_decay(10)
 	CouncilEventEngine.step_seasonal_council_decay(10)
 
@@ -382,6 +383,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 	SeasonManager.set_food_reserve(120)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
 	CouncilEventEngine.step_seasonal_council_decay(5)
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
 	CausalChainEngine.reset_continuous_state()
 
 	return result

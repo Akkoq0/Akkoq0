@@ -112,6 +112,7 @@ func _run_suite() -> void:
 	_test_phase12_long_horizon_politics_intrigue_envoy_and_telemetry()
 	_test_phase14_deterministic_long_horizon_harness()
 	_test_phase15_economy_ecology_profile_calibration()
+	_test_phase16_combat_turan_fsm_and_casualty_hardening()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -1120,6 +1121,7 @@ func _test_phase7_vectorial_wind_and_atmospheric_ballistics() -> void:
 	_expect(storm_cmd.effective_morale_shock < tailwind_cmd.effective_morale_shock and storm_cmd.effective_quiver_ammo_cost > tailwind_cmd.effective_quiver_ammo_cost,
 		"Pre-Zud gale storm weakens whistling arrow morale shock (0.60x) and increases quiver ammo consumption (1.35x).")
 
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
 	EventBus.wind_weather_changed.disconnect(_on_wind_weather_changed)
 	EventBus.atmospheric_volley_resolved.disconnect(_on_atmospheric_volley_resolved)
 
@@ -2509,3 +2511,273 @@ func _test_phase15_economy_ecology_profile_calibration() -> void:
 			crisis_end.remount_horse_ratio if crisis_end != null else -1.0,
 			crisis_end.active_troops if crisis_end != null else -1,
 			", ".join(crisis.violations)])
+
+
+func _test_phase16_combat_turan_fsm_and_casualty_hardening() -> void:
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/crescent_encirclement.tres") as TacticalDoctrineData
+	var combat_rules: CombatRules = ResourceLoader.load("res://data/combat/combat_rules.tres") as CombatRules
+	var calib: CausalFrictionCalibration = CausalChainEngine.get_calibration()
+
+	# 1. Zero-Ammo Setter Exit & Interrupted Mid-Battle Rest Cleanup
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	var tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics)
+	tactics.configure(1601, doctrine, 100.0)
+
+	var dummy_foe: CombatantStats = CombatantStats.new(1690, 120.0, 90.0, 600.0, 1.0)
+	tactics.execute_whistling_arrow_volley(dummy_foe)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT,
+		"Phase 16 setup: whistling volley enters Stage 2 WHISTLING_ARROW_HARASSMENT.")
+	tactics.set_quiver_ammo(0.0)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+		"Setting quiver ammo to 0.0 while in WHISTLING_ARROW_HARASSMENT immediately exits Stage 2 (prevents 0-ammo deadlock).")
+
+	tactics.configure(1601, doctrine, 50.0)
+	tactics.execute_whistling_arrow_volley(dummy_foe)
+	tactics.set_readiness_state(10.0, 0.0, 1.0)
+	_expect(tactics.get_current_phase() != GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT,
+		"set_readiness_state(..., 0.0, ...) immediately exits WHISTLING_ARROW_HARASSMENT.")
+
+	tactics.rest_and_resupply_tactical_readiness(10.0, 90.0, 0.5, steppe)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN \
+		and is_zero_approx(tactics.get_target_formation_entropy()),
+		"Interrupted mid-battle rest cleanly resets active Stage 3 commitment back to RECON_DUST_SCREEN.")
+
+	# 2. Pre-Zud Gale Storm Atmospheric Coupling in TuranTacticsComponent
+	var tactics_calm: TuranTacticsComponent = TuranTacticsComponent.new()
+	var tactics_storm: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics_calm)
+	add_child(tactics_storm)
+	tactics_calm.configure(1602, doctrine, 100.0)
+	tactics_storm.configure(1603, doctrine, 100.0)
+
+	var calm_foe: CombatantStats = CombatantStats.new(1691, 120.0, 90.0, 600.0, 1.0)
+	var storm_foe: CombatantStats = CombatantStats.new(1692, 120.0, 90.0, 600.0, 1.0)
+	var calm_volley: Dictionary[StringName, float] = tactics_calm.execute_whistling_arrow_volley(calm_foe)
+	var calm_ammo_spent: float = 100.0 - tactics_calm.get_quiver_ammo()
+
+	BallisticsEngine.set_steppe_wind_weather(Vector3(12.0, 0.0, 12.0), -12.0, true)
+	var storm_volley: Dictionary[StringName, float] = tactics_storm.execute_whistling_arrow_volley(storm_foe)
+	var storm_ammo_spent: float = 100.0 - tactics_storm.get_quiver_ammo()
+	_expect(storm_ammo_spent > calm_ammo_spent * 1.25 \
+		and storm_volley[TuranTacticsComponent.KEY_MORALE_DAMAGE] < calm_volley[TuranTacticsComponent.KEY_MORALE_DAMAGE] * 0.70,
+		"Pre-Zud gale storm increases whistling volley quiver drain (1.35x) and damps morale shock (0.60x).")
+
+	# Wing angle ~135 deg (2.356 rad >= PI*0.65 calm, *0.78 = 1.838 < PI*0.65 storm -> storm aborts to melee)
+	var wing_a: Vector3 = Vector3(1.0, 0.0, 0.0)
+	var wing_b: Vector3 = Vector3(-0.7071, 0.0, 0.7071).normalized()
+	tactics_storm.advance_to_phase(GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	var storm_trap_ok: bool = tactics_storm.evaluate_crescent_trap(wing_a, wing_b, forest, storm_foe)
+	_expect(not storm_trap_ok \
+		and tactics_storm.get_current_phase() == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION \
+		and tactics_storm.get_last_fallback_reason() == &"pre_zud_storm_crescent_melee",
+		"PRE_ZUD_GALE_STORM damps marginal Crescent wings and breaks stalemate into BORU_SHOCK_ANNIHILATION melee.")
+
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	tactics_calm.advance_to_phase(GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	_expect(tactics_calm.evaluate_crescent_trap(wing_a, wing_b, forest, calm_foe),
+		"Same marginal Crescent wings succeed cleanly once calm steppe weather returns.")
+
+	# 3. Stalled Lure / Blocked Crescent / Extreme Fatigue / Commander Loss Escape Guarantees
+	var fallback_reasons: Array[StringName] = []
+	var on_fallback: Callable = func(_prev: GameEnums.TuranTacticPhase, _fb: GameEnums.TuranTacticPhase, reason: StringName) -> void:
+		fallback_reasons.append(reason)
+	tactics.tactical_fallback_triggered.connect(on_fallback)
+
+	tactics.configure(1601, doctrine, 100.0)
+	for _lure_i: int in range(3):
+		tactics.calculate_lure_overextension(0.10, 0.90, 5.0, dummy_foe)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION \
+		and tactics.get_last_fallback_reason() == &"feigned_retreat_stalled_fallback",
+		"3 consecutive stalled low-ambition lure steps break out of FEIGNED_RETREAT_LURE into BORU_SHOCK_ANNIHILATION.")
+
+	tactics.configure(1601, doctrine, 100.0)
+	tactics.advance_to_phase(GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	var first_narrow: bool = tactics.evaluate_crescent_trap_with_remount_ratio(Vector3.FORWARD, Vector3.FORWARD, 1.0, calib, forest)
+	var phase_after_first_narrow: GameEnums.TuranTacticPhase = tactics.get_current_phase()
+	var second_narrow: bool = tactics.evaluate_crescent_trap_with_remount_ratio(Vector3.FORWARD, Vector3.FORWARD, 1.0, calib, forest)
+	_expect(not first_narrow and phase_after_first_narrow == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP \
+		and not second_narrow and tactics.get_current_phase() == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION \
+		and tactics.get_last_fallback_reason() == &"crescent_encirclement_blocked",
+		"Blocked Crescent permits 1 retry, then triggers deterministic melee fallback on second stalled attempt.")
+
+	tactics.set_readiness_state(88.0, 50.0, 1.0)
+	tactics.advance_to_phase(GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	tactics.evaluate_crescent_trap(wing_a, wing_b, forest)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN \
+		and tactics.get_last_fallback_reason() == &"extreme_fatigue_crescent_abort",
+		"Extreme battle fatigue (>= 85.0) aborts blocked or contested Crescent Trap cleanly into RECON_DUST_SCREEN.")
+
+	tactics.configure(1601, doctrine, 100.0)
+	var fresh_momentum: float = tactics.compute_boru_shock_momentum(1200.0, 14.0, true, false)
+	tactics.set_readiness_state(90.0, 10.0, 0.20)
+	var tired_momentum: float = tactics.compute_boru_shock_momentum(1200.0, 14.0, true, false)
+	_expect(fresh_momentum > tired_momentum and tired_momentum >= 1.0 and not is_nan(tired_momentum),
+		"Börü heavy shock scales safely down under fatigue/low-remounts (%.2f -> %.2f >= 1.0)." % [fresh_momentum, tired_momentum])
+
+	tactics.execute_whistling_arrow_volley(dummy_foe)
+	tactics.notify_commander_lost(false)
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN \
+		and not tactics.is_commander_alive() \
+		and fallback_reasons.has(&"commander_lost_withdrawal"),
+		"Losing commander mid-battle cleanly withdraws active Turan FSM stage back to RECON_DUST_SCREEN.")
+	tactics.tactical_fallback_triggered.disconnect(on_fallback)
+	tactics_calm.free()
+	tactics_storm.free()
+	tactics.free()
+
+	# 4. CombatCalculator NaN/Zero Vectors, Overkill Loot Cap, Extreme Penalty Finite Floor
+	CombatCalculator.claim_pending_toy_loot_pool()
+	var nan_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	nan_rng.seed = 1604
+	var atk_nan: CombatantStats = CombatantStats.new(1610, 180.0, 100.0, 600.0, 1.0)
+	atk_nan.attack_vector = Vector3.ZERO
+	var def_nan: CombatantStats = CombatantStats.new(1611, 100.0, 80.0, 500.0, 1.0)
+	def_nan.facing_vector = Vector3(NAN, 0.0, 0.0)
+	var res_nan: CombatResult = CombatCalculator.calculate(atk_nan, def_nan, steppe, null, nan_rng)
+	_expect(res_nan.engagement_angle == GameEnums.CombatEngagementAngle.FRONT \
+		and is_equal_approx(res_nan.directional_damage_multiplier, 1.0) \
+		and not is_nan(res_nan.damage_to_defender) and res_nan.damage_to_defender > 0.0,
+		"CombatCalculator safely falls back to FRONT (1.0x) on Vector3.ZERO / NAN vectors with zero NaN.")
+
+	var overkill_atk: CombatantStats = CombatantStats.new(1612, 10000.0, 100.0, 2000.0, 1.0)
+	overkill_atk.has_steel_weapons = true
+	overkill_atk.charge_mass_momentum = 3.0
+	var tiny_def: CombatantStats = CombatantStats.new(1613, 50.0, 20.0, 10.0, 1.0)
+	tiny_def.is_escape_vector_sealed = true
+	tiny_def.elite_vanguard_destroyed = true
+	var ok_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	ok_rng.seed = 1605
+	var res_ok: CombatResult = CombatCalculator.calculate(overkill_atk, tiny_def, steppe, null, ok_rng)
+	var max_legit_slaves: int = maxi(int(roundf(10.0 * combat_rules.slave_capture_per_routed_health)), 1)
+	var max_legit_loot: float = float(max_legit_slaves) * combat_rules.slave_worker_toy_value + 10.0 * combat_rules.annihilation_loot_per_health
+	_expect(res_ok.defender_routed \
+		and res_ok.captured_slave_workers <= max_legit_slaves \
+		and res_ok.captured_toy_loot_value <= max_legit_loot + 0.01,
+		"Massive overkill strike on 10-HP target caps slave capture (%d <= %d) and Toy loot (%.2f <= %.2f) to actual pre-hit HP." % [
+			res_ok.captured_slave_workers, max_legit_slaves, res_ok.captured_toy_loot_value, max_legit_loot])
+
+	var ext_atk: CombatantStats = CombatantStats.new(1614, 150.0, 90.0, 400.0, 0.0)
+	ext_atk.fatigue = 100.0
+	ext_atk.quiver_ammo_ratio = 0.0
+	ext_atk.remount_horse_ratio = 0.0
+	ext_atk.totem_offense_bonus = -0.95
+	ext_atk.active_tactic_phase = GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT
+	var ext_def: CombatantStats = CombatantStats.new(1615, 120.0, 90.0, 400.0, 1.0)
+	var res_ext: CombatResult = CombatCalculator.calculate(ext_atk, ext_def, steppe, null, nan_rng)
+	_expect(not is_nan(res_ext.damage_to_defender) and not is_inf(res_ext.damage_to_defender) and res_ext.damage_to_defender >= 0.0,
+		"Extreme stacked penalties (0 supply, 100 fatigue, 0 ammo, 0 remounts) yield finite non-negative combat damage.")
+
+	var claim_cmd: ResolveCombatCommand = ResolveCombatCommand.new(
+		CombatantStats.new(1616, 400.0, 100.0, 800.0, 1.0),
+		CombatantStats.new(1617, 50.0, 20.0, 50.0, 1.0),
+		steppe, 1606)
+	claim_cmd.defender.elite_vanguard_destroyed = true
+	CommandBus.dispatch(claim_cmd)
+	var pooled_before_claim: float = CombatCalculator.get_pending_toy_loot_pool()
+	var claimed_pool: float = CombatCalculator.claim_pending_toy_loot_pool()
+	_expect(pooled_before_claim > 0.0 and is_equal_approx(claimed_pool, pooled_before_claim) \
+		and is_zero_approx(CombatCalculator.get_pending_toy_loot_pool()),
+		"claim_pending_toy_loot_pool() returns full accumulated pool and resets pending pool cleanly to 0.0.")
+
+	# 5. MoraleComponent Idempotent Vanguard Loss, 0-Supply Rally Block, Staggered Hold Collapse
+	var morale_comp: MoraleComponent = MoraleComponent.new()
+	morale_comp.configure(1620, combat_rules)
+	add_child(morale_comp)
+	morale_comp.configure_veteran_and_commander_profile(0.15, 25.0, 55.0, 50.0)
+	var rout_signal_count: Array[int] = [0]
+	var on_rout: Callable = func(_id: int, _el: StringName, _mor: float) -> void:
+		rout_signal_count[0] += 1
+	morale_comp.cascade_rout_started.connect(on_rout)
+
+	var first_shock: Dictionary[StringName, float] = morale_comp.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	var second_shock: Dictionary[StringName, float] = morale_comp.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	_expect(rout_signal_count[0] == 1 \
+		and first_shock[&"morale_shock"] > 0.0 \
+		and is_zero_approx(second_shock[&"morale_shock"]) \
+		and is_zero_approx(second_shock[&"captured_slave_workers"]),
+		"Duplicate vanguard destruction call while already destroyed is strictly idempotent (1 rout signal, 0 duplicate shock/slaves).")
+
+	var morale_at_rout: float = morale_comp.get_current_morale()
+	morale_comp.recover_fatigue_and_rally(10.0, 0.0)
+	_expect(morale_comp.is_cascade_routing() and is_equal_approx(morale_comp.get_current_morale(), morale_at_rout),
+		"Starving formation (supply_ratio == 0.0) cannot rally morale or clear active cascade_rout.")
+	for _r: int in range(12):
+		morale_comp.recover_fatigue_and_rally(4.0, 1.0)
+	morale_comp.restore_elite_vanguard()
+	_expect(not morale_comp.is_cascade_routing() and morale_comp.get_current_morale() > morale_at_rout,
+		"Supplied rest and vanguard restoration lift cascade_rout and rally morale.")
+
+	morale_comp.configure_veteran_and_commander_profile(0.90, 95.0, 85.0, 80.0)
+	morale_comp.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	var held_initially: bool = morale_comp.is_in_staggered_hold() and not morale_comp.is_cascade_routing()
+	morale_comp.accumulate_battle_fatigue(40.0)
+	_expect(held_initially and not morale_comp.is_in_staggered_hold() and morale_comp.is_cascade_routing(),
+		"Formation holding in staggered_hold collapses into cascade_rout once fatigue reaches >= 85.0.")
+	morale_comp.cascade_rout_started.disconnect(on_rout)
+	morale_comp.free()
+
+	# 6. 25-Battle Soldier Conservation, 0-Veteran Fix, 0-Troop Edge & Captive Bound Gauntlet
+	var zero_vet_comp: AttritionCasualtyComponent = AttritionCasualtyComponent.new()
+	add_child(zero_vet_comp)
+	zero_vet_comp.configure(1621, 100, 0.0)
+	zero_vet_comp.reinforce_with_raw_recruits(50)
+	_expect(is_zero_approx(zero_vet_comp.get_veteran_ratio()),
+		"Reinforcing a 0.0-veteran raw army with more raw recruits preserves 0.0 veteran_ratio (no artificial 0.05 inflation).")
+	var wipe_res: Dictionary = zero_vet_comp.record_battle_casualties(9999)
+	var wounded_after_wipe: int = zero_vet_comp.get_wounded_pool()
+	var dead_after_wipe: int = zero_vet_comp.get_permanent_dead()
+	var post_wipe_res: Dictionary = zero_vet_comp.record_battle_casualties(50)
+	_expect(zero_vet_comp.get_active_troops() == 0 \
+		and wounded_after_wipe + dead_after_wipe == 150 \
+		and zero_vet_comp.get_wounded_pool() == wounded_after_wipe \
+		and zero_vet_comp.get_permanent_dead() == dead_after_wipe \
+		and wipe_res.has("active_troops") and post_wipe_res.has("wounded_added"),
+		"Total wipeout clamps cleanly to 0 active troops, preserves 150-soldier count, and rejects further casualties at 0 troops.")
+	zero_vet_comp.free()
+
+	var battle_comp: AttritionCasualtyComponent = AttritionCasualtyComponent.new()
+	var battle_tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(battle_comp)
+	add_child(battle_tactics)
+	battle_comp.configure(1622, 200, 0.80)
+	battle_tactics.configure(1622, doctrine, 100.0)
+	var total_recruited: int = 0
+	var gauntlet_ok: bool = true
+	var w_a: Vector3 = Vector3(-0.35, 0.0, 0.936).normalized()
+	var w_b: Vector3 = Vector3(0.35, 0.0, -0.936).normalized()
+
+	for b_idx: int in range(25):
+		var atk_b: CombatantStats = CombatantStats.new(1622, 220.0, 120.0, 700.0, 1.0)
+		var def_b: CombatantStats = CombatantStats.new(2600 + b_idx, 120.0, 80.0, 320.0, 0.9)
+		battle_tactics.execute_whistling_arrow_volley(def_b)
+		battle_tactics.calculate_lure_overextension(0.90, 0.40, 100.0, def_b)
+		battle_tactics.evaluate_crescent_trap(w_a, w_b, forest, def_b)
+		battle_tactics.compute_boru_shock_momentum(800.0, 13.0, true, false)
+		CommandBus.dispatch(ResolveCombatCommand.new(atk_b, def_b, steppe, 1650 + b_idx))
+		battle_comp.record_battle_casualties(20, 1.15, 0.10)
+		battle_comp.tick_wounded_treatment(b_idx % 4 != 0)
+		if battle_comp.get_active_troops() < 150:
+			battle_comp.reinforce_with_raw_recruits(35)
+			total_recruited += 35
+		battle_comp.tick_cohesion_acclimation(3.0)
+		battle_tactics.rest_and_resupply_tactical_readiness(20.0, 85.0, 0.5, steppe)
+		var conserved: int = battle_comp.get_active_troops() + battle_comp.get_wounded_pool() + battle_comp.get_permanent_dead()
+		var vr: float = battle_comp.get_veteran_ratio()
+		var sm: float = battle_comp.get_wounded_speed_multiplier()
+		var cc: float = battle_comp.get_effective_cohesion_cap()
+		if conserved != 200 + total_recruited or vr < 0.0 or vr > 1.0 or sm < 0.65 or sm > 1.0 or cc < 45.0 or cc > 100.0 \
+				or battle_tactics.get_current_phase() != GameEnums.TuranTacticPhase.RECON_DUST_SCREEN:
+			gauntlet_ok = false
+
+	var captive_cap: int = maxi(CaptiveLaborManager.get_core_clan_population(1) * 4, 480)
+	_expect(gauntlet_ok and CaptiveLaborManager.get_captured_slave_workers(1) <= captive_cap,
+		"25-battle combat gauntlet strictly conserves soldier count (%d), bounds veteran/speed/cohesion, resets Turan FSM, and caps captives (%d <= %d)." % [
+			200 + total_recruited, CaptiveLaborManager.get_captured_slave_workers(1), captive_cap])
+
+	CombatCalculator.claim_pending_toy_loot_pool()
+	battle_tactics.free()
+	battle_comp.free()
+

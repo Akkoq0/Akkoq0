@@ -74,9 +74,9 @@ extends Resource
 ## Classifies the engagement angle from `attack_vector` (direction of blow)
 ## and `defender_facing` (direction defender is looking) using `Vector3.dot`.
 func classify_engagement_angle(attack_vector: Vector3, defender_facing: Vector3) -> GameEnums.CombatEngagementAngle:
-	var atk_norm: Vector3 = attack_vector.normalized() if attack_vector.length_squared() > 0.0001 else Vector3.BACK
-	var def_norm: Vector3 = defender_facing.normalized() if defender_facing.length_squared() > 0.0001 else Vector3.FORWARD
-	var dot_val: float = atk_norm.dot(def_norm)
+	var atk_norm: Vector3 = attack_vector.normalized() if (attack_vector.is_finite() and attack_vector.length_squared() > 0.0001) else Vector3.BACK
+	var def_norm: Vector3 = defender_facing.normalized() if (defender_facing.is_finite() and defender_facing.length_squared() > 0.0001) else Vector3.FORWARD
+	var dot_val: float = clampf(atk_norm.dot(def_norm), -1.0, 1.0)
 	if dot_val <= -flank_dot_threshold:
 		return GameEnums.CombatEngagementAngle.FRONT
 	if dot_val >= flank_dot_threshold:

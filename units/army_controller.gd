@@ -79,13 +79,17 @@ func get_combatant_stats() -> CombatantStats:
 		template.get_total_health(),
 		supply.get_supply_ratio())
 	stats.morale = supply.get_battle_morale()
+	stats.remount_horse_ratio = supply.get_remount_horse_ratio()
+	stats.quiver_ammo_ratio = clampf(supply.get_quiver_ammo_reserve() / 100.0, 0.0, 1.0)
 	if morale_component != null:
 		stats.fatigue = morale_component.get_battle_fatigue()
 		stats.morale = minf(stats.morale, morale_component.get_current_morale())
+		stats.cohesion = morale_component.get_current_cohesion()
 		stats.elite_vanguard_destroyed = not morale_component.is_elite_vanguard_alive()
 		stats.is_fleeing_rout = morale_component.is_cascade_routing()
 	if turan_tactics != null:
 		stats.active_tactic_phase = turan_tactics.get_current_phase()
+		stats.quiver_ammo_ratio = clampf(turan_tactics.get_quiver_ammo() / 100.0, 0.0, 1.0)
 	return stats
 
 

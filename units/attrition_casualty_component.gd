@@ -28,6 +28,12 @@ func _ensure_profile_loaded() -> void:
 		profile = AttritionCasualtyProfile.new()
 
 
+static func _sanitize_float(val: float, fallback: float) -> float:
+	if is_nan(val) or is_inf(val):
+		return fallback
+	return val
+
+
 func configure(p_army_id: int, initial_troops: int, initial_veteran_ratio: float, custom_profile: AttritionCasualtyProfile = null) -> void:
 	if custom_profile != null:
 		profile = custom_profile
@@ -37,7 +43,7 @@ func configure(p_army_id: int, initial_troops: int, initial_veteran_ratio: float
 	_active_troops = maxi(1, initial_troops)
 	_wounded_pool = 0
 	_permanent_dead = 0
-	_veteran_ratio = clampf(initial_veteran_ratio, 0.0, 1.0)
+	_veteran_ratio = clampf(_sanitize_float(initial_veteran_ratio, 0.75), 0.0, 1.0)
 	_commander_fatigue = 0.0
 	_raw_recruit_cohesion_penalty = 0.0
 
@@ -52,6 +58,8 @@ func record_battle_casualties(total_fallen: int, veteran_casualty_bias: float = 
 			"wounded_pool": _wounded_pool,
 			"active_troops": _active_troops
 		}
+	var safe_bias: float = _sanitize_float(veteran_casualty_bias, 1.25)
+	var safe_fat_add: float = _sanitize_float(commander_fatigue_added, 0.18)
 	var pre_troops: int = _active_troops
 	var new_wounded: int = clampi(roundi(float(actual_fallen) * profile.wounded_survival_ratio), 0, actual_fallen)
 	var immediate_dead: int = actual_fallen - new_wounded
@@ -61,9 +69,10 @@ func record_battle_casualties(total_fallen: int, veteran_casualty_bias: float = 
 	_permanent_dead += immediate_dead
 
 	var casualty_fraction: float = float(actual_fallen) / float(maxi(1, pre_troops))
-	var vet_drop: float = casualty_fraction * maxf(0.1, veteran_casualty_bias) * 0.45
-	_veteran_ratio = clampf(_veteran_ratio - vet_drop, 0.05, 1.0)
-	_commander_fatigue = clampf(_commander_fatigue + maxf(0.0, commander_fatigue_added), 0.0, 1.0)
+	var vet_drop: float = casualty_fraction * maxf(0.1, safe_bias) * 0.45
+	var vet_floor: float = minf(_veteran_ratio, 0.05)
+	_veteran_ratio = clampf(_veteran_ratio - vet_drop, vet_floor, 1.0)
+	_commander_fatigue = clampf(_commander_fatigue + maxf(0.0, safe_fat_add), 0.0, 1.0)
 
 	var speed_mult: float = get_wounded_speed_multiplier()
 	var tac_mult: float = get_tactical_efficiency_multiplier()
@@ -114,7 +123,7 @@ func reinforce_with_raw_recruits(recruit_count: int) -> void:
 		return
 	var current_veterans: float = float(_active_troops) * _veteran_ratio
 	var new_total: int = _active_troops + added
-	_veteran_ratio = clampf(current_veterans / float(maxi(1, new_total)), 0.05, 1.0)
+	_veteran_ratio = clampf(current_veterans / float(maxi(1, new_total)), 0.0, 1.0)
 
 	var recruit_share: float = float(added) / float(maxi(1, new_total))
 	_raw_recruit_cohesion_penalty = clampf(
@@ -134,7 +143,7 @@ func reinforce_with_raw_recruits(recruit_count: int) -> void:
 
 func tick_cohesion_acclimation(delta_sec: float) -> void:
 	_ensure_profile_loaded()
-	var dt: float = maxf(0.0, delta_sec)
+	var dt: float = maxf(0.0, _sanitize_float(delta_sec, 0.0))
 	_raw_recruit_cohesion_penalty = maxf(0.0, _raw_recruit_cohesion_penalty - profile.cohesion_acclimation_recovery_per_sec * dt)
 	_commander_fatigue = maxf(0.0, _commander_fatigue - 0.02 * dt)
 

@@ -45,13 +45,25 @@ func configure(p_army_id: int, p_rules: CombatRules = null) -> void:
 	_is_in_cascade_rout = false
 
 
+static func _safe_float(val: float, fallback: float) -> float:
+	if is_nan(val) or is_inf(val):
+		return fallback
+	return val
+
+
 ## Accumulates battle fatigue over `combat_duration_sec` seconds of combat.
 ## Returns the updated fatigue score (`0..100`).
 func accumulate_battle_fatigue(combat_duration_sec: float) -> float:
-	if rules == null or combat_duration_sec <= 0.0:
+	var dt: float = _safe_float(combat_duration_sec, 0.0)
+	if rules == null or dt <= 0.0:
 		return _battle_fatigue
-	_battle_fatigue = clampf(_battle_fatigue + combat_duration_sec * rules.fatigue_accumulation_per_sec, 0.0, 100.0)
+	_battle_fatigue = clampf(_battle_fatigue + dt * rules.fatigue_accumulation_per_sec, 0.0, 100.0)
 	battle_fatigue_changed.emit(_battle_fatigue, get_fatigue_speed_multiplier(), get_fatigue_momentum_multiplier())
+	if _is_staggered_hold and not _is_in_cascade_rout and _battle_fatigue >= 85.0:
+		_is_staggered_hold = false
+		_is_in_cascade_rout = true
+		cascade_rout_started.emit(_army_id, &"extreme_fatigue_collapse", _current_morale)
+		EventBus.cascade_rout_triggered.emit(_army_id, &"extreme_fatigue_collapse", _current_morale)
 	return _battle_fatigue
 
 
@@ -71,24 +83,28 @@ func get_fatigue_momentum_multiplier() -> float:
 
 ## Effective charge speed for `base_charge_speed` after battle fatigue penalty.
 func get_effective_charge_speed(base_charge_speed: float) -> float:
-	return maxf(base_charge_speed, 0.0) * get_fatigue_speed_multiplier()
+	return maxf(_safe_float(base_charge_speed, 0.0), 0.0) * get_fatigue_speed_multiplier()
 
 
 ## Effective lance charge momentum for `base_momentum` after battle fatigue penalty.
 func get_effective_charge_momentum(base_momentum: float) -> float:
-	return maxf(base_momentum, 0.0) * get_fatigue_momentum_multiplier()
+	return maxf(_safe_float(base_momentum, 0.0), 0.0) * get_fatigue_momentum_multiplier()
 
 
 ## Notifies that front-line elite vanguard troops (e.g. `bozkurt_cavalry`) were
 ## wiped out, triggering a chain panic wave (`cascade_rout`) among rear rookies.
+## Idempotent while vanguard remains destroyed.
 func notify_elite_vanguard_destroyed(elite_unit_id: StringName = &"bozkurt_cavalry") -> bool:
 	if rules == null:
 		return false
+	if not _is_elite_vanguard_alive:
+		return _is_in_cascade_rout
 	_is_elite_vanguard_alive = false
 	var morale_shock: float = rules.elite_vanguard_loss_morale_shock * clampf(rookie_troop_ratio, 0.2, 1.5)
 	_current_morale = clampf(_current_morale - morale_shock, 0.0, 100.0)
 	_current_cohesion = clampf(_current_cohesion - rules.elite_vanguard_loss_cohesion_shock, 0.0, 100.0)
 	_is_in_cascade_rout = true
+	_is_staggered_hold = false
 	cascade_rout_started.emit(_army_id, elite_unit_id, _current_morale)
 	EventBus.cascade_rout_triggered.emit(_army_id, elite_unit_id, _current_morale)
 	return _is_in_cascade_rout
@@ -122,11 +138,12 @@ var _is_staggered_hold: bool = false
 ## Configures unit veteran experience (`0..1`) and commander leadership (`0..100`)
 ## for layered psychological shock absorption.
 func configure_veteran_and_commander_profile(p_veteran_ratio: float, p_commander_leadership: float, p_initial_morale: float = 75.0, p_initial_cohesion: float = 70.0) -> void:
-	_veteran_experience_ratio = clampf(p_veteran_ratio, 0.0, 1.0)
+	_veteran_experience_ratio = clampf(_safe_float(p_veteran_ratio, 0.35), 0.0, 1.0)
 	rookie_troop_ratio = clampf(1.0 - _veteran_experience_ratio, 0.05, 1.0)
-	_commander_leadership_score = clampf(p_commander_leadership, 0.0, 100.0)
-	_current_morale = clampf(p_initial_morale, 0.0, 100.0)
-	_current_cohesion = clampf(p_initial_cohesion, 0.0, 100.0)
+	_commander_leadership_score = clampf(_safe_float(p_commander_leadership, 50.0), 0.0, 100.0)
+	_current_morale = clampf(_safe_float(p_initial_morale, 75.0), 0.0, 100.0)
+	_current_cohesion = clampf(_safe_float(p_initial_cohesion, 70.0), 0.0, 100.0)
+	_is_elite_vanguard_alive = true
 	_is_in_cascade_rout = false
 	_is_staggered_hold = false
 
@@ -140,6 +157,7 @@ func is_in_staggered_hold() -> bool:
 ## Experienced formations led by strong commanders absorb the shock into a
 ## `staggered_hold` (`1.0x` front defense), whereas fatigued or rookie formations
 ## shatter into a `cascade_rout` (`2.1x` rear strike + Toy prisoner capture).
+## Idempotent if vanguard is already destroyed until restored.
 func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_cavalry", targeted_health: float = 200.0) -> Dictionary[StringName, float]:
 	var out: Dictionary[StringName, float] = {
 		&"morale_shock": 0.0,
@@ -151,7 +169,11 @@ func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_
 	}
 	if rules == null:
 		return out
+	if not _is_elite_vanguard_alive:
+		out[&"rear_strike_multiplier"] = rules.rear_damage_multiplier if _is_in_cascade_rout else rules.front_damage_multiplier
+		return out
 	_is_elite_vanguard_alive = false
+	var safe_hp: float = maxf(_safe_float(targeted_health, 0.0), 0.0)
 	var damping: float = clampf(1.0 - _veteran_experience_ratio * 0.45 - (_commander_leadership_score / 100.0) * 0.30 + (_battle_fatigue / 100.0) * 0.55, 0.25, 1.65)
 	var morale_shock: float = rules.elite_vanguard_loss_morale_shock * damping
 	var cohesion_shock: float = rules.elite_vanguard_loss_cohesion_shock * damping
@@ -162,7 +184,7 @@ func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_
 		_is_in_cascade_rout = true
 		_is_staggered_hold = false
 		out[&"rear_strike_multiplier"] = rules.rear_damage_multiplier
-		out[&"captured_slave_workers"] = float(maxi(int(roundf(maxf(targeted_health, 1.0) * rules.slave_capture_per_routed_health)), 1))
+		out[&"captured_slave_workers"] = float(maxi(int(roundf(safe_hp * rules.slave_capture_per_routed_health)), 1)) if safe_hp > 0.0 else 0.0
 		cascade_rout_started.emit(_army_id, elite_unit_id, _current_morale)
 		EventBus.cascade_rout_triggered.emit(_army_id, elite_unit_id, _current_morale)
 	else:
@@ -186,11 +208,16 @@ func restore_elite_vanguard() -> void:
 
 
 ## Recovers battle fatigue and rallies morale/cohesion when resting out of combat
-## with supply support (`supply_ratio`). Clears `cascade_rout` once rallied.
+## with supply support (`supply_ratio`). Starving armies (`supply_ratio <= 0.0`)
+## rest off light muscle fatigue but cannot rally morale or clear `cascade_rout`.
 func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
-	var dt: float = maxf(rest_sec, 0.0)
-	var sup: float = clampf(supply_ratio, 0.1, 1.0)
+	var dt: float = maxf(_safe_float(rest_sec, 0.0), 0.0)
+	var raw_sup: float = clampf(_safe_float(supply_ratio, 0.0), 0.0, 1.0)
 	var commander_bonus: float = 1.0 + (_commander_leadership_score / 100.0) * 0.40
+	if raw_sup <= 0.0:
+		_battle_fatigue = maxf(_battle_fatigue - dt * 1.2 * commander_bonus, 0.0)
+		return _battle_fatigue
+	var sup: float = clampf(raw_sup, 0.1, 1.0)
 	_battle_fatigue = maxf(_battle_fatigue - dt * 3.5 * sup * commander_bonus, 0.0)
 	_current_morale = clampf(_current_morale + dt * 2.2 * sup * commander_bonus, 0.0, 100.0)
 	_current_cohesion = clampf(_current_cohesion + dt * 2.5 * sup * commander_bonus, 0.0, 100.0)
