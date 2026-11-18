@@ -30,6 +30,7 @@ DiplomacyManager="*res://core/diplomacy_manager.gd"
 CouncilEventEngine="*res://core/council_event_engine.gd"
 BuildingPlacementManager="*res://core/building_placement_manager.gd"
 AICommander="*res://core/ai_commander.gd"
+PastureEcologyManager="*res://core/pasture_ecology_manager.gd"
 
 
 

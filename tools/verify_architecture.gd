@@ -242,6 +242,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as WorkerGatheringProfile).get_validation_errors())
 		elif res is AIBehaviorProfile:
 			errors.append_array((res as AIBehaviorProfile).get_validation_errors())
+		elif res is PastureData:
+			errors.append_array((res as PastureData).get_validation_errors())
 	return errors
 
 

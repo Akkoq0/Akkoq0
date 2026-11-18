@@ -122,6 +122,20 @@ enum AICommanderPhase {
 	LAUNCH_RAID = 2, ## 3. Oyuncu ikmal hatlarına veya obasına Turan formasyonunda baskın
 }
 
+## Phase 7 Macro region seasonal pasture & grazing health status.
+enum PastureCondition {
+	LUSH = 0, ## Gür Otlak: %100 et/süt üretimi, sağlıklı yılkı ve koyun sürüleri
+	GRAZED = 1, ## Yıpranmış Mera: Kapasite azalıyor
+	DEPLETED_STARVING = 2, ## Çoraklaşmış Mera (Overgrazed): Hayvanlar zayıflar (starving_livestock), et/süt durur, Sefer Arabası göçü zorunlu
+}
+
+## Phase 7 Steppe atmospheric wind & storm regime for arrow ballistics.
+enum WindWeatherState {
+	CALM = 0, ## Dingin Bozkır Havası
+	TAILWIND_BREEZE = 1, ## Arkadan Esen Uygun Rüzgar (+%25 menzil, yüksek isabet)
+	PRE_ZUD_GALE_STORM = 2, ## Zud Öncesi Şiddetli Bora / Fırtına (düşük menzil, zayıf ıslıklı ok morali, yüksek sadak tüketimi)
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -130,6 +144,7 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
 
 
 

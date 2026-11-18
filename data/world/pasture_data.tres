@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PastureData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/world/pasture_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+pasture_id = &"steppe_seasonal_pasture"
+max_pasture_capacity = 100.0
+pasture_depletion_rate = 0.08
+waterside_regeneration_per_tick = 15.0
+grazed_warning_threshold = 40.0
+rebellion_grace_ticks_after_depletion = 2
+rebellion_kut_penalty = 14.0

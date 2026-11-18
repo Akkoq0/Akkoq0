@@ -94,5 +94,16 @@ signal worker_caravan_delivered(worker_id: int, player_id: int, resource_id: Str
 signal ai_commander_phase_changed(agent_id: StringName, previous_phase: GameEnums.AICommanderPhase, new_phase: GameEnums.AICommanderPhase)
 signal ai_raid_launched(agent_id: StringName, is_rogue_warband: bool, raid_target_type: StringName, target_army_id: int, turan_phase: GameEnums.TuranTacticPhase, ambition: float, discipline: float)
 
+# --- Phase 7 Pasture Ecology, Atmospheric Ballistics & Captive Labor --------
+signal pasture_depleted_starving_livestock(region_coord: Vector2i, herd_size: int, migration_required: bool)
+signal camp_migrated_by_sefer_arabasi(player_id: int, from_coord: Vector2i, to_coord: Vector2i, restored_pasture_capacity: float)
+signal overgrazing_rebellion_triggered(player_id: int, region_coord: Vector2i, kut_penalty: float)
+signal wind_weather_changed(wind_vector: Vector3, temperature_celsius: float, weather_state: GameEnums.WindWeatherState)
+signal atmospheric_volley_resolved(shooter_id: int, range_multiplier: float, accuracy_multiplier: float, morale_damage_multiplier: float, ammo_consumption_multiplier: float)
+signal noble_captives_ransomed_or_exchanged(player_id: int, noble_count: int, mode: StringName, bullion_gained: int, trust_bonus: float)
+signal captive_labor_assigned(player_id: int, total_slave_workers: int, core_clan_population: int, build_time_saved_ratio: float, cost_discount_ratio: float)
+signal slave_revolt_triggered(player_id: int, slave_workers: int, clan_population: int, revolt_risk: float)
+
+
 
 
