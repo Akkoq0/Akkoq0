@@ -110,6 +110,7 @@ func _run_suite() -> void:
 	_test_phase12_long_horizon_ecology_seasons_and_supply_recovery()
 	_test_phase12_long_horizon_combat_turan_reset_and_bounds()
 	_test_phase12_long_horizon_politics_intrigue_envoy_and_telemetry()
+	_test_phase14_deterministic_long_horizon_harness()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -2349,6 +2350,54 @@ func _on_p12_cataclysm_erupted(_c_id: StringName, _c_type: GameEnums.CataclysmTy
 
 func _on_p12_internal_betrayal(_b_id: StringName, _stage: GameEnums.IntriguePlotStage, _trp: int, _sab: bool, _kut: float) -> void:
 	_p12_internal_betrayal_count += 1
+
+
+func _test_phase14_deterministic_long_horizon_harness() -> void:
+	# 1. Negative invariant verification: ensure SimulationInvariantChecker detects NaN, overflows, and deadlocks
+	var bad_snap: SimulationInvariantChecker.SeasonSnapshot = SimulationInvariantChecker.SeasonSnapshot.new()
+	bad_snap.kut = NAN
+	bad_snap.food = -15
+	bad_snap.ores = {&"iron": -3, &"steel": 999999}
+	bad_snap.jade_authority_multiplier = 2.75
+	bad_snap.turan_phase = GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT
+	bad_snap.turan_quiver_ammo = 0.0
+	bad_snap.army_speed = 0.10
+	bad_snap.base_speed = 8.0
+	var bad_errors: PackedStringArray = SimulationInvariantChecker.validate_snapshot(bad_snap)
+	_expect(bad_errors.size() >= 7,
+		"SimulationInvariantChecker flags NaN, negative food/ore, runaway inflation, clamp bypass, speed collapse, and FSM deadlock (%d errors detected)." % bad_errors.size())
+
+	# 2. Run 24-season (6-year) deterministic simulation under fixed seed 14001
+	var sim_a: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.BALANCED_NOMAD, 24, 14001, 0)
+	_expect(sim_a.seasons_simulated == 24 and sim_a.history.size() == 24,
+		"LongHorizonSimulator records all 24 seasonal snapshots (6 game years).")
+	_expect(sim_a.passed(),
+		"24-season balanced steppe simulation satisfies all invariants (violations: %s)." % ", ".join(sim_a.violations))
+
+	var final_a: SimulationInvariantChecker.SeasonSnapshot = sim_a.latest()
+	_expect(final_a != null \
+		and final_a.ores.size() == 8 \
+		and sim_a.steel_batches_smelted > 0 \
+		and sim_a.battles_fought >= 4 \
+		and final_a.dynasty_trust.size() == 3,
+		"Seasonal snapshots capture Food, Kut, 7-Ores+Steel, battles (%d), steel batches (%d), and dynasty relations." % [sim_a.battles_fought, sim_a.steel_batches_smelted])
+
+	# 3. Repeatability verification: identical seed on clean slot yields byte-for-byte identical trajectory
+	var sim_b: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.BALANCED_NOMAD, 24, 14001, 1)
+	var final_b: SimulationInvariantChecker.SeasonSnapshot = sim_b.latest()
+	var exact_replay_match: bool = sim_b.passed() \
+		and final_b != null \
+		and final_a.food == final_b.food \
+		and is_equal_approx(final_a.kut, final_b.kut) \
+		and final_a.ores[&"steel"] == final_b.ores[&"steel"] \
+		and final_a.active_troops == final_b.active_troops \
+		and is_equal_approx(final_a.glory_score, final_b.glory_score)
+	_expect(exact_replay_match,
+		"Fixed-seed replay reproduces identical Food (%d), Kut (%.2f), Steel (%d), Troops (%d), and Glory (%.2f)." % [
+			final_a.food, final_a.kut, final_a.ores.get(&"steel", 0), final_a.active_troops, final_a.glory_score])
+
 
 
 
