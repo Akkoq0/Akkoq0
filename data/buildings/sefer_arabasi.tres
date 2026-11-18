@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="BuildingData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://data/buildings/building_data.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/stone.tres" id="3_stone"]
+[ext_resource type="Resource" path="res://data/ores/iron.tres" id="4_iron"]
+
+[sub_resource type="Resource" id="Resource_cost_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 40
+
+[sub_resource type="Resource" id="Resource_cost_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_iron")
+amount = 20
+
+[sub_resource type="Resource" id="Resource_prod_stone"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_stone")
+amount = 10
+
+[resource]
+script = ExtResource("1_script")
+id = &"sefer_arabasi"
+display_name = "Sefer Arabası (Migration Cart)"
+description = "Heavy four-wheeled steppe wagon into which a Ger Camp or Nomadic Forge is packed for clan migration."
+category = 5
+allowed_terrains = Array[int]([0, 1, 6])
+footprint = Vector2i(2, 2)
+max_health = 550
+build_time_sec = 14.0
+is_nomadic_movable = true
+migration_cart_id = &"sefer_arabasi"
+pack_time_sec = 4.0
+unpack_time_sec = 4.0
+packed_weight = 90.0
+relocation_cost_ratio = 0.10
+relocation_distance_cost_per_meter = 0.20
+migration_cart_speed_m_per_sec = 7.5
+construction_cost = Array[ExtResource("2_amount")]([SubResource("Resource_cost_stone"), SubResource("Resource_cost_iron")])
+upkeep_per_minute = Array[ExtResource("2_amount")]([])
+production_per_minute = Array[ExtResource("2_amount")]([SubResource("Resource_prod_stone")])
+supply_radius_m = 20.0

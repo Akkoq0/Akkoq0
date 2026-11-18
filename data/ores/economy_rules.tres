@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EconomyRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/economy_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+tax_ore_id = &"silver_gold"
+base_tax_per_region = 12.0
+rich_region_tax_bonus = 6.0
+authority_ore_id = &"jade"
+jade_authority_bonus_per_unit = 0.005
+max_authority_multiplier = 2.0
+meteoric_ore_id = &"meteoric_iron"
+commander_weapon_binding_cost = 5
+totem_ascension_binding_cost = 12

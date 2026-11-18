@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="OreData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ores/ore_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+id = &"steel"
+display_name = "Bozkır Çeliği (Refined Steel)"
+description = "High-carbon crucible steel smelted inside a Nomadic Forge from 2 Iron and 1 Coal."
+tier = 3
+base_value = 8.0
+starting_amount = 0
+is_strategic = true
+is_refined = true
+weight_per_unit = 4.0
+extraction_rate_per_minute = 0.0
+spawn_terrains = Array[int]([])
+spawn_chance = 0.0
+deposit_min_amount = 0
+deposit_max_amount = 0
+debug_color = Color(0.72, 0.78, 0.86, 1)

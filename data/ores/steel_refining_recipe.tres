@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="RefiningRecipe" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://data/ores/refining_recipe.gd" id="1_script"]
+[ext_resource type="Script" path="res://data/common/resource_amount.gd" id="2_amount"]
+[ext_resource type="Resource" path="res://data/ores/iron.tres" id="3_iron"]
+[ext_resource type="Resource" path="res://data/ores/coal.tres" id="4_coal"]
+[ext_resource type="Resource" path="res://data/ores/steel.tres" id="5_steel"]
+
+[sub_resource type="Resource" id="Resource_in_iron"]
+script = ExtResource("2_amount")
+ore = ExtResource("3_iron")
+amount = 2
+
+[sub_resource type="Resource" id="Resource_in_coal"]
+script = ExtResource("2_amount")
+ore = ExtResource("4_coal")
+amount = 1
+
+[sub_resource type="Resource" id="Resource_out_steel"]
+script = ExtResource("2_amount")
+ore = ExtResource("5_steel")
+amount = 1
+
+[resource]
+script = ExtResource("1_script")
+recipe_id = &"smelt_steel"
+display_name = "Çelik Dökümü (2 Iron + 1 Coal -> 1 Steel)"
+required_building_id = &"nomadic_forge"
+inputs = Array[ExtResource("2_amount")]([SubResource("Resource_in_iron"), SubResource("Resource_in_coal")])
+outputs = Array[ExtResource("2_amount")]([SubResource("Resource_out_steel")])

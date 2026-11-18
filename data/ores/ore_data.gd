@@ -1,6 +1,6 @@
 class_name OreData
 extends Resource
-## Data layer (rank 1). Schema for a raw strategic resource ("ore").
+## Data layer (rank 1). Schema for a strategic raw or refined resource.
 ##
 ## All balancing numbers live in the `.tres` instances under `res://data/ores/`.
 
@@ -16,6 +16,8 @@ extends Resource
 @export_range(0, 1000000) var starting_amount: int = 0
 ## True for resources that unlock tier-gated content (totems, elite units).
 @export var is_strategic: bool = false
+## True when produced via refining (e.g. Steel in NomadicForge) rather than mined.
+@export var is_refined: bool = false
 
 @export_group("Logistics")
 ## Weight of one carried unit. Feeds the army weight-based speed formula.
@@ -37,6 +39,8 @@ extends Resource
 
 ## Returns true when this ore can spawn on `terrain_type`.
 func can_spawn_on(terrain_type: GameEnums.TerrainType) -> bool:
+	if is_refined:
+		return false
 	return spawn_terrains.has(terrain_type)
 
 
@@ -47,7 +51,7 @@ func get_validation_errors() -> PackedStringArray:
 		errors.append("OreData '%s' has an empty id." % resource_path)
 	if deposit_max_amount < deposit_min_amount:
 		errors.append("OreData '%s': deposit_max_amount < deposit_min_amount." % id)
-	if spawn_terrains.is_empty():
+	if not is_refined and spawn_terrains.is_empty():
 		errors.append("OreData '%s': spawn_terrains is empty." % id)
 	if base_value <= 0.0:
 		errors.append("OreData '%s': base_value must be > 0." % id)

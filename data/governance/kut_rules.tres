@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="KutRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/kut_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+max_kut = 100.0
+initial_kut = 75.0
+critical_kut_threshold = 30.0
+zud_starvation_kut_drain = 18.0
+battle_loss_base_kut_drain = 8.0
+consecutive_loss_escalation = 4.0
+victory_kut_gain = 6.0
+legitimacy_loss_penalty = 0.25
+trigger_civil_skirmish_on_critical = true
+starting_food_reserve = 120
+winter_food_consumption_per_cycle = 60

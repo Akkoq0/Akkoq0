@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="OreRegistry" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="OreRegistry" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://data/ores/ore_registry.gd" id="1_script"]
 [ext_resource type="Resource" path="res://data/ores/stone.tres" id="2_stone"]
@@ -8,8 +8,12 @@
 [ext_resource type="Resource" path="res://data/ores/jade.tres" id="6_jade"]
 [ext_resource type="Resource" path="res://data/ores/sulfur.tres" id="7_sulfur"]
 [ext_resource type="Resource" path="res://data/ores/meteoric_iron.tres" id="8_meteoric_iron"]
+[ext_resource type="Resource" path="res://data/ores/steel.tres" id="9_steel"]
+[ext_resource type="Resource" path="res://data/ores/steel_refining_recipe.tres" id="10_recipe"]
 
 [resource]
 script = ExtResource("1_script")
 ores = Array[Resource]([ExtResource("2_stone"), ExtResource("3_iron"), ExtResource("4_coal"), ExtResource("5_silver_gold"), ExtResource("6_jade"), ExtResource("7_sulfur"), ExtResource("8_meteoric_iron")])
 expected_ore_count = 7
+refined_ores = Array[Resource]([ExtResource("9_steel")])
+refining_recipes = Array[Resource]([ExtResource("10_recipe")])

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ToyDistributionRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/toy_distribution_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+expected_bey_share_ratio = 0.40
+max_bey_satisfaction = 100.0
+initial_bey_satisfaction = 65.0
+satisfaction_gain_on_fair_share = 12.0
+satisfaction_loss_per_shortfall_ratio = 85.0
+unfair_meat_portion_penalty = 18.0
+rebellion_satisfaction_threshold = 30.0
+rogue_warband_title = "Yersiz Yurtsuz Çeriler"
