@@ -13,6 +13,11 @@ extends Resource
 @export_range(1, 20) var rebellion_grace_ticks_after_depletion: int = 2
 @export_range(1.0, 50.0, 1.0) var rebellion_kut_penalty: float = 14.0
 
+@export_group("Ecological Yield & Sefer Arabasi Friction")
+@export_range(0.1, 1.0, 0.05) var grazed_meat_milk_multiplier: float = 0.75
+@export_range(0, 100) var migration_food_cost: int = 4
+@export_range(0, 100) var famine_bypass_food_threshold: int = 12
+
 
 ## Computes total pasture capacity consumed by `herd_size` animals during one grazing tick.
 func compute_depletion_delta(herd_size: int, season_depletion_multiplier: float = 1.0) -> float:
@@ -37,4 +42,6 @@ func get_validation_errors() -> PackedStringArray:
 		errors.append("PastureData: pasture_id cannot be empty.")
 	if max_pasture_capacity <= 0.0 or pasture_depletion_rate <= 0.0:
 		errors.append("PastureData: max_pasture_capacity and pasture_depletion_rate must be > 0.")
+	if grazed_meat_milk_multiplier <= 0.0 or grazed_meat_milk_multiplier > 1.0:
+		errors.append("PastureData: grazed_meat_milk_multiplier must lie in (0, 1].")
 	return errors

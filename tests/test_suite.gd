@@ -111,6 +111,7 @@ func _run_suite() -> void:
 	_test_phase12_long_horizon_combat_turan_reset_and_bounds()
 	_test_phase12_long_horizon_politics_intrigue_envoy_and_telemetry()
 	_test_phase14_deterministic_long_horizon_harness()
+	_test_phase15_economy_ecology_profile_calibration()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -2399,8 +2400,112 @@ func _test_phase14_deterministic_long_horizon_harness() -> void:
 			final_a.food, final_a.kut, final_a.ores.get(&"steel", 0), final_a.active_troops, final_a.glory_score])
 
 
+func _test_phase15_economy_ecology_profile_calibration() -> void:
+	# 1. Warehouse Stockpile Cap, Non-Stalling Crisis Smelting & Governance Tax Multiplier
+	var econ_rules: EconomyRules = ResourceManager.get_economy_rules()
+	var cap: int = econ_rules.max_ore_stockpile_capacity
+	CommandBus.dispatch(DepositResourcesCommand.new(1501, &"iron", cap + 25000))
+	_expect(ResourceManager.get_amount(1501, &"iron") == cap,
+		"Stockpile warehouse ceiling enforces max_ore_stockpile_capacity (%d)." % cap)
 
+	CommandBus.dispatch(DepositResourcesCommand.new(1502, &"iron", 20))
+	CommandBus.dispatch(DepositResourcesCommand.new(1502, &"coal", 10))
+	ResourceManager.set_camp_migration_and_supply_state(1502, true, true)
+	var crisis_smelt: int = ResourceManager.smelt_steel_with_logistics_constraints(1502, 4)
+	var capped_smelt: int = ResourceManager.smelt_steel_with_logistics_constraints(1502, 500)
+	_expect(crisis_smelt >= 1 and capped_smelt >= 1,
+		"Multi-batch Steel smelting does not stall to 0 under overlapping Sefer Arabası + Siege (min 1 batch) and clamps cleanly to affordable inputs.")
 
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p15_tax_baseline"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	var high_kut_tax: int = ResourceManager.calculate_effective_regional_tax_with_logistics(1502, 4, 2)
+	CommandBus.dispatch(ModifyKutCommand.new(22.0 - GameManager.get_kut_score(), &"p15_tax_low_kut"))
+	var low_kut_tax: int = ResourceManager.calculate_effective_regional_tax_with_logistics(1502, 4, 2)
+	_expect(low_kut_tax < high_kut_tax and is_equal_approx(ResourceManager.get_governance_tax_multiplier(), 0.75),
+		"Kut < 30 legitimacy penalty authentically reduces collected regional Silver/Gold tax (0.75x: %d < %d)." % [low_kut_tax, high_kut_tax])
 
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p15_tax_restore"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
 
+	# 2. Sefer Arabası Migration Rations vs Famine-Bypass & Zud Double-Emit Prevention
+	CommandBus.dispatch(MigrateCampToPastureCommand.new(1503, Vector2i(71, 71)))
+	SeasonManager.set_food_reserve(50)
+	var fed_mig: MigrateCampToPastureCommand = MigrateCampToPastureCommand.new(1503, Vector2i(71, 72))
+	_expect(CommandBus.dispatch(fed_mig) and fed_mig.migration_food_spent == 4 and SeasonManager.get_food_reserve() == 46,
+		"Healthy Sefer Arabası migration deducts calibrated migration_food_cost (4 Food: 50 -> 46).")
+	SeasonManager.set_food_reserve(5)
+	var famine_mig: MigrateCampToPastureCommand = MigrateCampToPastureCommand.new(1503, Vector2i(71, 73))
+	_expect(CommandBus.dispatch(famine_mig) and famine_mig.migration_food_spent == 0 and SeasonManager.get_food_reserve() == 5,
+		"Emergency famine-bypass (Food <= 12) allows critical pasture evacuation at 0 Food ration cost.")
 
+	# Verify GRAZED intermediate pasture multiplier (0.75x when capacity in (0, 40])
+	CommandBus.dispatch(GrazePastureCommand.new(1503, Vector2i(71, 73), 800, 1.0))
+	_expect(is_equal_approx(PastureEcologyManager.get_meat_milk_production_multiplier(1503), 0.75),
+		"Partially depleted pasture (<= 40.0) applies 0.75x GRAZED ecological friction before full collapse.")
+
+	# Verify SeasonManager.set_food_reserve(0) does not falsely fire Winter Zud drain without evaluate_zud_starvation
+	var winter_res: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.WINTER:
+		SeasonManager.advance_season_cycle()
+	var kut_before_zero: float = GameManager.get_kut_score()
+	SeasonManager.set_food_reserve(0)
+	_expect(is_equal_approx(GameManager.get_kut_score(), kut_before_zero),
+		"Setting Food reserve to 0 during Winter does not double-emit spurious zud_starvation_ticked Kut drain.")
+	SeasonManager.evaluate_zud_starvation(winter_res)
+	_expect(GameManager.get_kut_score() < kut_before_zero,
+		"Explicit Winter Zud evaluation drains calibrated Zud Kut penalty (-14.0).")
+
+	# 3. Three Distinct 24-Season (6-Year) Long-Horizon Profiles
+	var miner: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.SETTLED_MINER, 24, 15011, 2)
+	var miner_end: SimulationInvariantChecker.SeasonSnapshot = miner.latest()
+	_expect(miner.passed() and miner_end != null \
+		and miner.had_grazed_friction \
+		and not miner.had_starving_pasture \
+		and miner.steel_batches_smelted >= 60 \
+		and miner_end.ores.has(&"steel") and miner_end.ores[&"steel"] <= cap \
+		and miner_end.food >= 100,
+		"SETTLED_MINER (24s): passed=%s, grazed_friction=%s, steel_batches=%d, final_food=%d (violations: %s)." % [
+			miner.passed(), miner.had_grazed_friction, miner.steel_batches_smelted,
+			miner_end.food if miner_end != null else -1, ", ".join(miner.violations)])
+
+	var nomad: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.CONTINUOUS_NOMAD, 24, 15022, 3)
+	var nomad_end: SimulationInvariantChecker.SeasonSnapshot = nomad.latest()
+	_expect(nomad.passed() and nomad_end != null \
+		and nomad.migrations_performed >= 20 \
+		and nomad.migration_food_spent >= 40 \
+		and not nomad.had_starving_pasture \
+		and is_equal_approx(nomad.min_pasture_multiplier_observed, 1.0) \
+		and nomad_end.remount_horse_ratio >= 0.99 \
+		and nomad_end.food >= 100,
+		"CONTINUOUS_NOMAD (24s): passed=%s, migrations=%d, food_spent=%d, min_yield=%.2f, final_food=%d (violations: %s)." % [
+			nomad.passed(), nomad.migrations_performed, nomad.migration_food_spent,
+			nomad.min_pasture_multiplier_observed, nomad_end.food if nomad_end != null else -1,
+			", ".join(nomad.violations)])
+
+	var crisis: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.CRISIS_CLAN, 24, 15033, 4)
+	var crisis_end: SimulationInvariantChecker.SeasonSnapshot = crisis.latest()
+	var crisis_recovered: bool = crisis.passed() and crisis_end != null \
+		and crisis.min_food_observed == 0 \
+		and crisis.min_kut_observed < 30.0 \
+		and crisis.had_council_crisis \
+		and crisis.had_starving_pasture \
+		and crisis.min_remount_observed < 1.0 \
+		and crisis_end.food >= 40 \
+		and crisis_end.kut >= 40.0 \
+		and not crisis_end.council_active \
+		and crisis_end.remount_horse_ratio > crisis.min_remount_observed \
+		and crisis_end.remount_horse_ratio >= 0.90 \
+		and crisis_end.active_troops >= 100
+	_expect(crisis_recovered,
+		"CRISIS_CLAN (24s): genuine shock & organic recovery (min_food=%d -> %d, min_kut=%.1f -> %.1f, min_remount=%.2f -> %.2f, troops=%d, violations=%s)." % [
+			crisis.min_food_observed,
+			crisis_end.food if crisis_end != null else -1,
+			crisis.min_kut_observed,
+			crisis_end.kut if crisis_end != null else -1.0,
+			crisis.min_remount_observed,
+			crisis_end.remount_horse_ratio if crisis_end != null else -1.0,
+			crisis_end.active_troops if crisis_end != null else -1,
+			", ".join(crisis.violations)])

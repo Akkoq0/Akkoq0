@@ -87,7 +87,8 @@ func get_pasture_yield_multiplier(player_id: int) -> float:
 
 
 ## Produces seasonal food reserves from healthy livestock pastures in Spring/Summer/Autumn.
-## Healthy pastures replenish ~83 Food across the three mild seasons against 60 Winter draw,
+## Healthy pastures replenish ~101 Food across the three mild seasons against 60 Winter draw,
+## allowing stabilized clans to sustain Sefer Arabası migrations and rebuild after Zud within 1-2 years,
 ## whereas overgrazed/starving pastures (`multiplier = 0.0`) yield 0 Food and trigger Zud famine.
 func produce_seasonal_pasture_food(season: SeasonData, pasture_yield_multiplier: float = -1.0, max_reserve: int = 300) -> int:
 	if season == null or season.season_type == GameEnums.SeasonType.WINTER:
@@ -95,11 +96,11 @@ func produce_seasonal_pasture_food(season: SeasonData, pasture_yield_multiplier:
 	var mult: float = pasture_yield_multiplier if pasture_yield_multiplier >= 0.0 else get_pasture_yield_multiplier(1)
 	if mult <= 0.0:
 		return 0
-	var base_harvest: float = 22.0
+	var base_harvest: float = 28.0
 	if season.season_type == GameEnums.SeasonType.SUMMER:
-		base_harvest = 26.0
+		base_harvest = 32.0
 	elif season.season_type == GameEnums.SeasonType.AUTUMN:
-		base_harvest = 24.0
+		base_harvest = 28.0
 	var produced: int = maxi(int(roundf(base_harvest * season.production_multiplier * mult)), 0)
 	_food_reserve = mini(_food_reserve + produced, maxi(max_reserve, _food_reserve))
 	return produced
@@ -115,12 +116,18 @@ func advance_season_cycle(pasture_yield_multiplier: float = -1.0) -> SeasonData:
 	return get_current_season()
 
 
-## Sets the clan food reserve and evaluates Zud starvation if currently in Winter.
+## Consumes up to `amount` Food rations for Sefer Arabası migration logistics. Returns actual Food spent.
+func consume_food_for_migration(amount: int) -> int:
+	if amount <= 0 or _food_reserve <= 0:
+		return 0
+	var spent: int = mini(amount, _food_reserve)
+	_food_reserve -= spent
+	return spent
+
+
+## Sets the clan food reserve strictly without double-emitting Zud starvation events.
 func set_food_reserve(amount: int) -> void:
 	_food_reserve = maxi(amount, 0)
-	var current: SeasonData = get_current_season()
-	if current != null and current.season_type == GameEnums.SeasonType.WINTER and _food_reserve <= 0:
-		EventBus.zud_starvation_ticked.emit(_food_reserve, current)
 
 
 ## Evaluates seasonal food consumption and Zud (Winter) starvation for `season`.
@@ -322,7 +329,15 @@ func _on_game_state_changed(_previous: GameEnums.GameState, new_state: GameEnums
 func _broadcast(pasture_yield_multiplier: float = -1.0) -> void:
 	var season: SeasonData = get_current_season()
 	if season != null:
-		EventBus.season_changed.emit(season, _index)
+		var eff_yield: float = pasture_yield_multiplier if pasture_yield_multiplier >= 0.0 else get_pasture_yield_multiplier(1)
 		produce_seasonal_pasture_food(season, pasture_yield_multiplier)
+		EventBus.season_changed.emit(season, _index)
 		evaluate_zud_starvation(season)
+		if _kut_rules != null and season.season_type != GameEnums.SeasonType.WINTER \
+				and eff_yield >= 1.0 and _food_reserve >= _kut_rules.prosperity_food_surplus_threshold:
+			var current_kut: float = GameManager.get_kut_score()
+			if current_kut < _kut_rules.initial_kut:
+				var delta_kut: float = minf(_kut_rules.benign_pasture_prosperity_kut_recovery, _kut_rules.initial_kut - current_kut)
+				if delta_kut > 0.0:
+					CommandBus.dispatch(ModifyKutCommand.new(delta_kut, &"seasonal_pasture_prosperity"))
 

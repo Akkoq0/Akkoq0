@@ -11,3 +11,6 @@ waterside_regeneration_per_tick = 15.0
 grazed_warning_threshold = 40.0
 rebellion_grace_ticks_after_depletion = 2
 rebellion_kut_penalty = 14.0
+grazed_meat_milk_multiplier = 0.75
+migration_food_cost = 4
+famine_bypass_food_threshold = 12

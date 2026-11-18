@@ -13,3 +13,4 @@ max_authority_multiplier = 2.0
 meteoric_ore_id = &"meteoric_iron"
 commander_weapon_binding_cost = 5
 totem_ascension_binding_cost = 12
+max_ore_stockpile_capacity = 50000

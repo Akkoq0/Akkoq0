@@ -67,7 +67,21 @@ func is_overgrazing_rebellion_active(player_id: int) -> bool:
 func get_meat_milk_production_multiplier(player_id: int) -> float:
 	if is_livestock_starving(player_id):
 		return 0.0
-	return 1.0
+	if _pasture_data == null:
+		return 1.0
+	var yield_mult: float = 1.0
+	if _player_camp_regions.has(player_id):
+		var camp_coord: Vector2i = _player_camp_regions[player_id]
+		var cap: float = get_region_pasture_capacity(camp_coord)
+		var cond: GameEnums.PastureCondition = _pasture_data.classify_condition(cap)
+		if cond == GameEnums.PastureCondition.DEPLETED_STARVING:
+			return 0.0
+		elif cond == GameEnums.PastureCondition.GRAZED:
+			yield_mult = _pasture_data.grazed_meat_milk_multiplier
+		var cataclysm: CataclysmEventData = CataclysmEngine.get_active_region_cataclysm(camp_coord)
+		if cataclysm != null:
+			yield_mult *= cataclysm.pasture_yield_multiplier
+	return clampf(yield_mult, 0.0, 1.0)
 
 
 ## Regenerates pastures for rested macro regions not currently occupied by any camp
@@ -154,7 +168,7 @@ func _handle_graze_pasture(command: GameCommand) -> bool:
 		_rebellion_active[graze.player_id] = false
 		_depleted_ticks_without_migration[graze.player_id] = 0
 		graze.starving_livestock = false
-		graze.meat_milk_production_multiplier = 1.0
+		graze.meat_milk_production_multiplier = get_meat_milk_production_multiplier(graze.player_id)
 		graze.migration_required = false
 
 	SeasonManager.set_pasture_yield_multiplier(graze.player_id, get_meat_milk_production_multiplier(graze.player_id))
@@ -168,10 +182,20 @@ func _handle_migrate_camp(command: GameCommand) -> bool:
 	if _pasture_data == null:
 		return command.reject("PastureData not loaded.")
 
+	var has_existing_camp: bool = _player_camp_regions.has(migrate.player_id)
 	var prev_coord: Vector2i = _player_camp_regions.get(migrate.player_id, Vector2i.ZERO)
 	migrate.previous_region_coord = prev_coord
-	if prev_coord == migrate.target_region_coord:
+	if has_existing_camp and prev_coord == migrate.target_region_coord:
 		return command.reject("Camp is already located at region %s." % migrate.target_region_coord)
+
+	# Deduct calibrated Sefer Arabası migration rations only for active camp moves
+	# when above the starvation/emergency famine buffer (never blocking crisis evacuation).
+	var was_starving: bool = is_livestock_starving(migrate.player_id)
+	var spent_food: int = 0
+	if has_existing_camp and not was_starving and _pasture_data.migration_food_cost > 0:
+		if SeasonManager.get_food_reserve() > _pasture_data.famine_bypass_food_threshold:
+			spent_food = SeasonManager.consume_food_for_migration(_pasture_data.migration_food_cost)
+	migrate.migration_food_spent = spent_food
 
 	# Inspect actual capacity of target region (rested pastures regenerate across seasons)
 	var target_cap: float = get_region_pasture_capacity(migrate.target_region_coord)
@@ -186,10 +210,11 @@ func _handle_migrate_camp(command: GameCommand) -> bool:
 	_rebellion_active[migrate.player_id] = false
 	_depleted_ticks_without_migration[migrate.player_id] = 1 if still_depleted else 0
 
+	var effective_yield: float = get_meat_milk_production_multiplier(migrate.player_id)
 	migrate.new_pasture_capacity = target_cap
 	migrate.starving_livestock_cleared = not still_depleted
-	migrate.meat_milk_production_multiplier = 0.0 if still_depleted else 1.0
-	SeasonManager.set_pasture_yield_multiplier(migrate.player_id, get_meat_milk_production_multiplier(migrate.player_id))
+	migrate.meat_milk_production_multiplier = effective_yield
+	SeasonManager.set_pasture_yield_multiplier(migrate.player_id, effective_yield)
 
 	EventBus.camp_migrated_by_sefer_arabasi.emit(
 		migrate.player_id, prev_coord, migrate.target_region_coord, target_cap)

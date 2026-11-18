@@ -36,6 +36,14 @@ class SimulationRunResult:
 	var battles_fought: int = 0
 	var steel_batches_smelted: int = 0
 	var migrations_performed: int = 0
+	var migration_food_spent: int = 0
+	var min_food_observed: int = 999999
+	var min_kut_observed: float = 100.0
+	var min_remount_observed: float = 1.0
+	var min_pasture_multiplier_observed: float = 1.0
+	var had_grazed_friction: bool = false
+	var had_starving_pasture: bool = false
+	var had_council_crisis: bool = false
 
 	func passed() -> bool:
 		return violations.is_empty()
@@ -67,6 +75,8 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 		Vector2i(51, region_y),
 		Vector2i(52, region_y),
 		Vector2i(53, region_y),
+		Vector2i(54, region_y),
+		Vector2i(55, region_y),
 	]
 	var bey_id: StringName = StringName("sim_bey_%d_%d" % [slot_id, rng_seed])
 	var agent_id: StringName = StringName("sim_ai_%d_%d" % [slot_id, rng_seed])
@@ -86,11 +96,16 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 		sig_counts[&"overgrazing_rebellion"] = sig_counts[&"overgrazing_rebellion"] + 1
 	var on_betrayal: Callable = func(_b: StringName, _st: GameEnums.IntriguePlotStage, _t: int, _sb: bool, _k: float) -> void:
 		sig_counts[&"internal_betrayal"] = sig_counts[&"internal_betrayal"] + 1
+	var tracking_started: Array[bool] = [false]
+	var on_kut_changed: Callable = func(_prev: float, new_kut: float, _reason: StringName) -> void:
+		if tracking_started[0]:
+			result.min_kut_observed = minf(result.min_kut_observed, new_kut)
 
 	EventBus.ak_sakallilar_council_convened.connect(on_council)
 	EventBus.coalition_war_declared.connect(on_coalition)
 	EventBus.overgrazing_rebellion_triggered.connect(on_overgraze)
 	EventBus.internal_betrayal_triggered.connect(on_betrayal)
+	EventBus.kut_changed.connect(on_kut_changed)
 
 	# Load required data resources
 	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
@@ -136,7 +151,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 	CausalChainEngine.reset_continuous_state()
 	ResourceManager.set_camp_migration_and_supply_state(pid, false, false)
 	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"sim_init_baseline"))
-	SeasonManager.set_food_reserve(140)
+	SeasonManager.set_food_reserve(35 if profile == SimulationProfile.CRISIS_CLAN else 140)
 	SeasonManager.set_pasture_yield_multiplier(pid, 1.0)
 	for d_id: StringName in DYNASTY_IDS:
 		var prof: DynastyProfile = DiplomacyManager.get_dynasty_profile(d_id)
@@ -154,6 +169,9 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 
 	var left_wing: Vector3 = Vector3(-0.35, 0.0, 0.936).normalized()
 	var right_wing: Vector3 = Vector3(0.35, 0.0, -0.936).normalized()
+	var econ_rules: EconomyRules = ResourceManager.get_economy_rules()
+	var max_ore_cap: int = econ_rules.max_ore_stockpile_capacity if econ_rules != null else 50000
+	tracking_started[0] = true
 
 	for step_idx: int in range(num_seasons):
 		var cur_coord: Vector2i = region_band[current_region_idx]
@@ -171,7 +189,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 			iron_gain = 32
 			coal_gain = 20
 			jade_gain = 10
-			herd_size = 420
+			herd_size = 370
 			migrate_every_n = 3
 			combat_cadence = 4
 		elif profile == SimulationProfile.CONTINUOUS_NOMAD:
@@ -185,8 +203,8 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 			iron_gain = 10
 			coal_gain = 6
 			jade_gain = 2
-			herd_size = 950 if step_idx < 8 else 320
-			migrate_every_n = 99 if step_idx < 6 else 1
+			herd_size = 950 if step_idx < 7 else 320
+			migrate_every_n = 99 if step_idx < 7 else 1
 			combat_cadence = 2
 
 		CommandBus.dispatch(DepositResourcesCommand.new(pid, &"iron", iron_gain + rng.randi_range(0, 6)))
@@ -197,12 +215,18 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 		if step_idx % migrate_every_n == 0 and step_idx > 0:
 			current_region_idx = (current_region_idx + 1) % region_band.size()
 			cur_coord = region_band[current_region_idx]
-			CommandBus.dispatch(MigrateCampToPastureCommand.new(pid, cur_coord))
-			is_migrating_step = true
-			result.migrations_performed += 1
+			var mig_cmd: MigrateCampToPastureCommand = MigrateCampToPastureCommand.new(pid, cur_coord)
+			if CommandBus.dispatch(mig_cmd):
+				is_migrating_step = true
+				result.migrations_performed += 1
+				result.migration_food_spent += mig_cmd.migration_food_spent
 
-		var supply_cut_step: bool = (profile == SimulationProfile.CRISIS_CLAN and step_idx >= 3 and step_idx <= 7)
+		var supply_cut_step: bool = (profile == SimulationProfile.CRISIS_CLAN and step_idx >= 0 and step_idx <= 6)
 		ResourceManager.set_camp_migration_and_supply_state(pid, is_migrating_step, supply_cut_step)
+		if supply_cut_step and not CommandBus.is_army_supply_isolated(army_id):
+			CommandBus.dispatch(InterdictSupplyLineCommand.new(army_id, depot_id, agent_id))
+		elif not supply_cut_step and CommandBus.is_army_supply_isolated(army_id):
+			CommandBus.dispatch(RestoreSupplyLineCommand.new(army_id, depot_id, 0.45))
 
 		var target_batches: int = 10 if profile == SimulationProfile.SETTLED_MINER else 4
 		var smelted: int = ResourceManager.smelt_steel_with_logistics_constraints(pid, target_batches)
@@ -215,35 +239,30 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 		# --- B. Ecology Grazing & Cataclysm Exposure ---
 		var active_season: SeasonData = SeasonManager.get_current_season()
 		var sea_dep_mult: float = 1.2 if (active_season != null and active_season.season_type == GameEnums.SeasonType.WINTER) else 1.0
-		CommandBus.dispatch(GrazePastureCommand.new(pid, cur_coord, herd_size, sea_dep_mult))
-		SeasonManager.set_pasture_yield_multiplier(pid, PastureEcologyManager.get_meat_milk_production_multiplier(pid))
+		var graze_cmd: GrazePastureCommand = GrazePastureCommand.new(pid, cur_coord, herd_size, sea_dep_mult)
+		CommandBus.dispatch(graze_cmd)
+		if graze_cmd.condition == GameEnums.PastureCondition.GRAZED:
+			result.had_grazed_friction = true
+		var eff_pasture_mult: float = PastureEcologyManager.get_meat_milk_production_multiplier(pid)
+		SeasonManager.set_pasture_yield_multiplier(pid, eff_pasture_mult)
 
 		if profile == SimulationProfile.CRISIS_CLAN and step_idx == 5:
-			CommandBus.dispatch(EvaluateCataclysmCommand.new(cur_coord, true, 10.0, false, 0.25, 2.0, -18.0))
-		elif step_idx >= 10:
+			CommandBus.dispatch(EvaluateCataclysmCommand.new(cur_coord, true, -18.0, true, 0.0, 2.0, 0.0))
+		elif step_idx >= 9:
 			CataclysmEngine.clear_region_cataclysm(cur_coord)
 
 		# --- C. Seasonal Advancement & Food / Winter Zud Resolution ---
 		var next_season: SeasonData = SeasonManager.advance_season_cycle(PastureEcologyManager.get_meat_milk_production_multiplier(pid))
-		if next_season != null and next_season.season_type == GameEnums.SeasonType.WINTER:
+		if next_season != null:
 			army.mobility.set_season(next_season)
+		if next_season != null and next_season.season_type == GameEnums.SeasonType.WINTER:
 			if SeasonManager.get_food_reserve() <= 0:
-				var outbreak: bool = SeasonManager.evaluate_zud_epidemic_outbreak(army_id, true, rng_seed + step_idx, next_season)
-				if outbreak and army.supply.is_isolated():
-					army.supply.consume_yilki_horses_for_ration()
-			if supply_cut_step and not CommandBus.is_army_supply_isolated(army_id):
-				CommandBus.dispatch(InterdictSupplyLineCommand.new(army_id, depot_id, agent_id))
-		else:
-			if next_season != null:
-				army.mobility.set_season(next_season)
-			if not supply_cut_step and CommandBus.is_army_supply_isolated(army_id):
-				CommandBus.dispatch(RestoreSupplyLineCommand.new(army_id, depot_id, 0.45))
-			if army.supply.get_remount_horse_ratio() < 1.0:
-				army.supply.replenish_yilki_herd(0.35)
+				SeasonManager.evaluate_zud_epidemic_outbreak(army_id, true, rng_seed + step_idx, next_season)
 
 		if SeasonManager.is_army_infected(army_id):
 			var rem_troops: int = SeasonManager.simulate_epidemic_day(army_id, casualty_comp.get_active_troops())
-			if GameManager.get_kut_score() >= 25.0 and rem_troops > 0:
+			var pur_cost: float = SeasonManager.get_effective_purification_kut_cost(army_id)
+			if GameManager.get_kut_score() >= pur_cost + 15.0 and rem_troops > 0:
 				CommandBus.dispatch(PurifyEpidemicCommand.new(army_id, &"kurgan_shrine"))
 
 		# --- D. Tactical Combat Cycle, Casualties & Wounded Pool Recovery ---
@@ -252,7 +271,11 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 			var attacker_st: CombatantStats = CombatantStats.new(army_id, 210.0 + float(smelted) * 8.0, 125.0, 750.0, army.supply.get_supply_ratio())
 			attacker_st.has_steel_weapons = ResourceManager.get_amount(pid, &"steel") > 0
 			attacker_st.combat_duration_sec = 8.0
-			var defender_st: CombatantStats = CombatantStats.new(9500 + step_idx, 130.0, 95.0, 480.0, 0.90)
+			var is_crisis_siege_foe: bool = (profile == SimulationProfile.CRISIS_CLAN and step_idx <= 6)
+			var def_atk: float = 240.0 if is_crisis_siege_foe else 130.0
+			var def_def: float = 140.0 if is_crisis_siege_foe else 95.0
+			var def_hp: float = 950.0 if is_crisis_siege_foe else 480.0
+			var defender_st: CombatantStats = CombatantStats.new(9500 + step_idx, def_atk, def_def, def_hp, 0.90)
 
 			tactics.execute_whistling_arrow_volley(defender_st)
 			if tactics.get_current_phase() == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE or tactics.get_quiver_ammo() <= 0.0:
@@ -291,9 +314,6 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 				choice = GameEnums.CouncilDilemmaChoice.TRADITION
 			CommandBus.dispatch(EnactCouncilDecreeCommand.new(pid, choice))
 
-		if profile == SimulationProfile.CRISIS_CLAN and step_idx >= 8 and GameManager.get_kut_score() < 45.0:
-			CommandBus.dispatch(ModifyKutCommand.new(10.0, &"sim_crisis_stabilization"))
-
 		DiplomacyManager.evaluate_all_dynasties(GameManager.get_kut_score(), float(casualty_comp.get_active_troops()) * 4.5, 0.25)
 
 		CommandBus.dispatch(StepContinuousSimulationCommand.new(
@@ -321,8 +341,16 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 			glory_comp)
 		result.history.append(snap)
 		result.seasons_simulated += 1
+		result.min_food_observed = mini(result.min_food_observed, snap.food)
+		result.min_kut_observed = minf(result.min_kut_observed, snap.kut)
+		result.min_remount_observed = minf(result.min_remount_observed, snap.remount_horse_ratio)
+		result.min_pasture_multiplier_observed = minf(result.min_pasture_multiplier_observed, snap.meat_milk_multiplier)
+		if snap.pasture_starving:
+			result.had_starving_pasture = true
+		if snap.council_active:
+			result.had_council_crisis = true
 
-		var step_errors: PackedStringArray = SimulationInvariantChecker.validate_snapshot(snap)
+		var step_errors: PackedStringArray = SimulationInvariantChecker.validate_snapshot(snap, max_ore_cap)
 		for err: String in step_errors:
 			result.violations.append(err)
 
@@ -330,12 +358,15 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 	for err: String in hist_errors:
 		result.violations.append(err)
 	result.signal_counts = sig_counts
+	if sig_counts.get(&"council_convened", 0) > 0:
+		result.had_council_crisis = true
 
 	# Restore clean shared singleton baselines & detach temporary test objects
 	EventBus.ak_sakallilar_council_convened.disconnect(on_council)
 	EventBus.coalition_war_declared.disconnect(on_coalition)
 	EventBus.overgrazing_rebellion_triggered.disconnect(on_overgraze)
 	EventBus.internal_betrayal_triggered.disconnect(on_betrayal)
+	EventBus.kut_changed.disconnect(on_kut_changed)
 
 	depot.free()
 	army.free()
@@ -346,6 +377,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 
 	if winter != null:
 		pass
+	ResourceManager.set_camp_migration_and_supply_state(pid, false, false)
 	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"sim_cleanup_restore"))
 	SeasonManager.set_food_reserve(120)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)

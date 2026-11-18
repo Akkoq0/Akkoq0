@@ -27,6 +27,9 @@ extends Resource
 @export_group("Seasonal Food")
 @export_range(0, 100000) var starting_food_reserve: int = 120
 @export_range(0, 100000) var winter_food_consumption_per_cycle: int = 60
+## Mild-season Kut normalization toward baseline (75) when pastures are healthy and food buffer suffices.
+@export_range(0.0, 20.0, 0.5) var benign_pasture_prosperity_kut_recovery: float = 2.0
+@export_range(0, 500) var prosperity_food_surplus_threshold: int = 80
 
 @export_group("Phase 4 Zud Epidemic & Kurgan Purification")
 ## Base probability of Bozkır Vebası (`outbreak_epidemic`) when Food <= 0 during Winter/Zud.

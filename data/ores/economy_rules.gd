@@ -19,6 +19,9 @@ extends Resource
 @export_range(1, 10000) var commander_weapon_binding_cost: int = 5
 @export_range(1, 10000) var totem_ascension_binding_cost: int = 12
 
+@export_group("Warehouse Cap")
+@export_range(1000, 500000) var max_ore_stockpile_capacity: int = 50000
+
 
 ## Computes the Jade-driven Tamga/Authority multiplier from `jade_amount`.
 func compute_authority_multiplier(jade_amount: int) -> float:
@@ -49,4 +52,6 @@ func get_validation_errors() -> PackedStringArray:
 		errors.append("EconomyRules: meteoric_ore_id is empty.")
 	if max_authority_multiplier < 1.0:
 		errors.append("EconomyRules: max_authority_multiplier must be >= 1.0.")
+	if max_ore_stockpile_capacity < 1000:
+		errors.append("EconomyRules: max_ore_stockpile_capacity must be >= 1000.")
 	return errors

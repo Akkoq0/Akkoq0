@@ -16,4 +16,5 @@ quiver_resupply_rate_per_sec = 10.0
 yilki_sacrifice_ratio_per_starvation = 0.50
 yilki_sacrifice_supply_restored = 45.0
 yilki_sacrifice_morale_drop = 24.0
-yilki_sacrifice_kut_penalty = 14.0
+yilki_sacrifice_kut_penalty = 10.0
+benign_season_yilki_recovery_ratio = 0.25

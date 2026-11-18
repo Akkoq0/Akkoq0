@@ -12,6 +12,7 @@ var previous_region_coord: Vector2i = Vector2i.ZERO
 var new_pasture_capacity: float = 100.0
 var starving_livestock_cleared: bool = false
 var meat_milk_production_multiplier: float = 1.0
+var migration_food_spent: int = 0
 
 
 func _init(p_player_id: int, p_target_region_coord: Vector2i) -> void:

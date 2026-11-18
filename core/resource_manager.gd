@@ -119,11 +119,32 @@ func get_regional_tax_logistics_multiplier(player_id: int) -> float:
 	return mult
 
 
+## Returns combined political legitimacy (Kut < 30 penalty) and Ak Sakallılar Council income multiplier.
+func get_governance_tax_multiplier() -> float:
+	var mult: float = GameManager.get_legitimacy_multiplier() * CouncilEventEngine.get_active_income_multiplier()
+	return clampf(mult, 0.25, 1.5)
+
+
 ## Attempts `2 Iron + 1 Coal = 1 Steel` smelting constrained by mobile Sefer Arabası / siege capacity.
-## Returns the actual Steel batches smelted.
+## Clamps against available input stockpiles so large requests don't fail atomically, and avoids stalling
+## on multi-batch requests during overlapping migration + siege constraints. Returns actual Steel smelted.
 func smelt_steel_with_logistics_constraints(player_id: int, requested_batches: int) -> int:
+	var clamped_req: int = maxi(requested_batches, 0)
+	if clamped_req <= 0:
+		return 0
 	var throughput: float = get_effective_forge_throughput_multiplier(player_id)
-	var allowed_batches: int = maxi(int(floorf(float(maxi(requested_batches, 0)) * throughput)), 0)
+	var allowed_batches: int = int(floorf(float(clamped_req) * throughput))
+	if allowed_batches <= 0 and clamped_req >= 2 and throughput > 0.0:
+		allowed_batches = 1
+	if _registry != null:
+		var recipe: RefiningRecipe = _registry.find_recipe(STEEL_RECIPE_ID)
+		if recipe != null:
+			var stockpile: Stockpile = _get_or_create_stockpile(player_id)
+			var max_affordable: int = allowed_batches
+			for inp: ResourceAmount in recipe.inputs:
+				if inp != null and inp.amount > 0:
+					max_affordable = mini(max_affordable, stockpile.get_amount(inp.get_ore_id()) / inp.amount)
+			allowed_batches = maxi(max_affordable, 0)
 	if allowed_batches <= 0:
 		return 0
 	var cmd: RefineOreCommand = RefineOreCommand.new(player_id, NOMADIC_FORGE_ID, STEEL_RECIPE_ID, allowed_batches)
@@ -140,11 +161,11 @@ func collect_regional_tax(player_id: int, region_count: int, rich_region_count: 
 	return cmd.collected_tax
 
 
-## Pure preview/evaluation combining Jade Tamga Authority with Sefer Arabası & supply-line limits.
+## Pure preview/evaluation combining Jade Tamga Authority, Sefer Arabası logistics, and Kut/Council governance limits.
 func calculate_effective_regional_tax_with_logistics(player_id: int, region_count: int, rich_region_count: int = 0) -> int:
 	if _economy_rules == null or region_count <= 0:
 		return 0
-	var effective_mult: float = calculate_jade_authority_multiplier(player_id) * get_regional_tax_logistics_multiplier(player_id)
+	var effective_mult: float = calculate_jade_authority_multiplier(player_id) * get_regional_tax_logistics_multiplier(player_id) * get_governance_tax_multiplier()
 	return _economy_rules.compute_regional_tax(region_count, rich_region_count, effective_mult)
 
 
@@ -247,7 +268,8 @@ func _handle_collect_regional_tax(command: GameCommand) -> bool:
 		return command.reject("controlled_region_count must be positive.")
 	var authority_mult: float = calculate_jade_authority_multiplier(tax_cmd.player_id)
 	var logistics_mult: float = get_regional_tax_logistics_multiplier(tax_cmd.player_id)
-	var effective_mult: float = authority_mult * logistics_mult
+	var governance_mult: float = get_governance_tax_multiplier()
+	var effective_mult: float = authority_mult * logistics_mult * governance_mult
 	var tax_amount: int = _economy_rules.compute_regional_tax(
 		tax_cmd.controlled_region_count, tax_cmd.rich_region_count, effective_mult)
 	if tax_amount <= 0:
@@ -295,9 +317,13 @@ func _binding_key(player_id: int, target_id: StringName) -> StringName:
 
 
 func _get_or_create_stockpile(player_id: int) -> Stockpile:
+	var max_cap: int = _economy_rules.max_ore_stockpile_capacity if _economy_rules != null else 0
 	if _stockpiles.has(player_id):
-		return _stockpiles[player_id]
-	var stockpile: Stockpile = Stockpile.new(player_id)
+		var existing: Stockpile = _stockpiles[player_id]
+		if existing.get_max_capacity() == 0 and max_cap > 0:
+			existing.set_max_capacity(max_cap)
+		return existing
+	var stockpile: Stockpile = Stockpile.new(player_id, max_cap)
 	if _registry != null:
 		for ore: OreData in _registry.ores:
 			if ore != null and ore.starting_amount > 0:

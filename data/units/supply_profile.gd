@@ -28,4 +28,6 @@ extends Resource
 ## Battle morale collapse caused by slaughtering the clan's own mounts.
 @export_range(0.0, 100.0, 0.5) var yilki_sacrifice_morale_drop: float = 24.0
 ## Severe Kut (Divine Mandate) penalty inflicted on the Khagan when an isolated army eats its horses.
-@export_range(0.0, 100.0, 0.5) var yilki_sacrifice_kut_penalty: float = 14.0
+@export_range(0.0, 100.0, 0.5) var yilki_sacrifice_kut_penalty: float = 10.0
+## Fractional Yılkı spare-horse recovery on non-Winter seasons when connected to a depot with food reserves.
+@export_range(0.0, 1.0, 0.05) var benign_season_yilki_recovery_ratio: float = 0.25

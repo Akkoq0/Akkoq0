@@ -110,7 +110,10 @@ func tick_gathering(delta_sec: float) -> void:
 		_harvest_elapsed_sec += delta_sec
 		if _harvest_elapsed_sec >= profile.harvest_duration_sec:
 			_extract_from_target_tile()
-			_state = GameEnums.WorkerGatherState.HAULING_TO_GER_CAMP
+			if _carried_amount > 0:
+				_state = GameEnums.WorkerGatherState.HAULING_TO_GER_CAMP
+			else:
+				_state = GameEnums.WorkerGatherState.IDLE
 	elif _state == GameEnums.WorkerGatherState.HAULING_TO_GER_CAMP:
 		_current_position = _CurrentMoveToward(_current_position, _ger_camp_position, profile.caravan_haul_speed_m_per_sec * delta_sec)
 		if _current_position.distance_to(_ger_camp_position) <= profile.arrival_tolerance_m:

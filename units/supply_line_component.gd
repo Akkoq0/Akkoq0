@@ -97,8 +97,12 @@ func get_remount_horse_ratio() -> float:
 func replenish_yilki_herd(restored_ratio: float) -> float:
 	if _profile == null:
 		return _remount_horse_ratio
-	_remount_horse_ratio = clampf(_remount_horse_ratio + maxf(restored_ratio, 0.0), 0.0, _profile.initial_remount_horse_ratio)
-	remount_horse_ratio_changed.emit(_remount_horse_ratio)
+	var gained: float = maxf(restored_ratio, 0.0)
+	var prev: float = _remount_horse_ratio
+	_remount_horse_ratio = clampf(_remount_horse_ratio + gained, 0.0, _profile.initial_remount_horse_ratio)
+	if _remount_horse_ratio > prev:
+		_battle_morale = clampf(_battle_morale + gained * 20.0, 0.0, 100.0)
+		remount_horse_ratio_changed.emit(_remount_horse_ratio)
 	return _remount_horse_ratio
 
 
@@ -230,6 +234,12 @@ func _on_depot_unregistered(depot_id: int) -> void:
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 	_season_attrition = season.attrition_multiplier if season != null else 1.0
+	if season != null and season.season_type != GameEnums.SeasonType.WINTER \
+			and _profile != null and not is_isolated() \
+			and SeasonManager.get_food_reserve() > 0 \
+			and _remount_horse_ratio < _profile.initial_remount_horse_ratio:
+		if _is_connected or (body != null and _is_in_depot_range(body.global_position)):
+			replenish_yilki_herd(_profile.benign_season_yilki_recovery_ratio)
 
 
 func _on_supply_line_severed(army_id: int, _depot_id: int, _raider_id: StringName, _captured_loot_value: float) -> void:
