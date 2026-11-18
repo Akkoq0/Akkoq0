@@ -56,6 +56,7 @@ var _wounded_recovered_signal_received: bool = false
 var _veteran_shock_signal_received: bool = false
 var _causal_step_propagated_signal_received: bool = false
 var _causal_counterplay_signal_received: bool = false
+var _causal_transition_records: Array[CausalTransitionRecord] = []
 
 
 func _ready() -> void:
@@ -97,6 +98,9 @@ func _run_suite() -> void:
 	_test_phase9_wounded_pool_and_veteran_attrition()
 	_test_causal_friction_calibration_and_threshold_matrix()
 	_test_causal_chains_and_counterplay_recovery()
+	_test_phase11_continuous_accumulation_decay_and_telemetry()
+	_test_phase11_turan_maneuver_readiness_and_layered_morale()
+	_test_phase11_economy_logistics_contagion_and_political_synergy()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -1726,6 +1730,246 @@ func _on_causal_chain_step_propagated(_arch: GameEnums.CausalChainArchetype, _cn
 
 func _on_causal_chain_counterplay_applied(_arch: GameEnums.CausalChainArchetype, _cp: GameEnums.CausalCounterplayAction, _sum: StringName) -> void:
 	_causal_counterplay_signal_received = true
+
+
+func _on_causal_transition_recorded(record: CausalTransitionRecord) -> void:
+	if record != null:
+		_causal_transition_records.append(record)
+
+
+func _test_phase11_continuous_accumulation_decay_and_telemetry() -> void:
+	_causal_transition_records.clear()
+	EventBus.causal_transition_recorded.connect(_on_causal_transition_recorded)
+	CausalChainEngine.reset_continuous_state()
+
+	# 1. Sustained steppe crisis ticks (depleted pasture, no migration, no supply, Zud winter, unfair Toy share)
+	var tick_a: StepContinuousSimulationCommand = StepContinuousSimulationCommand.new(
+		1, 110, 4.0, true, false, false, true, 0.20, false)
+	_expect(CommandBus.dispatch(tick_a) and tick_a.ecological_pressure > 0.0 and tick_a.logistics_strain > 0.0,
+		"Continuous simulation accumulates ecological pressure and logistics strain under pasture depletion & supply cutoff.")
+
+	var tick_b: StepContinuousSimulationCommand = StepContinuousSimulationCommand.new(
+		1, 110, 6.0, true, false, false, true, 0.20, false)
+	_expect(CommandBus.dispatch(tick_b) \
+		and tick_b.ecological_pressure > tick_a.ecological_pressure \
+		and tick_b.logistics_strain > tick_a.logistics_strain \
+		and tick_b.morale_panic_pressure > tick_a.morale_panic_pressure \
+		and tick_b.political_fracture_pressure > tick_a.political_fracture_pressure,
+		"Continuous ticks compound pressure monotonically across ecology -> logistics -> morale -> political fracture.")
+	_expect(tick_b.effective_remount_ratio < 1.0 and tick_b.effective_maneuver_speed_mult < 1.0,
+		"Continuous Yılkı spare-horse depletion reduces maneuver speed multiplier progressively.")
+	_expect(_causal_transition_records.size() >= 6,
+		"Type-safe CausalTransitionRecord telemetry payloads emitted via EventBus for continuous causal steps.")
+
+	# 2. Active counterplay ticks: Sefer Arabası migration + intact supply + fair Toy + rest out of combat
+	var recovery_cmd: StepContinuousSimulationCommand = StepContinuousSimulationCommand.new(
+		1, 110, 8.0, false, true, true, false, 0.75, true)
+	_expect(CommandBus.dispatch(recovery_cmd) \
+		and recovery_cmd.ecological_pressure < tick_b.ecological_pressure \
+		and recovery_cmd.logistics_strain < tick_b.logistics_strain \
+		and recovery_cmd.morale_panic_pressure < tick_b.morale_panic_pressure \
+		and recovery_cmd.effective_remount_ratio > tick_b.effective_remount_ratio,
+		"Counterplay recovery ticks decay accumulated crisis pressures and restore Yılkı remount ratio.")
+
+	var found_recovery_record: bool = false
+	for rec: CausalTransitionRecord in _causal_transition_records:
+		if rec.is_recovery and rec.cause_source != &"" and rec.effect_target != &"":
+			found_recovery_record = true
+			break
+	_expect(found_recovery_record,
+		"CausalTransitionRecord stream explicitly logs recovery transitions with non-empty source and target tags.")
+
+	EventBus.causal_transition_recorded.disconnect(_on_causal_transition_recorded)
+
+
+func _test_phase11_turan_maneuver_readiness_and_layered_morale() -> void:
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/feigned_retreat.tres") as TacticalDoctrineData
+	var combat_rules: CombatRules = ResourceLoader.load("res://data/combat/combat_rules.tres") as CombatRules
+
+	# 1. TuranTacticsComponent maneuver readiness tied to fatigue, quiver_ammo, remount_horse_ratio & terrain
+	var tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics)
+	tactics.configure(112, doctrine)
+
+	tactics.set_readiness_state(0.0, 90.0, 1.0)
+	var fresh_eff: float = tactics.compute_maneuver_execution_efficiency(steppe)
+	tactics.set_readiness_state(85.0, 0.0, 0.20)
+	var exhausted_eff: float = tactics.compute_maneuver_execution_efficiency(forest)
+	_expect(fresh_eff >= 1.0 and exhausted_eff < 0.50 and exhausted_eff < fresh_eff,
+		"Turan maneuver efficiency rises on fertile steppe and drops severely under fatigue, empty quiver, and low Yılkı remounts.")
+
+	var tactics_tired: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics_tired)
+	tactics_tired.configure(115, doctrine)
+
+	var enemy_fresh: CombatantStats = CombatantStats.new(301, 140.0, 100.0, 500.0, 1.0)
+	var enemy_tired: CombatantStats = CombatantStats.new(302, 140.0, 100.0, 500.0, 1.0)
+	tactics.set_readiness_state(0.0, 90.0, 1.0)
+	var lure_fresh: Dictionary[StringName, float] = tactics.execute_feigned_retreat_with_readiness(0.90, 0.35, 80.0, steppe, enemy_fresh)
+	tactics_tired.set_readiness_state(85.0, 0.0, 0.15)
+	var lure_tired: Dictionary[StringName, float] = tactics_tired.execute_feigned_retreat_with_readiness(0.90, 0.35, 80.0, null, enemy_tired)
+	_expect(lure_fresh[TuranTacticsComponent.KEY_ARMOR_COLLAPSE_RATIO] > lure_tired[TuranTacticsComponent.KEY_ARMOR_COLLAPSE_RATIO],
+		"Exhausted, unmounted, ammo-starved troops induce less Feigned Retreat armor collapse than rested riders.")
+	tactics_tired.free()
+
+	tactics.set_readiness_state(85.0, 0.0, 0.20)
+	var recovered_eff: float = tactics.rest_and_resupply_tactical_readiness(25.0, 80.0, 0.85, steppe)
+	_expect(recovered_eff > exhausted_eff and recovered_eff >= 1.0,
+		"Out-of-combat rest and resupply restore full Turan maneuver execution readiness.")
+
+	# 2. CombatCalculator readiness scaling (quiver_ammo & remount_horse_ratio)
+	var atk_ready: CombatantStats = CombatantStats.new(310, 200.0, 100.0, 800.0, 1.0)
+	atk_ready.active_tactic_phase = GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT
+	atk_ready.quiver_ammo_ratio = 1.0
+	atk_ready.remount_horse_ratio = 1.0
+
+	var atk_depleted: CombatantStats = CombatantStats.new(311, 200.0, 100.0, 800.0, 1.0)
+	atk_depleted.active_tactic_phase = GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT
+	atk_depleted.quiver_ammo_ratio = 0.0
+	atk_depleted.remount_horse_ratio = 0.20
+
+	_expect(CombatCalculator.compute_maneuver_readiness_multiplier(atk_depleted) < 0.60,
+		"CombatCalculator reduces tactical readiness multiplier when quiver ammo and remount horses are depleted.")
+	var def_a: CombatantStats = CombatantStats.new(312, 100.0, 100.0, 800.0, 1.0)
+	var def_b: CombatantStats = CombatantStats.new(313, 100.0, 100.0, 800.0, 1.0)
+	var rng1: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng1.seed = 42
+	var rng2: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng2.seed = 42
+	var r_ready: CombatResult = CombatCalculator.calculate(atk_ready, def_a, null, null, rng1)
+	var r_depleted: CombatResult = CombatCalculator.calculate(atk_depleted, def_b, null, null, rng2)
+	_expect(r_depleted.damage_to_defender < r_ready.damage_to_defender,
+		"Depleted quiver ammo and Yılkı spare horses lower CombatCalculator damage output during whistling arrow phase.")
+
+	# 3. Layered MoraleComponent vanguard shock damping & recovery
+	var vet_morale: MoraleComponent = MoraleComponent.new()
+	vet_morale.configure(113, combat_rules)
+	add_child(vet_morale)
+	vet_morale.configure_veteran_and_commander_profile(0.90, 95.0, 85.0, 80.0)
+	var vet_shock: Dictionary[StringName, float] = vet_morale.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	_expect(vet_morale.is_in_staggered_hold() and not vet_morale.is_cascade_routing() \
+		and is_equal_approx(vet_shock[&"rear_strike_multiplier"], combat_rules.front_damage_multiplier) \
+		and is_zero_approx(vet_shock[&"captured_slave_workers"]),
+		"Veteran troops led by high-leadership commander hold in staggered_hold without cascade_rout or prisoner loss.")
+
+	var rookie_morale: MoraleComponent = MoraleComponent.new()
+	rookie_morale.configure(114, combat_rules)
+	add_child(rookie_morale)
+	rookie_morale.configure_veteran_and_commander_profile(0.10, 20.0, 50.0, 45.0)
+	rookie_morale.accumulate_battle_fatigue(28.0)
+	var rookie_shock: Dictionary[StringName, float] = rookie_morale.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	_expect(rookie_morale.is_cascade_routing() and not rookie_morale.is_in_staggered_hold() \
+		and is_equal_approx(rookie_shock[&"rear_strike_multiplier"], 2.1) \
+		and rookie_shock[&"captured_slave_workers"] > 0.0,
+		"Fatigued rookie formation breaks into cascade_rout (2.1x rear strike and Toy captive capture).")
+
+	var fatigued_before: float = rookie_morale.get_battle_fatigue()
+	rookie_morale.recover_fatigue_and_rally(10.0, 1.0)
+	_expect(rookie_morale.get_battle_fatigue() < fatigued_before,
+		"Supplied rest lowers battle fatigue and rallies unit morale/cohesion.")
+
+	tactics.free()
+	vet_morale.free()
+	rookie_morale.free()
+
+
+func _test_phase11_economy_logistics_contagion_and_political_synergy() -> void:
+	# 1. 7-Ore Refining & Tax under Sefer Arabası migration & supply isolation
+	CommandBus.dispatch(DepositResourcesCommand.new(3, &"iron", 20))
+	CommandBus.dispatch(DepositResourcesCommand.new(3, &"coal", 20))
+	CommandBus.dispatch(DepositResourcesCommand.new(3, &"jade", 10))
+	CommandBus.dispatch(DepositResourcesCommand.new(3, &"meteoric_iron", 10))
+
+	ResourceManager.set_camp_migration_and_supply_state(3, false, false)
+	var settled_tax: int = ResourceManager.calculate_effective_regional_tax_with_logistics(3, 5, 2)
+	var settled_smelt: int = ResourceManager.smelt_steel_with_logistics_constraints(3, 4)
+
+	ResourceManager.set_camp_migration_and_supply_state(3, true, false)
+	var migrating_tax: int = ResourceManager.calculate_effective_regional_tax_with_logistics(3, 5, 2)
+	var migrating_smelt: int = ResourceManager.smelt_steel_with_logistics_constraints(3, 4)
+	_expect(is_equal_approx(ResourceManager.get_effective_forge_throughput_multiplier(3), 0.35),
+		"Migrating Sefer Arabası limits Nomadic Forge smelting throughput to 0.35x.")
+	_expect(migrating_smelt == 1 and settled_smelt == 4 and migrating_tax < settled_tax,
+		"Migrating camp yields fewer Steel batches (1 vs 4) and reduced regional Silver/Gold tax collection.")
+	_expect(not ResourceManager.bind_meteoric_iron_with_logistics(3, &"totem_sky_altar", true),
+		"Meteoric Iron Totem Ascension binding requires a settled hearth and is blocked during Sefer Arabası migration.")
+	ResourceManager.set_camp_migration_and_supply_state(3, false, false)
+	_expect(ResourceManager.bind_meteoric_iron_with_logistics(3, &"totem_sky_altar", true),
+		"Once Sefer Arabası settles, Meteoric Iron Totem Ascension binding succeeds.")
+
+	# 2. Zud Contagion, Emergency Food Rations & Escalating Kurgan Kut Cost
+	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+	SeasonManager.set_food_reserve(0)
+	_expect(SeasonManager.evaluate_zud_epidemic_outbreak(121, true, 1, winter),
+		"Winter Zud starvation triggers outbreak_epidemic on army 121.")
+	SeasonManager.set_food_reserve(60)
+	var ration_metrics: Dictionary[StringName, float] = SeasonManager.evaluate_epidemic_contagion_and_ration_strain(121, 122, 25, 200)
+	_expect(is_equal_approx(ration_metrics[&"food_consumed"], 25.0) \
+		and ration_metrics[&"effective_attrition_ratio"] <= 0.045 \
+		and not SeasonManager.is_army_infected(122),
+		"Allocating >= 20 emergency food rations halves epidemic attrition and blocks contagion spread to nearby army 122.")
+
+	var neglect_metrics: Dictionary[StringName, float] = SeasonManager.evaluate_epidemic_contagion_and_ration_strain(121, 122, 0, 192)
+	_expect(SeasonManager.is_army_infected(122) \
+		and is_equal_approx(neglect_metrics[&"nearby_infected"], 1.0) \
+		and SeasonManager.get_effective_purification_kut_cost(121) > 12.0,
+		"Withholding rations spreads Zud epidemic to nearby army 122 and escalates Kurgan purification Kut cost above 12.0.")
+
+	CommandBus.dispatch(ModifyKutCommand.new(80.0 - GameManager.get_kut_score(), &"set_kut_for_escalated_kurgan"))
+	var escalated_cost: float = SeasonManager.get_effective_purification_kut_cost(121)
+	var purify_cmd: PurifyEpidemicCommand = PurifyEpidemicCommand.new(121, &"kurgan_shrine")
+	_expect(CommandBus.dispatch(purify_cmd) and is_equal_approx(purify_cmd.kut_spent, escalated_cost),
+		"PurifyEpidemicCommand charges the escalated Kurgan Kut cost (%.1f) and purifies army 121." % escalated_cost)
+
+	# 3. Intelligence -> Diplomacy -> Council -> Glory Synergy
+	DiplomacyManager.set_political_intelligence_context(0.0, 6.0, 18.0, 10.0)
+	var crisis_ctx: Dictionary[StringName, float] = DiplomacyManager.evaluate_coalition_with_political_context(22.0, 650.0, 3.0)
+	DiplomacyManager.set_political_intelligence_context(20.0, 0.0, 0.0, 78.0)
+	var deterred_ctx: Dictionary[StringName, float] = DiplomacyManager.evaluate_coalition_with_political_context(22.0, 1000.0, 0.5)
+	_expect(is_equal_approx(crisis_ctx[&"coalition_active"], 1.0) \
+		and deterred_ctx[&"max_effective_threat"] < crisis_ctx[&"max_effective_threat"],
+		"Combined Sık Orman espionage deterrence and high Khagan Glory sharply lower neighbor coalition threat even below Kut 30.")
+
+	var raw_council: Dictionary[StringName, float] = CouncilEventEngine.evaluate_council_crisis_severity_with_context(20.0, true, false, 15.0)
+	var mitigated_council: Dictionary[StringName, float] = CouncilEventEngine.evaluate_council_crisis_severity_with_context(20.0, false, true, 78.0)
+	_expect(mitigated_council[&"severity_score"] < raw_council[&"severity_score"] \
+		and mitigated_council[&"sacrifice_bullion_discount_ratio"] > 0.25,
+		"Espionage forewarning and Khagan Glory mitigate Ak Sakallılar crisis severity and expand political concessions.")
+
+	var rules: DiplomacyRules = ResourceLoader.load("res://data/diplomacy/diplomacy_rules.tres") as DiplomacyRules
+	var glory_comp: GloryComponent = GloryComponent.new()
+	add_child(glory_comp)
+	glory_comp.configure(125, rules)
+
+	var forest_p11: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var det_before: float = DiplomacyManager.get_espionage_deterrence_bonus()
+	var esp_adv_before: int = CouncilEventEngine.get_espionage_advantage_count()
+	var live_spy: DispatchSpyCommand = DispatchSpyCommand.new(
+		1, 2, 333, 95.0, forest_p11, 80.0, GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE)
+	_expect(CommandBus.dispatch(live_spy) and live_spy.report != null and live_spy.report.succeeded \
+		and DiplomacyManager.get_espionage_deterrence_bonus() > det_before \
+		and CouncilEventEngine.get_espionage_advantage_count() > esp_adv_before \
+		and glory_comp.get_glory_score() >= 4.0,
+		"Live espionage mission in Sık Orman synchronously boosts DiplomacyManager deterrence, CouncilEventEngine advantage, and Khagan Glory via EventBus.")
+
+	var glory_before_decree: float = glory_comp.get_glory_score()
+	var decree_exp: EnactCouncilDecreeCommand = EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.EXPANSION)
+	_expect(CommandBus.dispatch(decree_exp) and glory_comp.get_glory_score() > glory_before_decree,
+		"EXPANSION council decree boosts Khagan Glory via EventBus alongside raids & loot.")
+
+	glory_comp.record_successful_turan_tactic()
+	glory_comp.record_successful_feigned_retreat()
+	glory_comp.record_envoy_assassination()
+	glory_comp.record_successful_turan_tactic()
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"phase11_scaled_bey", 500.0, 0.0, false))
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"phase11_scaled_bey", 500.0, 0.0, false))
+	var scaled_recruited: int = glory_comp.recruit_rogue_warband_scaled_by_glory(&"phase11_scaled_bey")
+	_expect(scaled_recruited > rules.rogue_warband_troop_size,
+		"Surplus Khagan Glory (> 40) scales recruited Yersiz Yurtsuz Çeriler rider detachment above base 250 (%d riders)." % scaled_recruited)
+	glory_comp.free()
+
 
 
 
