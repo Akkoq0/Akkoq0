@@ -151,3 +151,14 @@ signal exile_dynasty_extinct(player_id: int, reason: StringName)
 signal dynasty_reborn_at_frontier(player_id: int, frontier_coord: Vector2i, glory_reset: float)
 signal vassal_coup_attempted(vassal_id: int, overlord_id: int, succeeded: bool, reason: StringName)
 
+# --- Phase 21 Realistic Physics, Courier Delay, Dust Deception & Caravans --
+signal courier_dispatched(order_id: StringName, player_id: int, target_army_id: int, eta_sec: float)
+signal courier_order_delivered(order_id: StringName, player_id: int, target_army_id: int, command_type: StringName)
+signal courier_ambushed_plan_exposed(order_id: StringName, victim_player_id: int, ambusher_id: int, leaked_plan: GameEnums.TuranTacticPhase)
+signal dust_deception_evaluated(observer_id: int, target_army_id: int, true_power: float, perceived_power: float, sees_through: bool)
+signal caravan_dispatched(caravan_id: StringName, owner_id: int, origin_coord: Vector2i, dest_coord: Vector2i, eta_sec: float)
+signal caravan_delivered(caravan_id: StringName, owner_id: int, steel_amt: int, food_amt: int, ammo_amt: float)
+signal army_caravan_resupply_delivered(army_id: int, quiver_ammo_amt: float, food_amt: int)
+signal caravan_intercepted_crisis(caravan_id: StringName, owner_id: int, raider_id: int, dest_army_id: int, ammo_lost: float, supply_drop: float)
+signal artisans_captured(victim_id: int, captor_id: int, captured_masters: int, steel_quality_after: float)
+

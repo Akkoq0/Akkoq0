@@ -183,6 +183,8 @@ func can_bind_meteoric_iron(player_id: int, for_totem_ascension: bool) -> bool:
 func bind_meteoric_iron_with_logistics(player_id: int, target_id: StringName, for_totem_ascension: bool) -> bool:
 	if for_totem_ascension and is_camp_migrating(player_id):
 		return false
+	if not CaravanLogisticsManager.can_forge_meteoric_iron(player_id):
+		return false
 	var cmd: BindMeteoricIronCommand = BindMeteoricIronCommand.new(player_id, target_id, for_totem_ascension)
 	return CommandBus.dispatch(cmd)
 

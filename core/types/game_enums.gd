@@ -285,6 +285,20 @@ enum CollapsePathChoice {
 	REBUILD_AT_FRONTIER = 2,
 }
 
+## Phase 21 Courier physical dispatch FSM (`CourierDispatchSystem`).
+enum CourierStatus {
+	IN_TRANSIT = 0,
+	DELIVERED = 1,
+	AMBUSHED_LOST = 2,
+}
+
+## Phase 21 Non-teleporting physical caravan states (`CaravanLogisticsManager`).
+enum CaravanCargoState {
+	EN_ROUTE = 0,
+	DELIVERED = 1,
+	INTERCEPTED = 2,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

@@ -117,6 +117,7 @@ func _run_suite() -> void:
 	_test_phase18_persistent_world_peace_and_anti_snowball()
 	_test_phase19_hybrid_conquest_yaylak_kislak_kurgan()
 	_test_phase20_asymmetric_collapse_exile_vassal_rebirth()
+	_test_phase21_courier_deception_caravans_artisans()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3373,6 +3374,145 @@ func _test_phase20_asymmetric_collapse_exile_vassal_rebirth() -> void:
 	CollapseRecoveryFSM.reset_collapse_state()
 	GracePeriodManager.reset_persistent_world()
 	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p20_cleanup_kut"))
+
+
+func _test_phase21_courier_deception_caravans_artisans() -> void:
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	var rules: CourierAndCaravanRules = CaravanLogisticsManager.get_rules()
+	var combat_rules: CombatRules = ResourceLoader.load("res://data/combat/combat_rules.tres") as CombatRules
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/feigned_retreat.tres") as TacticalDoctrineData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+
+	# 1. Courier Dispatch Latency + Offline Doctrine Autonomy During Transit + Scout Ambush Leak
+	var courier_steppe: DispatchCourierOrderCommand = DispatchCourierOrderCommand.new(
+		&"ord_steppe", 1, 2101, &"launch_feigned_retreat", GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+		Vector3.ZERO, Vector3(180.0, 0.0, 0.0), GameEnums.TerrainType.STEPPE, false)
+	var courier_mountain_storm: DispatchCourierOrderCommand = DispatchCourierOrderCommand.new(
+		&"ord_mountain", 1, 2102, &"crescent_trap", GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		Vector3.ZERO, Vector3(180.0, 0.0, 0.0), GameEnums.TerrainType.MOUNTAIN, true)
+	_expect(CommandBus.dispatch(courier_steppe) and CommandBus.dispatch(courier_mountain_storm) \
+		and courier_mountain_storm.computed_delay_sec > courier_steppe.computed_delay_sec * 2.0 \
+		and CourierDispatchSystem.is_army_awaiting_courier(2101) \
+		and not CourierDispatchSystem.is_order_delivered(&"ord_steppe"),
+		"Courier orders experience real terrain/storm transit delay (mountain+storm %.1fs > steppe %.1fs) instead of teleporting." % [
+			courier_mountain_storm.computed_delay_sec, courier_steppe.computed_delay_sec])
+
+	# While courier is in transit, OfflineDoctrineComponent runs autonomously when enemy approaches
+	var detached_offline: OfflineDoctrineComponent = OfflineDoctrineComponent.new()
+	var detached_tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(detached_offline)
+	add_child(detached_tactics)
+	detached_offline.configure(2101, 1.5, GameEnums.TerrainClass.SIK_ORMAN)
+	detached_tactics.configure(2101, doctrine, 100.0)
+	var transit_decision: OfflineDoctrineDecision = detached_offline.evaluate_doctrine(
+		180.0, 320.0, 1.0, detached_tactics, [steppe, forest], false)
+	_expect(CourierDispatchSystem.is_army_awaiting_courier(2101) \
+		and transit_decision.triggered and transit_decision.evade_combat and transit_decision.activated_feigned_retreat,
+		"While courier is in transit, detached army relies on OfflineDoctrineComponent autonomy.")
+
+	CourierDispatchSystem.step_courier_transit(courier_steppe.computed_delay_sec + 1.0)
+	_expect(CourierDispatchSystem.is_order_delivered(&"ord_steppe") \
+		and not CourierDispatchSystem.is_order_delivered(&"ord_mountain"),
+		"Advancing past steppe ETA delivers steppe order while slower mountain storm courier remains IN_TRANSIT.")
+
+	var ambush_cmd: AmbushCourierCommand = AmbushCourierCommand.new(&"ord_mountain", 2109)
+	_expect(CommandBus.dispatch(ambush_cmd) and ambush_cmd.intercepted \
+		and CourierDispatchSystem.get_order(&"ord_mountain").status == GameEnums.CourierStatus.AMBUSHED_LOST \
+		and IntelligenceManager.get_latest_report_for_army(2102) != null \
+		and IntelligenceManager.get_latest_report_for_army(2102).revealed_tactic_intent == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"Ambushing in-transit courier cancels delivery (AMBUSHED_LOST) and leaks intended tactic to IntelligenceManager.")
+	detached_tactics.free()
+	detached_offline.free()
+
+	# 2. Dust Screen Deception (Yılkı Toz Perdesi)
+	CourierDispatchSystem.activate_dust_decoy(2105)
+	var weak_recon: Dictionary[StringName, float] = CourierDispatchSystem.evaluate_dust_perception(
+		2109, 2105, 180.0, 35.0, 90.0)
+	var strong_recon: Dictionary[StringName, float] = CourierDispatchSystem.evaluate_dust_perception(
+		2109, 2105, 180.0, 82.0, 90.0)
+	var close_contact: Dictionary[StringName, float] = CourierDispatchSystem.evaluate_dust_perception(
+		2109, 2105, 180.0, 35.0, 20.0)
+	_expect(weak_recon[&"perceived_power"] > 340.0 and is_zero_approx(weak_recon[&"sees_through"]) \
+		and is_equal_approx(strong_recon[&"perceived_power"], 180.0) and is_equal_approx(strong_recon[&"sees_through"], 1.0) \
+		and is_equal_approx(close_contact[&"perceived_power"], 180.0) and is_equal_approx(close_contact[&"sees_through"], 1.0),
+		"Dust Screen deceives weak distant scouts (~2.1x perceived power) until strong scouts or close contact pierce the veil.")
+
+	# 3. Heavy Armor vs Light Horse-Archer Exponential Terrain/Storm Fatigue
+	var heavy_morale: MoraleComponent = MoraleComponent.new()
+	var light_morale: MoraleComponent = MoraleComponent.new()
+	add_child(heavy_morale)
+	add_child(light_morale)
+	heavy_morale.configure(2106, combat_rules)
+	light_morale.configure(2107, combat_rules)
+	var heavy_fat: float = heavy_morale.accumulate_armored_terrain_fatigue(4.0, true, true, true, true, 1.15, rules)
+	var light_fat: float = light_morale.accumulate_armored_terrain_fatigue(4.0, false, true, true, true, 1.0, rules)
+	_expect(heavy_fat > light_fat * 3.0 and heavy_fat >= 40.0,
+		"Heavy armor suffers exponential fatigue spike in mud/slope/storm (%.1f) vs agile light cavalry (%.1f)." % [heavy_fat, light_fat])
+	heavy_morale.free()
+	light_morale.free()
+
+	# 4. Physical Non-Teleporting Caravans + Interception Front-Line Crisis
+	CommandBus.dispatch(DepositResourcesCommand.new(2101, &"steel", 30))
+	SeasonManager.set_food_reserve(100)
+	var convoy_tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(convoy_tactics)
+	convoy_tactics.configure(2108, doctrine, 40.0)
+
+	var steel_before_convoy: int = ResourceManager.get_amount(2101, &"steel")
+	var disp_conv: DispatchPhysicalCaravanCommand = DispatchPhysicalCaravanCommand.new(
+		&"caravan_ammo_run", 2101, 2108, Vector2i(1, 1), Vector2i(2, 2), 110.0, {&"steel": 12}, 15, 25.0)
+	_expect(CommandBus.dispatch(disp_conv) \
+		and not disp_conv.arrived_immediately \
+		and ResourceManager.get_amount(2101, &"steel") == steel_before_convoy - 12 \
+		and SeasonManager.get_food_reserve() == 85,
+		"Physical caravan deducts cargo on dispatch and does NOT teleport Ore/Food/Ammo immediately.")
+
+	CaravanLogisticsManager.step_caravan_transit(disp_conv.computed_eta_sec * 0.5)
+	_expect(CaravanLogisticsManager.get_caravan(&"caravan_ammo_run").state == GameEnums.CaravanCargoState.EN_ROUTE \
+		and ResourceManager.get_amount(2101, &"steel") == steel_before_convoy - 12,
+		"At 50%% travel time, caravan cargo remains physically EN_ROUTE.")
+
+	CaravanLogisticsManager.step_caravan_transit(disp_conv.computed_eta_sec + 1.0)
+	_expect(CaravanLogisticsManager.get_caravan(&"caravan_ammo_run").state == GameEnums.CaravanCargoState.DELIVERED \
+		and ResourceManager.get_amount(2101, &"steel") == steel_before_convoy \
+		and SeasonManager.get_food_reserve() == 100 \
+		and convoy_tactics.get_quiver_ammo() >= 64.9,
+		"Upon completing physical transit, caravan restores Steel, Food, and refills front-line Quiver Ammo (%.1f)." % convoy_tactics.get_quiver_ammo())
+
+	# Dispatch second caravan & intercept it mid-flight -> front-line ammo/supply deficit & raider loot gain
+	var disp_raid: DispatchPhysicalCaravanCommand = DispatchPhysicalCaravanCommand.new(
+		&"caravan_doomed", 2101, 2108, Vector2i(1, 1), Vector2i(2, 2), 110.0, {&"steel": 10}, 10, 20.0)
+	CommandBus.dispatch(disp_raid)
+	var raider_steel_before: int = ResourceManager.get_amount(2109, &"steel")
+	var inter_cmd: InterceptCaravanCommand = InterceptCaravanCommand.new(&"caravan_doomed", 2109)
+	_expect(CommandBus.dispatch(inter_cmd) \
+		and inter_cmd.intercepted \
+		and ResourceManager.get_amount(2109, &"steel") == raider_steel_before + 10 \
+		and CaravanLogisticsManager.get_army_front_ammo_deficit(2108) >= 40.0 \
+		and CaravanLogisticsManager.get_army_front_supply_deficit(2108) >= 0.35,
+		"Intercepting caravan transfers cargo to raider and triggers front-line quiver ammo & supply shock.")
+	convoy_tactics.free()
+
+	# 5. Master Artisan Capture shifts Steel quality & blocks Meteoric Iron forging
+	CommandBus.dispatch(DepositResourcesCommand.new(2101, &"meteoric_iron", 10))
+	var qual_before: float = CaravanLogisticsManager.get_steel_quality_multiplier(2101)
+	var forge_before: bool = ResourceManager.bind_meteoric_iron_with_logistics(2101, &"p21_pre_blade", false)
+	var cap_art: CaptureArtisansCommand = CaptureArtisansCommand.new(2101, 2109, 4) # 8 -> 4 (< 6)
+	_expect(CommandBus.dispatch(cap_art) \
+		and forge_before \
+		and cap_art.captured_masters == 4 \
+		and CaravanLogisticsManager.get_steel_quality_multiplier(2101) < qual_before \
+		and CaravanLogisticsManager.get_steel_quality_multiplier(2109) > qual_before \
+		and not ResourceManager.bind_meteoric_iron_with_logistics(2101, &"p21_post_blade", false),
+		"Capturing 4 Master Artisans (8 -> 4 < 6) degrades Steel quality and blocks victim Meteoric Iron forging.")
+
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	IntelligenceManager.step_seasonal_intelligence_decay(IntelligenceManager.REPORT_STALENESS_SEASONS)
+	SeasonManager.set_food_reserve(120)
+
 
 
 

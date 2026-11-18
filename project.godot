@@ -41,6 +41,8 @@ CausalChainEngine="*res://core/causal_chain_engine.gd"
 GracePeriodManager="*res://core/grace_period_manager.gd"
 TerritoryManager="*res://core/territory_manager.gd"
 CollapseRecoveryFSM="*res://core/collapse_recovery_fsm.gd"
+CourierDispatchSystem="*res://core/courier_dispatch_system.gd"
+CaravanLogisticsManager="*res://core/caravan_logistics_manager.gd"
 
 
 

@@ -39,6 +39,20 @@ var _consecutive_stalled_steps: int = 0
 var _last_fallback_reason: StringName = &""
 
 
+func _ready() -> void:
+	EventBus.army_caravan_resupply_delivered.connect(_on_army_caravan_resupply_delivered)
+
+
+func _exit_tree() -> void:
+	if EventBus.army_caravan_resupply_delivered.is_connected(_on_army_caravan_resupply_delivered):
+		EventBus.army_caravan_resupply_delivered.disconnect(_on_army_caravan_resupply_delivered)
+
+
+func _on_army_caravan_resupply_delivered(p_army_id: int, quiver_ammo_amt: float, _food_amt: int) -> void:
+	if _army_id > 0 and p_army_id == _army_id and quiver_ammo_amt > 0.0:
+		set_quiver_ammo(_quiver_ammo + quiver_ammo_amt)
+
+
 static func _safe_float(val: float, fallback: float) -> float:
 	if is_nan(val) or is_inf(val):
 		return fallback

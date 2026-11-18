@@ -67,6 +67,41 @@ func accumulate_battle_fatigue(combat_duration_sec: float) -> float:
 	return _battle_fatigue
 
 
+## Phase 21 Heavy Armor vs Light Horse-Archer terrain & weather fatigue physics.
+## Iron/Steel heavy cavalry suffer exponential fatigue spikes in mud, steep slopes,
+## and storms (`pow(compound_factor, 1.35)`), while light riders remain agile (`0.65x`).
+func accumulate_armored_terrain_fatigue(
+		duration_sec: float,
+		is_heavy_armor: bool,
+		is_mud: bool = false,
+		is_steep_slope: bool = false,
+		is_storm: bool = false,
+		armor_mass_ratio: float = 1.0,
+		logistics_rules: CourierAndCaravanRules = null) -> float:
+	var dt: float = maxf(_safe_float(duration_sec, 0.0), 0.0)
+	if rules == null or dt <= 0.0:
+		return _battle_fatigue
+	var mud_m: float = logistics_rules.heavy_armor_mud_fatigue_mult if logistics_rules != null else 2.10
+	var slope_m: float = logistics_rules.heavy_armor_slope_fatigue_mult if logistics_rules != null else 1.90
+	var storm_m: float = logistics_rules.heavy_armor_storm_fatigue_mult if logistics_rules != null else 1.75
+	var exp_pow: float = logistics_rules.heavy_armor_exponential_power if logistics_rules != null else 1.35
+	var light_res: float = logistics_rules.light_cavalry_terrain_resilience if logistics_rules != null else 0.65
+
+	var compound: float = 1.0
+	if is_mud:
+		compound *= (mud_m if is_heavy_armor else 1.15)
+	if is_steep_slope:
+		compound *= (slope_m if is_heavy_armor else 1.12)
+	if is_storm:
+		compound *= (storm_m if is_heavy_armor else 1.10)
+
+	var armor_factor: float = pow(compound, exp_pow) * clampf(_safe_float(armor_mass_ratio, 1.0), 0.75, 1.50) if is_heavy_armor else compound * light_res
+	var delta_fatigue: float = dt * rules.fatigue_accumulation_per_sec * armor_factor
+	_battle_fatigue = clampf(_battle_fatigue + delta_fatigue, 0.0, 100.0)
+	battle_fatigue_changed.emit(_battle_fatigue, get_fatigue_speed_multiplier(), get_fatigue_momentum_multiplier())
+	return _battle_fatigue
+
+
 ## Current charge speed multiplier after battle fatigue degradation (`0.55..1.0`).
 func get_fatigue_speed_multiplier() -> float:
 	if rules == null:

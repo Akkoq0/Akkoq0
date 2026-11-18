@@ -51,6 +51,12 @@ func _ready() -> void:
 	EventBus.supply_line_severed.connect(_on_supply_line_severed)
 	EventBus.supply_line_restored.connect(_on_supply_line_restored)
 	EventBus.zud_starvation_ticked.connect(_on_zud_starvation_ticked)
+	EventBus.army_caravan_resupply_delivered.connect(_on_army_caravan_resupply_delivered)
+
+
+func _exit_tree() -> void:
+	if EventBus.army_caravan_resupply_delivered.is_connected(_on_army_caravan_resupply_delivered):
+		EventBus.army_caravan_resupply_delivered.disconnect(_on_army_caravan_resupply_delivered)
 
 
 ## Reads logistics data. Returns false when required data is missing.
@@ -108,6 +114,13 @@ func replenish_yilki_herd(restored_ratio: float) -> float:
 
 ## Current quiver arrow reserve (`quiver_ammo_reserve`).
 func get_quiver_ammo_reserve() -> float:
+	return _quiver_ammo_reserve
+
+
+## Replenishes `amount` into quiver ammo reserve from an arriving caravan or depot.
+func replenish_quiver_ammo(amount: float) -> float:
+	var cap: float = _profile.max_quiver_ammo_reserve if _profile != null else 100.0
+	_quiver_ammo_reserve = clampf(_quiver_ammo_reserve + maxf(amount, 0.0), 0.0, cap)
 	return _quiver_ammo_reserve
 
 
@@ -259,3 +272,9 @@ func _on_supply_line_restored(army_id: int, _depot_id: int) -> void:
 func _on_zud_starvation_ticked(food_remaining: int, _season: SeasonData) -> void:
 	if food_remaining <= 0 and is_isolated():
 		consume_yilki_horses_for_ration()
+
+
+func _on_army_caravan_resupply_delivered(p_army_id: int, quiver_ammo_amt: float, _food_amt: int) -> void:
+	if _army_id > 0 and p_army_id == _army_id and quiver_ammo_amt > 0.0:
+		replenish_quiver_ammo(quiver_ammo_amt)
+

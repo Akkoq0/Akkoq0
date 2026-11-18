@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CourierAndCaravanRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/logistics/courier_and_caravan_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"courier_and_caravan_rules"
+courier_base_speed_m_per_sec = 18.0
+mountain_forest_delay_mult = 1.65
+winter_storm_delay_mult = 1.45
+decoy_yilki_horse_cost = 0.15
+decoy_apparent_power_mult = 2.1
+scout_reveal_threshold = 70.0
+close_contact_reveal_distance_m = 35.0
+heavy_armor_mud_fatigue_mult = 2.1
+heavy_armor_slope_fatigue_mult = 1.9
+heavy_armor_storm_fatigue_mult = 1.75
+heavy_armor_exponential_power = 1.35
+light_cavalry_terrain_resilience = 0.65
+caravan_speed_m_per_sec = 11.0
+interception_ammo_shock = 28.0
+interception_supply_shock = 0.35
+initial_artisans_per_player = 8
+meteoric_forging_min_artisans = 6
+steel_quality_per_artisan = 0.05

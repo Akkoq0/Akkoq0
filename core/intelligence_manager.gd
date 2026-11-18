@@ -91,6 +91,26 @@ func declare_blood_feud_total_war(instigator_id: int, target_id: int) -> void:
 	EventBus.total_war_declared.emit(instigator_id, target_id, GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID)
 
 
+## Injects an intelligence leak report captured by ambushing a rider courier.
+func record_intercepted_courier_report(
+		spy_owner_id: int,
+		target_faction_id: int,
+		target_army_id: int,
+		leaked_plan: GameEnums.TuranTacticPhase) -> EspionageReport:
+	var rep: EspionageReport = EspionageReport.new()
+	rep.spy_owner_id = spy_owner_id
+	rep.target_faction_id = target_faction_id
+	rep.target_army_id = target_army_id
+	rep.computed_success_chance = 1.0
+	rep.succeeded = true
+	rep.revealed_tactic_intent = leaked_plan
+	if target_army_id > 0:
+		_army_reports[target_army_id] = rep
+		_report_seasons[target_army_id] = _season_tick
+	EventBus.espionage_mission_completed.emit(rep)
+	return rep
+
+
 ## Advances seasonal war exhaustion and prunes expired spy reports so long campaigns
 ## do not stay locked in permanent Total War or bloat report caches.
 func step_seasonal_intelligence_decay(cycles: int = 1) -> void:
