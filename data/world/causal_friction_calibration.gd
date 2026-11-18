@@ -30,6 +30,10 @@ extends Resource
 @export_range(0.10, 0.75, 0.01) var yilki_depletion_wing_angle_damping: float = 0.56
 @export_range(5.0, 45.0, 1.0) var failed_crescent_morale_penalty: float = 24.0
 @export_range(5.0, 60.0, 1.0) var counterplay_recovery_window_sec: float = 18.0
+@export_range(1.0, 25.0, 0.5) var continuous_pressure_accumulation_per_sec: float = 8.0
+@export_range(1.0, 30.0, 0.5) var continuous_pressure_decay_per_sec: float = 10.0
+@export_range(0.01, 0.25, 0.01) var remount_recovery_per_sec_when_supplied: float = 0.06
+@export_range(0.01, 0.25, 0.01) var remount_drain_per_sec_under_zud_strain: float = 0.05
 
 
 ## Computes the effective wing pincer angle (`radians`) during a Stage 4

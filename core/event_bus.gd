@@ -126,6 +126,8 @@ signal veteran_casualty_shock_applied(army_id: int, veteran_loss_ratio: float, t
 # --- Causal Chain Propagation & Friction Calibration ------------------------
 signal causal_chain_step_propagated(archetype: GameEnums.CausalChainArchetype, step_count: int, steps_executed: PackedStringArray, counterplay_broken: bool)
 signal causal_chain_counterplay_applied(archetype: GameEnums.CausalChainArchetype, counterplay: GameEnums.CausalCounterplayAction, recovery_summary: StringName)
+signal causal_transition_recorded(record: CausalTransitionRecord)
+
 
 
 

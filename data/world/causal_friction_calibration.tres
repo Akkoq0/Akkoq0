@@ -21,3 +21,8 @@ min_remount_ratio_for_crescent_trap = 0.55
 yilki_depletion_wing_angle_damping = 0.56
 failed_crescent_morale_penalty = 24.0
 counterplay_recovery_window_sec = 18.0
+continuous_pressure_accumulation_per_sec = 8.0
+continuous_pressure_decay_per_sec = 10.0
+remount_recovery_per_sec_when_supplied = 0.06
+remount_drain_per_sec_under_zud_strain = 0.05
+
