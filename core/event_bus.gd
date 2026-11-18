@@ -104,6 +104,16 @@ signal noble_captives_ransomed_or_exchanged(player_id: int, noble_count: int, mo
 signal captive_labor_assigned(player_id: int, total_slave_workers: int, core_clan_population: int, build_time_saved_ratio: float, cost_discount_ratio: float)
 signal slave_revolt_triggered(player_id: int, slave_workers: int, clan_population: int, revolt_risk: float)
 
+# --- Phase 8 Emergent Sandbox, Multi-Sovereignty & Modular Force Splitting --
+signal sovereignty_alignment_evolved(player_id: int, previous_alignment: GameEnums.SovereigntyAlignment, new_alignment: GameEnums.SovereigntyAlignment, dominant_score: float)
+signal emergent_causal_chain_triggered(chain_id: StringName, region_coord: Vector2i, severity: float, available_response_ids: PackedStringArray)
+signal inter_faction_conflict_erupted(attacker_faction_id: StringName, defender_faction_id: StringName, region_coord: Vector2i, contested_driver: StringName)
+signal player_intervened_in_faction_conflict(player_id: int, attacker_faction_id: StringName, defender_faction_id: StringName, stance: GameEnums.EmergentInterventionStance, gained_reward_value: float)
+signal nomadic_outpost_relocated(player_id: int, outpost_id: StringName, from_coord: Vector2i, to_coord: Vector2i)
+signal force_detached_from_army(parent_army_id: int, detachment_army_id: int, role: GameEnums.DetachmentRole, detached_riders: int, speed_bonus_multiplier: float)
+signal forces_merged_into_army(target_army_id: int, merged_detachment_id: int, total_riders: int)
+
+
 
 
 

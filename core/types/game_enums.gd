@@ -136,6 +136,30 @@ enum WindWeatherState {
 	PRE_ZUD_GALE_STORM = 2, ## Zud Öncesi Şiddetli Bora / Fırtına (düşük menzil, zayıf ıslıklı ok morali, yüksek sadak tüketimi)
 }
 
+## Phase 8 Dynamic behavioral Sovereignty Alignment (non-locking sandbox evolution).
+enum SovereigntyAlignment {
+	ULU_KAGAN_TORE_GUARDIAN = 0, ## Ulu Kağan & Töre Koruyucusu (Yüksek Kut, Konsey ve Töre uyumu)
+	STEPPE_RAIDER_WARLORD = 1, ## Bozkır Akıncısı & Yağma Beyi (Akın, İkmal Kesme, Toy Ganimeti ve Şöhret)
+	NOMADIC_MERCHANT_FORGEMASTER = 2, ## Göçebe Tüccar & Demirci Hanedanı (7-Cevher Rafinasyonu, Vergi, Sefer Arabası Üretim Ağı)
+	REBEL_INDEPENDENT_CLAN = 3, ## Asi / Bağımsız Oymak (Konseye/Otoriteye Başkaldırı, Özerk Bozkır Yasası)
+}
+
+## Phase 8 Player intervention choices in autonomous inter-faction steppe conflicts.
+enum EmergentInterventionStance {
+	NEUTRAL_TRADE_PROFITEER = 0, ## Tarafsız Kalıp Silah/Cevher Ticareti Yapma
+	JOIN_ATTACKER = 1, ## Saldıran Hanedanın Yanında Savaşa Girme
+	JOIN_DEFENDER = 2, ## Savunan Hanedanın Yanında Savaşa Girme
+	OPPORTUNISTIC_STRIKE_BOTH = 3, ## İki Tarafın Yıpranmasını Bekleyip Son Darbeyi Vurma
+}
+
+## Phase 8 Modular army detachment roles when splitting forces (`SplitDetachForceCommand`).
+enum DetachmentRole {
+	VANGUARD_MAIN = 0, ## Ana Ordu Kolu
+	FAST_CAVALRY_RECON_RAIDER = 1, ## Hızlı Süvari Keşif ve Akın Müfrezesi (+Hız Çarpanı)
+	SUPPLY_ESCORT_GUARD = 2, ## İkmal ve Yılkı Kervanı Koruma Birliği
+	OUTPOST_GARRISON = 3, ## İleri Karakol / Ocak Muhafız Birliği
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -144,6 +168,7 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
 
 
 

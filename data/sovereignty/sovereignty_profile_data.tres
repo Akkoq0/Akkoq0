@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SovereigntyProfileData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/sovereignty/sovereignty_profile_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"steppe_sandbox_sovereignty"
+kut_weight = 1.0
+tore_decree_action_weight = 18.0
+raid_and_interdiction_weight = 22.0
+glory_weight = 1.15
+toy_loot_distribution_weight = 14.0
+seven_ore_refining_weight = 20.0
+tax_and_trade_weight = 16.0
+sefer_arabasi_migration_weight = 18.0
+council_defiance_weight = 25.0
+low_kut_autonomy_weight = 1.10

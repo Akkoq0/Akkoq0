@@ -33,6 +33,7 @@ AICommander="*res://core/ai_commander.gd"
 PastureEcologyManager="*res://core/pasture_ecology_manager.gd"
 BallisticsEngine="*res://core/ballistics_engine.gd"
 CaptiveLaborManager="*res://core/captive_labor_manager.gd"
+SovereigntyPathEngine="*res://core/sovereignty_path_engine.gd"
 
 
 
