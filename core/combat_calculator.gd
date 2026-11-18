@@ -185,13 +185,28 @@ func _handle_sulfur_fire_trap(command: GameCommand) -> bool:
 	return true
 
 
+## Computes tactical readiness scaling (`0.45..1.0`) from quiver ammunition
+## during arrow harassment and Yılkı spare-horse ratio during cavalry phases.
+func compute_maneuver_readiness_multiplier(stats: CombatantStats) -> float:
+	if stats == null:
+		return 1.0
+	var ammo_factor: float = 1.0
+	if stats.active_tactic_phase == GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT:
+		ammo_factor = lerpf(0.55, 1.0, clampf(stats.quiver_ammo_ratio, 0.0, 1.0))
+	var remount_factor: float = 1.0
+	if stats.is_cavalry and stats.remount_horse_ratio < 0.55:
+		remount_factor = lerpf(0.60, 1.0, clampf(stats.remount_horse_ratio / 0.55, 0.0, 1.0))
+	return clampf(ammo_factor * remount_factor, 0.45, 1.0)
+
+
 func _effective_attack(stats: CombatantStats) -> float:
 	var supply_factor: float = lerpf(_rules.out_of_supply_attack_factor, 1.0, stats.supply_ratio)
 	var steel_mult: float = _rules.steel_shield_break_multiplier if stats.has_steel_weapons else 1.0
 	var meteoric_mult: float = _rules.meteoric_iron_crit_shock_multiplier if stats.has_meteoric_iron_weapon else 1.0
 	var kut_mult: float = maxf(stats.kut_legitimacy_multiplier, 0.1)
 	var momentum_mult: float = maxf(stats.charge_mass_momentum, 0.1)
-	return stats.attack * (1.0 + stats.totem_offense_bonus) * supply_factor * steel_mult * meteoric_mult * kut_mult * momentum_mult
+	var readiness_mult: float = compute_maneuver_readiness_multiplier(stats)
+	return stats.attack * (1.0 + stats.totem_offense_bonus) * supply_factor * steel_mult * meteoric_mult * kut_mult * momentum_mult * readiness_mult
 
 
 func _compute_terrain_defense(terrain: TerrainData) -> float:

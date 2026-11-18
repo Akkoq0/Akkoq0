@@ -112,3 +112,81 @@ func is_elite_vanguard_alive() -> bool:
 
 func is_cascade_routing() -> bool:
 	return _is_in_cascade_rout
+
+
+var _veteran_experience_ratio: float = 0.35
+var _commander_leadership_score: float = 50.0
+var _is_staggered_hold: bool = false
+
+
+## Configures unit veteran experience (`0..1`) and commander leadership (`0..100`)
+## for layered psychological shock absorption.
+func configure_veteran_and_commander_profile(p_veteran_ratio: float, p_commander_leadership: float, p_initial_morale: float = 75.0, p_initial_cohesion: float = 70.0) -> void:
+	_veteran_experience_ratio = clampf(p_veteran_ratio, 0.0, 1.0)
+	rookie_troop_ratio = clampf(1.0 - _veteran_experience_ratio, 0.05, 1.0)
+	_commander_leadership_score = clampf(p_commander_leadership, 0.0, 100.0)
+	_current_morale = clampf(p_initial_morale, 0.0, 100.0)
+	_current_cohesion = clampf(p_initial_cohesion, 0.0, 100.0)
+	_is_in_cascade_rout = false
+	_is_staggered_hold = false
+
+
+func is_in_staggered_hold() -> bool:
+	return _is_staggered_hold
+
+
+## Evaluates front-line elite vanguard loss with layered veteran experience,
+## formation cohesion, commander leadership damping, and battle fatigue amplification.
+## Experienced formations led by strong commanders absorb the shock into a
+## `staggered_hold` (`1.0x` front defense), whereas fatigued or rookie formations
+## shatter into a `cascade_rout` (`2.1x` rear strike + Toy prisoner capture).
+func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_cavalry", targeted_health: float = 200.0) -> Dictionary[StringName, float]:
+	var out: Dictionary[StringName, float] = {
+		&"morale_shock": 0.0,
+		&"cohesion_shock": 0.0,
+		&"remaining_morale": _current_morale,
+		&"remaining_cohesion": _current_cohesion,
+		&"rear_strike_multiplier": 1.0,
+		&"captured_slave_workers": 0.0,
+	}
+	if rules == null:
+		return out
+	_is_elite_vanguard_alive = false
+	var damping: float = clampf(1.0 - _veteran_experience_ratio * 0.45 - (_commander_leadership_score / 100.0) * 0.30 + (_battle_fatigue / 100.0) * 0.55, 0.25, 1.65)
+	var morale_shock: float = rules.elite_vanguard_loss_morale_shock * damping
+	var cohesion_shock: float = rules.elite_vanguard_loss_cohesion_shock * damping
+	_current_morale = clampf(_current_morale - morale_shock, 0.0, 100.0)
+	_current_cohesion = clampf(_current_cohesion - cohesion_shock, 0.0, 100.0)
+
+	if _current_morale < rules.rout_morale_threshold or _current_cohesion < rules.rout_cohesion_threshold or _battle_fatigue >= 65.0:
+		_is_in_cascade_rout = true
+		_is_staggered_hold = false
+		out[&"rear_strike_multiplier"] = rules.rear_damage_multiplier
+		out[&"captured_slave_workers"] = float(maxi(int(roundf(maxf(targeted_health, 1.0) * rules.slave_capture_per_routed_health)), 1))
+		cascade_rout_started.emit(_army_id, elite_unit_id, _current_morale)
+		EventBus.cascade_rout_triggered.emit(_army_id, elite_unit_id, _current_morale)
+	else:
+		_is_in_cascade_rout = false
+		_is_staggered_hold = true
+		out[&"rear_strike_multiplier"] = rules.front_damage_multiplier
+		out[&"captured_slave_workers"] = 0.0
+
+	out[&"morale_shock"] = morale_shock
+	out[&"cohesion_shock"] = cohesion_shock
+	out[&"remaining_morale"] = _current_morale
+	out[&"remaining_cohesion"] = _current_cohesion
+	return out
+
+
+## Recovers battle fatigue and rallies morale/cohesion when resting out of combat
+## with supply support (`supply_ratio`).
+func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
+	var dt: float = maxf(rest_sec, 0.0)
+	var sup: float = clampf(supply_ratio, 0.1, 1.0)
+	var commander_bonus: float = 1.0 + (_commander_leadership_score / 100.0) * 0.40
+	_battle_fatigue = maxf(_battle_fatigue - dt * 3.5 * sup * commander_bonus, 0.0)
+	_current_morale = clampf(_current_morale + dt * 2.2 * sup * commander_bonus, 0.0, 100.0)
+	_current_cohesion = clampf(_current_cohesion + dt * 2.5 * sup * commander_bonus, 0.0, 100.0)
+	if _battle_fatigue < 35.0 and _current_morale >= 35.0:
+		_is_staggered_hold = false
+	return _battle_fatigue

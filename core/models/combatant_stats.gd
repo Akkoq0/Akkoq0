@@ -41,6 +41,11 @@ var elite_vanguard_id: StringName = &"bozkurt_cavalry"
 var rookie_troop_ratio: float = 0.65
 var is_fleeing_rout: bool = false
 
+## Phase 11 Turan Doctrine maneuver readiness & leadership damping attributes.
+var quiver_ammo_ratio: float = 1.0
+var remount_horse_ratio: float = 1.0
+var commander_leadership: float = 50.0
+
 
 func _init(p_entity_id: int, p_attack: float, p_defense: float, p_health: float, p_supply_ratio: float) -> void:
 	entity_id = p_entity_id

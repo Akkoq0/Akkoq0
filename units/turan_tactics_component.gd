@@ -250,6 +250,58 @@ func get_last_flank_angle_rad() -> float:
 	return _last_flank_angle_rad
 
 
+var _own_fatigue: float = 0.0
+var _remount_horse_ratio: float = 1.0
+
+
+## Sets the army's own fatigue (`0..100`), quiver ammo (`0..100`), and Yılkı
+## spare-horse ratio (`0..1`) for maneuver readiness evaluation.
+func set_readiness_state(p_fatigue: float, p_quiver_ammo: float, p_remount_ratio: float) -> void:
+	_own_fatigue = clampf(p_fatigue, 0.0, 100.0)
+	_quiver_ammo = maxf(p_quiver_ammo, 0.0)
+	_remount_horse_ratio = clampf(p_remount_ratio, 0.0, 1.0)
+
+
+func get_own_fatigue() -> float:
+	return _own_fatigue
+
+
+func get_remount_horse_ratio() -> float:
+	return _remount_horse_ratio
+
+
+## Computes the tactical maneuver execution efficiency (`0.35..1.15`) based on
+## current unit fatigue, quiver ammunition, Yılkı spare-horse ratio, and terrain.
+func compute_maneuver_execution_efficiency(terrain: TerrainData = null) -> float:
+	var fatigue_penalty: float = (_own_fatigue / 100.0) * 0.35
+	var ammo_penalty: float = 0.20 if _quiver_ammo <= 0.0 else clampf((25.0 - _quiver_ammo) / 25.0, 0.0, 1.0) * 0.15
+	var remount_penalty: float = 0.0
+	if _remount_horse_ratio < 0.55:
+		remount_penalty = ((0.55 - _remount_horse_ratio) / 0.55) * 0.30
+	var terrain_bonus: float = 0.0
+	if terrain != null and (terrain.terrain_class == GameEnums.TerrainClass.BEREKET_HAVZASI or terrain.terrain_class == GameEnums.TerrainClass.SIK_ORMAN):
+		terrain_bonus = 0.08
+	return clampf(1.0 - fatigue_penalty - ammo_penalty - remount_penalty + terrain_bonus, 0.35, 1.15)
+
+
+## Executes Stage 3 Feigned Retreat while modulating overextension effectiveness
+## by the army's own fatigue, quiver ammo, and Yılkı spare-horse readiness.
+func execute_feigned_retreat_with_readiness(pursuer_ambition: float, pursuer_discipline: float, retreat_distance_m: float, terrain: TerrainData = null, pursuer: CombatantStats = null) -> Dictionary[StringName, float]:
+	var efficiency: float = compute_maneuver_execution_efficiency(terrain)
+	var effective_dist: float = maxf(retreat_distance_m, 0.0) * efficiency
+	_own_fatigue = clampf(_own_fatigue + maxf(retreat_distance_m, 0.0) * 0.08, 0.0, 100.0)
+	return calculate_lure_overextension(pursuer_ambition, pursuer_discipline, effective_dist, pursuer)
+
+
+## Rests and resupplies the tactical unit out of combat, reducing fatigue and
+## restoring quiver ammunition and Yılkı spare horses. Returns updated efficiency.
+func rest_and_resupply_tactical_readiness(rest_duration_sec: float, ammo_resupplied: float, remount_restored: float, terrain: TerrainData = null) -> float:
+	_own_fatigue = maxf(_own_fatigue - maxf(rest_duration_sec, 0.0) * 4.0, 0.0)
+	_quiver_ammo = clampf(_quiver_ammo + maxf(ammo_resupplied, 0.0), 0.0, 100.0)
+	_remount_horse_ratio = clampf(_remount_horse_ratio + maxf(remount_restored, 0.0), 0.0, 1.0)
+	return compute_maneuver_execution_efficiency(terrain)
+
+
 # --- Stage 5: BORU_SHOCK_ANNIHILATION ---------------------------------------
 
 ## Computes the momentum-based (`mass * speed`) shock multiplier of Börü heavy
@@ -263,3 +315,4 @@ func compute_boru_shock_momentum(cavalry_mass: float, current_speed: float, has_
 	var steel_mult: float = doctrine.boru_steel_shock_multiplier if has_steel else 1.0
 	var meteoric_mult: float = doctrine.boru_meteoric_iron_shock_multiplier if has_meteoric_iron else 1.0
 	return maxf(raw_momentum * steel_mult * meteoric_mult, 1.0)
+
