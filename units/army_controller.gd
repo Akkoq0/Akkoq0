@@ -11,6 +11,8 @@ extends Node3D
 @export var supply: SupplyLineComponent
 @export var terrain_sensor: TerrainSensorComponent
 @export var turan_tactics: TuranTacticsComponent
+@export var morale_component: MoraleComponent
+@export var espionage_component: EspionageComponent
 
 var _is_operational: bool = false
 
@@ -23,6 +25,8 @@ func _ready() -> void:
 	mobility.set_remount_horse_ratio(supply.get_remount_horse_ratio())
 	if turan_tactics != null and turan_tactics.doctrine != null:
 		turan_tactics.configure(army_id, turan_tactics.doctrine, supply.get_quiver_ammo_reserve())
+	if morale_component != null:
+		morale_component.configure(army_id)
 	mobility.passability_check = terrain_sensor.is_position_passable
 	terrain_sensor.terrain_changed.connect(_on_terrain_changed)
 	mobility.destination_reached.connect(_on_destination_reached)
@@ -59,7 +63,7 @@ func load_cargo(ore: OreData, amount: int) -> void:
 	mobility.add_cargo_weight(ore.weight_per_unit * float(amount))
 
 
-## Snapshot for combat resolution, including morale and active Turan tactic phase.
+## Snapshot for combat resolution, including morale, battle fatigue, and active Turan tactic phase.
 func get_combatant_stats() -> CombatantStats:
 	if not _is_operational:
 		return null
@@ -70,6 +74,11 @@ func get_combatant_stats() -> CombatantStats:
 		template.get_total_health(),
 		supply.get_supply_ratio())
 	stats.morale = supply.get_battle_morale()
+	if morale_component != null:
+		stats.fatigue = morale_component.get_battle_fatigue()
+		stats.morale = minf(stats.morale, morale_component.get_current_morale())
+		stats.elite_vanguard_destroyed = not morale_component.is_elite_vanguard_alive()
+		stats.is_fleeing_rout = morale_component.is_cascade_routing()
 	if turan_tactics != null:
 		stats.active_tactic_phase = turan_tactics.get_current_phase()
 	return stats

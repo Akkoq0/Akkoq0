@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://units/army_controller.gd" id="1_controller"]
 [ext_resource type="Resource" path="res://data/units/vanguard_army.tres" id="2_template"]
@@ -9,8 +9,12 @@
 [ext_resource type="Script" path="res://units/turan_tactics_component.gd" id="7_turan"]
 [ext_resource type="Resource" path="res://data/tactics/feigned_retreat.tres" id="8_doctrine"]
 [ext_resource type="Resource" path="res://data/units/default_supply_convoy.tres" id="9_convoy"]
+[ext_resource type="Script" path="res://units/morale_component.gd" id="10_morale"]
+[ext_resource type="Resource" path="res://data/combat/combat_rules.tres" id="11_combat_rules"]
+[ext_resource type="Script" path="res://units/espionage_component.gd" id="12_espionage"]
+[ext_resource type="Resource" path="res://data/diplomacy/diplomacy_rules.tres" id="13_diplomacy_rules"]
 
-[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor", "turan_tactics")]
+[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor", "turan_tactics", "morale_component", "espionage_component")]
 script = ExtResource("1_controller")
 army_id = 1
 owner_id = 1
@@ -19,6 +23,8 @@ mobility = NodePath("ArmyMobilityComponent")
 supply = NodePath("SupplyLineComponent")
 terrain_sensor = NodePath("TerrainSensorComponent")
 turan_tactics = NodePath("TuranTacticsComponent")
+morale_component = NodePath("MoraleComponent")
+espionage_component = NodePath("EspionageComponent")
 
 [node name="ArmyMobilityComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
 script = ExtResource("3_mobility")
@@ -37,7 +43,16 @@ body = NodePath("..")
 script = ExtResource("7_turan")
 doctrine = ExtResource("8_doctrine")
 
+[node name="MoraleComponent" type="Node" parent="."]
+script = ExtResource("10_morale")
+rules = ExtResource("11_combat_rules")
+
+[node name="EspionageComponent" type="Node" parent="."]
+script = ExtResource("12_espionage")
+rules = ExtResource("13_diplomacy_rules")
+
 [node name="LayerVisibilityComponent" type="Node" parent="."]
 script = ExtResource("6_visibility")
 visible_layers = 1
 initial_layer = 0
+

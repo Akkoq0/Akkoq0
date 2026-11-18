@@ -21,6 +21,12 @@ var defender_routed: bool = false
 var defender_annihilated_in_crescent: bool = false
 var captured_toy_loot_value: float = 0.0
 
+## Phase 4 Battle Fatigue & Cascade Rout outcomes.
+var attacker_fatigue_momentum_multiplier: float = 1.0
+var cascade_rout_triggered: bool = false
+var captured_slave_workers: int = 0
+
+
 
 ## True when the defender has no health left.
 func is_defender_destroyed() -> bool:

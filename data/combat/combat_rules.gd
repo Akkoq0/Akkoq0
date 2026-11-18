@@ -54,6 +54,22 @@ extends Resource
 ## Toy loot trade value (weapons & Yılkı horses) captured per unit of health when an encircled army is annihilated.
 @export_range(0.01, 10.0, 0.01) var annihilation_loot_per_health: float = 0.45
 
+@export_group("Phase 4 Psychological Warfare, Battle Fatigue & Cascade Rout")
+## Fatigue accumulated per second of sustained combat (`0..100` scale).
+@export_range(0.1, 20.0, 0.1) var fatigue_accumulation_per_sec: float = 2.5
+## Maximum fractional charge speed lost at 100 battle fatigue.
+@export_range(0.0, 0.90, 0.01) var max_fatigue_speed_penalty_ratio: float = 0.45
+## Maximum fractional lance impact momentum lost at 100 battle fatigue.
+@export_range(0.0, 0.90, 0.01) var max_fatigue_momentum_penalty_ratio: float = 0.50
+## Chain-panic morale shock inflicted on rear rookie troops when front-line elite units (e.g. Bozkurt cavalry) are destroyed.
+@export_range(0.0, 100.0, 0.5) var elite_vanguard_loss_morale_shock: float = 42.0
+## Cohesion collapse inflicted when front-line elite vanguard is wiped out.
+@export_range(0.0, 100.0, 0.5) var elite_vanguard_loss_cohesion_shock: float = 30.0
+## Enslaved workers captured per unit of routed enemy health for the Toy economy.
+@export_range(0.01, 5.0, 0.01) var slave_capture_per_routed_health: float = 0.25
+## Toy economy trade value added per captured slave worker.
+@export_range(0.1, 50.0, 0.1) var slave_worker_toy_value: float = 3.0
+
 
 ## Classifies the engagement angle from `attack_vector` (direction of blow)
 ## and `defender_facing` (direction defender is looking) using `Vector3.dot`.
@@ -84,3 +100,16 @@ func get_directional_cohesion_multiplier(angle: GameEnums.CombatEngagementAngle)
 	if angle == GameEnums.CombatEngagementAngle.FLANK:
 		return flank_cohesion_multiplier
 	return front_cohesion_multiplier
+
+
+## Charge speed multiplier (`1.0` at 0 fatigue -> `1.0 - max_fatigue_speed_penalty_ratio` at 100 fatigue).
+func compute_fatigue_speed_multiplier(fatigue: float) -> float:
+	var ratio: float = clampf(fatigue / 100.0, 0.0, 1.0)
+	return clampf(1.0 - ratio * max_fatigue_speed_penalty_ratio, 0.1, 1.0)
+
+
+## Lance charge momentum multiplier (`1.0` at 0 fatigue -> `1.0 - max_fatigue_momentum_penalty_ratio` at 100 fatigue).
+func compute_fatigue_momentum_multiplier(fatigue: float) -> float:
+	var ratio: float = clampf(fatigue / 100.0, 0.0, 1.0)
+	return clampf(1.0 - ratio * max_fatigue_momentum_penalty_ratio, 0.1, 1.0)
+

@@ -34,6 +34,13 @@ var active_tactic_phase: GameEnums.TuranTacticPhase = GameEnums.TuranTacticPhase
 var kut_legitimacy_multiplier: float = 1.0
 var charge_mass_momentum: float = 1.0
 
+## Phase 4 Battle Fatigue & Psychological Cascade Rout attributes.
+var combat_duration_sec: float = 0.0
+var elite_vanguard_destroyed: bool = false
+var elite_vanguard_id: StringName = &"bozkurt_cavalry"
+var rookie_troop_ratio: float = 0.65
+var is_fleeing_rout: bool = false
+
 
 func _init(p_entity_id: int, p_attack: float, p_defense: float, p_health: float, p_supply_ratio: float) -> void:
 	entity_id = p_entity_id
@@ -41,3 +48,4 @@ func _init(p_entity_id: int, p_attack: float, p_defense: float, p_health: float,
 	defense = p_defense
 	health = p_health
 	supply_ratio = clampf(p_supply_ratio, 0.0, 1.0)
+

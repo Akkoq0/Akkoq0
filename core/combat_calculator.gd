@@ -12,6 +12,7 @@ var _rules: CombatRules = null
 var _season: SeasonData = null
 var _sulfur_ore: OreData = null
 var _pending_toy_loot_pool: float = 0.0
+var _captured_slave_worker_pool: int = 0
 
 
 func _ready() -> void:
@@ -30,19 +31,37 @@ func _exit_tree() -> void:
 	CommandBus.unregister_handler(SulfurFireTrapCommand.ID, _handle_sulfur_fire_trap)
 
 
-## Accumulated Toy loot value captured from annihilated enemy armies.
+## Accumulated Toy loot value captured from annihilated or routed enemy armies.
 func get_pending_toy_loot_pool() -> float:
 	return _pending_toy_loot_pool
 
 
-## Pure resolution of one exchange under the Triple Collapse Model.
+## Total enslaved prisoner workers captured from fleeing (`cascade_rout`) armies for the Toy economy.
+func get_captured_slave_worker_pool() -> int:
+	return _captured_slave_worker_pool
+
+
+## Pure resolution of one exchange under the Triple Collapse & Phase 4 Psychological Warfare Model.
 func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terrain: TerrainData, season: SeasonData, rng: RandomNumberGenerator) -> CombatResult:
 	var result: CombatResult = CombatResult.new()
 	result.attacker_id = attacker.entity_id
 	result.defender_id = defender.entity_id
 
+	# --- Phase 4 Battle Fatigue accumulation & lance momentum decay ----------
+	if attacker.combat_duration_sec > 0.0:
+		attacker.fatigue = clampf(attacker.fatigue + attacker.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
+	if defender.combat_duration_sec > 0.0:
+		defender.fatigue = clampf(defender.fatigue + defender.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
+	var fatigue_momentum_mult: float = _rules.compute_fatigue_momentum_multiplier(attacker.fatigue)
+	result.attacker_fatigue_momentum_multiplier = fatigue_momentum_mult
+
+	# --- Phase 4 Elite Vanguard Destruction -> Cascade Rout & 2.1x Rear Strike
 	var angle: GameEnums.CombatEngagementAngle = _rules.classify_engagement_angle(
 		attacker.attack_vector, defender.facing_vector)
+	if defender.elite_vanguard_destroyed or defender.is_fleeing_rout:
+		result.cascade_rout_triggered = true
+		angle = GameEnums.CombatEngagementAngle.REAR
+
 	var dir_damage_mult: float = _rules.get_directional_damage_multiplier(angle)
 	var dir_cohesion_mult: float = _rules.get_directional_cohesion_multiplier(angle)
 	result.engagement_angle = angle
@@ -55,14 +74,15 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 	var armor_collapse_factor: float = clampf(1.0 - defender.armor_collapse_ratio, 0.1, 1.0)
 	var steel_pen_factor: float = (1.0 - _rules.steel_armor_penetration_ratio) if attacker.has_steel_weapons else 1.0
 
-	var attacker_power: float = _effective_attack(attacker) * terrain_attack * dir_damage_mult
+	var attacker_power: float = _effective_attack(attacker) * fatigue_momentum_mult * terrain_attack * dir_damage_mult
 	var defender_armor: float = defender.defense * (1.0 + defender.totem_defense_bonus) \
 		* terrain_defense * season_defense * armor_collapse_factor * steel_pen_factor
 	result.damage_to_defender = _mitigated_damage(attacker_power, defender_armor, rng)
 
-	var defender_power: float = _effective_attack(defender)
+	var defender_power: float = _effective_attack(defender) * _rules.compute_fatigue_momentum_multiplier(defender.fatigue)
 	var attacker_armor: float = attacker.defense * (1.0 + attacker.totem_defense_bonus) * season_defense
-	result.damage_to_attacker = _mitigated_damage(defender_power, attacker_armor, rng) * _rules.counter_attack_ratio
+	var counter_mult: float = 0.0 if result.cascade_rout_triggered else _rules.counter_attack_ratio
+	result.damage_to_attacker = _mitigated_damage(defender_power, attacker_armor, rng) * counter_mult
 
 	result.defender_remaining_health = maxf(defender.health - result.damage_to_defender, 0.0)
 	result.attacker_remaining_health = maxf(attacker.health - result.damage_to_attacker, 0.0)
@@ -75,6 +95,9 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 		morale_loss += _rules.rear_panic_morale_drop
 	if attacker.has_meteoric_iron_weapon:
 		morale_loss += _rules.meteoric_iron_dread_morale_drop
+	if result.cascade_rout_triggered:
+		cohesion_loss += _rules.elite_vanguard_loss_cohesion_shock
+		morale_loss += _rules.elite_vanguard_loss_morale_shock * clampf(defender.rookie_troop_ratio, 0.2, 1.5)
 
 	result.cohesion_damage_to_defender = cohesion_loss
 	result.morale_damage_to_defender = morale_loss
@@ -86,12 +109,17 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 	defender.morale = result.defender_remaining_morale
 	attacker.health = result.attacker_remaining_health
 
-	if result.defender_remaining_cohesion < _rules.rout_cohesion_threshold \
+	if result.cascade_rout_triggered \
+			or result.defender_remaining_cohesion < _rules.rout_cohesion_threshold \
 			or result.defender_remaining_morale < _rules.rout_morale_threshold:
 		result.defender_routed = true
-		if defender.is_escape_vector_sealed:
-			result.defender_annihilated_in_crescent = true
-			result.captured_toy_loot_value = (result.damage_to_defender + result.defender_remaining_health) * _rules.annihilation_loot_per_health
+		var total_targeted_health: float = result.damage_to_defender + result.defender_remaining_health
+		result.captured_slave_workers = maxi(int(roundf(total_targeted_health * _rules.slave_capture_per_routed_health)), 1)
+		var slave_toy_value: float = float(result.captured_slave_workers) * _rules.slave_worker_toy_value
+		result.captured_toy_loot_value += slave_toy_value
+		if defender.is_escape_vector_sealed or result.cascade_rout_triggered:
+			result.defender_annihilated_in_crescent = defender.is_escape_vector_sealed
+			result.captured_toy_loot_value += total_targeted_health * _rules.annihilation_loot_per_health
 			result.defender_remaining_health = 0.0
 			defender.health = 0.0
 	return result
@@ -106,8 +134,19 @@ func _handle_resolve(command: GameCommand) -> bool:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = resolve.rng_seed
 	resolve.result = calculate(resolve.attacker, resolve.defender, resolve.defender_terrain, _season, rng)
+	if resolve.result.cascade_rout_triggered:
+		EventBus.cascade_rout_triggered.emit(
+			resolve.result.defender_id,
+			resolve.defender.elite_vanguard_id,
+			resolve.result.defender_remaining_morale)
 	if resolve.result.defender_routed:
 		_pending_toy_loot_pool += resolve.result.captured_toy_loot_value
+		if resolve.result.captured_slave_workers > 0:
+			_captured_slave_worker_pool += resolve.result.captured_slave_workers
+			EventBus.routed_troops_enslaved_to_toy.emit(
+				resolve.result.defender_id,
+				resolve.result.captured_slave_workers,
+				resolve.result.captured_toy_loot_value)
 		EventBus.army_routed.emit(
 			resolve.result.defender_id,
 			resolve.result.defender_annihilated_in_crescent,

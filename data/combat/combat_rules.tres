@@ -32,3 +32,11 @@ base_morale_damage_ratio = 0.10
 rout_cohesion_threshold = 15.0
 rout_morale_threshold = 20.0
 annihilation_loot_per_health = 0.45
+fatigue_accumulation_per_sec = 2.5
+max_fatigue_speed_penalty_ratio = 0.45
+max_fatigue_momentum_penalty_ratio = 0.50
+elite_vanguard_loss_morale_shock = 42.0
+elite_vanguard_loss_cohesion_shock = 30.0
+slave_capture_per_routed_health = 0.25
+slave_worker_toy_value = 3.0
+
