@@ -21,6 +21,11 @@ var _enslaved_to_toy_signal_received: bool = false
 var _epidemic_outbreak_signal_received: bool = false
 var _epidemic_attrition_signal_received: bool = false
 var _epidemic_purified_signal_received: bool = false
+var _dynasty_stance_signal_received: bool = false
+var _coalition_war_signal_received: bool = false
+var _council_decree_signal_received: bool = false
+var _glory_changed_signal_received: bool = false
+var _warband_joined_by_glory_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -45,10 +50,13 @@ func _run_suite() -> void:
 	_test_phase4_espionage_and_envoy_provocation()
 	_test_phase4_psychological_warfare_and_cascade_rout()
 	_test_phase4_zud_epidemic_and_kurgan_purification()
+	_test_phase5_dynasty_threat_matrix_and_coalition_war()
+	_test_phase5_ak_sakallilar_council_dilemmas()
+	_test_phase5_kagan_glory_and_warband_recruitment()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -644,6 +652,139 @@ func _test_phase4_zud_epidemic_and_kurgan_purification() -> void:
 	army.free()
 
 
+func _test_phase5_dynasty_threat_matrix_and_coalition_war() -> void:
+	_dynasty_stance_signal_received = false
+	_coalition_war_signal_received = false
+	EventBus.dynasty_stance_changed.connect(_on_dynasty_stance_changed)
+	EventBus.coalition_war_declared.connect(_on_coalition_war_declared)
+
+	var karluk: DynastyProfile = DiplomacyManager.get_dynasty_profile(&"karluk")
+	var kipchak: DynastyProfile = DiplomacyManager.get_dynasty_profile(&"kipchak")
+	var oghuz: DynastyProfile = DiplomacyManager.get_dynasty_profile(&"oghuz")
+	_expect(karluk != null and kipchak != null and oghuz != null,
+		"Karluk, Kıpçak, and Oğuz DynastyProfile resources loaded in DiplomacyManager.")
+
+	# 1. Strong Khaganate (High Kut = 92, Strong Army = 1600, Zero Raids) -> Karluk becomes ALLY
+	DiplomacyManager.set_dynasty_trust(&"karluk", 82.0)
+	var karluk_stance_strong: GameEnums.DynastyAttitude = DiplomacyManager.calculate_dynasty_stance(&"karluk", 92.0, 1600.0, 0.0)
+	_expect(karluk_stance_strong == GameEnums.DynastyAttitude.ALLY,
+		"High Kut, strong army, and high trust yield ALLY (Müttefik) attitude from Karluk Beyliği.")
+
+	# 2. High raid frequency and high ambition -> Kıpçak becomes THREATENING or HOSTILE
+	var kipchak_stance_raids: GameEnums.DynastyAttitude = DiplomacyManager.calculate_dynasty_stance(&"kipchak", 55.0, 750.0, 5.0)
+	_expect(_dynasty_stance_signal_received and (kipchak_stance_raids == GameEnums.DynastyAttitude.THREATENING \
+		or kipchak_stance_raids == GameEnums.DynastyAttitude.HOSTILE),
+		"High border raid frequency and Kıpçak ambition escalate stance to THREATENING/HOSTILE.")
+
+	# 3. Kut drops below critical threshold (< 30) -> Coalition War triggered
+	var eval_cmd: EvaluateDiplomacyCommand = EvaluateDiplomacyCommand.new(22.0, 600.0, 4.0)
+	_expect(CommandBus.dispatch(eval_cmd) and eval_cmd.coalition_triggered,
+		"EvaluateDiplomacyCommand triggers Coalition War when Kut < 30 and army is weakened.")
+	_expect(_coalition_war_signal_received and DiplomacyManager.is_coalition_war_active() \
+		and eval_cmd.coalition_members.size() >= 2,
+		"Multiple rival dynasties unite in a Coalition War (coalition_war_declared) against a low-Kut Khaganate.")
+
+	EventBus.dynasty_stance_changed.disconnect(_on_dynasty_stance_changed)
+	EventBus.coalition_war_declared.disconnect(_on_coalition_war_declared)
+
+
+func _test_phase5_ak_sakallilar_council_dilemmas() -> void:
+	_council_decree_signal_received = false
+	EventBus.council_decree_enacted.connect(_on_council_decree_enacted)
+
+	var crisis: CouncilCrisisEvent = CouncilEventEngine.get_crisis_event()
+	_expect(crisis != null and crisis.get_validation_errors().is_empty(),
+		"CouncilCrisisEvent resource loaded and valid.")
+
+	# Drop Kut below 30 to convene Ak Sakallılar Konseyi
+	CommandBus.dispatch(ModifyKutCommand.new(20.0 - GameManager.get_kut_score(), &"trigger_phase5_council"))
+	_expect(GameManager.is_ak_sakallilar_council_active() and CouncilEventEngine.is_crisis_dilemma_pending(),
+		"Dropping Kut below 30 activates Ak Sakallılar Konseyi crisis dilemma.")
+
+	# Dilemma 1: Töreye Bağlılık (TRADITION) -> +Kut, -Income (0.75x), -Army Speed (0.85x)
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 91
+	add_child(army)
+	var base_speed: float = army.mobility.get_target_speed()
+	var kut_before_tradition: float = GameManager.get_kut_score()
+
+	var trad_cmd: EnactCouncilDecreeCommand = EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.TRADITION)
+	_expect(CommandBus.dispatch(trad_cmd) and _council_decree_signal_received,
+		"Enacting Töreye Bağlılık (TRADITION) succeeds and emits council_decree_enacted.")
+	_expect(GameManager.get_kut_score() > kut_before_tradition \
+		and is_equal_approx(CouncilEventEngine.get_active_income_multiplier(), crisis.tradition_income_multiplier) \
+		and is_equal_approx(army.mobility.get_target_speed(), base_speed * crisis.tradition_speed_multiplier),
+		"Töreye Bağlılık boosts Kut while restricting economic income (0.75x) and army movement speed (0.85x).")
+
+	# Dilemma 2: Yağma ve Sefer Serbestisi (EXPANSION) -> +Morale, +Loot (1.45x), -Dynasty Trust
+	var oghuz_trust_before: float = DiplomacyManager.get_dynasty_trust(&"oghuz")
+	var exp_cmd: EnactCouncilDecreeCommand = EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.EXPANSION)
+	_expect(CommandBus.dispatch(exp_cmd), "Enacting Yağma ve Sefer Serbestisi (EXPANSION) succeeds.")
+	_expect(CouncilEventEngine.get_active_morale_bonus() >= 20.0 \
+		and is_equal_approx(CouncilEventEngine.get_active_loot_multiplier(), crisis.expansion_loot_multiplier) \
+		and DiplomacyManager.get_dynasty_trust(&"oghuz") < oghuz_trust_before,
+		"Yağma ve Sefer Serbestisi boosts military morale and raid loot while collapsing neighboring dynasty trust.")
+
+	# Dilemma 3: Hazine Fedakarlığı (SACRIFICE) -> Spend Steel + Silver/Gold treasury to buy popular loyalty & Kut
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"steel", 10))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 40))
+
+	var steel_before: int = ResourceManager.get_amount(1, &"steel")
+	var bullion_before: int = ResourceManager.get_amount(1, &"silver_gold")
+	var kut_before_sac: float = GameManager.get_kut_score()
+
+	var sac_cmd: EnactCouncilDecreeCommand = EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.SACRIFICE)
+	_expect(CommandBus.dispatch(sac_cmd), "Enacting Hazine Fedakarlığı (SACRIFICE) succeeds when treasury suffices.")
+	_expect(ResourceManager.get_amount(1, &"steel") == steel_before - crisis.sacrifice_steel_cost \
+		and ResourceManager.get_amount(1, &"silver_gold") == bullion_before - crisis.sacrifice_silver_gold_cost,
+		"Hazine Fedakarlığı spends Steel and Silver/Gold from the player's treasury.")
+	_expect(GameManager.get_kut_score() > kut_before_sac and CouncilEventEngine.get_popular_loyalty_bonus() >= 30.0,
+		"Hazine Fedakarlığı purchases popular loyalty and restores Kut.")
+
+	EventBus.council_decree_enacted.disconnect(_on_council_decree_enacted)
+	army.free()
+
+
+func _test_phase5_kagan_glory_and_warband_recruitment() -> void:
+	_glory_changed_signal_received = false
+	_warband_joined_by_glory_signal_received = false
+	EventBus.kagan_glory_changed.connect(_on_kagan_glory_changed)
+	EventBus.rogue_warband_joined_by_glory.connect(_on_warband_joined_by_glory)
+
+	var rules: DiplomacyRules = ResourceLoader.load("res://data/diplomacy/diplomacy_rules.tres") as DiplomacyRules
+	var glory_comp: GloryComponent = GloryComponent.new()
+	glory_comp.configure(95, rules)
+	add_child(glory_comp)
+
+	# Create a rogue warband ('Yersiz Yurtsuz Çeriler') via unfair Toy distribution
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"bars_bey", 1000.0, 0.0, false))
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"bars_bey", 1000.0, 0.0, false))
+	_expect(CommandBus.is_bey_rogue_warband(&"bars_bey"),
+		"Bars Bey rebels into an independent Yersiz Yurtsuz Çeriler rogue warband.")
+	_expect(not glory_comp.can_recruit_rogue_warband_freely() and glory_comp.recruit_rogue_warband(&"bars_bey") == 0,
+		"Low-glory Khagan cannot recruit independent rogue warbands without hostages.")
+
+	# Accumulate Glory via Turan Tactic, Feigned Retreat lure, and Envoy Assassination
+	glory_comp.record_successful_turan_tactic()
+	glory_comp.record_successful_feigned_retreat()
+	glory_comp.record_envoy_assassination()
+	_expect(_glory_changed_signal_received and glory_comp.get_glory_score() >= rules.free_warband_recruitment_glory_threshold,
+		"Successful Turan tactics, Feigned Retreat lures, and Envoy Assassinations raise Khagan's glory_score above recruitment threshold (>= 40).")
+	_expect(glory_comp.can_recruit_rogue_warband_freely(),
+		"High glory unlocks hostage-free recruitment of roaming Yersiz Yurtsuz Çeriler warbands.")
+
+	var joined_troops: int = glory_comp.recruit_rogue_warband(&"bars_bey")
+	_expect(_warband_joined_by_glory_signal_received and joined_troops == rules.rogue_warband_troop_size,
+		"High-glory Khagan recruits rogue warband directly into the army (+250 veteran riders) without hostages.")
+	_expect(not CommandBus.is_bey_rogue_warband(&"bars_bey") and glory_comp.get_recruited_troops() == 250,
+		"Recruited warband is reintegrated into the Khaganate's command structure.")
+
+	EventBus.kagan_glory_changed.disconnect(_on_kagan_glory_changed)
+	EventBus.rogue_warband_joined_by_glory.disconnect(_on_warband_joined_by_glory)
+	glory_comp.free()
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -715,4 +856,25 @@ func _on_epidemic_attrition_ticked(_army_id: int, _remaining: int, _casualties: 
 
 func _on_epidemic_purified(_army_id: int, _shrine_id: StringName, _kut_spent: float) -> void:
 	_epidemic_purified_signal_received = true
+
+
+func _on_dynasty_stance_changed(_dynasty_id: StringName, _prev: GameEnums.DynastyAttitude, _next: GameEnums.DynastyAttitude, _trust: float) -> void:
+	_dynasty_stance_signal_received = true
+
+
+func _on_coalition_war_declared(_members: PackedStringArray, _kut: float) -> void:
+	_coalition_war_signal_received = true
+
+
+func _on_council_decree_enacted(_player_id: int, _choice: GameEnums.CouncilDilemmaChoice, _kut: float, _inc: float, _spd: float, _loot: float) -> void:
+	_council_decree_signal_received = true
+
+
+func _on_kagan_glory_changed(_army_id: int, _prev: float, _next: float, _reason: StringName) -> void:
+	_glory_changed_signal_received = true
+
+
+func _on_warband_joined_by_glory(_army_id: int, _bey_id: StringName, _troops: int, _glory: float) -> void:
+	_warband_joined_by_glory_signal_received = true
+
 
