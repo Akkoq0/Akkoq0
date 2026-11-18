@@ -16,6 +16,9 @@ var _economy_rules: EconomyRules = null
 var _stockpiles: Dictionary[int, Stockpile] = {}
 ## "<player_id>:<target_id>" -> true when Meteoric Iron has been bound.
 var _meteoric_bindings: Dictionary[StringName, bool] = {}
+## Phase 11 operational logistics state for Sefer Arabası migration & supply isolation.
+var _camp_migrating_state: Dictionary[int, bool] = {}
+var _camp_supply_cut_state: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
@@ -82,6 +85,53 @@ func smelt_steel_in_nomadic_forge(player_id: int, batches: int = 1) -> bool:
 	return CommandBus.dispatch(cmd)
 
 
+## Sets the player's current camp migration (`Sefer Arabası`) and supply-line status.
+func set_camp_migration_and_supply_state(player_id: int, is_migrating_sefer_arabasi: bool, is_supply_cut_or_besieged: bool) -> void:
+	_camp_migrating_state[player_id] = is_migrating_sefer_arabasi
+	_camp_supply_cut_state[player_id] = is_supply_cut_or_besieged
+
+
+func is_camp_migrating(player_id: int) -> bool:
+	return _camp_migrating_state.get(player_id, false)
+
+
+func is_camp_supply_cut(player_id: int) -> bool:
+	return _camp_supply_cut_state.get(player_id, false)
+
+
+## Returns Nomadic Forge steel smelting throughput multiplier under migration & supply constraints.
+func get_effective_forge_throughput_multiplier(player_id: int) -> float:
+	var mult: float = 1.0
+	if is_camp_migrating(player_id):
+		mult *= 0.35
+	if is_camp_supply_cut(player_id):
+		mult *= 0.70
+	return mult
+
+
+## Returns regional tax collection efficiency under Sefer Arabası migration & supply isolation.
+func get_regional_tax_logistics_multiplier(player_id: int) -> float:
+	var mult: float = 1.0
+	if is_camp_migrating(player_id):
+		mult *= 0.50
+	if is_camp_supply_cut(player_id):
+		mult *= 0.60
+	return mult
+
+
+## Attempts `2 Iron + 1 Coal = 1 Steel` smelting constrained by mobile Sefer Arabası / siege capacity.
+## Returns the actual Steel batches smelted.
+func smelt_steel_with_logistics_constraints(player_id: int, requested_batches: int) -> int:
+	var throughput: float = get_effective_forge_throughput_multiplier(player_id)
+	var allowed_batches: int = maxi(int(floorf(float(maxi(requested_batches, 0)) * throughput)), 0)
+	if allowed_batches <= 0:
+		return 0
+	var cmd: RefineOreCommand = RefineOreCommand.new(player_id, NOMADIC_FORGE_ID, STEEL_RECIPE_ID, allowed_batches)
+	if not CommandBus.dispatch(cmd):
+		return 0
+	return cmd.produced_amount
+
+
 ## Convenience helper: calculates and routes regional Silver/Gold tax to the treasury.
 func collect_regional_tax(player_id: int, region_count: int, rich_region_count: int = 0) -> int:
 	var cmd: CollectRegionalTaxCommand = CollectRegionalTaxCommand.new(player_id, region_count, rich_region_count)
@@ -90,12 +140,30 @@ func collect_regional_tax(player_id: int, region_count: int, rich_region_count: 
 	return cmd.collected_tax
 
 
+## Pure preview/evaluation combining Jade Tamga Authority with Sefer Arabası & supply-line limits.
+func calculate_effective_regional_tax_with_logistics(player_id: int, region_count: int, rich_region_count: int = 0) -> int:
+	if _economy_rules == null or region_count <= 0:
+		return 0
+	var effective_mult: float = calculate_jade_authority_multiplier(player_id) * get_regional_tax_logistics_multiplier(player_id)
+	return _economy_rules.compute_regional_tax(region_count, rich_region_count, effective_mult)
+
+
 ## True when `player_id` has enough Meteoric Iron for commander weapon or totem ascension binding.
 func can_bind_meteoric_iron(player_id: int, for_totem_ascension: bool) -> bool:
 	if _economy_rules == null:
 		return false
 	var required: int = _economy_rules.get_binding_cost(for_totem_ascension)
 	return get_amount(player_id, _economy_rules.meteoric_ore_id) >= required
+
+
+## Binds Meteoric Iron under realistic hearth constraints: Totem Ascension requires a
+## settled camp (blocked during Sefer Arabası migration), while emergency weapon binding
+## succeeds unless supply-cut with insufficient reserves.
+func bind_meteoric_iron_with_logistics(player_id: int, target_id: StringName, for_totem_ascension: bool) -> bool:
+	if for_totem_ascension and is_camp_migrating(player_id):
+		return false
+	var cmd: BindMeteoricIronCommand = BindMeteoricIronCommand.new(player_id, target_id, for_totem_ascension)
+	return CommandBus.dispatch(cmd)
 
 
 ## True when `target_id` (commander weapon or totem id) has already been bound with Meteoric Iron.
@@ -178,8 +246,10 @@ func _handle_collect_regional_tax(command: GameCommand) -> bool:
 	if tax_cmd.controlled_region_count <= 0:
 		return command.reject("controlled_region_count must be positive.")
 	var authority_mult: float = calculate_jade_authority_multiplier(tax_cmd.player_id)
+	var logistics_mult: float = get_regional_tax_logistics_multiplier(tax_cmd.player_id)
+	var effective_mult: float = authority_mult * logistics_mult
 	var tax_amount: int = _economy_rules.compute_regional_tax(
-		tax_cmd.controlled_region_count, tax_cmd.rich_region_count, authority_mult)
+		tax_cmd.controlled_region_count, tax_cmd.rich_region_count, effective_mult)
 	if tax_amount <= 0:
 		return command.reject("Computed regional tax is zero.")
 	var stockpile: Stockpile = _get_or_create_stockpile(tax_cmd.player_id)

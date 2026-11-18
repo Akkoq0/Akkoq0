@@ -17,6 +17,10 @@ var _player_army_size: float = 1000.0
 var _raid_frequency: float = 0.0
 var _coalition_war_active: bool = false
 var _coalition_members: PackedStringArray = PackedStringArray()
+var _espionage_deterrence_bonus: float = 0.0
+var _spy_exposure_penalty: float = 0.0
+var _recent_assassination_infamy: float = 0.0
+var _tracked_kagan_glory: float = 0.0
 
 
 func _ready() -> void:
@@ -26,6 +30,9 @@ func _ready() -> void:
 	_load_profile(OGHUZ_PATH)
 	CommandBus.register_handler(EvaluateDiplomacyCommand.ID, _handle_evaluate_diplomacy)
 	EventBus.kut_changed.connect(_on_kut_changed)
+	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
+	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
+	EventBus.kagan_glory_changed.connect(_on_kagan_glory_changed)
 
 
 func _exit_tree() -> void:
@@ -46,6 +53,73 @@ func calculate_dynasty_stance(dynasty_id: StringName, player_kut: float, player_
 	if previous != next_stance:
 		EventBus.dynasty_stance_changed.emit(dynasty_id, previous, next_stance, current_trust)
 	return next_stance
+
+
+## Evaluates a dynasty's effective Threat Score and attitude modulated by active
+## intelligence deterrence, exposed spies, envoy assassination infamy, and Khagan glory.
+func evaluate_dynasty_with_intelligence_and_glory(dynasty_id: StringName, player_kut: float, player_army_size: float, raid_frequency: float, glory_score_override: float = -1.0) -> GameEnums.DynastyAttitude:
+	var profile: DynastyProfile = _profiles.get(dynasty_id, null)
+	if profile == null:
+		return GameEnums.DynastyAttitude.NEUTRAL
+	var current_trust: float = _trust_scores.get(dynasty_id, profile.trust_index)
+	var base_threat: float = profile.calculate_threat_score(player_kut, player_army_size, raid_frequency, current_trust)
+	var active_glory: float = glory_score_override if glory_score_override >= 0.0 else _tracked_kagan_glory
+	var glory_deterrence: float = clampf((active_glory - 30.0) * 0.45, 0.0, 26.0)
+	var effective_threat: float = clampf(
+		base_threat - _espionage_deterrence_bonus - glory_deterrence + _spy_exposure_penalty + _recent_assassination_infamy,
+		0.0, 100.0)
+	if effective_threat <= profile.ally_threshold:
+		return GameEnums.DynastyAttitude.ALLY
+	if effective_threat <= profile.neutral_threshold:
+		return GameEnums.DynastyAttitude.NEUTRAL
+	if effective_threat <= profile.threatening_threshold:
+		return GameEnums.DynastyAttitude.THREATENING
+	return GameEnums.DynastyAttitude.HOSTILE
+
+
+## Evaluates full coalition warfare likelihood while factoring intelligence advantage
+## and Khagan glory deterrence (`glory >= 40` can deter low-Kut coalition war).
+func evaluate_coalition_with_political_context(player_kut: float, player_army_size: float, raid_frequency: float, glory_score_override: float = -1.0) -> Dictionary[StringName, float]:
+	var active_glory: float = glory_score_override if glory_score_override >= 0.0 else _tracked_kagan_glory
+	var hostile_count: int = 0
+	var max_effective_threat: float = 0.0
+	for dynasty_id: StringName in _profiles:
+		var profile: DynastyProfile = _profiles[dynasty_id]
+		var current_trust: float = _trust_scores.get(dynasty_id, profile.trust_index)
+		var base_threat: float = profile.calculate_threat_score(player_kut, player_army_size, raid_frequency, current_trust)
+		var glory_det: float = clampf((active_glory - 30.0) * 0.45, 0.0, 26.0)
+		var eff_threat: float = clampf(
+			base_threat - _espionage_deterrence_bonus - glory_det + _spy_exposure_penalty + _recent_assassination_infamy,
+			0.0, 100.0)
+		max_effective_threat = maxf(max_effective_threat, eff_threat)
+		if eff_threat > profile.neutral_threshold and profile.ambition >= 0.50:
+			hostile_count += 1
+	var raw_coalition_window: bool = player_kut < 30.0 and hostile_count > 0
+	var deterred: bool = player_kut < 30.0 and hostile_count == 0
+	return {
+		&"coalition_active": 1.0 if raw_coalition_window else 0.0,
+		&"coalition_deterred": 1.0 if deterred else 0.0,
+		&"hostile_member_count": float(hostile_count),
+		&"max_effective_threat": max_effective_threat,
+		&"espionage_deterrence": _espionage_deterrence_bonus,
+		&"assassination_infamy": _recent_assassination_infamy,
+	}
+
+
+## Sets or resets political intelligence & glory modifiers for scenario evaluation.
+func set_political_intelligence_context(espionage_deterrence: float, spy_exposure: float, assassination_infamy: float, kagan_glory: float) -> void:
+	_espionage_deterrence_bonus = clampf(espionage_deterrence, 0.0, 30.0)
+	_spy_exposure_penalty = clampf(spy_exposure, 0.0, 30.0)
+	_recent_assassination_infamy = clampf(assassination_infamy, 0.0, 45.0)
+	_tracked_kagan_glory = clampf(kagan_glory, 0.0, 100.0)
+
+
+func get_espionage_deterrence_bonus() -> float:
+	return _espionage_deterrence_bonus
+
+
+func get_recent_assassination_infamy() -> float:
+	return _recent_assassination_infamy
 
 
 ## Evaluates all rival dynasties and triggers `EventBus.coalition_war_declared`
@@ -134,3 +208,20 @@ func _load_profile(path: String) -> void:
 func _on_kut_changed(_previous_kut: float, new_kut: float, _reason: StringName) -> void:
 	if new_kut < 30.0:
 		evaluate_all_dynasties(new_kut, _player_army_size, _raid_frequency)
+
+
+func _on_espionage_mission_completed(report: EspionageReport) -> void:
+	if report == null:
+		return
+	if report.succeeded:
+		_espionage_deterrence_bonus = clampf(_espionage_deterrence_bonus + 8.0, 0.0, 24.0)
+	elif report.spy_captured:
+		_spy_exposure_penalty = clampf(_spy_exposure_penalty + 6.0, 0.0, 24.0)
+
+
+func _on_envoy_assassinated(_instigator_id: int, _target_id: int, _envoy_id: StringName, _kut_gained: float) -> void:
+	_recent_assassination_infamy = clampf(_recent_assassination_infamy + 18.0, 0.0, 40.0)
+
+
+func _on_kagan_glory_changed(_army_id: int, _previous_glory: float, new_glory: float, _reason: StringName) -> void:
+	_tracked_kagan_glory = clampf(new_glory, 0.0, 100.0)

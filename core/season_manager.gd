@@ -18,6 +18,7 @@ var _has_started: bool = false
 var _food_reserve: int = 0
 var _army_epidemic_states: Dictionary[int, GameEnums.EpidemicState] = {}
 var _army_troop_counts: Dictionary[int, int] = {}
+var _epidemic_unpurified_days: Dictionary[int, int] = {}
 
 
 func _ready() -> void:
@@ -160,6 +161,68 @@ func get_army_troop_count(army_id: int) -> int:
 	return _army_troop_counts.get(army_id, 0)
 
 
+## Effective Kut cost to perform a Kurgan / Şifahane purification ritual for `army_id`.
+## Neglecting an active outbreak increases ritual Kut cost (`+3.0` per unpurified day, max `30.0`).
+func get_effective_purification_kut_cost(army_id: int) -> float:
+	if _kut_rules == null:
+		return 12.0
+	var days: int = _epidemic_unpurified_days.get(army_id, 0)
+	return clampf(_kut_rules.kurgan_purification_kut_cost + float(days) * 3.0, _kut_rules.kurgan_purification_kut_cost, 30.0)
+
+
+func get_epidemic_unpurified_days(army_id: int) -> int:
+	return _epidemic_unpurified_days.get(army_id, 0)
+
+
+## Evaluates daily Zud epidemic contagion and food ration mitigation trade-offs:
+##  * Allocating `extra_ration_allocated >= 20` medicinal food rations (when food suffices)
+##    consumes food, halves daily troop attrition (`0.04`), and blocks contagion spread.
+##  * Withholding rations increments unpurified outbreak duration, infects `nearby_army_id`,
+##    and escalates future Kurgan purification `Kut` cost.
+func evaluate_epidemic_contagion_and_ration_strain(army_id: int, nearby_army_id: int, extra_ration_allocated: int, current_troops: int = 200) -> Dictionary[StringName, float]:
+	var clamped_troops: int = maxi(current_troops, 0)
+	var metrics: Dictionary[StringName, float] = {
+		&"food_consumed": 0.0,
+		&"effective_attrition_ratio": 0.0,
+		&"remaining_troops": float(clamped_troops),
+		&"nearby_infected": 0.0,
+		&"next_purification_kut_cost": get_effective_purification_kut_cost(army_id),
+		&"unpurified_days": float(get_epidemic_unpurified_days(army_id)),
+	}
+	if not is_army_infected(army_id) or _kut_rules == null or clamped_troops <= 0:
+		_army_troop_counts[army_id] = clamped_troops
+		return metrics
+
+	var attrition_ratio: float = _kut_rules.epidemic_daily_troop_attrition_ratio
+	if extra_ration_allocated >= 20 and _food_reserve >= 20:
+		var consumed: int = mini(extra_ration_allocated, _food_reserve)
+		_food_reserve -= consumed
+		attrition_ratio *= 0.5
+		metrics[&"food_consumed"] = float(consumed)
+	else:
+		var next_days: int = _epidemic_unpurified_days.get(army_id, 0) + 1
+		_epidemic_unpurified_days[army_id] = next_days
+		attrition_ratio = minf(attrition_ratio + float(mini(next_days, 4)) * 0.01, 0.20)
+		if nearby_army_id > 0 and nearby_army_id != army_id and not is_army_infected(nearby_army_id):
+			_army_epidemic_states[nearby_army_id] = GameEnums.EpidemicState.OUTBREAK_EPIDEMIC
+			EventBus.outbreak_epidemic_started.emit(
+				nearby_army_id,
+				_kut_rules.epidemic_speed_multiplier,
+				_kut_rules.epidemic_daily_troop_attrition_ratio)
+			metrics[&"nearby_infected"] = 1.0
+
+	var casualties: int = maxi(int(ceilf(float(clamped_troops) * attrition_ratio)), 1)
+	var remaining: int = maxi(clamped_troops - casualties, 0)
+	_army_troop_counts[army_id] = remaining
+	EventBus.epidemic_daily_attrition_ticked.emit(army_id, remaining, casualties)
+
+	metrics[&"effective_attrition_ratio"] = attrition_ratio
+	metrics[&"remaining_troops"] = float(remaining)
+	metrics[&"next_purification_kut_cost"] = get_effective_purification_kut_cost(army_id)
+	metrics[&"unpurified_days"] = float(get_epidemic_unpurified_days(army_id))
+	return metrics
+
+
 func _handle_purify_epidemic(command: GameCommand) -> bool:
 	var purify: PurifyEpidemicCommand = command as PurifyEpidemicCommand
 	if purify == null:
@@ -174,14 +237,16 @@ func _handle_purify_epidemic(command: GameCommand) -> bool:
 			_kut_rules.kurgan_shrine_building_id, INFIRMARY_BUILDING_ID])
 	if not is_army_infected(purify.target_army_id):
 		return command.reject("Target army %d is not infected by an epidemic." % purify.target_army_id)
-	if GameManager.get_kut_score() < _kut_rules.kurgan_purification_kut_cost:
+	var effective_kut_cost: float = get_effective_purification_kut_cost(purify.target_army_id)
+	if GameManager.get_kut_score() < effective_kut_cost:
 		return command.reject("Insufficient Kut for Kurgan epidemic purification ritual.")
 
-	var kut_cmd: ModifyKutCommand = ModifyKutCommand.new(-_kut_rules.kurgan_purification_kut_cost, REASON_KURGAN_PURIFICATION)
+	var kut_cmd: ModifyKutCommand = ModifyKutCommand.new(-effective_kut_cost, REASON_KURGAN_PURIFICATION)
 	CommandBus.dispatch(kut_cmd)
 
 	_army_epidemic_states[purify.target_army_id] = GameEnums.EpidemicState.PURIFIED
-	purify.kut_spent = _kut_rules.kurgan_purification_kut_cost
+	_epidemic_unpurified_days[purify.target_army_id] = 0
+	purify.kut_spent = effective_kut_cost
 	purify.purified = true
 	purify.remaining_kut = GameManager.get_kut_score()
 

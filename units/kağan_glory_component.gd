@@ -30,6 +30,8 @@ func _ready() -> void:
 	EventBus.crescent_trap_sprung.connect(_on_crescent_trap_sprung)
 	EventBus.feigned_retreat_lured.connect(_on_feigned_retreat_lured)
 	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
+	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
+	EventBus.council_decree_enacted.connect(_on_council_decree_enacted)
 
 
 ## Configures the component for `p_army_id` and resets `glory_score`.
@@ -92,6 +94,23 @@ func recruit_rogue_warband(bey_id: StringName) -> int:
 	return added_troops
 
 
+## Recruits a roaming rogue warband (`bey_id`) with detachment headcount scaled by
+## surplus `glory_score` (`1.0x` at threshold 40 up to `1.5x` at 100 glory).
+func recruit_rogue_warband_scaled_by_glory(bey_id: StringName) -> int:
+	if rules == null or bey_id == &"" or not can_recruit_rogue_warband_freely():
+		return 0
+	if not CommandBus.reintegrate_rogue_warband(bey_id):
+		return 0
+	var threshold: float = rules.free_warband_recruitment_glory_threshold
+	var excess_ratio: float = clampf((glory_score - threshold) / maxf(100.0 - threshold, 1.0), 0.0, 1.0)
+	var scale_mult: float = lerpf(1.0, 1.5, excess_ratio)
+	var added_troops: int = roundi(float(rules.rogue_warband_troop_size) * scale_mult)
+	_recruited_troops += added_troops
+	_recruited_warbands.append(String(bey_id))
+	EventBus.rogue_warband_joined_by_glory.emit(_army_id, bey_id, added_troops, glory_score)
+	return added_troops
+
+
 func get_recruited_troops() -> int:
 	return _recruited_troops
 
@@ -121,3 +140,13 @@ func _on_feigned_retreat_lured(luring_army_id: int, _pursuer_id: int, _overext: 
 
 func _on_envoy_assassinated(_instigator_id: int, _target_id: int, _envoy_id: StringName, _kut_gained: float) -> void:
 	record_envoy_assassination()
+
+
+func _on_espionage_mission_completed(report: EspionageReport) -> void:
+	if report != null and report.succeeded:
+		_add_glory(4.0, &"espionage_outmaneuver")
+
+
+func _on_council_decree_enacted(_player_id: int, choice: GameEnums.CouncilDilemmaChoice, _kut: float, _inc: float, _spd: float, _loot: float) -> void:
+	if choice == GameEnums.CouncilDilemmaChoice.EXPANSION:
+		_add_glory(6.0, &"council_expansion_decree")
