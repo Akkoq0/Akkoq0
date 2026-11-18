@@ -37,6 +37,7 @@ SovereigntyPathEngine="*res://core/sovereignty_path_engine.gd"
 EmergentWorldEngine="*res://core/emergent_world_engine.gd"
 CataclysmEngine="*res://core/cataclysm_engine.gd"
 KinshipIntrigueManager="*res://core/kinship_intrigue_manager.gd"
+CausalChainEngine="*res://core/causal_chain_engine.gd"
 
 
 

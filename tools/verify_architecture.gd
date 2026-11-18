@@ -258,6 +258,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as KinshipIntrigueRules).get_validation_errors())
 		elif res is AttritionCasualtyProfile:
 			errors.append_array((res as AttritionCasualtyProfile).get_validation_errors())
+		elif res is CausalFrictionCalibration:
+			errors.append_array((res as CausalFrictionCalibration).get_validation_errors())
 	return errors
 
 

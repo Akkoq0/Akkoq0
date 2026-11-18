@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CausalFrictionCalibration" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/world/causal_friction_calibration.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+calibration_id = &"otuken_causal_friction_matrix_v1"
+critical_kut_council_threshold = 30.0
+free_warband_glory_threshold = 40.0
+espionage_coalition_trust_recovery = 22.0
+fatigue_accumulation_per_sec = 2.5
+max_fatigue_speed_penalty_ratio = 0.45
+max_fatigue_momentum_penalty_ratio = 0.50
+directional_front_multiplier = 1.0
+directional_flank_multiplier = 1.45
+directional_rear_multiplier = 2.1
+epidemic_speed_multiplier = 0.50
+epidemic_daily_troop_attrition_ratio = 0.08
+kurgan_purification_kut_cost = 12.0
+min_remount_ratio_for_crescent_trap = 0.55
+yilki_depletion_wing_angle_damping = 0.56
+failed_crescent_morale_penalty = 24.0
+counterplay_recovery_window_sec = 18.0

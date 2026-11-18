@@ -183,6 +183,23 @@ enum IntrigueResolutionAction {
 	NEGOTIATE_KINSHIP_BALANCE = 2, ## Kan Bağı Müzakeresi ve Konsey Uzlaşısı
 }
 
+## Multi-system Causal Chain archetypes (`CausalChainEngine`).
+enum CausalChainArchetype {
+	ECOLOGICAL_LOGISTICS_COLLAPSE = 0, ## Otlak Tükenmesi -> Zud Erzak Krizi -> Yılkı Kesimi -> Hilal Kapanı Sarkması -> Moral Kırılması & Çeri Kopuşu
+	COMBAT_FATIGUE_PSYCHOLOGICAL_ROUT = 1, ## Muharebe Yorgunluğu -> Momentum Kaybı -> Seçkin Öncü Kaybı & Cascade Rout -> 2.1x Arka Darbe & Kut Erimesi
+	POLITICAL_ESPIONAGE_COALITION = 2, ## Düşük Kut / Toy Krizi -> Çeri Kopuşu & Koalisyon Tehdidi -> Casusluk veya Şöhret (>=40) ile Zincir Kırılması
+	EPIDEMIC_KURGAN_PURIFICATION = 3, ## Zud + Food<=0 -> Salgın (0.50x Hız, %8 Kırım) -> Kurgan Arınması (12 Kut) ile Durdurma
+}
+
+## Player counterplay actions that break or reverse an active causal chain.
+enum CausalCounterplayAction {
+	NONE = 0, ## Karşı Hamle Yok (Zincir Tam Sonucuna Ulaşır)
+	MIGRATE_SEFER_ARABASI_OR_RESUPPLY = 1, ## Sefer Arabası Göçü veya İkmal Hattı Onarımı
+	ROTATE_RESERVE_OR_TACTICAL_WITHDRAW = 2, ## İhtiyat Rotasyonu veya Taktik Geri Çekilme
+	ESPIONAGE_OR_GLORY_WARBAND_RECRUIT = 3, ## Sık Orman Casusluğu veya Şöhret (>=40) ile Çeri Geri Kazanımı
+	KURGAN_PURIFICATION_RITUAL = 4, ## Kurgan Şifahanesinde 12 Kut Bedeliyle Salgın Arınması
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -191,6 +208,7 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
 
 
 

@@ -214,6 +214,42 @@ func evaluate_crescent_trap(left_wing_dir: Vector3, right_wing_dir: Vector3, ter
 	return true
 
 
+## Evaluates the Stage 4 Crescent Encirclement Trap while accounting for Yılkı
+## spare-horse depletion (`remount_horse_ratio`). When `remount_horse_ratio` drops
+## below the calibrated friction threshold, wing cavalry cannot reach the pincer
+## angle in time and the encirclement fails.
+func evaluate_crescent_trap_with_remount_ratio(left_wing_dir: Vector3, right_wing_dir: Vector3, remount_horse_ratio: float, calibration: CausalFrictionCalibration, terrain: TerrainData, target: CombatantStats = null) -> bool:
+	if doctrine == null:
+		return false
+	var left_n: Vector3 = left_wing_dir.normalized() if left_wing_dir.length_squared() > 0.0001 else Vector3.LEFT
+	var right_n: Vector3 = right_wing_dir.normalized() if right_wing_dir.length_squared() > 0.0001 else Vector3.RIGHT
+	var dot_val: float = clampf(left_n.dot(right_n), -1.0, 1.0)
+	var raw_angle_rad: float = acos(dot_val)
+	if calibration != null:
+		_last_flank_angle_rad = calibration.compute_effective_crescent_wing_angle(raw_angle_rad, remount_horse_ratio)
+	else:
+		_last_flank_angle_rad = raw_angle_rad
+	if _last_flank_angle_rad < doctrine.min_crescent_flank_angle_rad:
+		return false
+
+	if _phase != GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP:
+		advance_to_phase(GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+
+	_is_escape_vector_sealed = terrain != null and doctrine.can_seal_escape_on(terrain.terrain_class)
+	var target_id: int = target.entity_id if target != null else 0
+	if target != null:
+		target.is_escape_vector_sealed = _is_escape_vector_sealed
+		target.cohesion = clampf(target.cohesion - doctrine.encirclement_cohesion_shock, 0.0, 100.0)
+
+	EventBus.crescent_trap_sprung.emit(_army_id, target_id, _last_flank_angle_rad, _is_escape_vector_sealed)
+	advance_to_phase(GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION)
+	return true
+
+
+func get_last_flank_angle_rad() -> float:
+	return _last_flank_angle_rad
+
+
 # --- Stage 5: BORU_SHOCK_ANNIHILATION ---------------------------------------
 
 ## Computes the momentum-based (`mass * speed`) shock multiplier of Börü heavy
