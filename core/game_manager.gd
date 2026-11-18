@@ -151,7 +151,8 @@ func _handle_modify_kut(command: GameCommand) -> bool:
 func _apply_kut_delta(delta: float, reason: StringName) -> void:
 	if is_nan(delta) or is_inf(delta):
 		return
-	var max_kut: float = _kut_rules.max_kut if _kut_rules != null else 100.0
+	var base_max: float = _kut_rules.max_kut if _kut_rules != null else 100.0
+	var max_kut: float = minf(base_max, CollapseRecoveryFSM.get_kut_ceiling_for_player(1))
 	var critical: float = _kut_rules.critical_kut_threshold if _kut_rules != null else 30.0
 	var previous: float = _kut_score
 	var was_council_active: bool = _council_active

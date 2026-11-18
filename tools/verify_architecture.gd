@@ -264,6 +264,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as PersistentWorldRules).get_validation_errors())
 		elif res is ConquestRules:
 			errors.append_array((res as ConquestRules).get_validation_errors())
+		elif res is CollapseRecoveryRules:
+			errors.append_array((res as CollapseRecoveryRules).get_validation_errors())
 	return errors
 
 

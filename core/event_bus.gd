@@ -143,3 +143,11 @@ signal yurt_claim_responded(claim_id: StringName, response: GameEnums.ClaimDefen
 signal region_control_changed(region_coord: Vector2i, owner_id: int, control_percent: float, aftermath_choice: GameEnums.ConquestAftermathChoice, scorched_seasons: int)
 signal great_khagan_candidate_proclaimed(player_id: int, owned_kurgans: int, total_kurgans: int, coalition_triggered: bool)
 
+# --- Phase 20 Asymmetric Collapse, Vassal, Exile Kingmaker & Rebirth ----------
+signal collapse_triggered(player_id: int, conqueror_id: int, truce_hours: float)
+signal collapse_truce_ended(player_id: int)
+signal collapse_path_selected(player_id: int, choice: GameEnums.CollapsePathChoice, new_state: GameEnums.CollapseState, overlord_id: int)
+signal exile_dynasty_extinct(player_id: int, reason: StringName)
+signal dynasty_reborn_at_frontier(player_id: int, frontier_coord: Vector2i, glory_reset: float)
+signal vassal_coup_attempted(vassal_id: int, overlord_id: int, succeeded: bool, reason: StringName)
+

@@ -268,6 +268,23 @@ enum ConquestAftermathChoice {
 	APPOINT_VASSAL_BEY = 2, ## Yerel Tâbi Bey atayarak istikrarı hızla artır
 }
 
+## Phase 20 Asymmetric collapse recovery FSM states (`CollapseRecoveryFSM`).
+enum CollapseState {
+	SOVEREIGN = 0, ## Normal independent Khaganate / Oba
+	TRUCE_WITHDRAWAL = 1, ## Çift yönlü 18 saatlik kaçış & ateşkes penceresi
+	VASSAL_BEYLIK = 2, ## Tâbi Beylik (%15-%25 haraç, Kut <= 50, hükümran gözetim & darbe çıkışı)
+	HOMELESS_EXILE = 3, ## Yersiz Yurtsuz Mülteci Güç (sabit ocak yok, 160 tavan, hızlı/ucuz, umut/sadakat sayacı)
+	FRONTIER_MARCH_LORD = 4, ## Uç Beyliği Sürgünü (dış sınırda zayıf otlak & sert Zud ile temiz başlangıç)
+	DYNASTY_EXTINCT = 5, ## Hanedan Sönümü (son araba düşerse / Umut 0'lanırsa bekleme + sıfır Şöhretle yeniden doğuş)
+}
+
+## Phase 20 Player strategic recovery paths upon defeat.
+enum CollapsePathChoice {
+	SUBMIT_VASSAL = 0,
+	FLEE_HOMELESS_EXILE = 1,
+	REBUILD_AT_FRONTIER = 2,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

@@ -116,6 +116,7 @@ func _run_suite() -> void:
 	_test_phase17_politics_intrigue_dynasty_long_horizon()
 	_test_phase18_persistent_world_peace_and_anti_snowball()
 	_test_phase19_hybrid_conquest_yaylak_kislak_kurgan()
+	_test_phase20_asymmetric_collapse_exile_vassal_rebirth()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3264,6 +3265,115 @@ func _test_phase19_hybrid_conquest_yaylak_kislak_kurgan() -> void:
 	DiplomacyManager.set_dynasty_trust(&"oghuz", DiplomacyManager.get_dynasty_profile(&"oghuz").trust_index)
 	DiplomacyManager.step_seasonal_diplomatic_decay(15)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _test_phase20_asymmetric_collapse_exile_vassal_rebirth() -> void:
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.configure_persistent_world(true, 96.0)
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var rules: CollapseRecoveryRules = CollapseRecoveryFSM.get_rules()
+
+	# 1. Two-way TRUCE_WITHDRAWAL blocks spawn-camp AND victim retaliation/espionage
+	var trig_p1: TriggerCollapseCommand = TriggerCollapseCommand.new(1, 2002)
+	_expect(CommandBus.dispatch(trig_p1) \
+		and CollapseRecoveryFSM.is_in_collapse_truce(1) \
+		and not GracePeriodManager.can_perform_action(2002, GameEnums.ToreActionType.PLAYER_ATTACK, 1) \
+		and not GracePeriodManager.can_perform_action(1, GameEnums.ToreActionType.ESPIONAGE, 2002),
+		"Collapse triggers 18h two-way TRUCE_WITHDRAWAL blocking both conqueror spawn-camp and defender retaliation.")
+
+	CollapseRecoveryFSM.advance_collapse_hours(19.0)
+	_expect(not CollapseRecoveryFSM.is_in_collapse_truce(1) \
+		and GracePeriodManager.can_perform_action(2002, GameEnums.ToreActionType.PLAYER_ATTACK, 1),
+		"Advancing past 18h expires TRUCE_WITHDRAWAL cleanly.")
+
+	# 2. Vassal Beylik anti-exploit tribute clamp, Kut <= 50 cap, visibility & Coup / Ransom exits
+	var vassal_sel: SelectCollapsePathCommand = SelectCollapsePathCommand.new(
+		1, GameEnums.CollapsePathChoice.SUBMIT_VASSAL, 0.90) # Attempt 90% slave exploit
+	_expect(CommandBus.dispatch(vassal_sel) \
+		and is_equal_approx(vassal_sel.applied_tribute_rate, rules.vassal_tribute_rate_max) \
+		and vassal_sel.resulting_state == GameEnums.CollapseState.VASSAL_BEYLIK \
+		and CollapseRecoveryFSM.can_overlord_observe_vassal(2002, 1),
+		"SUBMIT_VASSAL clamps tribute strictly inside [15%%, 25%%] (0.90 -> %.2f) and grants overlord visibility." % vassal_sel.applied_tribute_rate)
+
+	CommandBus.dispatch(ModifyKutCommand.new(40.0, &"p20_test_vassal_kut_cap"))
+	_expect(GameManager.get_kut_score() <= rules.vassal_max_kut_cap + 0.001,
+		"Vassal Beylik strictly enforces GameManager Kut ceiling (%.1f <= %.1f)." % [GameManager.get_kut_score(), rules.vassal_max_kut_cap])
+
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 100))
+	var overlord_gold_before: int = ResourceManager.get_amount(2002, &"silver_gold")
+	var trib_paid: int = CollapseRecoveryFSM.transfer_vassal_tribute(1, 100)
+	_expect(trib_paid == 25 and ResourceManager.get_amount(2002, &"silver_gold") == overlord_gold_before + 25,
+		"Vassal transfers clamped 25%% tribute (25 bullion) to overlord cleanly.")
+
+	var coup_strong: bool = CollapseRecoveryFSM.attempt_vassal_independence(1, 75.0, false)
+	var coup_weak: bool = CollapseRecoveryFSM.attempt_vassal_independence(1, 22.0, false)
+	_expect(not coup_strong and coup_weak \
+		and CollapseRecoveryFSM.get_player_state(1) == GameEnums.CollapseState.SOVEREIGN,
+		"Vassal coup fails while overlord Kut=75.0 and succeeds cleanly once overlord Kut drops below 30.0.")
+
+	# Verify bullion ransom escape option on player 2003
+	CommandBus.dispatch(TriggerCollapseCommand.new(2003, 2002))
+	CommandBus.dispatch(SelectCollapsePathCommand.new(2003, GameEnums.CollapsePathChoice.SUBMIT_VASSAL, 0.05))
+	var rec_2003: CollapseRecord = CollapseRecoveryFSM.get_or_create_record(2003)
+	CommandBus.dispatch(DepositResourcesCommand.new(2003, &"silver_gold", rules.vassal_ransom_bullion_cost))
+	_expect(is_equal_approx(rec_2003.tribute_rate, rules.vassal_tribute_rate_min) \
+		and CollapseRecoveryFSM.attempt_vassal_independence(2003, 85.0, true) \
+		and CollapseRecoveryFSM.get_player_state(2003) == GameEnums.CollapseState.SOVEREIGN,
+		"Minimum tribute rate clamps to 15%% and paying bullion ransom liberates Vassal cleanly even against high-Kut overlord.")
+
+	# 3. Homeless Exile (Yersiz Yurtsuz) stealth/speed/intel for Gök Demiri + Anti-Troll Hope Extinction & Frontier Rebirth
+	CommandBus.dispatch(TriggerCollapseCommand.new(2004, 2002))
+	var exile_sel: SelectCollapsePathCommand = SelectCollapsePathCommand.new(
+		2004, GameEnums.CollapsePathChoice.FLEE_HOMELESS_EXILE)
+	_expect(CommandBus.dispatch(exile_sel) \
+		and exile_sel.resulting_state == GameEnums.CollapseState.HOMELESS_EXILE \
+		and not CollapseRecoveryFSM.can_use_fixed_refining(2004) \
+		and CollapseRecoveryFSM.get_effective_army_cap(2004, 1000) == 160 \
+		and is_equal_approx(CollapseRecoveryFSM.get_effective_speed_multiplier(2004), 1.45) \
+		and is_equal_approx(CollapseRecoveryFSM.get_effective_upkeep_multiplier(2004), 0.40) \
+		and is_equal_approx(CollapseRecoveryFSM.get_forest_concealment_bonus(2004), 0.45),
+		"HOMELESS_EXILE disables fixed refining, caps army at 160, grants 1.45x speed, 0.40x upkeep, and +0.45 forest concealment.")
+
+	var meteor_before: int = ResourceManager.get_amount(2004, &"meteoric_iron")
+	_expect(CollapseRecoveryFSM.perform_exile_intel_sale(2004, 2002, 2099, forest) \
+		and ResourceManager.get_amount(2004, &"meteoric_iron") == meteor_before + rules.exile_intel_sale_meteoric_reward,
+		"Homeless Exile sells intelligence to rival factions for Meteoric Iron (Gök Demiri) and sustains Hope.")
+
+	# Idle exile decays Hope each season down to DYNASTY_EXTINCT
+	for _idle_s: int in range(6):
+		CollapseRecoveryFSM.step_collapse_season(2004, false)
+	_expect(CollapseRecoveryFSM.get_player_state(2004) == GameEnums.CollapseState.DYNASTY_EXTINCT,
+		"Idle Homeless Exile Hope/Loyalty exhausts over inactive seasons into DYNASTY_EXTINCT (anti-immortal-troll guard).")
+
+	# Verify extinction cooldown before Frontier March rebirth (0.0 Glory + harsh Frontier limits)
+	_expect(not CollapseRecoveryFSM.attempt_dynasty_rebirth(2004, Vector2i(12, 12), 5),
+		"Extinct dynasty cannot bypass rebirth cooldown before 4 seasons elapse.")
+	for _wait_s: int in range(rules.rebirth_cooldown_seasons):
+		CollapseRecoveryFSM.step_collapse_season(2004, false)
+	_expect(CollapseRecoveryFSM.attempt_dynasty_rebirth(2004, Vector2i(12, 12), 5) \
+		and CollapseRecoveryFSM.get_player_state(2004) == GameEnums.CollapseState.FRONTIER_MARCH_LORD \
+		and GracePeriodManager.is_outer_rim_coord(CollapseRecoveryFSM.get_or_create_record(2004).frontier_coord, Vector2i(12, 12)) \
+		and is_zero_approx(CollapseRecoveryFSM.get_or_create_record(2004).current_glory),
+		"After cooldown, Dynasty rebirths cleanly on outer rim Uç Beyliği with 0.0 Glory.")
+
+	var frontier_limits: Dictionary[StringName, float] = CollapseRecoveryFSM.get_frontier_constraints(2004)
+	_expect(is_equal_approx(frontier_limits[&"pasture_cap"], rules.frontier_edge_pasture_cap) \
+		and is_equal_approx(frontier_limits[&"winter_zud_multiplier"], rules.frontier_winter_zud_multiplier) \
+		and is_equal_approx(frontier_limits[&"ore_richness_multiplier"], rules.frontier_ore_richness_multiplier),
+		"FRONTIER_MARCH_LORD enforces outer-rim resource/ecology limits (pasture<=55, Winter Zud 1.35x, ore 0.65x).")
+
+	# Verify losing last Sefer Arabası immediately causes DYNASTY_EXTINCT
+	CommandBus.dispatch(TriggerCollapseCommand.new(2005, 2002))
+	CommandBus.dispatch(SelectCollapsePathCommand.new(2005, GameEnums.CollapsePathChoice.FLEE_HOMELESS_EXILE))
+	_expect(CollapseRecoveryFSM.destroy_exile_sefer_arabasi(2005) \
+		and CollapseRecoveryFSM.get_player_state(2005) == GameEnums.CollapseState.DYNASTY_EXTINCT,
+		"Destroying the final exile Sefer Arabası immediately triggers DYNASTY_EXTINCT.")
+
+	# Restore clean state
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p20_cleanup_kut"))
+
 
 
 

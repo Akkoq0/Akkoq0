@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CollapseRecoveryRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/collapse_recovery_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"collapse_recovery_rules"
+truce_window_hours = 18.0
+vassal_tribute_rate_min = 0.15
+vassal_tribute_rate_max = 0.25
+vassal_default_tribute_rate = 0.2
+vassal_max_kut_cap = 50.0
+vassal_coup_overlord_kut_threshold = 30.0
+vassal_ransom_bullion_cost = 120
+exile_speed_multiplier = 1.45
+exile_upkeep_multiplier = 0.4
+exile_forest_concealment_bonus = 0.45
+exile_max_army_cap = 160
+exile_initial_hope = 80.0
+exile_hope_decay_per_season = 22.0
+exile_hope_gain_per_operation = 18.0
+exile_intel_sale_meteoric_reward = 2
+frontier_edge_pasture_cap = 55.0
+frontier_winter_zud_multiplier = 1.35
+frontier_ore_richness_multiplier = 0.65
+rebirth_cooldown_seasons = 4

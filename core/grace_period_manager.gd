@@ -155,6 +155,14 @@ func notify_hostile_intent(actor_id: int, target_player_id: int, is_espionage: b
 ## Evaluates whether `actor_id` may execute `action` against `target_owner_id`
 ## (`0` indicates NPC / Yersiz Yurtsuz Çeri or unclaimed steppe node).
 func can_perform_action(actor_id: int, action: GameEnums.ToreActionType, target_owner_id: int = 0) -> bool:
+	if action == GameEnums.ToreActionType.ESPIONAGE \
+			or action == GameEnums.ToreActionType.BORDER_NODE_RAID \
+			or action == GameEnums.ToreActionType.CORE_YURT_CLAIM \
+			or action == GameEnums.ToreActionType.KURGAN_CONTEST \
+			or action == GameEnums.ToreActionType.PLAYER_ATTACK:
+		if CollapseRecoveryFSM.is_action_blocked_by_collapse_truce(actor_id, target_owner_id):
+			return false
+
 	if not _persistent_mode_active:
 		return true
 
