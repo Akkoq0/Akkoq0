@@ -1,13 +1,16 @@
 class_name ArmyMobilityComponent
 extends Node
-## Units (rank 3). Movement physics and the weight-based speed formula ONLY.
+## Units (rank 3). Movement physics, the weight-based speed formula, and
+## Phase 3 **Yılkı spare-horse (`remount_horse_ratio`)** speed scaling ONLY.
 ## Knows nothing about combat, supply, UI or how terrain is looked up.
 ##
 ## Speed formula (coefficients from `MobilityProfile`):
 ##   load_ratio = total_weight / carry_capacity
 ##   factor     = 1 - (1 - min_speed_factor) * load_ratio ^ load_exponent      (load_ratio <= 1)
 ##   factor     = min_speed_factor * overload_penalty / load_ratio            (load_ratio  > 1)
-##   speed      = slowest_unit_speed * factor * terrain_mult * season_mult
+##   remount    = dismounted_penalty                                          (remount_ratio <= 0)
+##   remount    = lerp(dismounted_penalty, full_remount_speed_bonus, ratio)   (remount_ratio  > 0)
+##   speed      = slowest_unit_speed * factor * remount * terrain_mult * season_mult
 
 signal destination_reached(position: Vector3)
 ## Emitted when the next step would enter an impassable / off-map position.
@@ -24,6 +27,7 @@ var _base_speed: float = 0.0
 var _unit_weight: float = 0.0
 var _carry_capacity: float = 0.0
 var _cargo_weight: float = 0.0
+var _remount_horse_ratio: float = 1.0
 var _terrain_multiplier: float = 1.0
 var _season_multiplier: float = 1.0
 var _destination: Vector3 = Vector3.ZERO
@@ -36,7 +40,7 @@ func _ready() -> void:
 	EventBus.season_changed.connect(_on_season_changed)
 
 
-## Pure speed formula, exposed for tests, AI estimates and UI previews.
+## Pure weight-based speed formula, exposed for tests, AI estimates and UI previews.
 static func calculate_weighted_speed(base_speed: float, total_weight: float, carry_capacity: float, profile: MobilityProfile) -> float:
 	if profile == null or base_speed <= 0.0:
 		return 0.0
@@ -53,6 +57,17 @@ static func calculate_weighted_speed(base_speed: float, total_weight: float, car
 	return base_speed * factor
 
 
+## Pure Yılkı spare-horse (`remount_horse_ratio`) speed multiplier.
+## Returns `dismounted_penalty` when spare horses are lost or slaughtered (`<= 0`).
+static func calculate_remount_speed_multiplier(remount_horse_ratio: float, profile: MobilityProfile) -> float:
+	if profile == null:
+		return 1.0
+	if remount_horse_ratio <= 0.0:
+		return profile.dismounted_penalty
+	var normalised: float = clampf(remount_horse_ratio / maxf(profile.optimal_remount_horse_ratio, 0.1), 0.0, 1.0)
+	return lerpf(profile.dismounted_penalty, profile.full_remount_speed_bonus, normalised)
+
+
 ## Reads the army composition. Returns false when required data is missing.
 func configure(template: ArmyTemplate) -> bool:
 	if body == null:
@@ -65,6 +80,7 @@ func configure(template: ArmyTemplate) -> bool:
 	_base_speed = template.get_slowest_base_speed()
 	_unit_weight = template.get_total_unit_weight()
 	_carry_capacity = template.get_total_carry_capacity()
+	_remount_horse_ratio = _profile.optimal_remount_horse_ratio
 	return true
 
 
@@ -89,6 +105,15 @@ func add_cargo_weight(delta_weight: float) -> void:
 	_cargo_weight = maxf(_cargo_weight + delta_weight, 0.0)
 
 
+## Sets the army's Yılkı spare-horse ratio (`remount_horse_ratio`).
+func set_remount_horse_ratio(ratio: float) -> void:
+	_remount_horse_ratio = maxf(ratio, 0.0)
+
+
+func get_remount_horse_ratio() -> float:
+	return _remount_horse_ratio
+
+
 ## Applies the movement multiplier of the terrain currently under the army.
 func set_terrain(terrain: TerrainData) -> void:
 	_terrain_multiplier = terrain.get_effective_movement_multiplier() if terrain != null else 1.0
@@ -110,10 +135,11 @@ func is_moving() -> bool:
 	return _has_destination
 
 
-## Desired cruising speed with every multiplier applied.
+## Desired cruising speed with weight, Yılkı remount, terrain, and season multipliers applied.
 func get_target_speed() -> float:
-	return calculate_weighted_speed(_base_speed, get_total_weight(), _carry_capacity, _profile) \
-		* _terrain_multiplier * _season_multiplier
+	var weighted: float = calculate_weighted_speed(_base_speed, get_total_weight(), _carry_capacity, _profile)
+	var remount_mult: float = calculate_remount_speed_multiplier(_remount_horse_ratio, _profile)
+	return weighted * remount_mult * _terrain_multiplier * _season_multiplier
 
 
 func _physics_process(delta: float) -> void:

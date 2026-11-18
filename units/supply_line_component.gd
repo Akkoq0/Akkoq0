@@ -1,14 +1,19 @@
 class_name SupplyLineComponent
 extends Node
-## Units (rank 3). Tracks an army's connection to friendly supply depots and
-## its carried supply. Knows nothing about movement or combat.
-##
-## Depots are learned exclusively through EventBus announcements.
+## Units (rank 3). Tracks an army's connection to friendly supply depots,
+## carried supply, **Yılkı spare horse ratio (`remount_horse_ratio`)**,
+## **quiver ammo reserve (`quiver_ammo_reserve`)**, supply interdiction
+## (`ISOLATED`), and the Winter/Zud emergency **Yılkı horse sacrifice**
+## (`consume_yilki_horses_for_ration()`).
+
+const REASON_YILKI_SACRIFICE: StringName = &"yilki_horse_sacrifice"
 
 signal supply_changed(supply_ratio: float, is_connected: bool)
+signal remount_horse_ratio_changed(new_ratio: float)
 
 ## Node whose position is checked against depot ranges.
 @export var body: Node3D
+@export var convoy_data: SupplyConvoyData
 
 
 class DepotRecord:
@@ -21,9 +26,14 @@ class DepotRecord:
 
 
 var _profile: SupplyProfile = null
+var _army_id: int = 0
 var _owner_id: int = 0
 var _consumption_per_sec: float = 0.0
 var _supply: float = 0.0
+var _remount_horse_ratio: float = 1.0
+var _quiver_ammo_reserve: float = 100.0
+var _battle_morale: float = 100.0
+var _supply_status: GameEnums.SupplyLineStatus = GameEnums.SupplyLineStatus.CONNECTED
 var _is_connected: bool = false
 var _last_reported_ratio: float = -1.0
 var _terrain_attrition: float = 1.0
@@ -36,10 +46,12 @@ func _ready() -> void:
 	EventBus.supply_depot_registered.connect(_on_depot_registered)
 	EventBus.supply_depot_unregistered.connect(_on_depot_unregistered)
 	EventBus.season_changed.connect(_on_season_changed)
+	EventBus.supply_line_severed.connect(_on_supply_line_severed)
+	EventBus.zud_starvation_ticked.connect(_on_zud_starvation_ticked)
 
 
 ## Reads logistics data. Returns false when required data is missing.
-func configure(template: ArmyTemplate, owner_id: int) -> bool:
+func configure(template: ArmyTemplate, owner_id: int, p_army_id: int = 1) -> bool:
 	if body == null:
 		push_error("SupplyLineComponent '%s': body is not assigned." % get_path())
 		return false
@@ -48,8 +60,13 @@ func configure(template: ArmyTemplate, owner_id: int) -> bool:
 		return false
 	_profile = template.supply_profile
 	_owner_id = owner_id
+	_army_id = p_army_id
 	_consumption_per_sec = template.get_supply_consumption_per_minute() / 60.0
 	_supply = _profile.supply_capacity
+	_remount_horse_ratio = _profile.initial_remount_horse_ratio
+	_quiver_ammo_reserve = _profile.initial_quiver_ammo_reserve
+	_battle_morale = 100.0
+	_supply_status = GameEnums.SupplyLineStatus.CONNECTED
 	set_physics_process(true)
 	_request_depot_resync.call_deferred()
 	return true
@@ -67,9 +84,42 @@ func get_supply_ratio() -> float:
 	return clampf(_supply / _profile.supply_capacity, 0.0, 1.0)
 
 
-## True when inside range of at least one friendly depot.
+## Current Yılkı spare-horse ratio (`remount_horse_ratio`).
+func get_remount_horse_ratio() -> float:
+	return _remount_horse_ratio
+
+
+## Current quiver arrow reserve (`quiver_ammo_reserve`).
+func get_quiver_ammo_reserve() -> float:
+	return _quiver_ammo_reserve
+
+
+## Consumes `amount` from quiver ammo reserve and returns remaining ammo.
+func consume_quiver_ammo(amount: float) -> float:
+	_quiver_ammo_reserve = maxf(_quiver_ammo_reserve - maxf(amount, 0.0), 0.0)
+	if _quiver_ammo_reserve <= 0.0:
+		EventBus.quiver_ammo_depleted.emit(_army_id)
+	return _quiver_ammo_reserve
+
+
+## Current battle morale of the army (`0..100`).
+func get_battle_morale() -> float:
+	return _battle_morale
+
+
+## Operational connectivity status of the supply line (`CONNECTED`, `UNCONNECTED`, `ISOLATED`).
+func get_supply_status() -> GameEnums.SupplyLineStatus:
+	return _supply_status
+
+
+## True when the army's supply corridor was severed by raiders (`ISOLATED`).
+func is_isolated() -> bool:
+	return _supply_status == GameEnums.SupplyLineStatus.ISOLATED
+
+
+## True when inside range of at least one friendly depot and not isolated.
 func is_connected_to_supply() -> bool:
-	return _is_connected
+	return _is_connected and not is_isolated()
 
 
 ## True when supply fell under the profile's starvation threshold.
@@ -77,23 +127,46 @@ func is_starving() -> bool:
 	return _profile != null and get_supply_ratio() < _profile.low_supply_threshold
 
 
+## Slaughters the army's own Yılkı spare horses during Winter/Zud starvation
+## (`Food <= 0`) when isolated from supply. Permanently destroys cavalry speed,
+## collapses battle morale, and drains the Khagan's Kut score.
+func consume_yilki_horses_for_ration() -> bool:
+	if _profile == null or _remount_horse_ratio <= 0.0:
+		return false
+	_remount_horse_ratio = maxf(_remount_horse_ratio - _profile.yilki_sacrifice_ratio_per_starvation, 0.0)
+	_supply = clampf(_supply + _profile.yilki_sacrifice_supply_restored, 0.0, _profile.supply_capacity)
+	_battle_morale = maxf(_battle_morale - _profile.yilki_sacrifice_morale_drop, 0.0)
+
+	remount_horse_ratio_changed.emit(_remount_horse_ratio)
+	CommandBus.dispatch(ModifyKutCommand.new(-_profile.yilki_sacrifice_kut_penalty, REASON_YILKI_SACRIFICE))
+	EventBus.yilki_horses_sacrificed_for_ration.emit(
+		_army_id, _remount_horse_ratio, _profile.yilki_sacrifice_morale_drop, _profile.yilki_sacrifice_kut_penalty)
+	return true
+
+
 func _physics_process(delta: float) -> void:
 	if _profile == null:
 		return
-	var connected: bool = _is_in_depot_range(body.global_position)
-	if connected:
+	var in_range: bool = not is_isolated() and _is_in_depot_range(body.global_position)
+	if in_range:
 		_supply += _profile.resupply_rate_per_sec * delta
+		_quiver_ammo_reserve = minf(
+			_quiver_ammo_reserve + _profile.quiver_resupply_rate_per_sec * delta,
+			_profile.max_quiver_ammo_reserve)
+		_supply_status = GameEnums.SupplyLineStatus.CONNECTED
 	else:
 		_supply -= _consumption_per_sec * _terrain_attrition * _season_attrition * delta
+		if not is_isolated():
+			_supply_status = GameEnums.SupplyLineStatus.UNCONNECTED
 	_supply = clampf(_supply, 0.0, _profile.supply_capacity)
 
 	var ratio: float = get_supply_ratio()
 	var crossed_step: bool = absf(ratio - _last_reported_ratio) >= _profile.report_step_ratio
 	var hit_bound: bool = (ratio <= 0.0 or ratio >= 1.0) and ratio != _last_reported_ratio
-	if connected != _is_connected or crossed_step or hit_bound:
-		_is_connected = connected
+	if in_range != _is_connected or crossed_step or hit_bound:
+		_is_connected = in_range
 		_last_reported_ratio = ratio
-		supply_changed.emit(ratio, connected)
+		supply_changed.emit(ratio, in_range)
 
 
 func _is_in_depot_range(world_position: Vector3) -> bool:
@@ -121,3 +194,16 @@ func _on_depot_unregistered(depot_id: int) -> void:
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 	_season_attrition = season.attrition_multiplier if season != null else 1.0
+
+
+func _on_supply_line_severed(army_id: int, _depot_id: int, _raider_id: StringName, _captured_loot_value: float) -> void:
+	if army_id == _army_id:
+		_supply_status = GameEnums.SupplyLineStatus.ISOLATED
+		_is_connected = false
+		_supply = 0.0
+		supply_changed.emit(0.0, false)
+
+
+func _on_zud_starvation_ticked(food_remaining: int, _season: SeasonData) -> void:
+	if food_remaining <= 0 and is_isolated():
+		consume_yilki_horses_for_ration()

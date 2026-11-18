@@ -1,20 +1,23 @@
 extends Node
 ## Autoload `CommandBus` (rank 2). Routes typed `GameCommand` objects to
 ## exactly one registered handler `Callable(command: GameCommand) -> bool`,
-## and executes the Khaganate's **Toy & Meat Distribution Siyaseti**
-## (`DistributeToyLootCommand`), tracking regional Bey satisfaction and
-## converting dissatisfied Beys into independent rogue warbands
-## (`Yersiz Yurtsuz Çeriler`).
+## executes **Toy & Meat Distribution Siyaseti** (`DistributeToyLootCommand`),
+## and handles **Supply Convoy Interdiction** (`InterdictSupplyLineCommand`)
+## by enemy formations or rogue `Yersiz Yurtsuz Çeriler` warbands.
 
 const TOY_RULES_PATH: String = "res://data/governance/toy_distribution_rules.tres"
+const DEFAULT_CONVOY_PATH: String = "res://data/units/default_supply_convoy.tres"
 
 signal command_dispatched(command: GameCommand)
 signal command_rejected(command: GameCommand, reason: String)
 
 var _handlers: Dictionary[StringName, Callable] = {}
 var _toy_rules: ToyDistributionRules = null
+var _default_convoy: SupplyConvoyData = null
 var _bey_satisfaction: Dictionary[StringName, float] = {}
 var _rogue_warbands: Dictionary[StringName, String] = {}
+var _isolated_armies: Dictionary[int, bool] = {}
+var _raider_seized_loot: Dictionary[StringName, float] = {}
 
 
 func _ready() -> void:
@@ -24,11 +27,14 @@ func _ready() -> void:
 	else:
 		for error: String in _toy_rules.get_validation_errors():
 			push_error("CommandBus: %s" % error)
+	_default_convoy = ResourceLoader.load(DEFAULT_CONVOY_PATH) as SupplyConvoyData
 	register_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
+	register_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
 
 
 func _exit_tree() -> void:
 	unregister_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
+	unregister_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
 
 
 ## Registers `handler` as the single owner of `command_id`.
@@ -103,6 +109,16 @@ func get_rogue_warband_beys() -> PackedStringArray:
 	return list
 
 
+## True when `army_id`'s supply corridor has been severed (`ISOLATED`).
+func is_army_supply_isolated(army_id: int) -> bool:
+	return _isolated_armies.get(army_id, false)
+
+
+## Total convoy loot value seized by `raider_id`.
+func get_raider_seized_loot(raider_id: StringName) -> float:
+	return _raider_seized_loot.get(raider_id, 0.0)
+
+
 func _handle_distribute_toy_loot(command: GameCommand) -> bool:
 	var dist: DistributeToyLootCommand = command as DistributeToyLootCommand
 	if dist == null:
@@ -130,6 +146,30 @@ func _handle_distribute_toy_loot(command: GameCommand) -> bool:
 		dist.turned_rogue_warband = true
 		dist.spawned_warband_title = _toy_rules.rogue_warband_title
 		EventBus.bey_rebelled_as_rogue_warband.emit(dist.bey_id, _toy_rules.rogue_warband_title, next_sat)
+	return true
+
+
+func _handle_interdict_supply_line(command: GameCommand) -> bool:
+	var interdict: InterdictSupplyLineCommand = command as InterdictSupplyLineCommand
+	if interdict == null:
+		return command.reject("Expected InterdictSupplyLineCommand.")
+	if interdict.target_army_id <= 0:
+		return command.reject("InterdictSupplyLineCommand requires target_army_id > 0.")
+	if interdict.raider_id == &"":
+		return command.reject("InterdictSupplyLineCommand requires a non-empty raider_id.")
+	var convoy: SupplyConvoyData = interdict.convoy_data if interdict.convoy_data != null else _default_convoy
+	if convoy == null:
+		return command.reject("No SupplyConvoyData available for interdiction.")
+
+	_isolated_armies[interdict.target_army_id] = true
+	interdict.target_isolated = true
+	interdict.captured_loot_value = convoy.captured_loot_value
+	interdict.captured_food_ration = convoy.carried_food_ration
+	interdict.captured_remount_ratio = convoy.carried_remount_ratio
+	_raider_seized_loot[interdict.raider_id] = _raider_seized_loot.get(interdict.raider_id, 0.0) + convoy.captured_loot_value
+
+	EventBus.supply_line_severed.emit(
+		interdict.target_army_id, interdict.depot_id, interdict.raider_id, convoy.captured_loot_value)
 	return true
 
 

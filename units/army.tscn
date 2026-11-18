@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://units/army_controller.gd" id="1_controller"]
 [ext_resource type="Resource" path="res://data/units/vanguard_army.tres" id="2_template"]
@@ -6,8 +6,11 @@
 [ext_resource type="Script" path="res://units/supply_line_component.gd" id="4_supply"]
 [ext_resource type="Script" path="res://units/terrain_sensor_component.gd" id="5_sensor"]
 [ext_resource type="Script" path="res://core/components/layer_visibility_component.gd" id="6_visibility"]
+[ext_resource type="Script" path="res://units/turan_tactics_component.gd" id="7_turan"]
+[ext_resource type="Resource" path="res://data/tactics/feigned_retreat.tres" id="8_doctrine"]
+[ext_resource type="Resource" path="res://data/units/default_supply_convoy.tres" id="9_convoy"]
 
-[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor")]
+[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor", "turan_tactics")]
 script = ExtResource("1_controller")
 army_id = 1
 owner_id = 1
@@ -15,6 +18,7 @@ template = ExtResource("2_template")
 mobility = NodePath("ArmyMobilityComponent")
 supply = NodePath("SupplyLineComponent")
 terrain_sensor = NodePath("TerrainSensorComponent")
+turan_tactics = NodePath("TuranTacticsComponent")
 
 [node name="ArmyMobilityComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
 script = ExtResource("3_mobility")
@@ -23,10 +27,15 @@ body = NodePath("..")
 [node name="SupplyLineComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
 script = ExtResource("4_supply")
 body = NodePath("..")
+convoy_data = ExtResource("9_convoy")
 
 [node name="TerrainSensorComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
 script = ExtResource("5_sensor")
 body = NodePath("..")
+
+[node name="TuranTacticsComponent" type="Node" parent="."]
+script = ExtResource("7_turan")
+doctrine = ExtResource("8_doctrine")
 
 [node name="LayerVisibilityComponent" type="Node" parent="."]
 script = ExtResource("6_visibility")

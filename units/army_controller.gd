@@ -1,6 +1,7 @@
 class_name ArmyController
 extends Node3D
-## Units (rank 3). Thin orchestrator: wires its components together and
+## Units (rank 3). Thin orchestrator: wires its components (`mobility`,
+## `supply`, `terrain_sensor`, and optional `turan_tactics`) together and
 ## bridges their local signals to the EventBus. Contains no formulas.
 
 @export var army_id: int = 0
@@ -9,6 +10,7 @@ extends Node3D
 @export var mobility: ArmyMobilityComponent
 @export var supply: SupplyLineComponent
 @export var terrain_sensor: TerrainSensorComponent
+@export var turan_tactics: TuranTacticsComponent
 
 var _is_operational: bool = false
 
@@ -16,13 +18,17 @@ var _is_operational: bool = false
 func _ready() -> void:
 	if not _validate():
 		return
-	if not mobility.configure(template) or not supply.configure(template, owner_id):
+	if not mobility.configure(template) or not supply.configure(template, owner_id, army_id):
 		return
+	mobility.set_remount_horse_ratio(supply.get_remount_horse_ratio())
+	if turan_tactics != null and turan_tactics.doctrine != null:
+		turan_tactics.configure(army_id, turan_tactics.doctrine, supply.get_quiver_ammo_reserve())
 	mobility.passability_check = terrain_sensor.is_position_passable
 	terrain_sensor.terrain_changed.connect(_on_terrain_changed)
 	mobility.destination_reached.connect(_on_destination_reached)
 	mobility.movement_blocked.connect(_on_movement_blocked)
 	supply.supply_changed.connect(_on_supply_changed)
+	supply.remount_horse_ratio_changed.connect(_on_remount_horse_ratio_changed)
 	_is_operational = true
 	EventBus.army_spawned.emit(army_id, owner_id, global_position)
 
@@ -53,12 +59,20 @@ func load_cargo(ore: OreData, amount: int) -> void:
 	mobility.add_cargo_weight(ore.weight_per_unit * float(amount))
 
 
-## Snapshot for combat resolution.
+## Snapshot for combat resolution, including morale and active Turan tactic phase.
 func get_combatant_stats() -> CombatantStats:
 	if not _is_operational:
 		return null
-	return CombatantStats.new(army_id, template.get_total_attack(), template.get_total_defense(),
-		template.get_total_health(), supply.get_supply_ratio())
+	var stats: CombatantStats = CombatantStats.new(
+		army_id,
+		template.get_total_attack(),
+		template.get_total_defense(),
+		template.get_total_health(),
+		supply.get_supply_ratio())
+	stats.morale = supply.get_battle_morale()
+	if turan_tactics != null:
+		stats.active_tactic_phase = turan_tactics.get_current_phase()
+	return stats
 
 
 func _validate() -> bool:
@@ -95,3 +109,7 @@ func _on_movement_blocked(position_blocked: Vector3) -> void:
 
 func _on_supply_changed(supply_ratio: float, is_connected: bool) -> void:
 	EventBus.army_supply_changed.emit(army_id, supply_ratio, is_connected)
+
+
+func _on_remount_horse_ratio_changed(new_ratio: float) -> void:
+	mobility.set_remount_horse_ratio(new_ratio)
