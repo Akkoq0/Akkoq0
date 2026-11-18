@@ -18,6 +18,10 @@ var _bey_satisfaction: Dictionary[StringName, float] = {}
 var _rogue_warbands: Dictionary[StringName, String] = {}
 var _isolated_armies: Dictionary[int, bool] = {}
 var _raider_seized_loot: Dictionary[StringName, float] = {}
+var _army_riders: Dictionary[int, int] = {}
+var _army_quiver_ammo: Dictionary[int, float] = {}
+var _army_roles: Dictionary[int, GameEnums.DetachmentRole] = {}
+var _nomadic_outposts: Dictionary[StringName, Vector2i] = {}
 
 
 func _ready() -> void:
@@ -30,11 +34,17 @@ func _ready() -> void:
 	_default_convoy = ResourceLoader.load(DEFAULT_CONVOY_PATH) as SupplyConvoyData
 	register_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
 	register_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
+	register_handler(SplitDetachForceCommand.ID, _handle_split_detach_force)
+	register_handler(MergeForcesCommand.ID, _handle_merge_forces)
+	register_handler(RelocateNomadicOutpostCommand.ID, _handle_relocate_nomadic_outpost)
 
 
 func _exit_tree() -> void:
 	unregister_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
 	unregister_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
+	unregister_handler(SplitDetachForceCommand.ID, _handle_split_detach_force)
+	unregister_handler(MergeForcesCommand.ID, _handle_merge_forces)
+	unregister_handler(RelocateNomadicOutpostCommand.ID, _handle_relocate_nomadic_outpost)
 
 
 ## Registers `handler` as the single owner of `command_id`.
@@ -120,15 +130,37 @@ func reintegrate_rogue_warband(bey_id: StringName) -> bool:
 	return true
 
 
-
 ## True when `army_id`'s supply corridor has been severed (`ISOLATED`).
 func is_army_supply_isolated(army_id: int) -> bool:
-	return _isolated_armies.get(army_id, false)
+	if _isolated_armies.has(army_id):
+		return _isolated_armies[army_id]
+	return false
 
 
 ## Total convoy loot value seized by `raider_id`.
 func get_raider_seized_loot(raider_id: StringName) -> float:
-	return _raider_seized_loot.get(raider_id, 0.0)
+	if _raider_seized_loot.has(raider_id):
+		return _raider_seized_loot[raider_id]
+	return 0.0
+
+
+## Returns the active rider count of `army_id` (or `0` if merged/unregistered).
+func get_army_rider_count(army_id: int) -> int:
+	if _army_riders.has(army_id):
+		return _army_riders[army_id]
+	return 0
+
+
+## Returns the active macro coordinate of `outpost_id`.
+func get_nomadic_outpost_coord(outpost_id: StringName) -> Vector2i:
+	if _nomadic_outposts.has(outpost_id):
+		return _nomadic_outposts[outpost_id]
+	return Vector2i.ZERO
+
+
+## Total number of nomadic outposts / camps deployed across the macro map.
+func get_nomadic_outpost_count() -> int:
+	return _nomadic_outposts.size()
 
 
 func _handle_distribute_toy_loot(command: GameCommand) -> bool:
@@ -178,10 +210,94 @@ func _handle_interdict_supply_line(command: GameCommand) -> bool:
 	interdict.captured_loot_value = convoy.captured_loot_value
 	interdict.captured_food_ration = convoy.carried_food_ration
 	interdict.captured_remount_ratio = convoy.carried_remount_ratio
-	_raider_seized_loot[interdict.raider_id] = _raider_seized_loot.get(interdict.raider_id, 0.0) + convoy.captured_loot_value
+	_raider_seized_loot[interdict.raider_id] = get_raider_seized_loot(interdict.raider_id) + convoy.captured_loot_value
 
 	EventBus.supply_line_severed.emit(
 		interdict.target_army_id, interdict.depot_id, interdict.raider_id, convoy.captured_loot_value)
+	return true
+
+
+func _handle_split_detach_force(command: GameCommand) -> bool:
+	var split_cmd: SplitDetachForceCommand = command as SplitDetachForceCommand
+	if split_cmd == null:
+		return command.reject("Expected SplitDetachForceCommand.")
+	if split_cmd.parent_army_id <= 0 or split_cmd.detachment_army_id <= 0 or split_cmd.parent_army_id == split_cmd.detachment_army_id:
+		return command.reject("SplitDetachForceCommand requires distinct positive parent and detachment army IDs.")
+	if not _army_riders.has(split_cmd.parent_army_id):
+		_army_riders[split_cmd.parent_army_id] = maxi(split_cmd.initial_parent_riders_if_unregistered, 1)
+		_army_quiver_ammo[split_cmd.parent_army_id] = maxf(split_cmd.initial_parent_quiver_if_unregistered, 0.0)
+		_army_roles[split_cmd.parent_army_id] = GameEnums.DetachmentRole.VANGUARD_MAIN
+
+	var parent_riders: int = _army_riders[split_cmd.parent_army_id]
+	if split_cmd.detached_riders <= 0 or split_cmd.detached_riders >= parent_riders:
+		return command.reject("Detached riders (%d) must be > 0 and < parent riders (%d)." % [split_cmd.detached_riders, parent_riders])
+
+	var parent_quiver: float = _army_quiver_ammo[split_cmd.parent_army_id]
+	var split_ratio: float = float(split_cmd.detached_riders) / float(parent_riders)
+	var det_quiver: float = parent_quiver * split_ratio
+	var rem_riders: int = parent_riders - split_cmd.detached_riders
+	var rem_quiver: float = maxf(parent_quiver - det_quiver, 0.0)
+
+	_army_riders[split_cmd.parent_army_id] = rem_riders
+	_army_quiver_ammo[split_cmd.parent_army_id] = rem_quiver
+	_army_riders[split_cmd.detachment_army_id] = split_cmd.detached_riders
+	_army_quiver_ammo[split_cmd.detachment_army_id] = det_quiver
+	_army_roles[split_cmd.detachment_army_id] = split_cmd.role
+
+	var speed_mult: float = 1.0
+	if split_cmd.role == GameEnums.DetachmentRole.FAST_CAVALRY_RECON_RAIDER:
+		speed_mult = 1.35
+	elif split_cmd.role == GameEnums.DetachmentRole.SUPPLY_ESCORT_GUARD:
+		speed_mult = 1.10
+
+	split_cmd.remaining_parent_riders = rem_riders
+	split_cmd.remaining_parent_quiver = rem_quiver
+	split_cmd.detached_quiver_ammo = det_quiver
+	split_cmd.speed_bonus_multiplier = speed_mult
+
+	EventBus.force_detached_from_army.emit(
+		split_cmd.parent_army_id, split_cmd.detachment_army_id, split_cmd.role, split_cmd.detached_riders, speed_mult)
+	return true
+
+
+func _handle_merge_forces(command: GameCommand) -> bool:
+	var merge_cmd: MergeForcesCommand = command as MergeForcesCommand
+	if merge_cmd == null:
+		return command.reject("Expected MergeForcesCommand.")
+	if not _army_riders.has(merge_cmd.target_army_id) or not _army_riders.has(merge_cmd.detachment_army_id):
+		return command.reject("MergeForcesCommand requires both target and detachment armies to exist.")
+	if merge_cmd.target_army_id == merge_cmd.detachment_army_id:
+		return command.reject("Cannot merge an army into itself.")
+
+	var total_riders: int = _army_riders[merge_cmd.target_army_id] + _army_riders[merge_cmd.detachment_army_id]
+	var total_quiver: float = _army_quiver_ammo[merge_cmd.target_army_id] + _army_quiver_ammo[merge_cmd.detachment_army_id]
+
+	_army_riders[merge_cmd.target_army_id] = total_riders
+	_army_quiver_ammo[merge_cmd.target_army_id] = total_quiver
+	_army_riders.erase(merge_cmd.detachment_army_id)
+	_army_quiver_ammo.erase(merge_cmd.detachment_army_id)
+	_army_roles.erase(merge_cmd.detachment_army_id)
+
+	merge_cmd.merged_total_riders = total_riders
+	merge_cmd.merged_quiver_ammo = total_quiver
+
+	EventBus.forces_merged_into_army.emit(merge_cmd.target_army_id, merge_cmd.detachment_army_id, total_riders)
+	return true
+
+
+func _handle_relocate_nomadic_outpost(command: GameCommand) -> bool:
+	var reloc: RelocateNomadicOutpostCommand = command as RelocateNomadicOutpostCommand
+	if reloc == null:
+		return command.reject("Expected RelocateNomadicOutpostCommand.")
+	if reloc.outpost_id == &"":
+		return command.reject("RelocateNomadicOutpostCommand requires non-empty outpost_id.")
+
+	var prev_coord: Vector2i = get_nomadic_outpost_coord(reloc.outpost_id)
+	reloc.previous_coord = prev_coord
+	_nomadic_outposts[reloc.outpost_id] = reloc.target_coord
+	reloc.active_outpost_count = _nomadic_outposts.size()
+
+	EventBus.nomadic_outpost_relocated.emit(reloc.player_id, reloc.outpost_id, prev_coord, reloc.target_coord)
 	return true
 
 
@@ -190,3 +306,4 @@ func _fail(command: GameCommand, reason: String) -> bool:
 		command.rejection_reason = reason
 	command_rejected.emit(command, reason)
 	return false
+
