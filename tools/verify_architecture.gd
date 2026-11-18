@@ -254,6 +254,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as EmergentWorldRules).get_validation_errors())
 		elif res is CataclysmEventData:
 			errors.append_array((res as CataclysmEventData).get_validation_errors())
+		elif res is KinshipIntrigueRules:
+			errors.append_array((res as KinshipIntrigueRules).get_validation_errors())
 	return errors
 
 
