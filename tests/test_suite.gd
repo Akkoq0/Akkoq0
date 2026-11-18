@@ -7,6 +7,12 @@ var _failures: PackedStringArray = PackedStringArray()
 var _assertions: int = 0
 var _council_signal_received: bool = false
 var _rogue_warband_signal_received: bool = false
+var _quiver_depleted_signal_received: bool = false
+var _lured_signal_received: bool = false
+var _entropy_critical_signal_received: bool = false
+var _crescent_trap_signal_received: bool = false
+var _supply_severed_signal_received: bool = false
+var _yilki_sacrificed_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -25,10 +31,13 @@ func _run_suite() -> void:
 	_test_camera_profile_and_layer_switch()
 	_test_phase2_kut_and_ak_sakallilar_council()
 	_test_phase2_toy_and_meat_distribution()
+	_test_phase3_turan_tactics_fsm()
+	_test_phase3_vectorial_combat_and_seven_ores()
+	_test_phase3_yilki_logistics_and_zud_sacrifice()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -68,7 +77,6 @@ func _test_ore_registry_and_economy() -> void:
 
 
 func _test_phase2_seven_ore_pipeline() -> void:
-	# 1. 2 Iron + 1 Coal = 1 Steel inside NomadicForge
 	var iron_before: int = ResourceManager.get_amount(2, &"iron")
 	var coal_before: int = ResourceManager.get_amount(2, &"coal")
 	var steel_before: int = ResourceManager.get_amount(2, &"steel")
@@ -80,7 +88,6 @@ func _test_phase2_seven_ore_pipeline() -> void:
 	var wrong_building_cmd: RefineOreCommand = RefineOreCommand.new(2, &"quarry", &"smelt_steel", 1)
 	_expect(not CommandBus.dispatch(wrong_building_cmd), "Steel smelting outside NomadicForge is rejected.")
 
-	# 2. Jade-driven Tamga/Authority multiplier & Regional Silver/Gold tax
 	var base_auth: float = ResourceManager.calculate_jade_authority_multiplier(2)
 	_expect(base_auth > 1.0, "Starting Jade grants > 1.0 Tamga/Authority multiplier.")
 	CommandBus.dispatch(DepositResourcesCommand.new(2, &"jade", 40))
@@ -93,7 +100,6 @@ func _test_phase2_seven_ore_pipeline() -> void:
 	_expect(ResourceManager.get_amount(2, &"silver_gold") == treasury_before + tax_collected,
 		"Regional Silver/Gold tax is routed directly to the player's treasury.")
 
-	# 3. Meteoric Iron binding for commander weapons and totem ascension
 	_expect(ResourceManager.can_bind_meteoric_iron(2, false), "Player can bind Meteoric Iron to commander weapon.")
 	var bind_weapon: BindMeteoricIronCommand = BindMeteoricIronCommand.new(2, &"khagan_kilic", false)
 	_expect(CommandBus.dispatch(bind_weapon), "Commander weapon Meteoric Iron binding succeeds.")
@@ -193,9 +199,10 @@ func _test_combat_calculator() -> void:
 	var mountain: TerrainData = ResourceLoader.load("res://data/terrain/mountain.tres") as TerrainData
 	var attacker: CombatantStats = CombatantStats.new(1, 200.0, 120.0, 1000.0, 1.0)
 	var defender: CombatantStats = CombatantStats.new(2, 160.0, 140.0, 1000.0, 1.0)
+	var defender2: CombatantStats = CombatantStats.new(3, 160.0, 140.0, 1000.0, 1.0)
 
 	var cmd_steppe: ResolveCombatCommand = ResolveCombatCommand.new(attacker, defender, steppe, 42)
-	var cmd_mountain: ResolveCombatCommand = ResolveCombatCommand.new(attacker, defender, mountain, 42)
+	var cmd_mountain: ResolveCombatCommand = ResolveCombatCommand.new(attacker, defender2, mountain, 42)
 	_expect(CommandBus.dispatch(cmd_steppe) and CommandBus.dispatch(cmd_mountain), "ResolveCombatCommand dispatches.")
 	_expect(cmd_mountain.result.damage_to_defender < cmd_steppe.result.damage_to_defender,
 		"Mountain defense multiplier reduces damage taken by defender.")
@@ -214,14 +221,12 @@ func _test_phase2_kut_and_ak_sakallilar_council() -> void:
 	var initial_kut: float = GameManager.get_kut_score()
 	_expect(is_equal_approx(initial_kut, 75.0), "Initial Kut score starts at 75 on the 0-100 scale.")
 
-	# Zud / Winter starvation (Food <= 0 during Winter) drains Kut
 	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
 	SeasonManager.set_food_reserve(0)
 	_expect(SeasonManager.evaluate_zud_starvation(winter), "Zud starvation triggers when Food <= 0 during Winter.")
 	var after_zud_kut: float = GameManager.get_kut_score()
 	_expect(after_zud_kut < initial_kut, "Zud starvation drains Kut.")
 
-	# Consecutive battle losses drain Kut and trigger Ak Sakallılar Konseyi below 30
 	GameManager.record_battle_outcome(false)
 	GameManager.record_battle_outcome(false)
 	GameManager.record_battle_outcome(false)
@@ -244,7 +249,6 @@ func _test_phase2_toy_and_meat_distribution() -> void:
 	_expect(fair_cmd.resulting_satisfaction > 65.0 and not fair_cmd.turned_rogue_warband,
 		"Fair loot share and Söğüş meat portion increase Bey satisfaction.")
 
-	# Stingy loot share + dishonored Söğüş meat portion triggers rebellion into Yersiz Yurtsuz Çeriler
 	var unfair_cmd1: DistributeToyLootCommand = DistributeToyLootCommand.new(&"kulan_bey", 1000.0, 50.0, false)
 	_expect(CommandBus.dispatch(unfair_cmd1), "Unfair Toy distribution command executes.")
 	_expect(unfair_cmd1.resulting_satisfaction < 30.0, "Severe loot shortfall and unfair meat portion drop satisfaction < 30.")
@@ -254,6 +258,188 @@ func _test_phase2_toy_and_meat_distribution() -> void:
 		"Rogue warband is titled 'Yersiz Yurtsuz Çeriler'.")
 
 	EventBus.bey_rebelled_as_rogue_warband.disconnect(_on_bey_rebelled)
+
+
+func _test_phase3_turan_tactics_fsm() -> void:
+	_quiver_depleted_signal_received = false
+	_lured_signal_received = false
+	_entropy_critical_signal_received = false
+	_crescent_trap_signal_received = false
+	EventBus.quiver_ammo_depleted.connect(_on_quiver_depleted)
+	EventBus.feigned_retreat_lured.connect(_on_feigned_retreat_lured)
+	EventBus.formation_entropy_critical.connect(_on_entropy_critical)
+	EventBus.crescent_trap_sprung.connect(_on_crescent_trap_sprung)
+
+	var doc_charge: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/standard_charge.tres") as TacticalDoctrineData
+	var doc_retreat: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/feigned_retreat.tres") as TacticalDoctrineData
+	var doc_crescent: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/crescent_encirclement.tres") as TacticalDoctrineData
+	var doc_ambush: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/steppe_ambush.tres") as TacticalDoctrineData
+	_expect(doc_charge != null and doc_retreat != null and doc_crescent != null and doc_ambush != null,
+		"All 4 TacticalDoctrineData .tres files load cleanly.")
+
+	var tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics)
+	_expect(tactics.configure(7, doc_retreat, 16.0), "TuranTacticsComponent configures with feigned_retreat.tres.")
+
+	# Stage 1: RECON_DUST_SCREEN
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.RECON_DUST_SCREEN,
+		"Starts in RECON_DUST_SCREEN phase.")
+	_expect(tactics.get_enemy_vision_multiplier() < 1.0 and tactics.get_deceptive_army_size_multiplier() > 1.0,
+		"Dust screen narrows enemy vision and projects deceptive army size.")
+
+	# Stage 2: WHISTLING_ARROW_HARASSMENT (2 volleys exhaust 16 quiver ammo -> forces exit to FEIGNED_RETREAT_LURE)
+	var enemy: CombatantStats = CombatantStats.new(99, 180.0, 140.0, 1000.0, 1.0)
+	tactics.execute_whistling_arrow_volley(enemy)
+	_expect(enemy.cohesion < 100.0 and enemy.morale < 100.0, "Whistling arrows erode enemy cohesion and morale.")
+	tactics.execute_whistling_arrow_volley(enemy)
+	_expect(_quiver_depleted_signal_received and is_zero_approx(tactics.get_quiver_ammo()),
+		"Depleting quiver ammo emits quiver_ammo_depleted.")
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+		"Empty quiver forces transition out of WHISTLING_ARROW_HARASSMENT into FEIGNED_RETREAT_LURE.")
+
+	# Stage 3: FEIGNED_RETREAT_LURE (overextension collapses armor up to 45%)
+	var lure_metrics: Dictionary[StringName, float] = tactics.calculate_lure_overextension(0.95, 0.35, 65.0, enemy)
+	_expect(_lured_signal_received and _entropy_critical_signal_received,
+		"Feigned retreat lure emits feigned_retreat_lured and formation_entropy_critical.")
+	_expect(is_equal_approx(lure_metrics[TuranTacticsComponent.KEY_ARMOR_COLLAPSE_RATIO], 0.45),
+		"Full formation entropy collapses pursuing enemy armor multiplier by 45%.")
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"Critical formation entropy advances FSM to CRESCENT_ENCIRCLEMENT_TRAP.")
+
+	# Stage 4: CRESCENT_ENCIRCLEMENT_TRAP (Vector3.dot flank angle >= PI * 0.65 on Sık Orman seals escape vector)
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var left_wing: Vector3 = Vector3(-0.35, 0.0, 0.936).normalized()
+	var right_wing: Vector3 = Vector3(0.35, 0.0, -0.936).normalized()
+	_expect(tactics.evaluate_crescent_trap(left_wing, right_wing, forest, enemy),
+		"Wing pincer angle >= PI * 0.65 springs Crescent Encirclement Trap.")
+	_expect(_crescent_trap_signal_received and enemy.is_escape_vector_sealed,
+		"Ambush units in Sık Orman seal the enemy escape vector.")
+	_expect(tactics.get_current_phase() == GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION,
+		"Springing Crescent Trap transitions FSM to BORU_SHOCK_ANNIHILATION.")
+
+	# Stage 5: BORU_SHOCK_ANNIHILATION
+	var shock_momentum: float = tactics.compute_boru_shock_momentum(850.0, 14.0, true, true)
+	_expect(shock_momentum > 10.0, "Börü heavy-lance charge computes Steel + Meteoric Iron shock momentum.")
+
+	EventBus.quiver_ammo_depleted.disconnect(_on_quiver_depleted)
+	EventBus.feigned_retreat_lured.disconnect(_on_feigned_retreat_lured)
+	EventBus.formation_entropy_critical.disconnect(_on_entropy_critical)
+	EventBus.crescent_trap_sprung.disconnect(_on_crescent_trap_sprung)
+	tactics.free()
+
+
+func _test_phase3_vectorial_combat_and_seven_ores() -> void:
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var mountain: TerrainData = ResourceLoader.load("res://data/terrain/mountain.tres") as TerrainData
+
+	# 1. Vectorial dot-product Front (1.0x) vs Flank (1.45x) vs Rear (2.1x)
+	var atk_front: CombatantStats = CombatantStats.new(10, 220.0, 120.0, 1000.0, 1.0)
+	atk_front.attack_vector = Vector3.BACK
+	var def_front: CombatantStats = CombatantStats.new(11, 140.0, 120.0, 1000.0, 1.0)
+	def_front.facing_vector = Vector3.FORWARD
+
+	var atk_flank: CombatantStats = CombatantStats.new(10, 220.0, 120.0, 1000.0, 1.0)
+	atk_flank.attack_vector = Vector3.RIGHT
+	var def_flank: CombatantStats = CombatantStats.new(12, 140.0, 120.0, 1000.0, 1.0)
+	def_flank.facing_vector = Vector3.FORWARD
+
+	var atk_rear: CombatantStats = CombatantStats.new(10, 220.0, 120.0, 1000.0, 1.0)
+	atk_rear.attack_vector = Vector3.FORWARD
+	var def_rear: CombatantStats = CombatantStats.new(13, 140.0, 120.0, 1000.0, 1.0)
+	def_rear.facing_vector = Vector3.FORWARD
+
+	var cmd_front: ResolveCombatCommand = ResolveCombatCommand.new(atk_front, def_front, steppe, 77)
+	var cmd_flank: ResolveCombatCommand = ResolveCombatCommand.new(atk_flank, def_flank, steppe, 77)
+	var cmd_rear: ResolveCombatCommand = ResolveCombatCommand.new(atk_rear, def_rear, steppe, 77)
+	CommandBus.dispatch(cmd_front)
+	CommandBus.dispatch(cmd_flank)
+	CommandBus.dispatch(cmd_rear)
+
+	_expect(is_equal_approx(cmd_front.result.directional_damage_multiplier, 1.0), "Frontal dot-product yields 1.0x multiplier.")
+	_expect(is_equal_approx(cmd_flank.result.directional_damage_multiplier, 1.45), "Flank dot-product yields 1.45x multiplier.")
+	_expect(is_equal_approx(cmd_rear.result.directional_damage_multiplier, 2.1), "Rear dot-product yields 2.1x multiplier.")
+	_expect(cmd_flank.result.cohesion_damage_to_defender > cmd_front.result.cohesion_damage_to_defender * 2.5,
+		"Flank strike inflicts 1.45x physical * 2.0x cohesion destruction.")
+	_expect(cmd_rear.result.morale_damage_to_defender > cmd_flank.result.morale_damage_to_defender + 20.0,
+		"Rear strike inflicts instant panic morale drop.")
+
+	# 2. Sulfur Fire & Smoke Trap in Damarlı Yamaç choke point
+	var enemy_cavalry: CombatantStats = CombatantStats.new(20, 180.0, 140.0, 900.0, 1.0)
+	var trap_cmd: SulfurFireTrapCommand = SulfurFireTrapCommand.new(1, enemy_cavalry, mountain)
+	_expect(CommandBus.dispatch(trap_cmd), "SulfurFireTrapCommand consumes Sulfur and detonates.")
+	_expect(trap_cmd.area_damage_dealt > 140.0 and trap_cmd.cohesion_drop_dealt > 30.0,
+		"Sulfur trap deals amplified chokepoint area damage and spooks enemy cavalry.")
+
+	# 3. Steel + Meteoric Iron + Sealed Crescent Encirclement -> Rout & Annihilation into Toy loot pool
+	var boru_attacker: CombatantStats = CombatantStats.new(30, 320.0, 160.0, 1200.0, 1.0)
+	boru_attacker.attack_vector = Vector3.FORWARD
+	boru_attacker.has_steel_weapons = true
+	boru_attacker.has_meteoric_iron_weapon = true
+	boru_attacker.charge_mass_momentum = 2.0
+
+	var encircled_defender: CombatantStats = CombatantStats.new(31, 140.0, 120.0, 600.0, 0.5)
+	encircled_defender.facing_vector = Vector3.FORWARD
+	encircled_defender.cohesion = 35.0
+	encircled_defender.morale = 40.0
+	encircled_defender.armor_collapse_ratio = 0.45
+	encircled_defender.is_escape_vector_sealed = true
+
+	var loot_before: float = CombatCalculator.get_pending_toy_loot_pool()
+	var annihilate_cmd: ResolveCombatCommand = ResolveCombatCommand.new(boru_attacker, encircled_defender, steppe, 99)
+	_expect(CommandBus.dispatch(annihilate_cmd), "Börü shock combat resolution succeeds.")
+	_expect(annihilate_cmd.result.defender_routed and annihilate_cmd.result.defender_annihilated_in_crescent,
+		"Encircled defender with broken cohesion routs and is annihilated inside Crescent Trap.")
+	_expect(annihilate_cmd.result.captured_toy_loot_value > 0.0 and CombatCalculator.get_pending_toy_loot_pool() > loot_before,
+		"Annihilated enemy's weapons and horses are transferred to the Toy loot pool.")
+
+
+func _test_phase3_yilki_logistics_and_zud_sacrifice() -> void:
+	_supply_severed_signal_received = false
+	_yilki_sacrificed_signal_received = false
+	EventBus.supply_line_severed.connect(_on_supply_line_severed)
+	EventBus.yilki_horses_sacrificed_for_ration.connect(_on_yilki_sacrificed)
+
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 77
+	add_child(army)
+
+	var speed_with_full_yilki: float = army.mobility.get_target_speed()
+	_expect(army.supply.get_remount_horse_ratio() >= 1.0, "Army starts with full Yılkı spare horse ratio.")
+
+	# Rogue warband ('Yersiz Yurtsuz Çeriler') interdicts the supply convoy
+	var interdict_cmd: InterdictSupplyLineCommand = InterdictSupplyLineCommand.new(77, 1, &"kulan_bey")
+	_expect(CommandBus.dispatch(interdict_cmd), "InterdictSupplyLineCommand succeeds.")
+	_expect(_supply_severed_signal_received and army.supply.is_isolated(),
+		"Severing supply line emits supply_line_severed and sets army status to ISOLATED.")
+	_expect(CommandBus.get_raider_seized_loot(&"kulan_bey") >= 240.0,
+		"Convoy rations and horses are seized by the rogue warband raider.")
+
+	# Winter/Zud starvation (Food <= 0) forces isolated army to slaughter its Yılkı spare horses
+	CommandBus.dispatch(ModifyKutCommand.new(60.0, &"restore_for_phase3_test"))
+	var kut_before_sacrifice: float = GameManager.get_kut_score()
+	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+	SeasonManager.set_food_reserve(0)
+	SeasonManager.evaluate_zud_starvation(winter)
+
+	_expect(_yilki_sacrificed_signal_received, "Isolated army slaughters Yılkı horses during Zud starvation.")
+	_expect(army.supply.get_remount_horse_ratio() < 1.0, "Yılkı spare horse ratio permanently reduced.")
+	_expect(army.mobility.get_target_speed() < speed_with_full_yilki,
+		"Slaughtering Yılkı spare horses permanently degrades army cavalry speed.")
+	_expect(army.supply.get_battle_morale() < 100.0, "Eating own mounts collapses army battle morale.")
+	_expect(GameManager.get_kut_score() < kut_before_sacrifice,
+		"Yılkı horse sacrifice heavily drains the Khagan's Kut score.")
+
+	# Exhausting remaining Yılkı horses drops army to dismounted infantry speed
+	army.supply.consume_yilki_horses_for_ration()
+	_expect(is_zero_approx(army.supply.get_remount_horse_ratio()), "Second Zud sacrifice exhausts all Yılkı spare horses.")
+	var dismounted_mult: float = ArmyMobilityComponent.calculate_remount_speed_multiplier(0.0, army.template.mobility_profile)
+	_expect(is_equal_approx(dismounted_mult, army.template.mobility_profile.dismounted_penalty),
+		"Zero Yılkı horses applies dismounted_penalty (0.42x infantry speed).")
+
+	EventBus.supply_line_severed.disconnect(_on_supply_line_severed)
+	EventBus.yilki_horses_sacrificed_for_ration.disconnect(_on_yilki_sacrificed)
+	army.free()
 
 
 func _test_main_scene_integration() -> void:
@@ -271,3 +457,27 @@ func _on_ak_sakallilar_council_convened(_current_kut: float, _penalty: float, _s
 
 func _on_bey_rebelled(_bey_id: StringName, _title: String, _satisfaction: float) -> void:
 	_rogue_warband_signal_received = true
+
+
+func _on_quiver_depleted(_army_id: int) -> void:
+	_quiver_depleted_signal_received = true
+
+
+func _on_feigned_retreat_lured(_army_id: int, _pursuer_id: int, _dist: float, _entropy: float, _collapse: float) -> void:
+	_lured_signal_received = true
+
+
+func _on_entropy_critical(_army_id: int, _entropy: float, _collapse: float) -> void:
+	_entropy_critical_signal_received = true
+
+
+func _on_crescent_trap_sprung(_army_id: int, _target_id: int, _angle: float, _sealed: bool) -> void:
+	_crescent_trap_signal_received = true
+
+
+func _on_supply_line_severed(_army_id: int, _depot_id: int, _raider_id: StringName, _loot: float) -> void:
+	_supply_severed_signal_received = true
+
+
+func _on_yilki_sacrificed(_army_id: int, _remount: float, _morale_drop: float, _kut_drop: float) -> void:
+	_yilki_sacrificed_signal_received = true

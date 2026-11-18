@@ -228,6 +228,10 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as KutRules).get_validation_errors())
 		elif res is ToyDistributionRules:
 			errors.append_array((res as ToyDistributionRules).get_validation_errors())
+		elif res is TacticalDoctrineData:
+			errors.append_array((res as TacticalDoctrineData).get_validation_errors())
+		elif res is SupplyConvoyData:
+			errors.append_array((res as SupplyConvoyData).get_validation_errors())
 	return errors
 
 
