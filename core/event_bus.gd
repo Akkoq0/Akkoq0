@@ -129,9 +129,9 @@ signal causal_chain_step_propagated(archetype: GameEnums.CausalChainArchetype, s
 signal causal_chain_counterplay_applied(archetype: GameEnums.CausalChainArchetype, counterplay: GameEnums.CausalCounterplayAction, recovery_summary: StringName)
 signal causal_transition_recorded(record: CausalTransitionRecord)
 
-
-
-
-
-
-
+# --- Phase 18 Persistent World Physics, Töre Peace & Anti-Snowball ----------
+signal tore_peace_stage_changed(previous_stage: GameEnums.TorePeaceStage, new_stage: GameEnums.TorePeaceStage, elapsed_hours: float)
+signal personal_tore_peace_granted(player_id: int, duration_hours: float, rim_coord: Vector2i)
+signal personal_tore_peace_forfeited(player_id: int, reason: StringName)
+signal anti_snowball_upkeep_applied(player_id: int, food_spoiled: int, steel_upkeep: int, iron_upkeep: int, kut_stagnation_drain: float, exp_pasture_multiplier: float)
+signal offline_doctrine_executed(army_id: int, trigger_reason: GameEnums.OfflineDoctrineTrigger, evade_combat: bool, packed_sefer_arabasi: bool, retreat_terrain_class: GameEnums.TerrainClass)

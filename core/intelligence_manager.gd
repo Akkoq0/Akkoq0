@@ -156,6 +156,9 @@ func _handle_dispatch_spy(command: GameCommand) -> bool:
 	else:
 		report.spy_captured = true
 
+	if spy_cmd.target_faction_id > 0 and spy_cmd.spy_owner_id > 0 and spy_cmd.spy_owner_id != spy_cmd.target_faction_id:
+		GracePeriodManager.notify_hostile_intent(spy_cmd.spy_owner_id, spy_cmd.target_faction_id, true)
+
 	spy_cmd.report = report
 	EventBus.espionage_mission_completed.emit(report)
 	return true

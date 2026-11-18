@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://units/army_controller.gd" id="1_controller"]
 [ext_resource type="Resource" path="res://data/units/vanguard_army.tres" id="2_template"]
@@ -14,8 +14,9 @@
 [ext_resource type="Script" path="res://units/espionage_component.gd" id="12_espionage"]
 [ext_resource type="Resource" path="res://data/diplomacy/diplomacy_rules.tres" id="13_diplomacy_rules"]
 [ext_resource type="Script" path="res://units/kağan_glory_component.gd" id="14_glory"]
+[ext_resource type="Script" path="res://units/offline_doctrine_component.gd" id="15_offline"]
 
-[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor", "turan_tactics", "morale_component", "espionage_component", "glory_component")]
+[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor", "turan_tactics", "morale_component", "espionage_component", "glory_component", "offline_doctrine")]
 script = ExtResource("1_controller")
 army_id = 1
 owner_id = 1
@@ -27,6 +28,7 @@ turan_tactics = NodePath("TuranTacticsComponent")
 morale_component = NodePath("MoraleComponent")
 espionage_component = NodePath("EspionageComponent")
 glory_component = NodePath("GloryComponent")
+offline_doctrine = NodePath("OfflineDoctrineComponent")
 
 [node name="ArmyMobilityComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
 script = ExtResource("3_mobility")
@@ -56,6 +58,9 @@ rules = ExtResource("13_diplomacy_rules")
 [node name="GloryComponent" type="Node" parent="."]
 script = ExtResource("14_glory")
 rules = ExtResource("13_diplomacy_rules")
+
+[node name="OfflineDoctrineComponent" type="Node" parent="."]
+script = ExtResource("15_offline")
 
 [node name="LayerVisibilityComponent" type="Node" parent="."]
 script = ExtResource("6_visibility")

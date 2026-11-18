@@ -114,6 +114,7 @@ func _run_suite() -> void:
 	_test_phase15_economy_ecology_profile_calibration()
 	_test_phase16_combat_turan_fsm_and_casualty_hardening()
 	_test_phase17_politics_intrigue_dynasty_long_horizon()
+	_test_phase18_persistent_world_peace_and_anti_snowball()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -2981,5 +2982,131 @@ func _test_phase17_politics_intrigue_dynasty_long_horizon() -> void:
 	CouncilEventEngine.step_seasonal_council_decay(15)
 	IntelligenceManager.step_seasonal_intelligence_decay(10)
 	CausalChainEngine.reset_continuous_state()
+
+
+func _test_phase18_persistent_world_peace_and_anti_snowball() -> void:
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/feigned_retreat.tres") as TacticalDoctrineData
+	var rules: PersistentWorldRules = GracePeriodManager.get_rules()
+
+	# 1. Graduated 3-Stage Töre Barışı (Kurultay Barışı)
+	GracePeriodManager.configure_persistent_world(true, 0.0)
+	var p1_spawn: Vector2i = GracePeriodManager.register_player(1801, false, Vector2i(12, 12), 1)
+	var p2_spawn: Vector2i = GracePeriodManager.register_player(1802, false, Vector2i(12, 12), 2)
+	_expect(p1_spawn != Vector2i.ZERO and p2_spawn != Vector2i.ZERO \
+		and GracePeriodManager.get_global_stage() == GameEnums.TorePeaceStage.STAGE_1_FULL_TORE_PEACE,
+		"Server Day 1 opens in STAGE_1_FULL_TORE_PEACE.")
+	_expect(GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.SCOUTING) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.NPC_CLEANUP, 0) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.UNCLAIMED_NODE_TUG, 0) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.REFINING) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.ESPIONAGE, 1802),
+		"Day 1-2 Töre Peace permits scouting, NPC cleanup, unclaimed node Tuğ, refining, and espionage.")
+	_expect(not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.BORDER_NODE_RAID, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.CORE_YURT_CLAIM, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.KURGAN_CONTEST, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.PLAYER_ATTACK, 1802),
+		"Day 1-2 Töre Peace strictly locks inter-player attacks, border raids, core Yurt claims, and Kurgan contests.")
+
+	# Advance to Day 3 (48h..72h): Border skirmishes open, core Oba/Yurt and Kurgan stay locked
+	var stage_day3: GameEnums.TorePeaceStage = GracePeriodManager.advance_world_hours(50.0)
+	_expect(stage_day3 == GameEnums.TorePeaceStage.STAGE_2_BORDER_SKIRMISH \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.BORDER_NODE_RAID, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.CORE_YURT_CLAIM, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.KURGAN_CONTEST, 1802) \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.PLAYER_ATTACK, 1802),
+		"Day 3 Stage 2 opens Border Node cavalry skirmishes while keeping core Yurts & Sacred Kurgans protected.")
+
+	# Advance to Day 4+ (72h+): Full steppe conquest unlocks
+	var stage_day4: GameEnums.TorePeaceStage = GracePeriodManager.advance_world_hours(25.0)
+	_expect(stage_day4 == GameEnums.TorePeaceStage.STAGE_3_TOTAL_STEPPE \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.CORE_YURT_CLAIM, 1802) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.KURGAN_CONTEST, 1802) \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.PLAYER_ATTACK, 1802),
+		"Day 4+ Stage 3 opens all Yurt claims, Kurgan conquests, and total steppe war.")
+
+	# 2. Late-Joiner Uç Beyi Outer Rim Spawn & Anti-Exploit Personal Peace Forfeit
+	var late_coord: Vector2i = GracePeriodManager.register_player(1803, true, Vector2i(12, 12), 9)
+	_expect(GracePeriodManager.is_outer_rim_coord(late_coord, Vector2i(12, 12)) \
+		and GracePeriodManager.has_active_personal_peace(1803) \
+		and GracePeriodManager.get_remaining_personal_peace_hours(1803) >= 47.9 \
+		and not GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.PLAYER_ATTACK, 1803),
+		"Late-joiner spawns on outer rim Uç Beyi border (%s) and receives 48h personal peace shielding against attacks." % late_coord)
+
+	# Late-joiner initiating hostile espionage immediately forfeits personal 48h Töre Peace
+	var forfeit_events: Array[StringName] = []
+	var on_forfeit: Callable = func(pid: int, reason: StringName) -> void:
+		if pid == 1803:
+			forfeit_events.append(reason)
+	EventBus.personal_tore_peace_forfeited.connect(on_forfeit)
+	CommandBus.dispatch(DispatchSpyCommand.new(1803, 1801, 1899, 80.0, forest, 60.0, GameEnums.TuranTacticPhase.RECON_DUST_SCREEN, GameEnums.TacticalDoctrineType.FEIGNED_RETREAT, 0.0, 1))
+	EventBus.personal_tore_peace_forfeited.disconnect(on_forfeit)
+	_expect(not GracePeriodManager.has_active_personal_peace(1803) \
+		and forfeit_events.has(&"hostile_espionage_break") \
+		and GracePeriodManager.can_perform_action(1801, GameEnums.ToreActionType.PLAYER_ATTACK, 1803),
+		"Personal 48h Töre Peace is immediately forfeited when late-joiner dispatches hostile espionage against another player.")
+
+	# 3. Non-Linear Exponential Upkeep, Day-1 Spoilage & Passive Stagnation Kut Erosion
+	var exp_100: float = rules.compute_exponential_consumption(10.0, 100)
+	var exp_1000: float = rules.compute_exponential_consumption(10.0, 1000)
+	var expected_1000: float = 10.0 * (1.0 + 0.002 * pow(1000.0, 1.25))
+	_expect(is_equal_approx(exp_1000, expected_1000) and exp_1000 > exp_100 * 5.0,
+		"Exponential upkeep follows exact non-linear power law (100u=%.2f vs 1000u=%.2f)." % [exp_100, exp_1000])
+
+	# Day 1 active spoilage, upkeep & pasture depletion (even while in Stage 1 Töre Peace!)
+	GracePeriodManager.configure_persistent_world(true, 10.0)
+	SeasonManager.set_food_reserve(200)
+	CommandBus.dispatch(ModifyKutCommand.new(80.0 - GameManager.get_kut_score(), &"p18_kut_baseline"))
+	CommandBus.dispatch(DepositResourcesCommand.new(1804, &"steel", 80))
+	CommandBus.dispatch(DepositResourcesCommand.new(1804, &"iron", 120))
+	CommandBus.dispatch(DepositResourcesCommand.new(1804, &"jade", 40))
+	CommandBus.dispatch(DepositResourcesCommand.new(1804, &"meteoric_iron", 15))
+	var jade_before: int = ResourceManager.get_amount(1804, &"jade")
+	var meteor_before: int = ResourceManager.get_amount(1804, &"meteoric_iron")
+	var steel_before: int = ResourceManager.get_amount(1804, &"steel")
+
+	var upkeep_cmd: StepAntiSnowballTickCommand = StepAntiSnowballTickCommand.new(1804, 2.0, 1000, 600, 350, Vector2i(88, 1), false)
+	var upkeep_cmd_2: StepAntiSnowballTickCommand = StepAntiSnowballTickCommand.new(1804, 2.5, 1000, 600, 350, Vector2i(88, 1), false)
+	_expect(CommandBus.dispatch(upkeep_cmd) and CommandBus.dispatch(upkeep_cmd_2),
+		"StepAntiSnowballTickCommand executes cleanly during Day 1 Töre Peace.")
+	_expect(SeasonManager.get_food_reserve() < 200 \
+		and upkeep_cmd.food_spoiled > 0 \
+		and ResourceManager.get_amount(1804, &"steel") < steel_before \
+		and ResourceManager.get_amount(1804, &"jade") == jade_before \
+		and ResourceManager.get_amount(1804, &"meteoric_iron") == meteor_before \
+		and PastureEcologyManager.get_region_pasture_capacity(Vector2i(88, 1)) < 100.0 \
+		and upkeep_cmd_2.kut_stagnation_drain > 0.0 \
+		and GameManager.get_kut_score() < 80.0,
+		"Day-1 anti-snowball physics spoils Food, drains Steel/Iron maintenance & exponential pasture, erodes stagnant Kut, and leaves Jade/Meteoric Iron 100%% immune.")
+
+	# 4. OfflineDoctrineComponent (Enemy Power Ratio >= 1.5 -> Pack Sefer Arabası + Feigned Retreat to Sık Orman)
+	var offline_comp: OfflineDoctrineComponent = OfflineDoctrineComponent.new()
+	var offline_tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(offline_comp)
+	add_child(offline_tactics)
+	offline_comp.configure(1805, 1.5, GameEnums.TerrainClass.SIK_ORMAN)
+	offline_tactics.configure(1805, doctrine, 100.0)
+	var candidates: Array[TerrainData] = [steppe, forest]
+
+	var calm_watch: OfflineDoctrineDecision = offline_comp.evaluate_doctrine(200.0, 220.0, 1.0, offline_tactics, candidates, false)
+	var outnumbered_watch: OfflineDoctrineDecision = offline_comp.evaluate_doctrine(200.0, 340.0, 1.0, offline_tactics, candidates, false)
+	_expect(not calm_watch.triggered \
+		and outnumbered_watch.triggered \
+		and outnumbered_watch.trigger_reason == GameEnums.OfflineDoctrineTrigger.ENEMY_POWER_RATIO_EXCEEDED \
+		and outnumbered_watch.evade_combat \
+		and outnumbered_watch.packed_sefer_arabasi \
+		and outnumbered_watch.activated_feigned_retreat \
+		and outnumbered_watch.retreat_target_terrain_class == GameEnums.TerrainClass.SIK_ORMAN \
+		and outnumbered_watch.target_terrain == forest \
+		and offline_tactics.get_current_phase() == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+		"OfflineDoctrineComponent stays standby at 1.1x ratio and executes Sefer Arabası + Feigned Retreat into Sık Orman when enemy ratio >= 1.5x.")
+
+	offline_tactics.free()
+	offline_comp.free()
+	GracePeriodManager.reset_persistent_world()
+	SeasonManager.set_food_reserve(120)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p18_cleanup_restore"))
+
 
 

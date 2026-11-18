@@ -14,6 +14,7 @@ extends Node3D
 @export var morale_component: MoraleComponent
 @export var espionage_component: EspionageComponent
 @export var glory_component: GloryComponent
+@export var offline_doctrine: OfflineDoctrineComponent
 
 var _is_operational: bool = false
 
@@ -30,6 +31,8 @@ func _ready() -> void:
 		morale_component.configure(army_id)
 	if glory_component != null:
 		glory_component.configure(army_id, null, owner_id)
+	if offline_doctrine != null:
+		offline_doctrine.configure(army_id)
 	mobility.passability_check = terrain_sensor.is_position_passable
 	terrain_sensor.terrain_changed.connect(_on_terrain_changed)
 	mobility.destination_reached.connect(_on_destination_reached)

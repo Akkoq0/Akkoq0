@@ -123,6 +123,13 @@ func step_seasonal_pasture_regeneration(season: SeasonData = null, excluded_regi
 	return updated
 
 
+## Computes the Phase 18 non-linear exponential pasture draw multiplier for `unit_count`.
+static func get_exponential_depletion_multiplier(unit_count: int, coeff: float = 0.002, exponent: float = 1.25) -> float:
+	if unit_count <= 0:
+		return 1.0
+	return 1.0 + coeff * pow(float(unit_count), exponent)
+
+
 func _handle_graze_pasture(command: GameCommand) -> bool:
 	var graze: GrazePastureCommand = command as GrazePastureCommand
 	if graze == null:

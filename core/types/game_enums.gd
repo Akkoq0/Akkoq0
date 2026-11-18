@@ -200,6 +200,34 @@ enum CausalCounterplayAction {
 	KURGAN_PURIFICATION_RITUAL = 4, ## Kurgan Şifahanesinde 12 Kut Bedeliyle Salgın Arınması
 }
 
+## Phase 18 Graduated Kurultay / Töre Peace server phases (`GracePeriodManager`).
+enum TorePeaceStage {
+	STAGE_1_FULL_TORE_PEACE = 0, ## 1-2. Gün: Saldırı ve yurt iddiası kilitli; keşif, NPC temizliği, sahipsiz Tuğ, rafinasyon, casusluk serbest
+	STAGE_2_BORDER_SKIRMISH = 1, ## 3. Gün: Sınır düğümü süvari akınları açık; ana Oba/Yurt ve Kutsal Kurgan hâlâ kilitli
+	STAGE_3_TOTAL_STEPPE = 2, ## 4. Gün+: Topyekûn Bozkır; tüm fetih, elçi, kan davası ve Kurgan mekanikleri açık
+}
+
+## Phase 18 Actions audited against graduated Töre Peace & personal protection rules.
+enum ToreActionType {
+	SCOUTING = 0,
+	NPC_CLEANUP = 1,
+	UNCLAIMED_NODE_TUG = 2,
+	REFINING = 3,
+	ESPIONAGE = 4,
+	BORDER_NODE_RAID = 5,
+	CORE_YURT_CLAIM = 6,
+	KURGAN_CONTEST = 7,
+	PLAYER_ATTACK = 8,
+}
+
+## Phase 18 Triggers for conditional offline / standing steppe watch behavior (`OfflineDoctrineComponent`).
+enum OfflineDoctrineTrigger {
+	NONE = 0,
+	ENEMY_POWER_RATIO_EXCEEDED = 1, ## Rakip güç oranı >= eşik: Çatışma, Sefer Arabasını topla ve Sahte Ricat ile geri çekil
+	LOW_SUPPLY_OR_AMMO = 2,
+	ORDER_TIMED_OUT_OFFLINE = 3,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

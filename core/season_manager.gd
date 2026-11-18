@@ -125,6 +125,15 @@ func consume_food_for_migration(amount: int) -> int:
 	return spent
 
 
+## Applies Phase 18 food spoilage/rot safely without double-emitting Zud signals.
+func apply_food_spoilage(amount: int) -> int:
+	if amount <= 0 or _food_reserve <= 0:
+		return 0
+	var spoiled: int = mini(amount, _food_reserve)
+	_food_reserve -= spoiled
+	return spoiled
+
+
 ## Sets the clan food reserve strictly without double-emitting Zud starvation events.
 func set_food_reserve(amount: int) -> void:
 	_food_reserve = maxi(amount, 0)
