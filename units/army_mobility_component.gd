@@ -31,6 +31,7 @@ var _remount_horse_ratio: float = 1.0
 var _terrain_multiplier: float = 1.0
 var _season_multiplier: float = 1.0
 var _epidemic_multiplier: float = 1.0
+var _council_speed_multiplier: float = 1.0
 var _destination: Vector3 = Vector3.ZERO
 var _has_destination: bool = false
 var _current_speed: float = 0.0
@@ -39,6 +40,7 @@ var _current_speed: float = 0.0
 func _ready() -> void:
 	set_physics_process(false)
 	EventBus.season_changed.connect(_on_season_changed)
+	EventBus.council_decree_enacted.connect(_on_council_decree_enacted)
 
 
 ## Pure weight-based speed formula, exposed for tests, AI estimates and UI previews.
@@ -83,6 +85,7 @@ func configure(template: ArmyTemplate) -> bool:
 	_carry_capacity = template.get_total_carry_capacity()
 	_remount_horse_ratio = _profile.optimal_remount_horse_ratio
 	_epidemic_multiplier = 1.0
+	_council_speed_multiplier = 1.0
 	return true
 
 
@@ -146,11 +149,11 @@ func is_moving() -> bool:
 	return _has_destination
 
 
-## Desired cruising speed with weight, Yılkı remount, terrain, season, and epidemic multipliers applied.
+## Desired cruising speed with weight, Yılkı remount, terrain, season, epidemic, and council multipliers applied.
 func get_target_speed() -> float:
 	var weighted: float = calculate_weighted_speed(_base_speed, get_total_weight(), _carry_capacity, _profile)
 	var remount_mult: float = calculate_remount_speed_multiplier(_remount_horse_ratio, _profile)
-	return weighted * remount_mult * _terrain_multiplier * _season_multiplier * _epidemic_multiplier
+	return weighted * remount_mult * _terrain_multiplier * _season_multiplier * _epidemic_multiplier * _council_speed_multiplier
 
 
 func _physics_process(delta: float) -> void:
@@ -188,3 +191,8 @@ func _face(direction: Vector3, delta: float) -> void:
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 	_season_multiplier = season.movement_multiplier if season != null else 1.0
+
+
+func _on_council_decree_enacted(_player_id: int, _choice: GameEnums.CouncilDilemmaChoice, _kut: float, _income_mult: float, speed_mult: float, _loot_mult: float) -> void:
+	_council_speed_multiplier = clampf(speed_mult, 0.1, 1.5)
+

@@ -27,6 +27,8 @@ TotemManager="*res://core/totem_manager.gd"
 CombatCalculator="*res://core/combat_calculator.gd"
 IntelligenceManager="*res://core/intelligence_manager.gd"
 DiplomacyManager="*res://core/diplomacy_manager.gd"
+CouncilEventEngine="*res://core/council_event_engine.gd"
+
 
 
 

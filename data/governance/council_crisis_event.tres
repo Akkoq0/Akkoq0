@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CouncilCrisisEvent" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/council_crisis_event.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+crisis_id = &"ak_sakallilar_mandate_crisis"
+title = "Ak Sakallılar Kurultayı: Kut ve Töre İkilemi"
+tradition_kut_gain = 22.0
+tradition_income_multiplier = 0.75
+tradition_speed_multiplier = 0.85
+expansion_morale_bonus = 20.0
+expansion_loot_multiplier = 1.45
+expansion_diplomacy_trust_penalty = -35.0
+sacrifice_steel_cost = 2
+sacrifice_silver_gold_cost = 15
+sacrifice_kut_gain = 28.0
+sacrifice_popular_loyalty_bonus = 30.0
