@@ -1,0 +1,34 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://units/army_controller.gd" id="1_controller"]
+[ext_resource type="Resource" path="res://data/units/vanguard_army.tres" id="2_template"]
+[ext_resource type="Script" path="res://units/army_mobility_component.gd" id="3_mobility"]
+[ext_resource type="Script" path="res://units/supply_line_component.gd" id="4_supply"]
+[ext_resource type="Script" path="res://units/terrain_sensor_component.gd" id="5_sensor"]
+[ext_resource type="Script" path="res://core/components/layer_visibility_component.gd" id="6_visibility"]
+
+[node name="Army" type="Node3D" node_paths=PackedStringArray("mobility", "supply", "terrain_sensor")]
+script = ExtResource("1_controller")
+army_id = 1
+owner_id = 1
+template = ExtResource("2_template")
+mobility = NodePath("ArmyMobilityComponent")
+supply = NodePath("SupplyLineComponent")
+terrain_sensor = NodePath("TerrainSensorComponent")
+
+[node name="ArmyMobilityComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
+script = ExtResource("3_mobility")
+body = NodePath("..")
+
+[node name="SupplyLineComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
+script = ExtResource("4_supply")
+body = NodePath("..")
+
+[node name="TerrainSensorComponent" type="Node" parent="." node_paths=PackedStringArray("body")]
+script = ExtResource("5_sensor")
+body = NodePath("..")
+
+[node name="LayerVisibilityComponent" type="Node" parent="."]
+script = ExtResource("6_visibility")
+visible_layers = 1
+initial_layer = 0
