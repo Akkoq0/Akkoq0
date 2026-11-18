@@ -13,6 +13,14 @@ var _entropy_critical_signal_received: bool = false
 var _crescent_trap_signal_received: bool = false
 var _supply_severed_signal_received: bool = false
 var _yilki_sacrificed_signal_received: bool = false
+var _espionage_signal_received: bool = false
+var _envoy_assassinated_signal_received: bool = false
+var _total_war_signal_received: bool = false
+var _cascade_rout_signal_received: bool = false
+var _enslaved_to_toy_signal_received: bool = false
+var _epidemic_outbreak_signal_received: bool = false
+var _epidemic_attrition_signal_received: bool = false
+var _epidemic_purified_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -34,10 +42,13 @@ func _run_suite() -> void:
 	_test_phase3_turan_tactics_fsm()
 	_test_phase3_vectorial_combat_and_seven_ores()
 	_test_phase3_yilki_logistics_and_zud_sacrifice()
+	_test_phase4_espionage_and_envoy_provocation()
+	_test_phase4_psychological_warfare_and_cascade_rout()
+	_test_phase4_zud_epidemic_and_kurgan_purification()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -442,6 +453,197 @@ func _test_phase3_yilki_logistics_and_zud_sacrifice() -> void:
 	army.free()
 
 
+func _test_phase4_espionage_and_envoy_provocation() -> void:
+	_espionage_signal_received = false
+	_envoy_assassinated_signal_received = false
+	_total_war_signal_received = false
+	EventBus.espionage_mission_completed.connect(_on_espionage_completed)
+	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
+	EventBus.total_war_declared.connect(_on_total_war_declared)
+
+	var rules: DiplomacyRules = ResourceLoader.load("res://data/diplomacy/diplomacy_rules.tres") as DiplomacyRules
+	_expect(rules != null and rules.get_validation_errors().is_empty(), "DiplomacyRules loaded and valid.")
+
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var chance_open: float = IntelligenceManager.evaluate_espionage_chance(75.0, steppe, 0.05)
+	var chance_forest: float = IntelligenceManager.evaluate_espionage_chance(75.0, forest, 0.05)
+	var chance_novice: float = IntelligenceManager.evaluate_espionage_chance(20.0, steppe, 0.05)
+	_expect(chance_open > chance_novice, "Commander leadership directly increases espionage success probability.")
+	_expect(chance_forest > chance_open, "SIK_ORMAN (Dense Forest) stealth multiplier amplifies spy infiltration chance.")
+
+	var espionage_comp: EspionageComponent = EspionageComponent.new()
+	espionage_comp.rules = rules
+	espionage_comp.commander_leadership = 95.0
+	add_child(espionage_comp)
+
+	var report: EspionageReport = espionage_comp.infiltrate_target_army(
+		1,
+		2,
+		501,
+		forest,
+		84.0,
+		GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		GameEnums.TacticalDoctrineType.CRESCENT_ENCIRCLEMENT,
+		0.0,
+		1)
+	_expect(_espionage_signal_received and report != null and report.succeeded,
+		"Infiltration through SIK_ORMAN with high leadership succeeds and emits espionage_mission_completed.")
+	_expect(is_equal_approx(report.revealed_quiver_ammo, 84.0),
+		"Successful espionage reveals enemy's hidden quiver ammunition reserve (quiver_ammo).")
+	_expect(report.revealed_tactic_intent == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"Successful espionage reveals enemy's planned Turan tactic phase intent.")
+	_expect(IntelligenceManager.get_latest_report_for_army(501) == report,
+		"IntelligenceManager caches latest intelligence report for target army.")
+
+	# Envoy Assassination & Provocation -> Instant Kut Gain + Total War (Büyük Yağma)
+	CommandBus.dispatch(ModifyKutCommand.new(60.0 - GameManager.get_kut_score(), &"set_baseline_for_envoy_test"))
+	var kut_before_envoy: float = GameManager.get_kut_score()
+	_expect(not IntelligenceManager.is_total_war_active(1, 2), "Factions 1 and 2 start in TRUCE stance.")
+	_expect(espionage_comp.assassinate_enemy_envoy(1, 2, &"juan_juan_elcisi"),
+		"Assassinating rival dynasty's envoy succeeds.")
+	_expect(_envoy_assassinated_signal_received and _total_war_signal_received,
+		"Envoy execution emits EventBus.envoy_assassinated and EventBus.total_war_declared.")
+	_expect(is_equal_approx(GameManager.get_kut_score(), kut_before_envoy + rules.envoy_assassination_kut_gain),
+		"Executing enemy envoy grants an instant Kut surge (+15.0) to the Khagan.")
+	_expect(IntelligenceManager.is_total_war_active(1, 2),
+		"Envoy assassination triggers inevitable Total War (TOTAL_WAR_GREAT_RAID / Büyük Yağma).")
+
+	EventBus.espionage_mission_completed.disconnect(_on_espionage_completed)
+	EventBus.envoy_assassinated.disconnect(_on_envoy_assassinated)
+	EventBus.total_war_declared.disconnect(_on_total_war_declared)
+	espionage_comp.free()
+
+
+func _test_phase4_psychological_warfare_and_cascade_rout() -> void:
+	_cascade_rout_signal_received = false
+	_enslaved_to_toy_signal_received = false
+	EventBus.cascade_rout_triggered.connect(_on_cascade_rout_triggered)
+	EventBus.routed_troops_enslaved_to_toy.connect(_on_routed_troops_enslaved)
+
+	var rules: CombatRules = ResourceLoader.load("res://data/combat/combat_rules.tres") as CombatRules
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+
+	# 1. Battle Fatigue: progressive charge speed & lance impact momentum degradation
+	var morale_comp: MoraleComponent = MoraleComponent.new()
+	morale_comp.configure(401, rules)
+	add_child(morale_comp)
+
+	_expect(is_equal_approx(morale_comp.get_fatigue_speed_multiplier(), 1.0) \
+		and is_equal_approx(morale_comp.get_fatigue_momentum_multiplier(), 1.0),
+		"Fresh army has 1.0x charge speed and 1.0x lance impact momentum.")
+	morale_comp.accumulate_battle_fatigue(20.0) # 20s * 2.5/s = 50.0 fatigue
+	_expect(is_equal_approx(morale_comp.get_battle_fatigue(), 50.0),
+		"20 seconds of combat accumulates 50.0 battle fatigue.")
+	_expect(morale_comp.get_fatigue_speed_multiplier() < 1.0 \
+		and is_equal_approx(morale_comp.get_fatigue_momentum_multiplier(), 0.75),
+		"50 battle fatigue degrades charge speed and reduces lance impact momentum by 25%.")
+	_expect(morale_comp.get_effective_charge_speed(16.0) < 16.0 \
+		and morale_comp.get_effective_charge_momentum(2.0) < 2.0,
+		"Effective charge speed and lance momentum scale down with accumulated fatigue.")
+
+	var fresh_lancer: CombatantStats = CombatantStats.new(61, 200.0, 100.0, 800.0, 1.0)
+	var tired_lancer: CombatantStats = CombatantStats.new(62, 200.0, 100.0, 800.0, 1.0)
+	tired_lancer.combat_duration_sec = 30.0 # accumulates 75 fatigue in CombatCalculator
+	var dummy_a: CombatantStats = CombatantStats.new(63, 100.0, 100.0, 800.0, 1.0)
+	var dummy_b: CombatantStats = CombatantStats.new(64, 100.0, 100.0, 800.0, 1.0)
+
+	var rng_a: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng_a.seed = 123
+	var rng_b: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng_b.seed = 123
+	var res_fresh: CombatResult = CombatCalculator.calculate(fresh_lancer, dummy_a, steppe, null, rng_a)
+	var res_tired: CombatResult = CombatCalculator.calculate(tired_lancer, dummy_b, steppe, null, rng_b)
+	_expect(res_tired.attacker_fatigue_momentum_multiplier < 1.0 \
+		and res_tired.damage_to_defender < res_fresh.damage_to_defender,
+		"Sustained battle fatigue reduces attacker's lance impact momentum and physical damage output.")
+
+	# 2. Psychological Pressure & Cascade Rout (Bozkurt elite vanguard wiped out -> rear rookie panic -> 2.1x Rear strike & Toy enslavement)
+	_expect(morale_comp.notify_elite_vanguard_destroyed(&"bozkurt_cavalry"),
+		"Destroying front-line Bozkurt elite cavalry triggers cascade_rout in MoraleComponent.")
+	_expect(morale_comp.is_cascade_routing() and morale_comp.get_current_morale() < 100.0,
+		"Cascade rout collapses rear rookie morale and cohesion.")
+
+	var pursuer: CombatantStats = CombatantStats.new(70, 220.0, 120.0, 900.0, 1.0)
+	var panicking_defender: CombatantStats = CombatantStats.new(71, 130.0, 100.0, 500.0, 1.0)
+	panicking_defender.elite_vanguard_destroyed = true
+	panicking_defender.elite_vanguard_id = &"bozkurt_cavalry"
+	panicking_defender.rookie_troop_ratio = 0.85
+
+	var slaves_before: int = CombatCalculator.get_captured_slave_worker_pool()
+	var toy_loot_before: float = CombatCalculator.get_pending_toy_loot_pool()
+	var rout_cmd: ResolveCombatCommand = ResolveCombatCommand.new(pursuer, panicking_defender, steppe, 777)
+	_expect(CommandBus.dispatch(rout_cmd), "ResolveCombatCommand on cascade-routing army succeeds.")
+	_expect(_cascade_rout_signal_received and rout_cmd.result.cascade_rout_triggered,
+		"Destruction of elite Bozkurt vanguard triggers cascade_rout during combat resolution.")
+	_expect(rout_cmd.result.engagement_angle == GameEnums.CombatEngagementAngle.REAR \
+		and is_equal_approx(rout_cmd.result.directional_damage_multiplier, 2.1),
+		"Fleeing cascade_rout units turn their backs and suffer the 2.1x Rear strike multiplier.")
+	_expect(_enslaved_to_toy_signal_received and rout_cmd.result.captured_slave_workers > 0,
+		"Fleeing troops are captured as slave workers and transferred to the Toy economy.")
+	_expect(CombatCalculator.get_captured_slave_worker_pool() > slaves_before \
+		and CombatCalculator.get_pending_toy_loot_pool() > toy_loot_before,
+		"Captured slave workers expand both the slave worker pool and the Toy loot pool.")
+
+	EventBus.cascade_rout_triggered.disconnect(_on_cascade_rout_triggered)
+	EventBus.routed_troops_enslaved_to_toy.disconnect(_on_routed_troops_enslaved)
+	morale_comp.free()
+
+
+func _test_phase4_zud_epidemic_and_kurgan_purification() -> void:
+	_epidemic_outbreak_signal_received = false
+	_epidemic_attrition_signal_received = false
+	_epidemic_purified_signal_received = false
+	EventBus.outbreak_epidemic_started.connect(_on_epidemic_outbreak_started)
+	EventBus.epidemic_daily_attrition_ticked.connect(_on_epidemic_attrition_ticked)
+	EventBus.epidemic_purified_at_kurgan.connect(_on_epidemic_purified)
+
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 88
+	add_child(army)
+
+	var healthy_speed: float = army.mobility.get_target_speed()
+	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+	SeasonManager.set_food_reserve(0)
+
+	var closed_camp_chance: float = SeasonManager.get_epidemic_outbreak_chance(true)
+	var open_camp_chance: float = SeasonManager.get_epidemic_outbreak_chance(false)
+	_expect(closed_camp_chance > open_camp_chance and is_equal_approx(closed_camp_chance, 0.90),
+		"Closed camp during Zud starvation (Food <= 0) has a 90% Bozkır Vebası outbreak probability.")
+
+	var outbreak: bool = SeasonManager.evaluate_zud_epidemic_outbreak(88, true, 1, winter)
+	_expect(outbreak and _epidemic_outbreak_signal_received and SeasonManager.is_army_infected(88),
+		"Zud starvation triggers outbreak_epidemic on army 88 and emits outbreak_epidemic_started.")
+	_expect(is_equal_approx(army.mobility.get_epidemic_speed_multiplier(), 0.50) \
+		and is_equal_approx(army.mobility.get_target_speed(), healthy_speed * 0.50),
+		"Steppe plague halves the infected army's movement speed (0.50x).")
+
+	var day1_remaining: int = SeasonManager.simulate_epidemic_day(88, 1000)
+	var day2_remaining: int = SeasonManager.simulate_epidemic_day(88, day1_remaining)
+	_expect(_epidemic_attrition_signal_received and day1_remaining == 920 and day2_remaining < day1_remaining,
+		"Infected army loses 8% of its troops each day to the steppe plague.")
+
+	# Shamanic purification ritual around Kurgan Shrine ('kurgan_shrine.tres') spends Kut to halt the epidemic
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"set_kut_for_kurgan_ritual"))
+	var kut_before_ritual: float = GameManager.get_kut_score()
+	var purify_cmd: PurifyEpidemicCommand = PurifyEpidemicCommand.new(88, &"kurgan_shrine")
+	_expect(CommandBus.dispatch(purify_cmd) and purify_cmd.purified,
+		"Kurgan Shrine purification ritual succeeds when Kut suffices.")
+	_expect(_epidemic_purified_signal_received and not SeasonManager.is_army_infected(88) \
+		and SeasonManager.get_army_epidemic_state(88) == GameEnums.EpidemicState.PURIFIED,
+		"Purification ritual halts the epidemic and transitions army state to PURIFIED.")
+	_expect(is_equal_approx(GameManager.get_kut_score(), kut_before_ritual - purify_cmd.kut_spent),
+		"Kurgan purification ritual deducts the required Kut cost (12.0) from the Khagan.")
+	_expect(is_equal_approx(army.mobility.get_target_speed(), healthy_speed),
+		"Purifying the plague restores the army's full movement speed (1.0x).")
+
+	EventBus.outbreak_epidemic_started.disconnect(_on_epidemic_outbreak_started)
+	EventBus.epidemic_daily_attrition_ticked.disconnect(_on_epidemic_attrition_ticked)
+	EventBus.epidemic_purified_at_kurgan.disconnect(_on_epidemic_purified)
+	army.free()
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -481,3 +683,36 @@ func _on_supply_line_severed(_army_id: int, _depot_id: int, _raider_id: StringNa
 
 func _on_yilki_sacrificed(_army_id: int, _remount: float, _morale_drop: float, _kut_drop: float) -> void:
 	_yilki_sacrificed_signal_received = true
+
+
+func _on_espionage_completed(_report: EspionageReport) -> void:
+	_espionage_signal_received = true
+
+
+func _on_envoy_assassinated(_instigator: int, _target: int, _envoy: StringName, _kut: float) -> void:
+	_envoy_assassinated_signal_received = true
+
+
+func _on_total_war_declared(_instigator: int, _target: int, _stance: GameEnums.DiplomaticStance) -> void:
+	_total_war_signal_received = true
+
+
+func _on_cascade_rout_triggered(_army_id: int, _elite_id: StringName, _morale: float) -> void:
+	_cascade_rout_signal_received = true
+
+
+func _on_routed_troops_enslaved(_army_id: int, _slaves: int, _loot_val: float) -> void:
+	_enslaved_to_toy_signal_received = true
+
+
+func _on_epidemic_outbreak_started(_army_id: int, _speed_mult: float, _attrition: float) -> void:
+	_epidemic_outbreak_signal_received = true
+
+
+func _on_epidemic_attrition_ticked(_army_id: int, _remaining: int, _casualties: int) -> void:
+	_epidemic_attrition_signal_received = true
+
+
+func _on_epidemic_purified(_army_id: int, _shrine_id: StringName, _kut_spent: float) -> void:
+	_epidemic_purified_signal_received = true
+
