@@ -132,6 +132,30 @@ func set_political_intelligence_context(espionage_deterrence: float, spy_exposur
 	_tracked_kagan_glory = _safe_float(kagan_glory, _tracked_kagan_glory, 0.0, 100.0)
 
 
+## Adds an external diplomatic threat/infamy spike (e.g. Kan Davası envoy killing
+## or Sacred Kurgan hegemon proclamation) and triggers a Coalition check when warranted.
+func add_diplomatic_infamy_spike(boost: float, force_coalition_evaluation: bool = false) -> bool:
+	var safe_boost: float = _safe_float(boost, 0.0, 0.0, 60.0)
+	_recent_assassination_infamy = clampf(_recent_assassination_infamy + safe_boost, 0.0, 60.0)
+	if force_coalition_evaluation:
+		var was_active: bool = _coalition_war_active
+		var members: PackedStringArray = PackedStringArray()
+		for dynasty_id: StringName in _profiles:
+			var profile: DynastyProfile = _profiles[dynasty_id]
+			var current_trust: float = _trust_scores.get(dynasty_id, profile.trust_index)
+			var base_threat: float = profile.calculate_threat_score(GameManager.get_kut_score(), _player_army_size, _raid_frequency, current_trust)
+			if base_threat + _recent_assassination_infamy > profile.neutral_threshold and profile.ambition >= 0.50:
+				members.append(String(dynasty_id))
+				_stances[dynasty_id] = GameEnums.DynastyAttitude.HOSTILE
+		if not members.is_empty():
+			_coalition_war_active = true
+			_coalition_members = members
+			if not was_active:
+				EventBus.coalition_war_declared.emit(_coalition_members, GameManager.get_kut_score())
+			return true
+	return false
+
+
 func get_espionage_deterrence_bonus() -> float:
 	return _espionage_deterrence_bonus
 

@@ -81,6 +81,16 @@ func establish_truce(faction_a: int, faction_b: int) -> void:
 	_total_war_seasons.erase(key)
 
 
+## Escalates factions immediately to `TOTAL_WAR_GREAT_RAID` on a Kan Davası blood feud.
+func declare_blood_feud_total_war(instigator_id: int, target_id: int) -> void:
+	if instigator_id == target_id:
+		return
+	var key: StringName = _pair_key(instigator_id, target_id)
+	_stances[key] = GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID
+	_total_war_seasons[key] = 0
+	EventBus.total_war_declared.emit(instigator_id, target_id, GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID)
+
+
 ## Advances seasonal war exhaustion and prunes expired spy reports so long campaigns
 ## do not stay locked in permanent Total War or bloat report caches.
 func step_seasonal_intelligence_decay(cycles: int = 1) -> void:

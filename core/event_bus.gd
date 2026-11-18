@@ -135,3 +135,11 @@ signal personal_tore_peace_granted(player_id: int, duration_hours: float, rim_co
 signal personal_tore_peace_forfeited(player_id: int, reason: StringName)
 signal anti_snowball_upkeep_applied(player_id: int, food_spoiled: int, steel_upkeep: int, iron_upkeep: int, kut_stagnation_drain: float, exp_pasture_multiplier: float)
 signal offline_doctrine_executed(army_id: int, trigger_reason: GameEnums.OfflineDoctrineTrigger, evade_combat: bool, packed_sefer_arabasi: bool, retreat_terrain_class: GameEnums.TerrainClass)
+
+# --- Phase 19 Hybrid Steppe Conquest, Tuğ Spheres & Kurgan Hegemony ----------
+signal border_node_captured(region_coord: Vector2i, node_id: StringName, previous_owner_id: int, new_owner_id: int, tug_radius_m: float, overlapping_enemies: int)
+signal yurt_claim_opened(claim_id: StringName, challenger_id: int, defender_id: int, target_coord: Vector2i, contestation_hours: float)
+signal yurt_claim_responded(claim_id: StringName, response: GameEnums.ClaimDefenseResponse, resulting_stage: GameEnums.ClaimContestationStage, new_owner_id: int)
+signal region_control_changed(region_coord: Vector2i, owner_id: int, control_percent: float, aftermath_choice: GameEnums.ConquestAftermathChoice, scorched_seasons: int)
+signal great_khagan_candidate_proclaimed(player_id: int, owned_kurgans: int, total_kurgans: int, coalition_triggered: bool)
+

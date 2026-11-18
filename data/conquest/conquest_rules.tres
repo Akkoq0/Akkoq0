@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="ConquestRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/conquest/conquest_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"steppe_conquest_rules"
+yaylak_warm_regen_mult = 1.65
+yaylak_warm_yilki_breed_mult = 1.4
+yaylak_winter_freeze_attrition_mult = 2.4
+yaylak_winter_supply_drain_mult = 1.8
+kislak_winter_shelter_attrition_mult = 0.55
+kislak_winter_supply_drain_mult = 0.65
+kislak_winter_regen_mult = 0.5
+sacred_core_kurgan_kut_per_season = 2.0
+sacred_core_epidemic_resistance = 0.45
+base_tug_radius_m = 120.0
+overlap_caravan_disruption_ratio = 0.35
+claim_kut_cost = 8.0
+claim_glory_cost = 10.0
+claim_contestation_hours = 18.0
+tribute_freeze_hours = 24.0
+tribute_steel_cost = 8
+tribute_meteoric_cost = 2
+tribute_yilki_drop = 0.2
+kan_davasi_trust_penalty = -35.0
+kan_davasi_coalition_threat_boost = 35.0
+initial_conquest_control = 20.0
+low_control_rebellion_threshold = 40.0
+garrison_control_gain_per_step = 15.0
+toy_festival_control_gain = 20.0
+vassal_appointment_control_bonus = 25.0
+scorched_earth_speed_penalty_mult = 0.6
+scorched_earth_supply_penalty_mult = 0.5
+scorched_earth_duration_seasons = 4
+scorched_earth_pillage_bullion = 55
+scorched_earth_captive_workers = 35
+kurgan_majority_threshold_ratio = 0.51
+kurgan_hegemon_threat_spike = 40.0

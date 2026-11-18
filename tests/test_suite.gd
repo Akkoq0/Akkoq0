@@ -115,6 +115,7 @@ func _run_suite() -> void:
 	_test_phase16_combat_turan_fsm_and_casualty_hardening()
 	_test_phase17_politics_intrigue_dynasty_long_horizon()
 	_test_phase18_persistent_world_peace_and_anti_snowball()
+	_test_phase19_hybrid_conquest_yaylak_kislak_kurgan()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3107,6 +3108,163 @@ func _test_phase18_persistent_world_peace_and_anti_snowball() -> void:
 	GracePeriodManager.reset_persistent_world()
 	SeasonManager.set_food_reserve(120)
 	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p18_cleanup_restore"))
+
+
+func _test_phase19_hybrid_conquest_yaylak_kislak_kurgan() -> void:
+	TerritoryManager.reset_territory_state()
+	GracePeriodManager.configure_persistent_world(true, 80.0) # Day 4+ Stage 3 Total Steppe
+	CommandBus.dispatch(ModifyKutCommand.new(80.0 - GameManager.get_kut_score(), &"p19_init_kut"))
+	DiplomacyManager.set_political_intelligence_context(0.0, 0.0, 0.0, 50.0)
+	var rules: ConquestRules = TerritoryManager.get_rules()
+
+	# 1. Yaylak vs Kışlak seasonal shift & Sacred Core passive Kurgan bonus
+	var yaylak: RegionData = TerritoryManager.register_region(
+		Vector2i(20, 1), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1901, false, false, 100.0)
+	var kislak: RegionData = TerritoryManager.register_region(
+		Vector2i(20, 2), GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 1901, true, false, 100.0)
+	var kurgan_a: RegionData = TerritoryManager.register_region(
+		Vector2i(20, 3), GameEnums.RegionGeographyClass.SACRED_CORE, 1902, false, true, 100.0)
+	var kurgan_b: RegionData = TerritoryManager.register_region(
+		Vector2i(20, 4), GameEnums.RegionGeographyClass.SACRED_CORE, 1902, false, true, 100.0)
+	var kurgan_c: RegionData = TerritoryManager.register_region(
+		Vector2i(20, 5), GameEnums.RegionGeographyClass.SACRED_CORE, 1903, false, true, 100.0)
+
+	var y_summer: Dictionary[StringName, float] = yaylak.compute_seasonal_modifiers(GameEnums.SeasonType.SUMMER, rules)
+	var y_winter: Dictionary[StringName, float] = yaylak.compute_seasonal_modifiers(GameEnums.SeasonType.WINTER, rules)
+	var k_winter: Dictionary[StringName, float] = kislak.compute_seasonal_modifiers(GameEnums.SeasonType.WINTER, rules)
+	var core_mod: Dictionary[StringName, float] = kurgan_a.compute_seasonal_modifiers(GameEnums.SeasonType.WINTER, rules)
+	_expect(y_summer[&"pasture_regen_mult"] >= 1.6 \
+		and y_summer[&"yilki_breed_mult"] >= 1.35 \
+		and y_winter[&"attrition_mult"] >= 2.2 \
+		and k_winter[&"attrition_mult"] <= 0.65 \
+		and k_winter[&"supply_drain_mult"] < y_winter[&"supply_drain_mult"] \
+		and core_mod[&"kurgan_kut_bonus"] >= 2.0 \
+		and core_mod[&"epidemic_resistance"] >= 0.40,
+		"Yaylak excels in warm pasture/breeding but freezes in Winter while Kışlak shelters & Sacred Kurgan grants passive Kut and plague resistance.")
+
+	var kut_before_kurgan_season: float = GameManager.get_kut_score()
+	TerritoryManager.step_seasonal_territory_cycle(GameEnums.SeasonType.SPRING, 1902)
+	_expect(GameManager.get_kut_score() > kut_before_kurgan_season,
+		"Owning Sacred Kurgan cores awards passive seasonal Kut bonus.")
+
+	# 2. Frontier BorderNode Capture, Jade Tuğ Scaling & Overlapping Enemy Disruption
+	CommandBus.dispatch(DepositResourcesCommand.new(1901, &"jade", 45))
+	TerritoryManager.add_border_node(Vector2i(20, 1), &"quarry_west", GameEnums.BorderNodeType.ORE_QUARRY_NODE, Vector3(0.0, 0.0, 0.0), &"iron", 0)
+	TerritoryManager.add_border_node(Vector2i(20, 1), &"pass_east", GameEnums.BorderNodeType.CARAVAN_PASS_NODE, Vector3(140.0, 0.0, 0.0), &"coal", 1902)
+
+	var cap_free: CaptureBorderNodeCommand = CaptureBorderNodeCommand.new(1901, Vector2i(20, 1), &"quarry_west", true)
+	_expect(CommandBus.dispatch(cap_free) \
+		and cap_free.tug_radius_m > rules.base_tug_radius_m \
+		and cap_free.overlapping_enemy_tug_count >= 1 \
+		and cap_free.caravan_disruption_ratio >= 0.35,
+		"BorderNode instant capture plants Jade-scaled Bozkır Tuğu (%.1fm) and detects overlapping enemy sphere disruption (%.2f)." % [
+			cap_free.tug_radius_m, cap_free.caravan_disruption_ratio])
+
+	# Verify Day 1-2 Stage 1 blocks Core Yurt Claim, Day 4+ Stage 3 allows it
+	GracePeriodManager.configure_persistent_world(true, 10.0)
+	var early_claim: OpenYurtClaimCommand = OpenYurtClaimCommand.new(&"claim_early_blocked", 1901, Vector2i(20, 3), 35.0)
+	_expect(not CommandBus.dispatch(early_claim),
+		"Core Yurt Claim is rejected during Stage 1 Töre Peace.")
+	GracePeriodManager.advance_world_hours(70.0)
+
+	# 3. Defender Response A: PAY_ULUS_TRIBUTE freezes claims against that region
+	CommandBus.dispatch(DepositResourcesCommand.new(1902, &"steel", 20))
+	CommandBus.dispatch(DepositResourcesCommand.new(1902, &"meteoric_iron", 10))
+	var claim_trib: OpenYurtClaimCommand = OpenYurtClaimCommand.new(&"claim_tribute", 1901, Vector2i(20, 3), 35.0, 18.0)
+	_expect(CommandBus.dispatch(claim_trib) and claim_trib.stage == GameEnums.ClaimContestationStage.WINDOW_OPEN,
+		"OpenYurtClaimCommand opens 18h Yurt Claim contestation window.")
+	var resp_trib: RespondToYurtClaimCommand = RespondToYurtClaimCommand.new(
+		&"claim_tribute", 1902, GameEnums.ClaimDefenseResponse.PAY_ULUS_TRIBUTE)
+	_expect(CommandBus.dispatch(resp_trib) \
+		and resp_trib.tribute_paid \
+		and resp_trib.resulting_stage == GameEnums.ClaimContestationStage.TRIBUTE_FROZEN \
+		and not CommandBus.dispatch(OpenYurtClaimCommand.new(&"claim_frozen_reattempt", 1901, Vector2i(20, 3), 35.0)),
+		"Paying Ülüş Tribute transfers Steel/Meteoric Iron, enters TRIBUTE_FROZEN, and blocks follow-up claims during freeze window.")
+
+	# 4. Defender Response B: KILL_ENVOY_KAN_DAVASI triggers zero-wait Total War & Diplomatic Trust/Coalition spike
+	var karluk_before: float = DiplomacyManager.get_dynasty_trust(&"karluk")
+	var claim_kd: OpenYurtClaimCommand = OpenYurtClaimCommand.new(&"claim_kan_davasi", 1901, Vector2i(20, 4), 40.0)
+	CommandBus.dispatch(claim_kd)
+	var resp_kd: RespondToYurtClaimCommand = RespondToYurtClaimCommand.new(
+		&"claim_kan_davasi", 1902, GameEnums.ClaimDefenseResponse.KILL_ENVOY_KAN_DAVASI)
+	_expect(CommandBus.dispatch(resp_kd) \
+		and resp_kd.kan_davasi_triggered \
+		and resp_kd.resulting_stage == GameEnums.ClaimContestationStage.BLOOD_FEUD_TOTAL_WAR \
+		and IntelligenceManager.is_total_war_active(1901, 1902) \
+		and DiplomacyManager.get_dynasty_trust(&"karluk") < karluk_before,
+		"Killing Yurt Claim envoy unleashes immediate BLOOD_FEUD_TOTAL_WAR and drops dynasty trust.")
+	IntelligenceManager.establish_truce(1901, 1902)
+
+	# 5. Defender Response C: ACCEPT_PITCHED_BATTLE -> Aftermath Choices (Scorched Earth, %20 Control, Vassal Bey, Sacred Kurgan Majority)
+	# First capture kurgan_b (via Blood Feud war) using SCORCHED_EARTH_PILLAGE, verify Kavruk Bozkır penalties
+	var scorch_cmd: ResolveConquestAftermathCommand = ResolveConquestAftermathCommand.new(
+		1901, Vector2i(20, 4), GameEnums.ConquestAftermathChoice.SCORCHED_EARTH_PILLAGE)
+	_expect(CommandBus.dispatch(scorch_cmd) \
+		and kurgan_b.owner_id == 1901 \
+		and kurgan_b.scorched_seasons_remaining == rules.scorched_earth_duration_seasons \
+		and scorch_cmd.bullion_gained == rules.scorched_earth_pillage_bullion,
+		"SCORCHED_EARTH_PILLAGE awards bullion/captives and leaves Kavruk Bozkır across the conquered region.")
+	var scorch_mod: Dictionary[StringName, float] = kurgan_b.compute_seasonal_modifiers(GameEnums.SeasonType.SPRING, rules)
+	_expect(scorch_mod[&"movement_speed_mult"] <= 0.65 and scorch_mod[&"supply_efficiency_mult"] <= 0.55,
+		"Kavruk Bozkır imposes movement speed (%.2f) and supply efficiency (%.2f) penalties." % [
+			scorch_mod[&"movement_speed_mult"], scorch_mod[&"supply_efficiency_mult"]])
+
+	# Capture kurgan_c via ACCEPT_PITCHED_BATTLE and HOLD_GARRISON_CONTROL (%20 Initial Control -> raises above rebellion floor)
+	var pitched_atk: CombatantStats = CombatantStats.new(1950, 260.0, 140.0, 900.0, 1.0)
+	var pitched_def: CombatantStats = CombatantStats.new(1951, 90.0, 60.0, 120.0, 0.8)
+	var claim_pitched: OpenYurtClaimCommand = OpenYurtClaimCommand.new(&"claim_pitched", 1901, Vector2i(20, 5), 40.0)
+	CommandBus.dispatch(claim_pitched)
+	var resp_pitched: RespondToYurtClaimCommand = RespondToYurtClaimCommand.new(
+		&"claim_pitched", 1903, GameEnums.ClaimDefenseResponse.ACCEPT_PITCHED_BATTLE, true, pitched_atk, pitched_def, 1909)
+	CommandBus.dispatch(resp_pitched)
+
+	var khagan_signals: Array[int] = [0]
+	var on_khagan: Callable = func(pid: int, _owned: int, _tot: int, _coal: bool) -> void:
+		if pid == 1901:
+			khagan_signals[0] += 1
+	EventBus.great_khagan_candidate_proclaimed.connect(on_khagan)
+
+	var hold_cmd: ResolveConquestAftermathCommand = ResolveConquestAftermathCommand.new(
+		1901, Vector2i(20, 5), GameEnums.ConquestAftermathChoice.HOLD_GARRISON_CONTROL)
+	CommandBus.dispatch(hold_cmd)
+	EventBus.great_khagan_candidate_proclaimed.disconnect(on_khagan)
+
+	var ctrl_after_conquest: float = kurgan_c.control_percent
+	var prone_initially: bool = kurgan_c.is_rebellion_prone(rules)
+	TerritoryManager.raise_region_control(Vector2i(20, 5), 1901, true)
+	TerritoryManager.raise_region_control(Vector2i(20, 5), 1901, false)
+
+	_expect(resp_pitched.winner_id == 1901 \
+		and is_equal_approx(ctrl_after_conquest, 20.0) \
+		and prone_initially \
+		and not kurgan_c.is_rebellion_prone(rules) \
+		and TerritoryManager.is_great_khagan_candidate(1901) \
+		and khagan_signals[0] == 1 \
+		and DiplomacyManager.is_coalition_war_active(),
+		"Pitched battle + HOLD_GARRISON_CONTROL starts at 20% Denetim (rebellion-prone until raised via Toy/Garrison), while owning 2/3 Sacred Kurgans proclaims Büyük Kağan Adayı and triggers Coalition War.")
+
+	# Vassal Bey appointment test on kurgan_a after expiry
+	GracePeriodManager.advance_world_hours(30.0)
+	var claim_vassal: OpenYurtClaimCommand = OpenYurtClaimCommand.new(&"claim_vassal", 1901, Vector2i(20, 3), 40.0)
+	CommandBus.dispatch(claim_vassal)
+	CommandBus.dispatch(RespondToYurtClaimCommand.new(&"claim_vassal", 1902, GameEnums.ClaimDefenseResponse.ACCEPT_PITCHED_BATTLE, true))
+	var vassal_cmd: ResolveConquestAftermathCommand = ResolveConquestAftermathCommand.new(
+		1901, Vector2i(20, 3), GameEnums.ConquestAftermathChoice.APPOINT_VASSAL_BEY, &"kul_tegin_bey")
+	_expect(CommandBus.dispatch(vassal_cmd) \
+		and vassal_cmd.resulting_control_percent >= 45.0 \
+		and kurgan_a.vassal_bey_id == &"kul_tegin_bey",
+		"APPOINT_VASSAL_BEY installs vassal Bey with 45% immediate stability above rebellion threshold.")
+
+	# Restore clean state
+	TerritoryManager.reset_territory_state()
+	GracePeriodManager.reset_persistent_world()
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p19_cleanup_kut"))
+	DiplomacyManager.set_dynasty_trust(&"karluk", DiplomacyManager.get_dynasty_profile(&"karluk").trust_index)
+	DiplomacyManager.set_dynasty_trust(&"kipchak", DiplomacyManager.get_dynasty_profile(&"kipchak").trust_index)
+	DiplomacyManager.set_dynasty_trust(&"oghuz", DiplomacyManager.get_dynasty_profile(&"oghuz").trust_index)
+	DiplomacyManager.step_seasonal_diplomatic_decay(15)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
 
 
 

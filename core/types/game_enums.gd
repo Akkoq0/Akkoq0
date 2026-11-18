@@ -228,6 +228,46 @@ enum OfflineDoctrineTrigger {
 	ORDER_TIMED_OUT_OFFLINE = 3,
 }
 
+## Phase 19 Seasonal steppe region geography archetypes (`RegionData`).
+enum RegionGeographyClass {
+	HIGH_PLATEAU_YAYLAK = 0, ## Bahar/Yazda yüksek otlak & yılkı üremesi; Kışın donup ağır yıpranma cezası verir
+	SHELTERED_VALLEY_KISLAK = 1, ## Kış/Zud döneminde korunaklı hayatta kalma merkezi
+	FOREST_EDGE = 2, ## Odun & Sık Orman pusu sınırı
+	SACRED_CORE = 3, ## Kutsal Kurgan barındıran stratejik özek bölge
+}
+
+## Phase 19 Strategic frontier sub-nodes inside each macro region (`BorderNode`).
+enum BorderNodeType {
+	ORE_QUARRY_NODE = 0, ## 7-Cevher Ocağı
+	CARAVAN_PASS_NODE = 1, ## Kervan Geçidi
+	RIVER_CROSSING_NODE = 2, ## Nehir Geçiş Kıyısı
+	WATCHTOWER_HILL_NODE = 3, ## Gözetleme Tepesi
+}
+
+## Phase 19 Contested Yurt Claim FSM states (`ClaimContestationFSM`).
+enum ClaimContestationStage {
+	NONE = 0,
+	WINDOW_OPEN = 1, ## Çekişme penceresi (12-24 saat eşdeğeri) açık
+	PITCHED_BATTLE_ACCEPTED = 2, ## Savunan Meydanı Kabul Etti
+	TRIBUTE_FROZEN = 3, ## Ülüş/Haraç ile dondurulmuş iddia
+	BLOOD_FEUD_TOTAL_WAR = 4, ## Elçi katli -> Kan Davası topyekûn savaş
+	RESOLVED = 5,
+}
+
+## Phase 19 Three strategic defender reactions to a Yurt Claim (`RespondToYurtClaimCommand`).
+enum ClaimDefenseResponse {
+	ACCEPT_PITCHED_BATTLE = 0, ## Meydanı Kabul Et (Turan Taktiği ile kesin savaş)
+	PAY_ULUS_TRIBUTE = 1, ## Ülüş / Haraç Öde (Çelik / Gök Demiri / Yılkı ile dondur)
+	KILL_ENVOY_KAN_DAVASI = 2, ## Elçiyi Öldür -> Anında topyekûn savaş + ağır itibar/koalisyon cezası
+}
+
+## Phase 19 Post-conquest aftermath options (*Crusader* evolution).
+enum ConquestAftermathChoice {
+	SCORCHED_EARTH_PILLAGE = 0, ## Talan / Yakıp Geç (`Kavruk Bozkır`: Ganimet+Toy al, düşmana hız/ikmal cezalı yanık bölge bırak)
+	HOLD_GARRISON_CONTROL = 1, ## %20 Denetimle Yurt Tut + Garnizon/Toy ile yükselt
+	APPOINT_VASSAL_BEY = 2, ## Yerel Tâbi Bey atayarak istikrarı hızla artır
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
