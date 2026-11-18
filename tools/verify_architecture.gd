@@ -246,6 +246,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as PastureData).get_validation_errors())
 		elif res is BallisticsRules:
 			errors.append_array((res as BallisticsRules).get_validation_errors())
+		elif res is CaptiveLaborRules:
+			errors.append_array((res as CaptiveLaborRules).get_validation_errors())
 	return errors
 
 

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CaptiveLaborRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/captive_labor_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"tore_captive_labor_rules"
+bullion_ransom_per_noble = 35
+trust_gain_per_exchanged_noble = 12.0
+workers_for_max_efficiency = 30
+max_labor_discount_ratio = 0.30
+default_core_clan_population = 120
+revolt_risk_per_excess_ratio = 0.65
+slave_revolt_kut_penalty = 10.0
