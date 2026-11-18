@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="AttritionCasualtyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/units/attrition_casualty_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+profile_id = &"default_attrition_casualty_profile"
+wounded_survival_ratio = 0.45
+max_wounded_speed_penalty = 0.35
+healer_recovery_ratio_per_tick = 0.4
+neglect_mortality_ratio_per_tick = 0.35
+veteran_loss_tactical_penalty_weight = 0.35
+veteran_loss_morale_penalty_weight = 0.3
+raw_recruit_cohesion_cap_penalty_max = 28.0
+cohesion_acclimation_recovery_per_sec = 3.5
+commander_fatigue_efficiency_penalty_weight = 0.25
