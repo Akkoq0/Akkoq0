@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CataclysmEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cataclysms/cataclysm_event_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+cataclysm_id = &"great_flood_quake_exodus"
+display_name = "Büyük Göç Dalgası ve Yıkım Depremi / Sel Taşkını"
+cataclysm_type = 3
+pasture_yield_multiplier = 0.50
+yilki_mobility_multiplier = 0.60
+caravan_speed_multiplier = 0.50
+forest_concealment_loss_ratio = 0.15
+structural_wear_ratio = 0.45
+refugee_influx_count = 180
+kut_shock_drain = 9.0
+open_response_options = PackedStringArray("absorb_refugees_into_oymak", "repair_quarry_and_forges", "relocate_to_high_plateau")

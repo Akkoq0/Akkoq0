@@ -113,6 +113,17 @@ signal nomadic_outpost_relocated(player_id: int, outpost_id: StringName, from_co
 signal force_detached_from_army(parent_army_id: int, detachment_army_id: int, role: GameEnums.DetachmentRole, detached_riders: int, speed_bonus_multiplier: float)
 signal forces_merged_into_army(target_army_id: int, merged_detachment_id: int, total_riders: int)
 
+# --- Phase 9 Steppe Cataclysms, Kinship Intrigue & Realistic Casualties -----
+signal cataclysm_erupted(cataclysm_id: StringName, cataclysm_type: GameEnums.CataclysmType, region_coord: Vector2i, pasture_mult: float, caravan_speed_mult: float, structural_wear: float, refugee_influx: int)
+signal cataclysm_subsided(cataclysm_id: StringName, region_coord: Vector2i)
+signal kinship_plot_escalated(bey_id: StringName, stage: GameEnums.IntriguePlotStage, loyalty: float, ambition: float, grievance: float)
+signal internal_betrayal_triggered(bey_id: StringName, stage: GameEnums.IntriguePlotStage, defected_troops: int, supply_sabotaged: bool, kut_drain: float)
+signal kinship_crisis_resolved(bey_id: StringName, action: GameEnums.IntrigueResolutionAction, restored_loyalty: float)
+signal battle_wounded_recorded(army_id: int, new_wounded: int, total_wounded_pool: int, speed_penalty_multiplier: float)
+signal wounded_troops_recovered(army_id: int, recovered_troops: int, remaining_wounded_pool: int)
+signal veteran_casualty_shock_applied(army_id: int, veteran_loss_ratio: float, tactical_efficiency_multiplier: float, cohesion_cap: float)
+
+
 
 
 

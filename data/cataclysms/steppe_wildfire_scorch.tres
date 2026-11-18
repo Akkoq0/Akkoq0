@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CataclysmEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cataclysms/cataclysm_event_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+cataclysm_id = &"steppe_wildfire_scorch"
+display_name = "Bozkır Yangını ve Kurak Rüzgar"
+cataclysm_type = 2
+pasture_yield_multiplier = 0.10
+yilki_mobility_multiplier = 0.70
+caravan_speed_multiplier = 0.60
+forest_concealment_loss_ratio = 0.65
+structural_wear_ratio = 0.25
+refugee_influx_count = 40
+kut_shock_drain = 8.0
+open_response_options = PackedStringArray("evacuate_sik_orman_and_pasture", "dig_firebreak_trenches", "drive_flames_toward_enemy_camp")

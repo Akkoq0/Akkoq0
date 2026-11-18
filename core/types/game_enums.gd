@@ -160,6 +160,29 @@ enum DetachmentRole {
 	OUTPOST_GARRISON = 3, ## İleri Karakol / Ocak Muhafız Birliği
 }
 
+## Phase 9 Major steppe cataclysm archetypes (`CataclysmEngine`).
+enum CataclysmType {
+	NONE = 0,
+	KARA_ZUD_ICE_TRAP = 1, ## Kara Zud ve Buz Kapanı: Mera donması, Yılkı ve ikmal kervanı felci
+	STEPPE_WILDFIRE_SCORCH = 2, ## Bozkır Yangını ve Kurak Rüzgar: Otlak ve Sık Orman pusu örtüsü yangını
+	GREAT_FLOOD_QUAKE_EXODUS = 3, ## Büyük Göç Dalgası ve Yıkım Depremi / Sel Taşkını: Yapısal hasar ve mülteci akını
+}
+
+## Phase 9 Intra-dynasty kinship plot & betrayal escalation stages (`KinshipIntrigueManager`).
+enum IntriguePlotStage {
+	LOYAL_CALM = 0, ## Sadık ve Dengeli Boy Beyi
+	FACTION_PLOT_BREWING = 1, ## Gizli Hizipleşme (faction_plot)
+	DEFECTION_OR_SABOTAGE = 2, ## Ordu/Kaynak Çekerek Kopuş (defection) ve İkmal Sabotajı
+	INTERNAL_UPRISING = 3, ## Açık İç Ayaklanma ve Taht/Otağ Darbesi (internal_uprising)
+}
+
+## Phase 9 Open-ended player responses to kinship intrigue and betrayal.
+enum IntrigueResolutionAction {
+	BESTOW_TITLE_AND_TOY_SHARE = 0, ## Ödül, Ünvan ve Ülüş/Toy Ganimeti Dağıtma
+	SUPPRESS_WITH_LOYAL_GUARD = 1, ## Sadık Muhafız Birlikleriyle Bastırma
+	NEGOTIATE_KINSHIP_BALANCE = 2, ## Kan Bağı Müzakeresi ve Konsey Uzlaşısı
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -168,6 +191,7 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
 
 
 

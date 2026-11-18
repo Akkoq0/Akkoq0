@@ -35,6 +35,7 @@ BallisticsEngine="*res://core/ballistics_engine.gd"
 CaptiveLaborManager="*res://core/captive_labor_manager.gd"
 SovereigntyPathEngine="*res://core/sovereignty_path_engine.gd"
 EmergentWorldEngine="*res://core/emergent_world_engine.gd"
+CataclysmEngine="*res://core/cataclysm_engine.gd"
 
 
 

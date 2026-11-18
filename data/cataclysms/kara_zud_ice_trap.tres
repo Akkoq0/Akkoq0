@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CataclysmEventData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/cataclysms/cataclysm_event_data.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+cataclysm_id = &"kara_zud_ice_trap"
+display_name = "Kara Zud ve Buz Kapanı"
+cataclysm_type = 1
+pasture_yield_multiplier = 0.15
+yilki_mobility_multiplier = 0.45
+caravan_speed_multiplier = 0.35
+forest_concealment_loss_ratio = 0.0
+structural_wear_ratio = 0.10
+refugee_influx_count = 0
+kut_shock_drain = 10.0
+open_response_options = PackedStringArray("migrate_south_by_sefer_arabasi", "slaughter_yilki_emergency_rations", "kurgan_fire_offering")
