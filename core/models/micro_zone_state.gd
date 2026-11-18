@@ -57,6 +57,21 @@ func tile_to_world(coord: Vector2i) -> Vector3:
 		(float(coord.y) + 0.5 - float(grid_size.y) * 0.5) * tile_size_m)
 
 
+## Converts a 3D world click position into a grid-snapped micro tile coordinate.
+func world_to_tile(world_position: Vector3) -> Vector2i:
+	if tile_size_m <= 0.0:
+		return Vector2i.ZERO
+	var rel_x: float = (world_position.x - world_center.x) / tile_size_m + float(grid_size.x) * 0.5
+	var rel_y: float = (world_position.z - world_center.z) / tile_size_m + float(grid_size.y) * 0.5
+	return Vector2i(floori(rel_x), floori(rel_y))
+
+
+## Snaps a 3D world position to the center of its micro grid cell.
+func snap_world_to_grid(world_position: Vector3) -> Vector3:
+	return tile_to_world(world_to_tile(world_position))
+
+
 ## Half extents (m) of the zone on X/Z.
 func get_half_extents() -> Vector2:
 	return Vector2(float(grid_size.x), float(grid_size.y)) * tile_size_m * 0.5
+

@@ -87,4 +87,12 @@ signal council_decree_enacted(player_id: int, choice: GameEnums.CouncilDilemmaCh
 signal kagan_glory_changed(army_id: int, previous_glory: float, new_glory: float, reason: StringName)
 signal rogue_warband_joined_by_glory(army_id: int, bey_id: StringName, joined_troops: int, glory_score: float)
 
+# --- Phase 6 Micro Building Placement, Nomadic Workers & AI Commander -------
+signal building_placed_on_micro_grid(instance_id: int, player_id: int, building_id: StringName, zone_id: StringName, origin_coord: Vector2i, world_position: Vector3)
+signal worker_gathering_started(worker_id: int, player_id: int, resource_id: StringName, target_coord: Vector2i, target_world_position: Vector3)
+signal worker_caravan_delivered(worker_id: int, player_id: int, resource_id: StringName, amount: int, camp_world_position: Vector3)
+signal ai_commander_phase_changed(agent_id: StringName, previous_phase: GameEnums.AICommanderPhase, new_phase: GameEnums.AICommanderPhase)
+signal ai_raid_launched(agent_id: StringName, is_rogue_warband: bool, raid_target_type: StringName, target_army_id: int, turan_phase: GameEnums.TuranTacticPhase, ambition: float, discipline: float)
+
+
 
