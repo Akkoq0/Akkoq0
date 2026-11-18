@@ -57,6 +57,12 @@ var _veteran_shock_signal_received: bool = false
 var _causal_step_propagated_signal_received: bool = false
 var _causal_counterplay_signal_received: bool = false
 var _causal_transition_records: Array[CausalTransitionRecord] = []
+var _p12_overgrazing_rebellion_count: int = 0
+var _p12_supply_restored_count: int = 0
+var _p12_council_convened_count: int = 0
+var _p12_coalition_declared_count: int = 0
+var _p12_cataclysm_erupted_count: int = 0
+var _p12_internal_betrayal_count: int = 0
 
 
 func _ready() -> void:
@@ -101,6 +107,9 @@ func _run_suite() -> void:
 	_test_phase11_continuous_accumulation_decay_and_telemetry()
 	_test_phase11_turan_maneuver_readiness_and_layered_morale()
 	_test_phase11_economy_logistics_contagion_and_political_synergy()
+	_test_phase12_long_horizon_ecology_seasons_and_supply_recovery()
+	_test_phase12_long_horizon_combat_turan_reset_and_bounds()
+	_test_phase12_long_horizon_politics_intrigue_envoy_and_telemetry()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -1969,6 +1978,378 @@ func _test_phase11_economy_logistics_contagion_and_political_synergy() -> void:
 	_expect(scaled_recruited > rules.rogue_warband_troop_size,
 		"Surplus Khagan Glory (> 40) scales recruited Yersiz Yurtsuz Çeriler rider detachment above base 250 (%d riders)." % scaled_recruited)
 	glory_comp.free()
+
+
+func _test_phase12_long_horizon_ecology_seasons_and_supply_recovery() -> void:
+	_p12_overgrazing_rebellion_count = 0
+	_p12_supply_restored_count = 0
+	EventBus.overgrazing_rebellion_triggered.connect(_on_p12_overgrazing_rebellion)
+	EventBus.supply_line_restored.connect(_on_p12_supply_line_restored)
+
+	# 1. Overgrazing rebellion idempotency & anti ping-pong pasture exploit
+	if PastureEcologyManager.get_player_camp_region(1) != Vector2i(10, 10):
+		CommandBus.dispatch(MigrateCampToPastureCommand.new(1, Vector2i(10, 10)))
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p12_setup_kut_ecology"))
+	var kut_before_overgraze: float = GameManager.get_kut_score()
+
+	# First graze depletes (10, 10) completely to 0.0; next 5 ticks remain without migrating
+	CommandBus.dispatch(GrazePastureCommand.new(1, Vector2i(10, 10), 1300, 1.0))
+	for _tick: int in range(5):
+		CommandBus.dispatch(GrazePastureCommand.new(1, Vector2i(10, 10), 1300, 1.0))
+	var p_data: PastureData = PastureEcologyManager.get_pasture_data()
+	_expect(_p12_overgrazing_rebellion_count == 1 \
+		and is_equal_approx(GameManager.get_kut_score(), kut_before_overgraze - p_data.rebellion_kut_penalty),
+		"Repeated overgrazing ticks without migration inflict rebellion Kut penalty (-14.0) only ONCE.")
+
+	# Ping-pong migrate immediately back into exhausted (10, 10) must NOT conjure free grass
+	_expect(CommandBus.dispatch(MigrateCampToPastureCommand.new(1, Vector2i(10, 11))),
+		"Sefer Arabası migrates to fresh waterside region (10, 11) and lifts overgrazing starvation.")
+	_expect(not PastureEcologyManager.is_livestock_starving(1) and is_equal_approx(PastureEcologyManager.get_meat_milk_production_multiplier(1), 1.0),
+		"Fresh region (10, 11) immediately restores 100% meat/milk output.")
+	CommandBus.dispatch(MigrateCampToPastureCommand.new(1, Vector2i(10, 10)))
+	_expect(PastureEcologyManager.is_livestock_starving(1) and is_zero_approx(PastureEcologyManager.get_meat_milk_production_multiplier(1)),
+		"Immediately migrating back into exhausted (10, 10) without seasonal rest preserves starvation (zero free ping-pong grass).")
+
+	# 2. 12-Season (3-Year) Rotational Nomadism & Sustainable Food Balance
+	CommandBus.dispatch(MigrateCampToPastureCommand.new(1, Vector2i(10, 11)))
+	SeasonManager.set_food_reserve(100)
+	var rotation_coords: Array[Vector2i] = [Vector2i(10, 11), Vector2i(10, 12), Vector2i(10, 13), Vector2i(10, 14)]
+	for step_idx: int in range(12):
+		var active_region: Vector2i = rotation_coords[step_idx % rotation_coords.size()]
+		if PastureEcologyManager.get_player_camp_region(1) != active_region:
+			CommandBus.dispatch(MigrateCampToPastureCommand.new(1, active_region))
+		CommandBus.dispatch(GrazePastureCommand.new(1, active_region, 350, 1.0))
+		SeasonManager.advance_season_cycle()
+
+	var regen_cap_10_10: float = PastureEcologyManager.get_region_pasture_capacity(Vector2i(10, 10))
+	_expect(regen_cap_10_10 >= 90.0,
+		"Exhausted region (10, 10) rested for 3 years regenerates back to fertile capacity (%.1f >= 90.0)." % regen_cap_10_10)
+	_expect(SeasonManager.get_food_reserve() > 100 and not PastureEcologyManager.is_livestock_starving(1),
+		"3-year (12-season) rotational grazing sustains healthy pastures and achieves a net multi-year food surplus (%d > 100)." % SeasonManager.get_food_reserve())
+
+	# 3. Supply Line Interdiction Anti-Loot-Farming & Auto Depot Recovery
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 131
+	army.owner_id = 1
+	army.position = Vector3(20.0, 0.0, 20.0)
+	add_child(army)
+
+	var ger_data: BuildingData = ResourceLoader.load("res://data/buildings/ger_camp.tres") as BuildingData
+	var depot: SupplyDepotNode = SupplyDepotNode.new()
+	depot.depot_id = 55
+	depot.owner_id = 1
+	depot.building_data = ger_data
+	depot.position = Vector3(20.0, 0.0, 20.0)
+	add_child(depot)
+
+	var raider_tag: StringName = &"p12_convoy_farmer"
+	var interdict_first: InterdictSupplyLineCommand = InterdictSupplyLineCommand.new(131, 55, raider_tag)
+	var interdict_dup: InterdictSupplyLineCommand = InterdictSupplyLineCommand.new(131, 55, raider_tag)
+	_expect(CommandBus.dispatch(interdict_first) and CommandBus.dispatch(interdict_dup),
+		"InterdictSupplyLineCommand executes on initial and duplicate attacks cleanly.")
+	_expect(interdict_first.captured_loot_value > 200.0 \
+		and is_zero_approx(interdict_dup.captured_loot_value) \
+		and is_equal_approx(CommandBus.get_raider_seized_loot(raider_tag), interdict_first.captured_loot_value),
+		"Attacking an already-ISOLATED army grants 0.0 extra convoy loot (prevents infinite convoy loot farming).")
+
+	army.supply._physics_process(2.2)
+	army.supply._physics_process(2.2)
+	_expect(_p12_supply_restored_count >= 1 \
+		and not CommandBus.is_army_supply_isolated(131) \
+		and not army.supply.is_isolated() \
+		and army.supply.is_connected_to_supply(),
+		"Holding within friendly GerCamp depot perimeter automatically dispatches RestoreSupplyLineCommand and clears ISOLATED state.")
+
+	army.supply.consume_yilki_horses_for_ration()
+	var depleted_remount: float = army.supply.get_remount_horse_ratio()
+	var replenished_remount: float = army.supply.replenish_yilki_herd(0.40)
+	_expect(replenished_remount > depleted_remount,
+		"Friendly depot replenishment restores Yılkı spare-horse ratio (%.2f -> %.2f)." % [depleted_remount, replenished_remount])
+
+	CommandBus.dispatch(InterdictSupplyLineCommand.new(132, 55, raider_tag))
+	var manual_restore: RestoreSupplyLineCommand = RestoreSupplyLineCommand.new(132, 55, 0.45)
+	_expect(CommandBus.dispatch(manual_restore) and manual_restore.was_isolated and manual_restore.restored and not CommandBus.is_army_supply_isolated(132),
+		"Direct RestoreSupplyLineCommand cleanly clears ISOLATED logistics status on isolated armies.")
+
+	# 4. Captive Labor Cap, Single Revolt Kut Penalty & Seasonal Emancipation
+	CommandBus.dispatch(ModifyKutCommand.new(80.0 - GameManager.get_kut_score(), &"p12_captive_kut_baseline"))
+	var kut_before_captives: float = GameManager.get_kut_score()
+	for _c: int in range(5):
+		CommandBus.dispatch(AssignCaptiveLaborCommand.new(6, 150, 100))
+	var expected_revolt_kut: float = CaptiveLaborManager.get_rules().slave_revolt_kut_penalty
+	_expect(CaptiveLaborManager.get_captured_slave_workers(6) <= 480 \
+		and is_equal_approx(GameManager.get_kut_score(), kut_before_captives - expected_revolt_kut),
+		"Flooding captive workers enforces population cap (<= 480) and triggers single revolt Kut penalty (-%.1f)." % expected_revolt_kut)
+	CaptiveLaborManager.step_captive_labor_season(6)
+	CaptiveLaborManager.release_or_emancipate_captives(6, 480)
+	_expect(not CaptiveLaborManager.is_slave_revolt_active(6) and is_zero_approx(CaptiveLaborManager.get_slave_revolt_risk(6)),
+		"Voluntary emancipation and seasonal attrition resolve active slave revolt risk cleanly.")
+
+	# 5. AI Commander 12-Tick Multi-Cycle Stamina Loop
+	var ai_id: StringName = &"p12_stamina_warlord"
+	var raid_steps: int = 0
+	var returned_to_gather: bool = false
+	var saw_first_raid: bool = false
+	for _ai_tick: int in range(12):
+		var ai_cmd: StepAICommanderCommand = StepAICommanderCommand.new(ai_id, true, 0, 1)
+		CommandBus.dispatch(ai_cmd)
+		if ai_cmd.raid_launched:
+			raid_steps += 1
+			saw_first_raid = true
+			if ai_cmd.new_phase == GameEnums.AICommanderPhase.GATHER_RESOURCES:
+				returned_to_gather = true
+		elif saw_first_raid and ai_cmd.new_phase == GameEnums.AICommanderPhase.GATHER_RESOURCES:
+			returned_to_gather = true
+	_expect(raid_steps >= 4 and returned_to_gather,
+		"AICommander executes multiple raid cycles (%d raids) and falls back to GATHER_RESOURCES upon spending raid stockpile." % raid_steps)
+
+	EventBus.overgrazing_rebellion_triggered.disconnect(_on_p12_overgrazing_rebellion)
+	EventBus.supply_line_restored.disconnect(_on_p12_supply_line_restored)
+	depot.free()
+	army.free()
+
+
+func _test_phase12_long_horizon_combat_turan_reset_and_bounds() -> void:
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/crescent_encirclement.tres") as TacticalDoctrineData
+	var combat_rules: CombatRules = ResourceLoader.load("res://data/combat/combat_rules.tres") as CombatRules
+	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+
+	# 1. 0-HP Corpse Farming Immunity & Dead Target Fire Trap Rejection
+	CommandBus.dispatch(ModifyKutCommand.new(60.0 - GameManager.get_kut_score(), &"p12_corpse_kut_baseline"))
+	var kut_before_corpse: float = GameManager.get_kut_score()
+	var loot_before_corpse: float = CombatCalculator.get_pending_toy_loot_pool()
+	var slaves_before_corpse: int = CombatCalculator.get_captured_slave_worker_pool()
+
+	var corpse_attacker: CombatantStats = CombatantStats.new(801, 200.0, 100.0, 600.0, 1.0)
+	var dead_target: CombatantStats = CombatantStats.new(802, 120.0, 80.0, 400.0, 1.0)
+	dead_target.health = 0.0
+	dead_target.cohesion = 0.0
+	dead_target.elite_vanguard_destroyed = true
+
+	var corpse_attack_clean: bool = true
+	for _strike: int in range(5):
+		var c_cmd: ResolveCombatCommand = ResolveCombatCommand.new(corpse_attacker, dead_target, steppe, 901)
+		CommandBus.dispatch(c_cmd)
+		if c_cmd.result == null or not is_zero_approx(c_cmd.result.damage_to_defender) \
+				or c_cmd.result.defender_routed or c_cmd.result.captured_slave_workers > 0:
+			corpse_attack_clean = false
+	_expect(corpse_attack_clean \
+		and is_equal_approx(CombatCalculator.get_pending_toy_loot_pool(), loot_before_corpse) \
+		and CombatCalculator.get_captured_slave_worker_pool() == slaves_before_corpse \
+		and is_equal_approx(GameManager.get_kut_score(), kut_before_corpse),
+		"Striking 0-HP corpses deals 0 damage, yields 0 Toy loot/prisoners, and prevents infinite victory Kut farming.")
+
+	var dead_trap: SulfurFireTrapCommand = SulfurFireTrapCommand.new(1, dead_target, steppe)
+	_expect(not CommandBus.dispatch(dead_trap),
+		"SulfurFireTrapCommand rejects 0-HP already-destroyed targets cleanly.")
+
+	# 2. Multi-Battle Turan Tactic 5-Stage Reset & Morale Cascade Rout Rally
+	var tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics)
+	tactics.configure(133, doctrine, 100.0)
+
+	var left_wing: Vector3 = Vector3(-0.35, 0.0, 0.936).normalized()
+	var right_wing: Vector3 = Vector3(0.35, 0.0, -0.936).normalized()
+	var all_three_cycles_complete: bool = true
+	for _battle_idx: int in range(3):
+		if tactics.get_current_phase() != GameEnums.TuranTacticPhase.RECON_DUST_SCREEN:
+			all_three_cycles_complete = false
+		var target_foe: CombatantStats = CombatantStats.new(820, 120.0, 90.0, 500.0, 1.0)
+		tactics.execute_whistling_arrow_volley(target_foe)
+		if tactics.get_current_phase() != GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT:
+			all_three_cycles_complete = false
+		tactics.calculate_lure_overextension(0.90, 0.40, 120.0, target_foe)
+		if not tactics.evaluate_crescent_trap(left_wing, right_wing, forest, target_foe):
+			all_three_cycles_complete = false
+		if tactics.get_current_phase() != GameEnums.TuranTacticPhase.BORU_SHOCK_ANNIHILATION:
+			all_three_cycles_complete = false
+		tactics.rest_and_resupply_tactical_readiness(25.0, 90.0, 0.90, steppe)
+		if tactics.get_current_phase() != GameEnums.TuranTacticPhase.RECON_DUST_SCREEN \
+				or not is_zero_approx(tactics.get_target_formation_entropy()):
+			all_three_cycles_complete = false
+	_expect(all_three_cycles_complete,
+		"TuranTacticsComponent completes 3 full 5-stage battles back-to-back with automatic post-battle reset & quiver resupply.")
+
+	var morale_comp: MoraleComponent = MoraleComponent.new()
+	morale_comp.configure(134, combat_rules)
+	add_child(morale_comp)
+	morale_comp.configure_veteran_and_commander_profile(0.15, 25.0, 45.0, 45.0)
+	morale_comp.accumulate_battle_fatigue(20.0)
+	morale_comp.evaluate_layered_vanguard_loss_shock(&"bozkurt_cavalry", 200.0)
+	_expect(morale_comp.is_cascade_routing(),
+		"Broken rookie formation initially enters cascade_rout.")
+	for _rally_step: int in range(12):
+		morale_comp.recover_fatigue_and_rally(4.0, 1.0)
+	morale_comp.restore_elite_vanguard()
+	_expect(not morale_comp.is_cascade_routing() and morale_comp.get_current_morale() >= 50.0 and is_zero_approx(morale_comp.get_battle_fatigue()),
+		"Supplied field rest and vanguard replacement clear cascade_rout and rally morale/cohesion.")
+
+	# 3. Stacked Speed Debuff Navigable Mobility Floor (>= 12%)
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var slow_army: ArmyController = army_packed.instantiate() as ArmyController
+	slow_army.army_id = 135
+	slow_army.owner_id = 1
+	add_child(slow_army)
+	var clean_speed: float = slow_army.mobility.get_target_speed()
+
+	CommandBus.dispatch(ModifyKutCommand.new(20.0 - GameManager.get_kut_score(), &"p12_stack_council_debuff"))
+	CommandBus.dispatch(EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.TRADITION))
+	SeasonManager.set_food_reserve(0)
+	SeasonManager.evaluate_zud_epidemic_outbreak(135, true, 1, winter)
+	slow_army.mobility.set_season(winter)
+	slow_army.supply.consume_yilki_horses_for_ration()
+	slow_army.supply.consume_yilki_horses_for_ration()
+
+	var base_speed: float = slow_army.template.get_slowest_base_speed()
+	var stacked_speed: float = slow_army.mobility.get_target_speed()
+	_expect(stacked_speed >= base_speed * 0.12 - 0.001 and stacked_speed > 0.0 and stacked_speed < clean_speed,
+		"Simultaneous winter + plague + dismounted Yılkı + council austerity preserves navigable >= 12%% base speed floor (%.2f >= %.2f)." % [stacked_speed, base_speed * 0.12])
+
+	tactics.free()
+	morale_comp.free()
+	slow_army.free()
+
+
+func _test_phase12_long_horizon_politics_intrigue_envoy_and_telemetry() -> void:
+	_p12_council_convened_count = 0
+	_p12_coalition_declared_count = 0
+	_p12_cataclysm_erupted_count = 0
+	_p12_internal_betrayal_count = 0
+	EventBus.ak_sakallilar_council_convened.connect(_on_p12_council_convened)
+	EventBus.coalition_war_declared.connect(_on_p12_coalition_declared)
+	EventBus.cataclysm_erupted.connect(_on_p12_cataclysm_erupted)
+	EventBus.internal_betrayal_triggered.connect(_on_p12_internal_betrayal)
+
+	# 1. Kinship Intrigue Idempotent Uprising & Fair Healing
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p12_kinship_kut"))
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p12_ambitious_bey", true, true, 90.0, 0))
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p12_ambitious_bey", true, true, 90.0, 0))
+	var uprising_stage: GameEnums.IntriguePlotStage = KinshipIntrigueManager.get_lord_plot_stage(&"p12_ambitious_bey")
+	var kut_at_uprising: float = GameManager.get_kut_score()
+	var betrayal_before_repeat: int = _p12_internal_betrayal_count
+	for _rep: int in range(4):
+		CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p12_ambitious_bey", true, true, 90.0, 0))
+	_expect(uprising_stage == GameEnums.IntriguePlotStage.INTERNAL_UPRISING \
+		and is_equal_approx(GameManager.get_kut_score(), kut_at_uprising) \
+		and _p12_internal_betrayal_count == betrayal_before_repeat,
+		"Repeated steps while already at INTERNAL_UPRISING do not drain infinite -12.0 Kut or spam betrayal signals.")
+
+	var lord_rec: KinshipLordRecord = KinshipIntrigueManager.get_or_create_lord(&"p12_ambitious_bey")
+	var grv_before: float = lord_rec.grievance
+	var loy_before: float = lord_rec.loyalty
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p12_ambitious_bey", false, false, -1.0, 0))
+	_expect(lord_rec.grievance < grv_before and lord_rec.loyalty > loy_before,
+		"Fair Toy/Kut turns actively heal kinsman Bey grievances and gradually rebuild loyalty.")
+
+	# 2. Ak Sakallılar Council & Coalition Auto-Closure + Seasonal Policy Sunset
+	CommandBus.dispatch(ModifyKutCommand.new(60.0 - GameManager.get_kut_score(), &"p12_reset_high_kut"))
+	DiplomacyManager.evaluate_all_dynasties(GameManager.get_kut_score(), 1000.0, 0.2)
+	_p12_council_convened_count = 0
+	_p12_coalition_declared_count = 0
+
+	CommandBus.dispatch(ModifyKutCommand.new(22.0 - GameManager.get_kut_score(), &"p12_trigger_crisis"))
+	CommandBus.dispatch(ModifyKutCommand.new(-3.0, &"p12_fluctuate_1"))
+	CommandBus.dispatch(ModifyKutCommand.new(4.0, &"p12_fluctuate_2"))
+	CommandBus.dispatch(ModifyKutCommand.new(-5.0, &"p12_fluctuate_3"))
+	_expect(_p12_council_convened_count == 1 and _p12_coalition_declared_count == 1,
+		"Fluctuating below Kut 30 triggers Ak Sakallılar council and Coalition War ONCE without oscillation spam.")
+
+	CommandBus.dispatch(EnactCouncilDecreeCommand.new(1, GameEnums.CouncilDilemmaChoice.TRADITION))
+	CommandBus.dispatch(ModifyKutCommand.new(72.0 - GameManager.get_kut_score(), &"p12_recover_above_30"))
+	_expect(not GameManager.is_ak_sakallilar_council_active() \
+		and not CouncilEventEngine.is_crisis_dilemma_pending() \
+		and not DiplomacyManager.is_coalition_war_active(),
+		"Restoring Kut above 30 synchronously closes Ak Sakallılar crisis, pending dilemma, and hostile coalition war.")
+
+	SeasonManager.set_food_reserve(120)
+	SeasonManager.advance_season_cycle()
+	_expect(is_equal_approx(CouncilEventEngine.get_active_income_multiplier(), 1.0) \
+		and is_equal_approx(CouncilEventEngine.get_active_speed_multiplier(), 1.0),
+		"Passing a season after Kut crisis resolution cleanly sunsets temporary TRADITION austerity multipliers.")
+
+	# 3. Envoy Assassination Total War Lock Guard, Truce & Seasonal Infamy Decay
+	var envoy_cmd_1: AssassinateEnvoyCommand = AssassinateEnvoyCommand.new(10, 11, &"p12_envoy_alpha")
+	var envoy_cmd_while_war: AssassinateEnvoyCommand = AssassinateEnvoyCommand.new(10, 11, &"p12_envoy_beta")
+	_expect(CommandBus.dispatch(envoy_cmd_1) and IntelligenceManager.is_total_war_active(10, 11),
+		"Initial envoy assassination succeeds and escalates factions (10, 11) into TOTAL_WAR_GREAT_RAID.")
+	_expect(not CommandBus.dispatch(envoy_cmd_while_war),
+		"Envoy assassination is rejected while Total War is already active between factions.")
+
+	IntelligenceManager.establish_truce(10, 11)
+	_expect(not IntelligenceManager.is_total_war_active(10, 11) \
+		and not CommandBus.dispatch(AssassinateEnvoyCommand.new(10, 11, &"p12_envoy_alpha")) \
+		and CommandBus.dispatch(AssassinateEnvoyCommand.new(10, 11, &"p12_envoy_beta")),
+		"Restoring truce clears Total War lock for future diplomacy while keeping executed envoy permanently dead.")
+
+	DiplomacyManager.step_seasonal_diplomatic_decay(10)
+	_expect(is_zero_approx(DiplomacyManager.get_recent_assassination_infamy()) \
+		and is_zero_approx(DiplomacyManager.get_spy_exposure_penalty()),
+		"Seasonal diplomatic decay cools old assassination infamy and spy exposure penalties over time.")
+
+	# 4. Dead Army Epidemic Clearance, Duplicate Cataclysm Guard & Bounded Telemetry History
+	var winter: SeasonData = ResourceLoader.load("res://data/seasons/winter.tres") as SeasonData
+	SeasonManager.set_food_reserve(0)
+	SeasonManager.evaluate_zud_epidemic_outbreak(201, true, 1, winter)
+	SeasonManager.simulate_epidemic_day(201, 0)
+	_expect(not SeasonManager.is_army_infected(201),
+		"Exterminated army (0 troops) automatically clears OUTBREAK_EPIDEMIC status.")
+	SeasonManager.evaluate_epidemic_contagion_and_ration_strain(201, 202, 0, 0)
+	_expect(not SeasonManager.is_army_infected(202),
+		"Dead army (0 troops) cannot spread steppe plague contagion to living army 202.")
+
+	var kut_before_cataclysm: float = GameManager.get_kut_score()
+	for _fire_tick: int in range(5):
+		CommandBus.dispatch(EvaluateCataclysmCommand.new(Vector2i(19, 19), false, 34.0, false, 0.85, 14.5, 0.0))
+	var fire_data: CataclysmEventData = CataclysmEngine.get_cataclysm_data(GameEnums.CataclysmType.STEPPE_WILDFIRE_SCORCH)
+	_expect(_p12_cataclysm_erupted_count == 1 \
+		and is_equal_approx(GameManager.get_kut_score(), kut_before_cataclysm - fire_data.kut_shock_drain),
+		"Re-evaluating an already-active STEPPE_WILDFIRE_SCORCH on (19, 19) does not double-drain Kut or spam eruptions.")
+	CataclysmEngine.clear_region_cataclysm(Vector2i(19, 19))
+
+	CausalChainEngine.reset_continuous_state()
+	for _acc: int in range(260):
+		CommandBus.dispatch(StepContinuousSimulationCommand.new(1, 210, 1.0, true, false, false, true, 0.25, false))
+	for _rec_step: int in range(60):
+		CommandBus.dispatch(StepContinuousSimulationCommand.new(1, 210, 2.0, false, true, true, false, 0.80, true))
+	var settled_tick: StepContinuousSimulationCommand = StepContinuousSimulationCommand.new(
+		1, 210, 1.0, false, true, true, false, 0.80, true)
+	CommandBus.dispatch(settled_tick)
+	_expect(CausalChainEngine.get_transition_history().size() <= CausalChainEngine.MAX_TRANSITION_HISTORY \
+		and settled_tick.transition_records_emitted == 0,
+		"CausalChainEngine history stays capped (<= 256) across 320+ ticks and stops emitting no-op steady-state recovery records.")
+
+	EventBus.ak_sakallilar_council_convened.disconnect(_on_p12_council_convened)
+	EventBus.coalition_war_declared.disconnect(_on_p12_coalition_declared)
+	EventBus.cataclysm_erupted.disconnect(_on_p12_cataclysm_erupted)
+	EventBus.internal_betrayal_triggered.disconnect(_on_p12_internal_betrayal)
+
+
+func _on_p12_overgrazing_rebellion(_p_id: int, _coord: Vector2i, _penalty: float) -> void:
+	_p12_overgrazing_rebellion_count += 1
+
+
+func _on_p12_supply_line_restored(_army_id: int, _depot_id: int) -> void:
+	_p12_supply_restored_count += 1
+
+
+func _on_p12_council_convened(_current_kut: float, _penalty: float, _skirmish: bool) -> void:
+	_p12_council_convened_count += 1
+
+
+func _on_p12_coalition_declared(_members: PackedStringArray, _kut: float) -> void:
+	_p12_coalition_declared_count += 1
+
+
+func _on_p12_cataclysm_erupted(_c_id: StringName, _c_type: GameEnums.CataclysmType, _coord: Vector2i, _p_mult: float, _c_mult: float, _wear: float, _ref: int) -> void:
+	_p12_cataclysm_erupted_count += 1
+
+
+func _on_p12_internal_betrayal(_b_id: StringName, _stage: GameEnums.IntriguePlotStage, _trp: int, _sab: bool, _kut: float) -> void:
+	_p12_internal_betrayal_count += 1
+
 
 
 
