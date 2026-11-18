@@ -250,6 +250,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as CaptiveLaborRules).get_validation_errors())
 		elif res is SovereigntyProfileData:
 			errors.append_array((res as SovereigntyProfileData).get_validation_errors())
+		elif res is EmergentWorldRules:
+			errors.append_array((res as EmergentWorldRules).get_validation_errors())
 	return errors
 
 

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EmergentWorldRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/world/emergent_world_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"steppe_emergent_causality_rules"
+zud_pasture_supply_yilki_attrition = 0.25
+low_quiver_ammo_threshold = 6.0
+fracture_kut_threshold = 35.0
+inter_faction_mutual_exhaustion_ratio = 0.45
+neutral_trade_profiteer_bullion = 80
+opportunistic_double_strike_loot = 420.0
+coalition_intervention_reward = 210.0
