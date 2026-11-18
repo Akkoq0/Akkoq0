@@ -61,6 +61,7 @@ signal supply_depot_unregistered(depot_id: int)
 ## Late joiners (e.g. freshly spawned armies) ask depots to re-announce.
 signal supply_depots_resync_requested()
 signal supply_line_severed(army_id: int, depot_id: int, raider_id: StringName, captured_loot_value: float)
+signal supply_line_restored(army_id: int, depot_id: int)
 signal yilki_horses_sacrificed_for_ration(army_id: int, remaining_remount_ratio: float, morale_drop: float, kut_penalty: float)
 
 # --- Combat & Triple Collapse -----------------------------------------------

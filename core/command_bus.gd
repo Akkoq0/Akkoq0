@@ -34,6 +34,7 @@ func _ready() -> void:
 	_default_convoy = ResourceLoader.load(DEFAULT_CONVOY_PATH) as SupplyConvoyData
 	register_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
 	register_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
+	register_handler(RestoreSupplyLineCommand.ID, _handle_restore_supply_line)
 	register_handler(SplitDetachForceCommand.ID, _handle_split_detach_force)
 	register_handler(MergeForcesCommand.ID, _handle_merge_forces)
 	register_handler(RelocateNomadicOutpostCommand.ID, _handle_relocate_nomadic_outpost)
@@ -42,6 +43,7 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	unregister_handler(DistributeToyLootCommand.ID, _handle_distribute_toy_loot)
 	unregister_handler(InterdictSupplyLineCommand.ID, _handle_interdict_supply_line)
+	unregister_handler(RestoreSupplyLineCommand.ID, _handle_restore_supply_line)
 	unregister_handler(SplitDetachForceCommand.ID, _handle_split_detach_force)
 	unregister_handler(MergeForcesCommand.ID, _handle_merge_forces)
 	unregister_handler(RelocateNomadicOutpostCommand.ID, _handle_relocate_nomadic_outpost)
@@ -185,7 +187,7 @@ func _handle_distribute_toy_loot(command: GameCommand) -> bool:
 
 	EventBus.toy_loot_distributed.emit(dist.bey_id, dist.total_loot_value, dist.allocated_bey_value, delta)
 
-	if next_sat < _toy_rules.rebellion_satisfaction_threshold:
+	if next_sat < _toy_rules.rebellion_satisfaction_threshold and not _rogue_warbands.has(dist.bey_id):
 		_rogue_warbands[dist.bey_id] = _toy_rules.rogue_warband_title
 		dist.turned_rogue_warband = true
 		dist.spawned_warband_title = _toy_rules.rogue_warband_title
@@ -205,15 +207,34 @@ func _handle_interdict_supply_line(command: GameCommand) -> bool:
 	if convoy == null:
 		return command.reject("No SupplyConvoyData available for interdiction.")
 
+	var was_isolated: bool = is_army_supply_isolated(interdict.target_army_id)
 	_isolated_armies[interdict.target_army_id] = true
 	interdict.target_isolated = true
-	interdict.captured_loot_value = convoy.captured_loot_value
-	interdict.captured_food_ration = convoy.carried_food_ration
-	interdict.captured_remount_ratio = convoy.carried_remount_ratio
-	_raider_seized_loot[interdict.raider_id] = get_raider_seized_loot(interdict.raider_id) + convoy.captured_loot_value
+	if not was_isolated:
+		interdict.captured_loot_value = convoy.captured_loot_value
+		interdict.captured_food_ration = convoy.carried_food_ration
+		interdict.captured_remount_ratio = convoy.carried_remount_ratio
+		_raider_seized_loot[interdict.raider_id] = get_raider_seized_loot(interdict.raider_id) + convoy.captured_loot_value
+	else:
+		interdict.captured_loot_value = 0.0
+		interdict.captured_food_ration = 0
+		interdict.captured_remount_ratio = 0.0
 
 	EventBus.supply_line_severed.emit(
-		interdict.target_army_id, interdict.depot_id, interdict.raider_id, convoy.captured_loot_value)
+		interdict.target_army_id, interdict.depot_id, interdict.raider_id, interdict.captured_loot_value)
+	return true
+
+
+func _handle_restore_supply_line(command: GameCommand) -> bool:
+	var restore: RestoreSupplyLineCommand = command as RestoreSupplyLineCommand
+	if restore == null:
+		return command.reject("Expected RestoreSupplyLineCommand.")
+	if restore.army_id <= 0 or restore.depot_id <= 0:
+		return command.reject("RestoreSupplyLineCommand requires positive army_id and depot_id.")
+	restore.was_isolated = is_army_supply_isolated(restore.army_id)
+	_isolated_armies[restore.army_id] = false
+	restore.restored = true
+	EventBus.supply_line_restored.emit(restore.army_id, restore.depot_id)
 	return true
 
 

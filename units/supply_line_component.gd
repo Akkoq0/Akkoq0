@@ -7,6 +7,7 @@ extends Node
 ## (`consume_yilki_horses_for_ration()`).
 
 const REASON_YILKI_SACRIFICE: StringName = &"yilki_horse_sacrifice"
+const ISOLATION_RELIEF_DELAY_SEC: float = 4.0
 
 signal supply_changed(supply_ratio: float, is_connected: bool)
 signal remount_horse_ratio_changed(new_ratio: float)
@@ -38,6 +39,7 @@ var _is_connected: bool = false
 var _last_reported_ratio: float = -1.0
 var _terrain_attrition: float = 1.0
 var _season_attrition: float = 1.0
+var _isolation_relief_elapsed_sec: float = 0.0
 var _depots: Dictionary[int, DepotRecord] = {}
 
 
@@ -47,6 +49,7 @@ func _ready() -> void:
 	EventBus.supply_depot_unregistered.connect(_on_depot_unregistered)
 	EventBus.season_changed.connect(_on_season_changed)
 	EventBus.supply_line_severed.connect(_on_supply_line_severed)
+	EventBus.supply_line_restored.connect(_on_supply_line_restored)
 	EventBus.zud_starvation_ticked.connect(_on_zud_starvation_ticked)
 
 
@@ -67,6 +70,7 @@ func configure(template: ArmyTemplate, owner_id: int, p_army_id: int = 1) -> boo
 	_quiver_ammo_reserve = _profile.initial_quiver_ammo_reserve
 	_battle_morale = 100.0
 	_supply_status = GameEnums.SupplyLineStatus.CONNECTED
+	_isolation_relief_elapsed_sec = 0.0
 	set_physics_process(true)
 	_request_depot_resync.call_deferred()
 	return true
@@ -86,6 +90,15 @@ func get_supply_ratio() -> float:
 
 ## Current Yılkı spare-horse ratio (`remount_horse_ratio`).
 func get_remount_horse_ratio() -> float:
+	return _remount_horse_ratio
+
+
+## Replenishes Yılkı spare-horse herds at a friendly pasture or depot.
+func replenish_yilki_herd(restored_ratio: float) -> float:
+	if _profile == null:
+		return _remount_horse_ratio
+	_remount_horse_ratio = clampf(_remount_horse_ratio + maxf(restored_ratio, 0.0), 0.0, _profile.initial_remount_horse_ratio)
+	remount_horse_ratio_changed.emit(_remount_horse_ratio)
 	return _remount_horse_ratio
 
 
@@ -127,6 +140,20 @@ func is_starving() -> bool:
 	return _profile != null and get_supply_ratio() < _profile.low_supply_threshold
 
 
+## Clears `ISOLATED` state and restores operational supply corridor status.
+func restore_supply_corridor(restored_supply_ratio: float = 0.35) -> bool:
+	if _profile == null:
+		return false
+	_isolation_relief_elapsed_sec = 0.0
+	var inside_perimeter: bool = body != null and _is_in_depot_range(body.global_position)
+	_supply_status = GameEnums.SupplyLineStatus.CONNECTED if inside_perimeter else GameEnums.SupplyLineStatus.UNCONNECTED
+	_is_connected = inside_perimeter
+	_supply = maxf(_supply, clampf(restored_supply_ratio, 0.0, 1.0) * _profile.supply_capacity)
+	_last_reported_ratio = get_supply_ratio()
+	supply_changed.emit(_last_reported_ratio, _is_connected)
+	return true
+
+
 ## Slaughters the army's own Yılkı spare horses during Winter/Zud starvation
 ## (`Food <= 0`) when isolated from supply. Permanently destroys cavalry speed,
 ## collapses battle morale, and drains the Khagan's Kut score.
@@ -147,7 +174,16 @@ func consume_yilki_horses_for_ration() -> bool:
 func _physics_process(delta: float) -> void:
 	if _profile == null:
 		return
-	var in_range: bool = not is_isolated() and _is_in_depot_range(body.global_position)
+	var inside_perimeter: bool = _is_in_depot_range(body.global_position)
+	if is_isolated():
+		if inside_perimeter:
+			_isolation_relief_elapsed_sec += delta
+			if _isolation_relief_elapsed_sec >= ISOLATION_RELIEF_DELAY_SEC:
+				CommandBus.dispatch(RestoreSupplyLineCommand.new(_army_id, 1, 0.35))
+		else:
+			_isolation_relief_elapsed_sec = 0.0
+
+	var in_range: bool = not is_isolated() and inside_perimeter
 	if in_range:
 		_supply += _profile.resupply_rate_per_sec * delta
 		_quiver_ammo_reserve = minf(
@@ -198,10 +234,16 @@ func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 
 func _on_supply_line_severed(army_id: int, _depot_id: int, _raider_id: StringName, _captured_loot_value: float) -> void:
 	if army_id == _army_id:
+		_isolation_relief_elapsed_sec = 0.0
 		_supply_status = GameEnums.SupplyLineStatus.ISOLATED
 		_is_connected = false
 		_supply = 0.0
 		supply_changed.emit(0.0, false)
+
+
+func _on_supply_line_restored(army_id: int, _depot_id: int) -> void:
+	if army_id == _army_id:
+		restore_supply_corridor(0.35)
 
 
 func _on_zud_starvation_ticked(food_remaining: int, _season: SeasonData) -> void:

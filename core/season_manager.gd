@@ -19,6 +19,7 @@ var _food_reserve: int = 0
 var _army_epidemic_states: Dictionary[int, GameEnums.EpidemicState] = {}
 var _army_troop_counts: Dictionary[int, int] = {}
 var _epidemic_unpurified_days: Dictionary[int, int] = {}
+var _pasture_yield_multipliers: Dictionary[int, float] = {}
 
 
 func _ready() -> void:
@@ -76,6 +77,44 @@ func get_food_reserve() -> int:
 	return _food_reserve
 
 
+## Updates the active seasonal meat/milk pasture yield multiplier for `player_id`.
+func set_pasture_yield_multiplier(player_id: int, multiplier: float) -> void:
+	_pasture_yield_multipliers[player_id] = clampf(multiplier, 0.0, 2.0)
+
+
+func get_pasture_yield_multiplier(player_id: int) -> float:
+	return _pasture_yield_multipliers.get(player_id, 1.0)
+
+
+## Produces seasonal food reserves from healthy livestock pastures in Spring/Summer/Autumn.
+## Healthy pastures replenish ~83 Food across the three mild seasons against 60 Winter draw,
+## whereas overgrazed/starving pastures (`multiplier = 0.0`) yield 0 Food and trigger Zud famine.
+func produce_seasonal_pasture_food(season: SeasonData, pasture_yield_multiplier: float = -1.0, max_reserve: int = 300) -> int:
+	if season == null or season.season_type == GameEnums.SeasonType.WINTER:
+		return 0
+	var mult: float = pasture_yield_multiplier if pasture_yield_multiplier >= 0.0 else get_pasture_yield_multiplier(1)
+	if mult <= 0.0:
+		return 0
+	var base_harvest: float = 22.0
+	if season.season_type == GameEnums.SeasonType.SUMMER:
+		base_harvest = 26.0
+	elif season.season_type == GameEnums.SeasonType.AUTUMN:
+		base_harvest = 24.0
+	var produced: int = maxi(int(roundf(base_harvest * season.production_multiplier * mult)), 0)
+	_food_reserve = mini(_food_reserve + produced, maxi(max_reserve, _food_reserve))
+	return produced
+
+
+## Advances one full season synchronously, broadcasting `season_changed`,
+## harvesting mild-season pasture food, and evaluating Winter Zud starvation.
+func advance_season_cycle(pasture_yield_multiplier: float = -1.0) -> SeasonData:
+	if _cycle == null:
+		return null
+	_index = _cycle.get_next_index(_index)
+	_broadcast(pasture_yield_multiplier)
+	return get_current_season()
+
+
 ## Sets the clan food reserve and evaluates Zud starvation if currently in Winter.
 func set_food_reserve(amount: int) -> void:
 	_food_reserve = maxi(amount, 0)
@@ -97,7 +136,7 @@ func evaluate_zud_starvation(season: SeasonData) -> bool:
 	return false
 
 
-## Probability (`0..1`) of a Bozkır Vebası (`outbreak_epidemic`) outbreak when Food <= 0 during Winter/Zud.
+## Probability (`0..1`) of a Bozkır Vebası (`outbreak_epidemic`) when Food <= 0 during Winter/Zud.
 func get_epidemic_outbreak_chance(is_closed_camp: bool = true) -> float:
 	if _kut_rules == null:
 		return 0.0
@@ -143,16 +182,22 @@ func get_epidemic_speed_multiplier(army_id: int) -> float:
 
 
 ## Simulates one day of plague troop attrition for `army_id`.
-## Returns the remaining troop headcount after daily deaths.
+## Returns the remaining troop headcount after daily deaths and clears plague state if 0 remain.
 func simulate_epidemic_day(army_id: int, current_troops: int) -> int:
 	var clamped_troops: int = maxi(current_troops, 0)
-	if not is_army_infected(army_id) or _kut_rules == null or clamped_troops <= 0:
+	if clamped_troops <= 0:
+		_army_troop_counts[army_id] = 0
+		_clear_dead_army_epidemic(army_id)
+		return 0
+	if not is_army_infected(army_id) or _kut_rules == null:
 		_army_troop_counts[army_id] = clamped_troops
 		return clamped_troops
 	var casualties: int = maxi(int(ceilf(float(clamped_troops) * _kut_rules.epidemic_daily_troop_attrition_ratio)), 1)
 	var remaining: int = maxi(clamped_troops - casualties, 0)
 	_army_troop_counts[army_id] = remaining
 	EventBus.epidemic_daily_attrition_ticked.emit(army_id, remaining, casualties)
+	if remaining <= 0:
+		_clear_dead_army_epidemic(army_id)
 	return remaining
 
 
@@ -177,10 +222,13 @@ func get_epidemic_unpurified_days(army_id: int) -> int:
 ## Evaluates daily Zud epidemic contagion and food ration mitigation trade-offs:
 ##  * Allocating `extra_ration_allocated >= 20` medicinal food rations (when food suffices)
 ##    consumes food, halves daily troop attrition (`0.04`), and blocks contagion spread.
-##  * Withholding rations increments unpurified outbreak duration, infects `nearby_army_id`,
+##  * Withholding rations increments unpurified outbreak duration, infects living `nearby_army_id`,
 ##    and escalates future Kurgan purification `Kut` cost.
 func evaluate_epidemic_contagion_and_ration_strain(army_id: int, nearby_army_id: int, extra_ration_allocated: int, current_troops: int = 200) -> Dictionary[StringName, float]:
 	var clamped_troops: int = maxi(current_troops, 0)
+	if clamped_troops <= 0:
+		_army_troop_counts[army_id] = 0
+		_clear_dead_army_epidemic(army_id)
 	var metrics: Dictionary[StringName, float] = {
 		&"food_consumed": 0.0,
 		&"effective_attrition_ratio": 0.0,
@@ -203,7 +251,8 @@ func evaluate_epidemic_contagion_and_ration_strain(army_id: int, nearby_army_id:
 		var next_days: int = _epidemic_unpurified_days.get(army_id, 0) + 1
 		_epidemic_unpurified_days[army_id] = next_days
 		attrition_ratio = minf(attrition_ratio + float(mini(next_days, 4)) * 0.01, 0.20)
-		if nearby_army_id > 0 and nearby_army_id != army_id and not is_army_infected(nearby_army_id):
+		var nearby_alive: bool = not _army_troop_counts.has(nearby_army_id) or _army_troop_counts[nearby_army_id] > 0
+		if nearby_army_id > 0 and nearby_army_id != army_id and nearby_alive and not is_army_infected(nearby_army_id):
 			_army_epidemic_states[nearby_army_id] = GameEnums.EpidemicState.OUTBREAK_EPIDEMIC
 			EventBus.outbreak_epidemic_started.emit(
 				nearby_army_id,
@@ -215,12 +264,19 @@ func evaluate_epidemic_contagion_and_ration_strain(army_id: int, nearby_army_id:
 	var remaining: int = maxi(clamped_troops - casualties, 0)
 	_army_troop_counts[army_id] = remaining
 	EventBus.epidemic_daily_attrition_ticked.emit(army_id, remaining, casualties)
+	if remaining <= 0:
+		_clear_dead_army_epidemic(army_id)
 
 	metrics[&"effective_attrition_ratio"] = attrition_ratio
 	metrics[&"remaining_troops"] = float(remaining)
 	metrics[&"next_purification_kut_cost"] = get_effective_purification_kut_cost(army_id)
 	metrics[&"unpurified_days"] = float(get_epidemic_unpurified_days(army_id))
 	return metrics
+
+
+func _clear_dead_army_epidemic(army_id: int) -> void:
+	_army_epidemic_states[army_id] = GameEnums.EpidemicState.HEALTHY
+	_epidemic_unpurified_days[army_id] = 0
 
 
 func _handle_purify_epidemic(command: GameCommand) -> bool:
@@ -263,9 +319,10 @@ func _on_game_state_changed(_previous: GameEnums.GameState, new_state: GameEnums
 		_broadcast()
 
 
-func _broadcast() -> void:
+func _broadcast(pasture_yield_multiplier: float = -1.0) -> void:
 	var season: SeasonData = get_current_season()
 	if season != null:
 		EventBus.season_changed.emit(season, _index)
+		produce_seasonal_pasture_food(season, pasture_yield_multiplier)
 		evaluate_zud_starvation(season)
 

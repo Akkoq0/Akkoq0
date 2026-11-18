@@ -31,6 +31,7 @@ func _ready() -> void:
 			push_error("PastureEcologyManager: %s" % err)
 	CommandBus.register_handler(GrazePastureCommand.ID, _handle_graze_pasture)
 	CommandBus.register_handler(MigrateCampToPastureCommand.ID, _handle_migrate_camp)
+	EventBus.season_changed.connect(_on_season_changed)
 
 
 func _exit_tree() -> void:
@@ -45,6 +46,10 @@ func get_pasture_data() -> PastureData:
 func get_region_pasture_capacity(region_coord: Vector2i) -> float:
 	var default_cap: float = _pasture_data.max_pasture_capacity if _pasture_data != null else 100.0
 	return _region_capacities.get(region_coord, default_cap)
+
+
+func get_player_camp_region(player_id: int) -> Vector2i:
+	return _player_camp_regions.get(player_id, Vector2i.ZERO)
 
 
 func is_livestock_starving(player_id: int) -> bool:
@@ -63,6 +68,45 @@ func get_meat_milk_production_multiplier(player_id: int) -> float:
 	if is_livestock_starving(player_id):
 		return 0.0
 	return 1.0
+
+
+## Regenerates pastures for rested macro regions not currently occupied by any camp
+## (`excluded_regions` plus all active player camp coordinates).
+func step_seasonal_pasture_regeneration(season: SeasonData = null, excluded_regions: Array[Vector2i] = []) -> Dictionary[Vector2i, float]:
+	var updated: Dictionary[Vector2i, float] = {}
+	if _pasture_data == null:
+		return updated
+	var season_mult: float = 1.0
+	if season != null:
+		if season.season_type == GameEnums.SeasonType.WINTER:
+			season_mult = 0.0
+		elif season.season_type == GameEnums.SeasonType.SPRING:
+			season_mult = 1.5
+		elif season.season_type == GameEnums.SeasonType.SUMMER:
+			season_mult = 1.0
+		elif season.season_type == GameEnums.SeasonType.AUTUMN:
+			season_mult = 0.5
+	if season_mult <= 0.0:
+		return updated
+
+	var regen_delta: float = _pasture_data.waterside_regeneration_per_tick * season_mult
+	var coords: Array[Vector2i] = _region_capacities.keys()
+	for coord: Vector2i in coords:
+		if excluded_regions.has(coord):
+			continue
+		var occupied: bool = false
+		for pid: int in _player_camp_regions:
+			if _player_camp_regions[pid] == coord:
+				occupied = true
+				break
+		if occupied:
+			continue
+		var current_cap: float = _region_capacities[coord]
+		if current_cap < _pasture_data.max_pasture_capacity:
+			var next_cap: float = clampf(current_cap + regen_delta, 0.0, _pasture_data.max_pasture_capacity)
+			_region_capacities[coord] = next_cap
+			updated[coord] = next_cap
+	return updated
 
 
 func _handle_graze_pasture(command: GameCommand) -> bool:
@@ -84,6 +128,7 @@ func _handle_graze_pasture(command: GameCommand) -> bool:
 
 	if condition == GameEnums.PastureCondition.DEPLETED_STARVING:
 		var was_starving: bool = is_livestock_starving(graze.player_id)
+		var was_rebellion: bool = is_overgrazing_rebellion_active(graze.player_id)
 		_starving_livestock[graze.player_id] = true
 		_migration_required[graze.player_id] = true
 		graze.starving_livestock = true
@@ -99,9 +144,10 @@ func _handle_graze_pasture(command: GameCommand) -> bool:
 			if ticks >= _pasture_data.rebellion_grace_ticks_after_depletion:
 				_rebellion_active[graze.player_id] = true
 				graze.rebellion_triggered = true
-				CommandBus.dispatch(ModifyKutCommand.new(-_pasture_data.rebellion_kut_penalty, &"overgrazing_rebellion"))
-				EventBus.overgrazing_rebellion_triggered.emit(
-					graze.player_id, graze.region_coord, _pasture_data.rebellion_kut_penalty)
+				if not was_rebellion:
+					CommandBus.dispatch(ModifyKutCommand.new(-_pasture_data.rebellion_kut_penalty, &"overgrazing_rebellion"))
+					EventBus.overgrazing_rebellion_triggered.emit(
+						graze.player_id, graze.region_coord, _pasture_data.rebellion_kut_penalty)
 	else:
 		_starving_livestock[graze.player_id] = false
 		_migration_required[graze.player_id] = false
@@ -111,6 +157,7 @@ func _handle_graze_pasture(command: GameCommand) -> bool:
 		graze.meat_milk_production_multiplier = 1.0
 		graze.migration_required = false
 
+	SeasonManager.set_pasture_yield_multiplier(graze.player_id, get_meat_milk_production_multiplier(graze.player_id))
 	return true
 
 
@@ -126,22 +173,28 @@ func _handle_migrate_camp(command: GameCommand) -> bool:
 	if prev_coord == migrate.target_region_coord:
 		return command.reject("Camp is already located at region %s." % migrate.target_region_coord)
 
-	# Rested waterside target region has full or regenerated pasture capacity
+	# Inspect actual capacity of target region (rested pastures regenerate across seasons)
 	var target_cap: float = get_region_pasture_capacity(migrate.target_region_coord)
-	if target_cap < _pasture_data.max_pasture_capacity:
-		target_cap = clampf(target_cap + _pasture_data.waterside_regeneration_per_tick, 0.0, _pasture_data.max_pasture_capacity)
 	_region_capacities[migrate.target_region_coord] = target_cap
 
+	var target_condition: GameEnums.PastureCondition = _pasture_data.classify_condition(target_cap)
+	var still_depleted: bool = target_condition == GameEnums.PastureCondition.DEPLETED_STARVING
+
 	_player_camp_regions[migrate.player_id] = migrate.target_region_coord
-	_starving_livestock[migrate.player_id] = false
-	_migration_required[migrate.player_id] = false
+	_starving_livestock[migrate.player_id] = still_depleted
+	_migration_required[migrate.player_id] = still_depleted
 	_rebellion_active[migrate.player_id] = false
-	_depleted_ticks_without_migration[migrate.player_id] = 0
+	_depleted_ticks_without_migration[migrate.player_id] = 1 if still_depleted else 0
 
 	migrate.new_pasture_capacity = target_cap
-	migrate.starving_livestock_cleared = true
-	migrate.meat_milk_production_multiplier = 1.0
+	migrate.starving_livestock_cleared = not still_depleted
+	migrate.meat_milk_production_multiplier = 0.0 if still_depleted else 1.0
+	SeasonManager.set_pasture_yield_multiplier(migrate.player_id, get_meat_milk_production_multiplier(migrate.player_id))
 
 	EventBus.camp_migrated_by_sefer_arabasi.emit(
 		migrate.player_id, prev_coord, migrate.target_region_coord, target_cap)
 	return true
+
+
+func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
+	step_seasonal_pasture_regeneration(season)

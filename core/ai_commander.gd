@@ -8,6 +8,7 @@ extends Node
 ## `discipline` ratios (`DynastyProfile`) and `AIBehaviorProfile`.
 
 const AI_PROFILE_PATH: String = "res://data/ai/ai_behavior_profile.tres"
+const RAID_SUPPLY_COST: float = 60.0
 
 var _profile: AIBehaviorProfile = null
 var _agent_phases: Dictionary[StringName, GameEnums.AICommanderPhase] = {}
@@ -80,7 +81,10 @@ func _handle_step_ai(command: GameCommand) -> bool:
 	if current_phase == GameEnums.AICommanderPhase.GATHER_RESOURCES:
 		stockpile += _profile.base_gather_rate_per_tick * (1.0 + ambition * 0.50 + discipline * 0.30)
 		_agent_stockpiles[step_cmd.agent_id] = stockpile
-		if stockpile >= _profile.compute_effective_forge_threshold(ambition):
+		if is_agent_forge_upgraded(step_cmd.agent_id):
+			if stockpile >= _profile.compute_effective_raid_threshold(ambition, discipline):
+				_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.LAUNCH_RAID)
+		elif stockpile >= _profile.compute_effective_forge_threshold(ambition):
 			_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.UPGRADE_FORGE)
 	elif current_phase == GameEnums.AICommanderPhase.UPGRADE_FORGE:
 		_agent_forge_upgraded[step_cmd.agent_id] = true
@@ -91,27 +95,34 @@ func _handle_step_ai(command: GameCommand) -> bool:
 
 	var updated_phase: GameEnums.AICommanderPhase = get_agent_phase(step_cmd.agent_id)
 	if updated_phase == GameEnums.AICommanderPhase.LAUNCH_RAID:
-		var turan_phase: GameEnums.TuranTacticPhase = _profile.select_deterministic_turan_phase(ambition, discipline)
-		var target_type: StringName = _profile.select_deterministic_raid_target(ambition, discipline)
-		if step_cmd.is_rogue_warband:
-			target_type = &"supply_line"
-		if target_type == &"supply_line" and step_cmd.target_player_army_id > 0:
-			CommandBus.dispatch(InterdictSupplyLineCommand.new(
-				step_cmd.target_player_army_id, step_cmd.target_depot_id, step_cmd.agent_id))
-		_agent_raids_launched[step_cmd.agent_id] = get_agent_raids_launched(step_cmd.agent_id) + 1
-		step_cmd.raid_launched = true
-		step_cmd.chosen_turan_phase = turan_phase
-		step_cmd.raid_target_type = target_type
-		EventBus.ai_raid_launched.emit(
-			step_cmd.agent_id,
-			step_cmd.is_rogue_warband,
-			target_type,
-			step_cmd.target_player_army_id,
-			turan_phase,
-			ambition,
-			discipline)
+		if stockpile < RAID_SUPPLY_COST:
+			_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.GATHER_RESOURCES)
+		else:
+			stockpile -= RAID_SUPPLY_COST
+			_agent_stockpiles[step_cmd.agent_id] = stockpile
+			var turan_phase: GameEnums.TuranTacticPhase = _profile.select_deterministic_turan_phase(ambition, discipline)
+			var target_type: StringName = _profile.select_deterministic_raid_target(ambition, discipline)
+			if step_cmd.is_rogue_warband:
+				target_type = &"supply_line"
+			if target_type == &"supply_line" and step_cmd.target_player_army_id > 0:
+				CommandBus.dispatch(InterdictSupplyLineCommand.new(
+					step_cmd.target_player_army_id, step_cmd.target_depot_id, step_cmd.agent_id))
+			_agent_raids_launched[step_cmd.agent_id] = get_agent_raids_launched(step_cmd.agent_id) + 1
+			step_cmd.raid_launched = true
+			step_cmd.chosen_turan_phase = turan_phase
+			step_cmd.raid_target_type = target_type
+			EventBus.ai_raid_launched.emit(
+				step_cmd.agent_id,
+				step_cmd.is_rogue_warband,
+				target_type,
+				step_cmd.target_player_army_id,
+				turan_phase,
+				ambition,
+				discipline)
+			if stockpile < RAID_SUPPLY_COST:
+				_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.GATHER_RESOURCES)
 
-	step_cmd.new_phase = updated_phase
+	step_cmd.new_phase = get_agent_phase(step_cmd.agent_id)
 	return true
 
 

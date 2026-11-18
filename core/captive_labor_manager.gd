@@ -21,6 +21,7 @@ var _rules: CaptiveLaborRules = null
 var _slave_workers_by_player: Dictionary[int, int] = {}
 var _clan_population_by_player: Dictionary[int, int] = {}
 var _envoy_exchange_credits: Dictionary[int, float] = {}
+var _revolt_active_by_player: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
@@ -57,6 +58,10 @@ func get_envoy_exchange_credits(player_id: int) -> float:
 	return _envoy_exchange_credits.get(player_id, 0.0)
 
 
+func is_slave_revolt_active(player_id: int) -> bool:
+	return _revolt_active_by_player.get(player_id, false)
+
+
 ## Returns the construction time multiplier (`1.0` down to `0.70` = 30% reduction).
 func get_construction_time_multiplier(player_id: int) -> float:
 	if _rules == null:
@@ -76,6 +81,29 @@ func get_slave_revolt_risk(player_id: int) -> float:
 	if _rules == null:
 		return 0.0
 	return _rules.compute_slave_revolt_risk(get_captured_slave_workers(player_id), get_core_clan_population(player_id))
+
+
+## Voluntarily emancipates or releases `count` captive workers to restore Töre balance
+## and defuse active slave revolt risk. Returns remaining captive workers.
+func release_or_emancipate_captives(player_id: int, count: int) -> int:
+	var current: int = get_captured_slave_workers(player_id)
+	var updated: int = maxi(current - maxi(count, 0), 0)
+	_slave_workers_by_player[player_id] = updated
+	var clan_pop: int = get_core_clan_population(player_id)
+	if updated <= clan_pop:
+		_revolt_active_by_player[player_id] = false
+	return updated
+
+
+## Applies seasonal captive manumission / attrition so captive labor pools do not accumulate unboundedly.
+func step_captive_labor_season(player_id: int) -> int:
+	var current: int = get_captured_slave_workers(player_id)
+	if current <= 0:
+		_revolt_active_by_player[player_id] = false
+		return 0
+	var clan_pop: int = get_core_clan_population(player_id)
+	var attrition: int = maxi(current / 12, 1) if current > clan_pop else maxi(current / 20, 0)
+	return release_or_emancipate_captives(player_id, attrition)
 
 
 func _handle_process_nobles(command: GameCommand) -> bool:
@@ -113,12 +141,36 @@ func _handle_assign_labor(command: GameCommand) -> bool:
 	if cmd.core_clan_population > 0:
 		_clan_population_by_player[cmd.player_id] = cmd.core_clan_population
 
-	var updated_workers: int = maxi(get_captured_slave_workers(cmd.player_id) + cmd.added_slave_workers, 0)
-	_slave_workers_by_player[cmd.player_id] = updated_workers
 	var clan_pop: int = get_core_clan_population(cmd.player_id)
+	var max_camp_captives: int = maxi(clan_pop * 4, 480)
+	var updated_workers: int = clampi(get_captured_slave_workers(cmd.player_id) + cmd.added_slave_workers, 0, max_camp_captives)
+	_slave_workers_by_player[cmd.player_id] = updated_workers
 
 	var discount: float = _rules.compute_labor_discount_ratio(updated_workers)
 	var risk: float = _rules.compute_slave_revolt_risk(updated_workers, clan_pop)
+
+	if risk > 0.0:
+		var was_revolt_active: bool = is_slave_revolt_active(cmd.player_id)
+		var excess: int = updated_workers - clan_pop
+		if not was_revolt_active:
+			_revolt_active_by_player[cmd.player_id] = true
+			cmd.revolt_triggered = true
+			CommandBus.dispatch(ModifyKutCommand.new(-_rules.slave_revolt_kut_penalty, &"slave_revolt"))
+			EventBus.slave_revolt_triggered.emit(cmd.player_id, updated_workers, clan_pop, risk)
+			if excess > 1:
+				var escaped: int = mini(excess - 1, maxi(excess / 3, 1))
+				updated_workers -= escaped
+				_slave_workers_by_player[cmd.player_id] = updated_workers
+				discount = _rules.compute_labor_discount_ratio(updated_workers)
+				risk = _rules.compute_slave_revolt_risk(updated_workers, clan_pop)
+		elif cmd.added_slave_workers > 0 and excess > 1:
+			var overflow_escaped: int = mini(excess - 1, maxi(cmd.added_slave_workers / 2, 1))
+			updated_workers -= overflow_escaped
+			_slave_workers_by_player[cmd.player_id] = updated_workers
+			discount = _rules.compute_labor_discount_ratio(updated_workers)
+			risk = _rules.compute_slave_revolt_risk(updated_workers, clan_pop)
+	else:
+		_revolt_active_by_player[cmd.player_id] = false
 
 	cmd.total_slave_workers = updated_workers
 	cmd.discount_ratio = discount
@@ -127,17 +179,13 @@ func _handle_assign_labor(command: GameCommand) -> bool:
 	cmd.slave_revolt_risk = risk
 
 	EventBus.captive_labor_assigned.emit(cmd.player_id, updated_workers, clan_pop, discount, discount)
-
-	if risk > 0.0:
-		cmd.revolt_triggered = true
-		CommandBus.dispatch(ModifyKutCommand.new(-_rules.slave_revolt_kut_penalty, &"slave_revolt"))
-		EventBus.slave_revolt_triggered.emit(cmd.player_id, updated_workers, clan_pop, risk)
-
 	return true
 
 
 func _on_routed_troops_enslaved(_routed_army_id: int, captured_slave_workers: int, _added_toy_loot_value: float) -> void:
 	if captured_slave_workers <= 0:
 		return
+	var clan_pop: int = get_core_clan_population(1)
+	var max_camp_captives: int = maxi(clan_pop * 4, 480)
 	var current: int = get_captured_slave_workers(1)
-	_slave_workers_by_player[1] = current + captured_slave_workers
+	_slave_workers_by_player[1] = clampi(current + captured_slave_workers, 0, max_camp_captives)

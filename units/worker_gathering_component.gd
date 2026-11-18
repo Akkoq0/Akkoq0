@@ -159,12 +159,12 @@ func _extract_from_target_tile() -> void:
 	if _target_tile == null or profile == null:
 		return
 	var cap: int = profile.carry_capacity_per_trip
-	if _target_tile.has_ore():
-		var extracted: int = mini(cap, _target_tile.ore_amount)
+	if _target_tile.ore != null:
+		var extracted: int = mini(cap, maxi(_target_tile.ore_amount, 0))
 		_target_tile.ore_amount = maxi(_target_tile.ore_amount - extracted, 0)
-		_carried_resource_id = _target_tile.ore.id
+		_carried_resource_id = _target_tile.ore.id if extracted > 0 else &""
 		_carried_amount = extracted
-	else:
+	elif _target_tile.terrain != null and _target_tile.terrain.terrain_type == GameEnums.TerrainType.FOREST:
 		_carried_resource_id = WOOD_RESOURCE_ID
 		_carried_amount = cap
 
