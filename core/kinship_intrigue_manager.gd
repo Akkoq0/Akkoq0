@@ -58,6 +58,14 @@ func get_lord_plot_stage(bey_id: StringName) -> GameEnums.IntriguePlotStage:
 	return get_or_create_lord(bey_id).plot_stage
 
 
+func get_active_plot_count() -> int:
+	var count: int = 0
+	for bey_id: StringName in _lords:
+		if _lords[bey_id].plot_stage != GameEnums.IntriguePlotStage.LOYAL_CALM:
+			count += 1
+	return count
+
+
 func _handle_step_intrigue(command: GameCommand) -> bool:
 	var cmd: StepKinshipIntrigueCommand = command as StepKinshipIntrigueCommand
 	if cmd == null:
@@ -67,7 +75,7 @@ func _handle_step_intrigue(command: GameCommand) -> bool:
 
 	var lord: KinshipLordRecord = get_or_create_lord(cmd.bey_id)
 	var prev_stage: GameEnums.IntriguePlotStage = lord.plot_stage
-	if cmd.ambition_override >= 0.0:
+	if not is_nan(cmd.ambition_override) and not is_inf(cmd.ambition_override) and cmd.ambition_override >= 0.0:
 		lord.ambition = clampf(cmd.ambition_override, 0.0, 100.0)
 
 	if cmd.unfair_toy_share:
@@ -83,7 +91,11 @@ func _handle_step_intrigue(command: GameCommand) -> bool:
 	var next_stage: GameEnums.IntriguePlotStage = _rules.classify_plot_stage(lord.loyalty, lord.ambition, lord.grievance)
 	lord.plot_stage = next_stage
 
-	if next_stage == GameEnums.IntriguePlotStage.FACTION_PLOT_BREWING:
+	if next_stage == GameEnums.IntriguePlotStage.LOYAL_CALM:
+		lord.defected_troops = 0
+		lord.supply_sabotaged = false
+		lord.uprising_kut_applied = false
+	elif next_stage == GameEnums.IntriguePlotStage.FACTION_PLOT_BREWING:
 		if next_stage != prev_stage:
 			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
 	elif next_stage == GameEnums.IntriguePlotStage.DEFECTION_OR_SABOTAGE:
@@ -94,16 +106,17 @@ func _handle_step_intrigue(command: GameCommand) -> bool:
 				CommandBus.dispatch(InterdictSupplyLineCommand.new(cmd.target_army_id_for_sabotage, 1, lord.bey_id))
 			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
 			EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, true, 0.0)
-		cmd.defected_troops = lord.defected_troops
-		cmd.supply_sabotaged = lord.supply_sabotaged
 	elif next_stage == GameEnums.IntriguePlotStage.INTERNAL_UPRISING:
 		if next_stage != prev_stage:
 			lord.defected_troops = _rules.base_defected_troops * 2
-			CommandBus.dispatch(ModifyKutCommand.new(-_rules.uprising_kut_drain, &"kinship_internal_uprising"))
-			EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
-			EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, false, _rules.uprising_kut_drain)
-		cmd.defected_troops = lord.defected_troops
+			if not lord.uprising_kut_applied:
+				lord.uprising_kut_applied = true
+				CommandBus.dispatch(ModifyKutCommand.new(-_rules.uprising_kut_drain, &"kinship_internal_uprising"))
+				EventBus.kinship_plot_escalated.emit(lord.bey_id, next_stage, lord.loyalty, lord.ambition, lord.grievance)
+				EventBus.internal_betrayal_triggered.emit(lord.bey_id, next_stage, lord.defected_troops, false, _rules.uprising_kut_drain)
 
+	cmd.defected_troops = lord.defected_troops
+	cmd.supply_sabotaged = lord.supply_sabotaged
 	cmd.resulting_loyalty = lord.loyalty
 	cmd.resulting_grievance = lord.grievance
 	cmd.resulting_stage = lord.plot_stage
@@ -140,6 +153,7 @@ func _handle_resolve_intrigue(command: GameCommand) -> bool:
 	lord.plot_stage = GameEnums.IntriguePlotStage.LOYAL_CALM
 	lord.defected_troops = 0
 	lord.supply_sabotaged = false
+	lord.uprising_kut_applied = false
 
 	cmd.restored_loyalty = lord.loyalty
 	cmd.remaining_grievance = lord.grievance

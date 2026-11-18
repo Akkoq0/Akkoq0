@@ -124,7 +124,7 @@ func get_rogue_warband_beys() -> PackedStringArray:
 ## Reintegrates an independent rogue warband (`Yersiz Yurtsuz Çeriler`) directly
 ## into the Khagan's army without hostages when recruited via high Khagan Glory.
 func reintegrate_rogue_warband(bey_id: StringName) -> bool:
-	if not _rogue_warbands.has(bey_id):
+	if bey_id == &"" or not _rogue_warbands.has(bey_id):
 		return false
 	_rogue_warbands.erase(bey_id)
 	var restored_sat: float = _toy_rules.initial_bey_satisfaction if _toy_rules != null else 65.0
@@ -173,6 +173,9 @@ func _handle_distribute_toy_loot(command: GameCommand) -> bool:
 		return command.reject("ToyDistributionRules not loaded.")
 	if dist.bey_id == &"":
 		return command.reject("DistributeToyLootCommand requires a non-empty bey_id.")
+	if is_nan(dist.total_loot_value) or is_inf(dist.total_loot_value) \
+			or is_nan(dist.allocated_bey_value) or is_inf(dist.allocated_bey_value):
+		return command.reject("Loot values must be finite.")
 	if dist.total_loot_value < 0.0 or dist.allocated_bey_value < 0.0:
 		return command.reject("Loot values cannot be negative.")
 	if dist.allocated_bey_value > dist.total_loot_value:
@@ -245,8 +248,10 @@ func _handle_split_detach_force(command: GameCommand) -> bool:
 	if split_cmd.parent_army_id <= 0 or split_cmd.detachment_army_id <= 0 or split_cmd.parent_army_id == split_cmd.detachment_army_id:
 		return command.reject("SplitDetachForceCommand requires distinct positive parent and detachment army IDs.")
 	if not _army_riders.has(split_cmd.parent_army_id):
+		var raw_quiver: float = split_cmd.initial_parent_quiver_if_unregistered
+		var safe_init_quiver: float = 0.0 if (is_nan(raw_quiver) or is_inf(raw_quiver)) else maxf(raw_quiver, 0.0)
 		_army_riders[split_cmd.parent_army_id] = maxi(split_cmd.initial_parent_riders_if_unregistered, 1)
-		_army_quiver_ammo[split_cmd.parent_army_id] = maxf(split_cmd.initial_parent_quiver_if_unregistered, 0.0)
+		_army_quiver_ammo[split_cmd.parent_army_id] = safe_init_quiver
 		_army_roles[split_cmd.parent_army_id] = GameEnums.DetachmentRole.VANGUARD_MAIN
 
 	var parent_riders: int = _army_riders[split_cmd.parent_army_id]
@@ -298,6 +303,7 @@ func _handle_merge_forces(command: GameCommand) -> bool:
 	_army_riders.erase(merge_cmd.detachment_army_id)
 	_army_quiver_ammo.erase(merge_cmd.detachment_army_id)
 	_army_roles.erase(merge_cmd.detachment_army_id)
+	_isolated_armies.erase(merge_cmd.detachment_army_id)
 
 	merge_cmd.merged_total_riders = total_riders
 	merge_cmd.merged_quiver_ammo = total_quiver

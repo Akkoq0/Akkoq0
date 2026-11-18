@@ -20,6 +20,7 @@ const REASON_ENVOY_ASSASSINATION: StringName = &"envoy_assassination"
 
 var glory_score: float = 0.0
 var _army_id: int = 1
+var _owner_id: int = 1
 var _recruited_troops: int = 0
 var _recruited_warbands: PackedStringArray = PackedStringArray()
 
@@ -27,16 +28,35 @@ var _recruited_warbands: PackedStringArray = PackedStringArray()
 func _ready() -> void:
 	if rules == null:
 		rules = ResourceLoader.load(DEFAULT_RULES_PATH) as DiplomacyRules
-	EventBus.crescent_trap_sprung.connect(_on_crescent_trap_sprung)
-	EventBus.feigned_retreat_lured.connect(_on_feigned_retreat_lured)
-	EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
-	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
-	EventBus.council_decree_enacted.connect(_on_council_decree_enacted)
+	if not EventBus.crescent_trap_sprung.is_connected(_on_crescent_trap_sprung):
+		EventBus.crescent_trap_sprung.connect(_on_crescent_trap_sprung)
+	if not EventBus.feigned_retreat_lured.is_connected(_on_feigned_retreat_lured):
+		EventBus.feigned_retreat_lured.connect(_on_feigned_retreat_lured)
+	if not EventBus.envoy_assassinated.is_connected(_on_envoy_assassinated):
+		EventBus.envoy_assassinated.connect(_on_envoy_assassinated)
+	if not EventBus.espionage_mission_completed.is_connected(_on_espionage_mission_completed):
+		EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
+	if not EventBus.council_decree_enacted.is_connected(_on_council_decree_enacted):
+		EventBus.council_decree_enacted.connect(_on_council_decree_enacted)
 
 
-## Configures the component for `p_army_id` and resets `glory_score`.
-func configure(p_army_id: int, p_rules: DiplomacyRules = null) -> void:
+func _exit_tree() -> void:
+	if EventBus.crescent_trap_sprung.is_connected(_on_crescent_trap_sprung):
+		EventBus.crescent_trap_sprung.disconnect(_on_crescent_trap_sprung)
+	if EventBus.feigned_retreat_lured.is_connected(_on_feigned_retreat_lured):
+		EventBus.feigned_retreat_lured.disconnect(_on_feigned_retreat_lured)
+	if EventBus.envoy_assassinated.is_connected(_on_envoy_assassinated):
+		EventBus.envoy_assassinated.disconnect(_on_envoy_assassinated)
+	if EventBus.espionage_mission_completed.is_connected(_on_espionage_mission_completed):
+		EventBus.espionage_mission_completed.disconnect(_on_espionage_mission_completed)
+	if EventBus.council_decree_enacted.is_connected(_on_council_decree_enacted):
+		EventBus.council_decree_enacted.disconnect(_on_council_decree_enacted)
+
+
+## Configures the component for `p_army_id` (and `p_owner_id`) and resets `glory_score`.
+func configure(p_army_id: int, p_rules: DiplomacyRules = null, p_owner_id: int = 1) -> void:
 	_army_id = p_army_id
+	_owner_id = p_owner_id
 	if p_rules != null:
 		rules = p_rules
 	elif rules == null:
@@ -89,7 +109,9 @@ func recruit_rogue_warband(bey_id: StringName) -> int:
 		return 0
 	var added_troops: int = rules.rogue_warband_troop_size
 	_recruited_troops += added_troops
-	_recruited_warbands.append(String(bey_id))
+	var bey_label: String = String(bey_id)
+	if not _recruited_warbands.has(bey_label):
+		_recruited_warbands.append(bey_label)
 	EventBus.rogue_warband_joined_by_glory.emit(_army_id, bey_id, added_troops, glory_score)
 	return added_troops
 
@@ -106,7 +128,9 @@ func recruit_rogue_warband_scaled_by_glory(bey_id: StringName) -> int:
 	var scale_mult: float = lerpf(1.0, 1.5, excess_ratio)
 	var added_troops: int = roundi(float(rules.rogue_warband_troop_size) * scale_mult)
 	_recruited_troops += added_troops
-	_recruited_warbands.append(String(bey_id))
+	var bey_label: String = String(bey_id)
+	if not _recruited_warbands.has(bey_label):
+		_recruited_warbands.append(bey_label)
 	EventBus.rogue_warband_joined_by_glory.emit(_army_id, bey_id, added_troops, glory_score)
 	return added_troops
 
@@ -120,6 +144,10 @@ func get_recruited_warbands() -> PackedStringArray:
 
 
 func _add_glory(delta: float, reason: StringName) -> float:
+	if is_nan(delta) or is_inf(delta):
+		return glory_score
+	if is_nan(glory_score) or is_inf(glory_score):
+		glory_score = 0.0
 	var max_glory: float = rules.max_glory_score if rules != null else 100.0
 	var previous: float = glory_score
 	glory_score = clampf(glory_score + delta, 0.0, max_glory)
@@ -138,15 +166,16 @@ func _on_feigned_retreat_lured(luring_army_id: int, _pursuer_id: int, _overext: 
 		record_successful_feigned_retreat()
 
 
-func _on_envoy_assassinated(_instigator_id: int, _target_id: int, _envoy_id: StringName, _kut_gained: float) -> void:
-	record_envoy_assassination()
+func _on_envoy_assassinated(instigator_id: int, _target_id: int, _envoy_id: StringName, _kut_gained: float) -> void:
+	if instigator_id == _owner_id:
+		record_envoy_assassination()
 
 
 func _on_espionage_mission_completed(report: EspionageReport) -> void:
-	if report != null and report.succeeded:
+	if report != null and report.succeeded and report.spy_owner_id == _owner_id:
 		_add_glory(4.0, &"espionage_outmaneuver")
 
 
-func _on_council_decree_enacted(_player_id: int, choice: GameEnums.CouncilDilemmaChoice, _kut: float, _inc: float, _spd: float, _loot: float) -> void:
-	if choice == GameEnums.CouncilDilemmaChoice.EXPANSION:
+func _on_council_decree_enacted(player_id: int, choice: GameEnums.CouncilDilemmaChoice, _kut: float, _inc: float, _spd: float, _loot: float) -> void:
+	if player_id == _owner_id and choice == GameEnums.CouncilDilemmaChoice.EXPANSION:
 		_add_glory(6.0, &"council_expansion_decree")

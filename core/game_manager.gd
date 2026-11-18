@@ -149,23 +149,29 @@ func _handle_modify_kut(command: GameCommand) -> bool:
 
 
 func _apply_kut_delta(delta: float, reason: StringName) -> void:
+	if is_nan(delta) or is_inf(delta):
+		return
 	var max_kut: float = _kut_rules.max_kut if _kut_rules != null else 100.0
 	var critical: float = _kut_rules.critical_kut_threshold if _kut_rules != null else 30.0
 	var previous: float = _kut_score
 	var was_council_active: bool = _council_active
+	if is_nan(_kut_score) or is_inf(_kut_score):
+		_kut_score = _kut_rules.initial_kut if _kut_rules != null else 75.0
 	_kut_score = clampf(_kut_score + delta, 0.0, max_kut)
-	if not is_equal_approx(previous, _kut_score):
-		EventBus.kut_changed.emit(previous, _kut_score, reason)
 	if _kut_score < critical:
 		var penalty: float = _kut_rules.legitimacy_loss_penalty if _kut_rules != null else 0.25
 		var skirmish: bool = _kut_rules.trigger_civil_skirmish_on_critical if _kut_rules != null else true
 		_council_active = true
 		_legitimacy_multiplier = clampf(1.0 - penalty, 0.0, 1.0)
+		if not is_equal_approx(previous, _kut_score):
+			EventBus.kut_changed.emit(previous, _kut_score, reason)
 		if not was_council_active:
 			EventBus.ak_sakallilar_council_convened.emit(_kut_score, penalty, skirmish)
 	else:
 		_council_active = false
 		_legitimacy_multiplier = 1.0
+		if not is_equal_approx(previous, _kut_score):
+			EventBus.kut_changed.emit(previous, _kut_score, reason)
 
 
 func _on_zud_starvation_ticked(_food_remaining: int, _season: SeasonData) -> void:

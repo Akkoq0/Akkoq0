@@ -9,12 +9,19 @@ extends Node
 
 const AI_PROFILE_PATH: String = "res://data/ai/ai_behavior_profile.tres"
 const RAID_SUPPLY_COST: float = 60.0
+const MAX_AGENT_STOCKPILE: float = 5000.0
 
 var _profile: AIBehaviorProfile = null
 var _agent_phases: Dictionary[StringName, GameEnums.AICommanderPhase] = {}
 var _agent_stockpiles: Dictionary[StringName, float] = {}
 var _agent_forge_upgraded: Dictionary[StringName, bool] = {}
 var _agent_raids_launched: Dictionary[StringName, int] = {}
+
+
+static func _safe_float(val: float, fallback: float, min_val: float = 0.0, max_val: float = MAX_AGENT_STOCKPILE) -> float:
+	if is_nan(val) or is_inf(val):
+		return fallback
+	return clampf(val, min_val, max_val)
 
 
 func _ready() -> void:
@@ -40,7 +47,8 @@ func get_agent_phase(agent_id: StringName) -> GameEnums.AICommanderPhase:
 
 
 func get_agent_stockpile(agent_id: StringName) -> float:
-	return _agent_stockpiles.get(agent_id, 0.0)
+	var raw: float = _agent_stockpiles[agent_id] if _agent_stockpiles.has(agent_id) else 0.0
+	return clampf(_safe_float(raw, 0.0), 0.0, MAX_AGENT_STOCKPILE)
 
 
 func is_agent_forge_upgraded(agent_id: StringName) -> bool:
@@ -55,9 +63,11 @@ func get_agent_raids_launched(agent_id: StringName) -> int:
 func get_agent_traits(agent_id: StringName, is_rogue_warband: bool) -> Vector2:
 	var dyn: DynastyProfile = DiplomacyManager.get_dynasty_profile(agent_id)
 	if dyn != null and not is_rogue_warband:
-		return Vector2(dyn.ambition, dyn.discipline)
+		return Vector2(_safe_float(dyn.ambition, 0.65, 0.0, 1.0), _safe_float(dyn.discipline, 0.70, 0.0, 1.0))
 	if _profile != null:
-		return Vector2(_profile.rogue_warband_default_ambition, _profile.rogue_warband_default_discipline)
+		return Vector2(
+			_safe_float(_profile.rogue_warband_default_ambition, 0.85, 0.0, 1.0),
+			_safe_float(_profile.rogue_warband_default_discipline, 0.60, 0.0, 1.0))
 	return Vector2(0.85, 0.60)
 
 
@@ -79,7 +89,7 @@ func _handle_step_ai(command: GameCommand) -> bool:
 	var stockpile: float = get_agent_stockpile(step_cmd.agent_id)
 
 	if current_phase == GameEnums.AICommanderPhase.GATHER_RESOURCES:
-		stockpile += _profile.base_gather_rate_per_tick * (1.0 + ambition * 0.50 + discipline * 0.30)
+		stockpile = clampf(stockpile + _profile.base_gather_rate_per_tick * (1.0 + ambition * 0.50 + discipline * 0.30), 0.0, MAX_AGENT_STOCKPILE)
 		_agent_stockpiles[step_cmd.agent_id] = stockpile
 		if is_agent_forge_upgraded(step_cmd.agent_id):
 			if stockpile >= _profile.compute_effective_raid_threshold(ambition, discipline):
@@ -88,7 +98,7 @@ func _handle_step_ai(command: GameCommand) -> bool:
 			_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.UPGRADE_FORGE)
 	elif current_phase == GameEnums.AICommanderPhase.UPGRADE_FORGE:
 		_agent_forge_upgraded[step_cmd.agent_id] = true
-		stockpile += _profile.base_gather_rate_per_tick * (1.0 + ambition * 0.45 + discipline * 0.55)
+		stockpile = clampf(stockpile + _profile.base_gather_rate_per_tick * (1.0 + ambition * 0.45 + discipline * 0.55), 0.0, MAX_AGENT_STOCKPILE)
 		_agent_stockpiles[step_cmd.agent_id] = stockpile
 		if stockpile >= _profile.compute_effective_raid_threshold(ambition, discipline):
 			_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.LAUNCH_RAID)
@@ -98,7 +108,7 @@ func _handle_step_ai(command: GameCommand) -> bool:
 		if stockpile < RAID_SUPPLY_COST:
 			_set_phase(step_cmd.agent_id, GameEnums.AICommanderPhase.GATHER_RESOURCES)
 		else:
-			stockpile -= RAID_SUPPLY_COST
+			stockpile = clampf(stockpile - RAID_SUPPLY_COST, 0.0, MAX_AGENT_STOCKPILE)
 			_agent_stockpiles[step_cmd.agent_id] = stockpile
 			var turan_phase: GameEnums.TuranTacticPhase = _profile.select_deterministic_turan_phase(ambition, discipline)
 			var target_type: StringName = _profile.select_deterministic_raid_target(ambition, discipline)

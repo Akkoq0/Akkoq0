@@ -29,7 +29,7 @@ func _ready() -> void:
 	if morale_component != null:
 		morale_component.configure(army_id)
 	if glory_component != null:
-		glory_component.configure(army_id)
+		glory_component.configure(army_id, null, owner_id)
 	mobility.passability_check = terrain_sensor.is_position_passable
 	terrain_sensor.terrain_changed.connect(_on_terrain_changed)
 	mobility.destination_reached.connect(_on_destination_reached)

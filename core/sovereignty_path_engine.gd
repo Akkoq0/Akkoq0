@@ -9,6 +9,7 @@ extends Node
 ## into a rigid class or linear quest line (`is_any_path_locked() == false`).
 
 const PROFILE_PATH: String = "res://data/sovereignty/sovereignty_profile_data.tres"
+const MAX_ALIGNMENT_ACTION_COUNT: int = 100000
 
 var _profile: SovereigntyProfileData = null
 var _active_alignment: Dictionary[int, GameEnums.SovereigntyAlignment] = {}
@@ -79,27 +80,30 @@ func _handle_evaluate_sovereignty(command: GameCommand) -> bool:
 		_migration_actions[pid] = 0
 		_defiance_actions[pid] = 0
 
-	var tore_cnt: int = maxi(_get_count(_tore_actions, pid) + cmd.add_tore_actions, 0)
-	var raid_cnt: int = maxi(_get_count(_raid_actions, pid) + cmd.add_raid_actions, 0)
-	var toy_cnt: int = maxi(_get_count(_toy_actions, pid) + cmd.add_toy_actions, 0)
-	var ref_cnt: int = maxi(_get_count(_refining_actions, pid) + cmd.add_refining_actions, 0)
-	var trd_cnt: int = maxi(_get_count(_trade_actions, pid) + cmd.add_trade_actions, 0)
-	var mig_cnt: int = maxi(_get_count(_migration_actions, pid) + cmd.add_migration_actions, 0)
-	var def_cnt: int = maxi(_get_count(_defiance_actions, pid) + cmd.add_defiance_actions, 0)
+	var tore_cnt: int = clampi(_get_count(_tore_actions, pid) + cmd.add_tore_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var raid_cnt: int = clampi(_get_count(_raid_actions, pid) + cmd.add_raid_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var toy_cnt: int = clampi(_get_count(_toy_actions, pid) + cmd.add_toy_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var ref_cnt: int = clampi(_get_count(_refining_actions, pid) + cmd.add_refining_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var trd_cnt: int = clampi(_get_count(_trade_actions, pid) + cmd.add_trade_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var mig_cnt: int = clampi(_get_count(_migration_actions, pid) + cmd.add_migration_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
+	var def_cnt: int = clampi(_get_count(_defiance_actions, pid) + cmd.add_defiance_actions, 0, MAX_ALIGNMENT_ACTION_COUNT)
 
 	_tore_actions[pid] = tore_cnt
 	_raid_actions[pid] = raid_cnt
+	_trade_actions[pid] = trd_cnt
 	_toy_actions[pid] = toy_cnt
 	_refining_actions[pid] = ref_cnt
-	_trade_actions[pid] = trd_cnt
 	_migration_actions[pid] = mig_cnt
 	_defiance_actions[pid] = def_cnt
+
+	var safe_kut: float = 75.0 if (is_nan(cmd.kut_score) or is_inf(cmd.kut_score)) else clampf(cmd.kut_score, 0.0, 100.0)
+	var safe_glory: float = 0.0 if (is_nan(cmd.glory_score) or is_inf(cmd.glory_score)) else clampf(cmd.glory_score, 0.0, 100.0)
 
 	var prev: GameEnums.SovereigntyAlignment = get_active_alignment(pid)
 	cmd.previous_alignment = prev
 
 	var scores: Dictionary[GameEnums.SovereigntyAlignment, float] = _profile.compute_alignment_scores(
-		cmd.kut_score, tore_cnt, raid_cnt, cmd.glory_score, toy_cnt, ref_cnt, trd_cnt, mig_cnt, def_cnt)
+		safe_kut, tore_cnt, raid_cnt, safe_glory, toy_cnt, ref_cnt, trd_cnt, mig_cnt, def_cnt)
 
 	var best_alignment: GameEnums.SovereigntyAlignment = GameEnums.SovereigntyAlignment.ULU_KAGAN_TORE_GUARDIAN
 	var best_score: float = -1.0
@@ -126,27 +130,27 @@ func _get_count(table: Dictionary[int, int], player_id: int) -> int:
 
 
 func _on_ore_refined(player_id: int, _recipe_id: StringName, _building_id: StringName, batches: int) -> void:
-	_refining_actions[player_id] = _get_count(_refining_actions, player_id) + maxi(batches, 1)
+	_refining_actions[player_id] = mini(_get_count(_refining_actions, player_id) + maxi(batches, 1), MAX_ALIGNMENT_ACTION_COUNT)
 
 
 func _on_regional_tax_collected(player_id: int, _tax_amount: int, _mult: float) -> void:
-	_trade_actions[player_id] = _get_count(_trade_actions, player_id) + 1
+	_trade_actions[player_id] = mini(_get_count(_trade_actions, player_id) + 1, MAX_ALIGNMENT_ACTION_COUNT)
 
 
 func _on_camp_migrated(player_id: int, _from: Vector2i, _to: Vector2i, _cap: float) -> void:
-	_migration_actions[player_id] = _get_count(_migration_actions, player_id) + 1
+	_migration_actions[player_id] = mini(_get_count(_migration_actions, player_id) + 1, MAX_ALIGNMENT_ACTION_COUNT)
 
 
 func _on_supply_line_severed(_army_id: int, _depot_id: int, _raider_id: StringName, _loot: float) -> void:
-	_raid_actions[1] = _get_count(_raid_actions, 1) + 1
+	_raid_actions[1] = mini(_get_count(_raid_actions, 1) + 1, MAX_ALIGNMENT_ACTION_COUNT)
 
 
 func _on_council_decree_enacted(player_id: int, choice: GameEnums.CouncilDilemmaChoice, _kut: float, _inc: float, _spd: float, _loot: float) -> void:
 	if choice == GameEnums.CouncilDilemmaChoice.TRADITION:
-		_tore_actions[player_id] = _get_count(_tore_actions, player_id) + 1
+		_tore_actions[player_id] = mini(_get_count(_tore_actions, player_id) + 1, MAX_ALIGNMENT_ACTION_COUNT)
 	elif choice == GameEnums.CouncilDilemmaChoice.EXPANSION:
-		_raid_actions[player_id] = _get_count(_raid_actions, player_id) + 1
+		_raid_actions[player_id] = mini(_get_count(_raid_actions, player_id) + 1, MAX_ALIGNMENT_ACTION_COUNT)
 
 
 func _on_overgrazing_rebellion(player_id: int, _coord: Vector2i, _penalty: float) -> void:
-	_defiance_actions[player_id] = _get_count(_defiance_actions, player_id) + 1
+	_defiance_actions[player_id] = mini(_get_count(_defiance_actions, player_id) + 1, MAX_ALIGNMENT_ACTION_COUNT)

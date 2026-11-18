@@ -113,6 +113,7 @@ func _run_suite() -> void:
 	_test_phase14_deterministic_long_horizon_harness()
 	_test_phase15_economy_ecology_profile_calibration()
 	_test_phase16_combat_turan_fsm_and_casualty_hardening()
+	_test_phase17_politics_intrigue_dynasty_long_horizon()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -2780,4 +2781,205 @@ func _test_phase16_combat_turan_fsm_and_casualty_hardening() -> void:
 	CombatCalculator.claim_pending_toy_loot_pool()
 	battle_tactics.free()
 	battle_comp.free()
+
+
+func _test_phase17_politics_intrigue_dynasty_long_horizon() -> void:
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var rules: DiplomacyRules = ResourceLoader.load("res://data/diplomacy/diplomacy_rules.tres") as DiplomacyRules
+
+	# 1. GameManager Kut/Council Synchronicity inside kut_changed & NaN/INF Immunity
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p17_init_baseline"))
+	var observed_council: Array[bool] = [false]
+	var observed_dilemma: Array[bool] = [false]
+	var on_kut_sync: Callable = func(_prev: float, new_kut: float, _reason: StringName) -> void:
+		if new_kut < 30.0:
+			observed_council[0] = GameManager.is_ak_sakallilar_council_active()
+			observed_dilemma[0] = CouncilEventEngine.is_crisis_dilemma_pending()
+	EventBus.kut_changed.connect(on_kut_sync)
+
+	CommandBus.dispatch(ModifyKutCommand.new(22.0 - GameManager.get_kut_score(), &"p17_drop_below_30"))
+	_expect(observed_council[0] and observed_dilemma[0],
+		"Subscribers inside EventBus.kut_changed observe synchronized _council_active and _crisis_dilemma_pending states.")
+	EventBus.kut_changed.disconnect(on_kut_sync)
+
+	CommandBus.dispatch(ModifyKutCommand.new(NAN, &"p17_nan_delta"))
+	CommandBus.dispatch(ModifyKutCommand.new(INF, &"p17_inf_delta"))
+	_expect(is_equal_approx(GameManager.get_kut_score(), 22.0) and not is_nan(GameManager.get_kut_score()),
+		"GameManager ignores NaN/INF Kut deltas without corrupting state.")
+
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p17_restore_kut"))
+	_expect(not GameManager.is_ak_sakallilar_council_active() \
+		and not CouncilEventEngine.is_crisis_dilemma_pending() \
+		and not DiplomacyManager.is_coalition_war_active(),
+		"Restoring Kut above 30 synchronously clears council, pending dilemma, and coalition state.")
+
+	# 2. DiplomacyManager NaN Guards & Multi-Season Peaceful Trust Thaw
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+	var karluk_profile: DynastyProfile = DiplomacyManager.get_dynasty_profile(&"karluk")
+	DiplomacyManager.set_dynasty_trust(&"karluk", 20.0)
+	DiplomacyManager.set_dynasty_trust(&"karluk", NAN)
+	DiplomacyManager.modify_all_dynasty_trust(NAN)
+	var guarded_stance: GameEnums.DynastyAttitude = DiplomacyManager.evaluate_dynasty_with_intelligence_and_glory(&"karluk", NAN, INF, -NAN)
+	_expect(is_equal_approx(DiplomacyManager.get_dynasty_trust(&"karluk"), 20.0) \
+		and guarded_stance >= GameEnums.DynastyAttitude.ALLY,
+		"DiplomacyManager rejects NaN/INF trust and evaluation inputs while keeping trust finite (20.0).")
+
+	DiplomacyManager.step_seasonal_diplomatic_decay(10)
+	var thawed_trust: float = DiplomacyManager.get_dynasty_trust(&"karluk")
+	DiplomacyManager.step_seasonal_diplomatic_decay(30)
+	var capped_trust: float = DiplomacyManager.get_dynasty_trust(&"karluk")
+	_expect(thawed_trust > 30.0 and thawed_trust <= karluk_profile.trust_index \
+		and is_equal_approx(capped_trust, karluk_profile.trust_index),
+		"Peaceful high-Kut seasons gradually thaw depressed dynasty trust (20.0 -> %.1f) and cap at baseline (%.1f)." % [
+			thawed_trust, karluk_profile.trust_index])
+
+	# 3. CouncilEventEngine Stack Cap, Loyalty Decay & Coalition Sync
+	CouncilEventEngine.step_seasonal_council_decay(20)
+	CommandBus.dispatch(DepositResourcesCommand.new(1701, &"steel", 20))
+	CommandBus.dispatch(DepositResourcesCommand.new(1701, &"silver_gold", 100))
+	CommandBus.dispatch(ModifyKutCommand.new(20.0 - GameManager.get_kut_score(), &"p17_council_sac_setup"))
+	CommandBus.dispatch(EnactCouncilDecreeCommand.new(1701, GameEnums.CouncilDilemmaChoice.SACRIFICE))
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p17_council_sac_restore"))
+	var loy_after_sac: float = CouncilEventEngine.get_popular_loyalty_bonus()
+	CouncilEventEngine.step_seasonal_council_decay(4)
+	var loy_decayed: float = CouncilEventEngine.get_popular_loyalty_bonus()
+	CouncilEventEngine.step_seasonal_council_decay(10)
+	_expect(loy_after_sac >= 30.0 and loy_decayed < loy_after_sac and is_zero_approx(CouncilEventEngine.get_popular_loyalty_bonus()),
+		"Council popular loyalty bonus decays across peaceful post-crisis seasons (%.1f -> %.1f -> 0.0)." % [
+			loy_after_sac, loy_decayed])
+
+	for _spy_i: int in range(15):
+		CommandBus.dispatch(DispatchSpyCommand.new(1, 2, 1710 + _spy_i, 95.0, forest, 70.0, GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP, GameEnums.TacticalDoctrineType.CRESCENT_ENCIRCLEMENT, 0.0, 1))
+	var capped_adv: int = CouncilEventEngine.get_espionage_advantage_count()
+	CouncilEventEngine.step_seasonal_council_decay(12)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+	var synced_sev: Dictionary[StringName, float] = CouncilEventEngine.evaluate_council_crisis_severity_with_context(25.0, false, false, 0.0)
+	_expect(capped_adv <= 12 and CouncilEventEngine.get_espionage_advantage_count() == 0 \
+		and is_zero_approx(synced_sev[&"coalition_weight"]),
+		"CouncilEventEngine caps espionage stacks (%d <= 12), cools to 0, and syncs cleared coalition weight." % capped_adv)
+
+	# 4. IntelligenceManager Total War Auto-Truce & Bounded Spy Cache
+	var envoy_war: AssassinateEnvoyCommand = AssassinateEnvoyCommand.new(1710, 1711, &"p17_envoy_war_a")
+	_expect(CommandBus.dispatch(envoy_war) and IntelligenceManager.is_total_war_active(1710, 1711),
+		"Envoy execution escalates factions (1710, 1711) into Total War.")
+	IntelligenceManager.step_seasonal_intelligence_decay(7)
+	var still_at_war_7: bool = IntelligenceManager.is_total_war_active(1710, 1711)
+	IntelligenceManager.step_seasonal_intelligence_decay(1)
+	var settled_at_war_8: bool = IntelligenceManager.is_total_war_active(1710, 1711)
+	_expect(still_at_war_7 and not settled_at_war_8 \
+		and CommandBus.dispatch(AssassinateEnvoyCommand.new(1710, 1711, &"p17_envoy_war_b")),
+		"Prolonged Total War auto-resolves to TRUCE after 8 seasons, unlocking later diplomacy.")
+	IntelligenceManager.establish_truce(1710, 1711)
+
+	for _cache_i: int in range(135):
+		CommandBus.dispatch(DispatchSpyCommand.new(1, 2, 17200 + _cache_i, 99.0, forest, 60.0, GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE, GameEnums.TacticalDoctrineType.FEIGNED_RETREAT, 0.0, 1))
+	var cached_during_flood: int = IntelligenceManager.get_cached_report_count()
+	IntelligenceManager.step_seasonal_intelligence_decay(IntelligenceManager.REPORT_STALENESS_SEASONS)
+	_expect(cached_during_flood <= IntelligenceManager.MAX_CACHED_ARMY_REPORTS \
+		and IntelligenceManager.get_cached_report_count() == 0 \
+		and IntelligenceManager.get_latest_report_for_army(17334) == null,
+		"IntelligenceManager caps report cache (%d <= %d) and expires stale reports after 8 seasons." % [
+			cached_during_flood, IntelligenceManager.MAX_CACHED_ARMY_REPORTS])
+
+	# 5. KinshipIntrigueManager Anti-Oscillation & Organic Healing Cleanup + CommandBus & Glory
+	var nan_intrigue: StepKinshipIntrigueCommand = StepKinshipIntrigueCommand.new(&"p17_osc_bey", false, false, NAN, 0)
+	CommandBus.dispatch(nan_intrigue)
+	var osc_lord: KinshipLordRecord = KinshipIntrigueManager.get_or_create_lord(&"p17_osc_bey")
+	_expect(not is_nan(osc_lord.ambition) and not is_nan(osc_lord.loyalty),
+		"KinshipIntrigueManager ignores NaN ambition_override cleanly.")
+
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p17_kinship_base"))
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p17_osc_bey", true, true, 82.0, 0))
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p17_osc_bey", true, true, 82.0, 0))
+	var kut_after_first_uprising: float = GameManager.get_kut_score()
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p17_osc_bey", true, true, 70.0, 0))
+	var dipped_to_stage2: bool = KinshipIntrigueManager.get_lord_plot_stage(&"p17_osc_bey") == GameEnums.IntriguePlotStage.DEFECTION_OR_SABOTAGE
+	CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p17_osc_bey", true, true, 85.0, 0))
+	var reentered_stage3: bool = KinshipIntrigueManager.get_lord_plot_stage(&"p17_osc_bey") == GameEnums.IntriguePlotStage.INTERNAL_UPRISING
+	var kut_after_reentry: float = GameManager.get_kut_score()
+	_expect(dipped_to_stage2 and reentered_stage3 and is_equal_approx(kut_after_reentry, kut_after_first_uprising),
+		"Stage 2 <-> 3 ambition oscillation does not double-drain uprising Kut penalty.")
+
+	for _heal_i: int in range(18):
+		CommandBus.dispatch(StepKinshipIntrigueCommand.new(&"p17_osc_bey", false, false, -1.0, 0))
+	_expect(osc_lord.plot_stage == GameEnums.IntriguePlotStage.LOYAL_CALM \
+		and osc_lord.defected_troops == 0 \
+		and not osc_lord.supply_sabotaged \
+		and not osc_lord.uprising_kut_applied,
+		"Organic healing back to LOYAL_CALM clears defected_troops, supply_sabotaged, and uprising_kut_applied.")
+
+	var nan_toy: DistributeToyLootCommand = DistributeToyLootCommand.new(&"p17_rebel_bey", NAN, 0.0, false)
+	_expect(not CommandBus.dispatch(nan_toy),
+		"CommandBus rejects NaN Toy loot distribution cleanly.")
+
+	CommandBus.dispatch(SplitDetachForceCommand.new(1740, 1741, GameEnums.DetachmentRole.FAST_CAVALRY_RECON_RAIDER, 80))
+	CommandBus.dispatch(InterdictSupplyLineCommand.new(1741, 1, &"p17_raider"))
+	var iso_before_merge: bool = CommandBus.is_army_supply_isolated(1741)
+	CommandBus.dispatch(MergeForcesCommand.new(1740, 1741))
+	_expect(iso_before_merge and not CommandBus.is_army_supply_isolated(1741),
+		"Merging detached army erases stale _isolated_armies status for the dissolved detachment.")
+
+	var glory_comp: GloryComponent = GloryComponent.new()
+	add_child(glory_comp)
+	glory_comp.configure(1750, rules, 1)
+	CommandBus.dispatch(AssassinateEnvoyCommand.new(20, 21, &"p17_third_party_envoy"))
+	CommandBus.dispatch(DispatchSpyCommand.new(20, 21, 1755, 99.0, forest, 75.0, GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE, GameEnums.TacticalDoctrineType.FEIGNED_RETREAT, 0.0, 1))
+	_expect(is_zero_approx(glory_comp.get_glory_score()),
+		"GloryComponent ignores third-party faction (20 != 1) envoy assassinations and spy reports.")
+	IntelligenceManager.establish_truce(20, 21)
+
+	glory_comp.record_successful_turan_tactic()
+	glory_comp.record_successful_turan_tactic()
+	glory_comp.record_successful_turan_tactic()
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"p17_rebel_bey", 1000.0, 0.0, false))
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"p17_rebel_bey", 1000.0, 0.0, false))
+	var first_rec: int = glory_comp.recruit_rogue_warband(&"p17_rebel_bey")
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"p17_rebel_bey", 1000.0, 0.0, false))
+	CommandBus.dispatch(DistributeToyLootCommand.new(&"p17_rebel_bey", 1000.0, 0.0, false))
+	var second_rec: int = glory_comp.recruit_rogue_warband(&"p17_rebel_bey")
+	_expect(first_rec == rules.rogue_warband_troop_size \
+		and second_rec == rules.rogue_warband_troop_size \
+		and glory_comp.get_recruited_warbands().size() == 1 \
+		and glory_comp.get_recruited_troops() == rules.rogue_warband_troop_size * 2,
+		"Re-rebelling and re-recruiting rogue warband deduplicates warband names cleanly without blocking repeat integration.")
+	glory_comp.free()
+
+	for _ai_i: int in range(35):
+		CommandBus.dispatch(StepAICommanderCommand.new(&"p17_cap_agent", false, 0, 0))
+	_expect(AICommander.get_agent_stockpile(&"p17_cap_agent") <= AICommander.MAX_AGENT_STOCKPILE,
+		"AICommander agent stockpile respects bounded ceiling (<= 5000.0).")
+
+	var sov_nan: EvaluateSovereigntyPathCommand = EvaluateSovereigntyPathCommand.new(1790, NAN, INF)
+	_expect(CommandBus.dispatch(sov_nan) and not is_nan(sov_nan.dominant_score) and sov_nan.dominant_score >= 0.0,
+		"SovereigntyPathEngine sanitizes NaN/INF Kut and Glory telemetry inputs.")
+
+	# 6. 36-Season (9-Year) Multi-Profile Long-Horizon Stress Test
+	var bal36: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.BALANCED_NOMAD, 36, 17001, 5)
+	var bal36_end: SimulationInvariantChecker.SeasonSnapshot = bal36.latest()
+	_expect(bal36.seasons_simulated == 36 and bal36.passed() and bal36_end != null,
+		"BALANCED_NOMAD 36-season (9-year) marathon passes all invariants (violations: %s)." % ", ".join(bal36.violations))
+
+	var crisis36: LongHorizonSimulator.SimulationRunResult = LongHorizonSimulator.run(
+		self, LongHorizonSimulator.SimulationProfile.CRISIS_CLAN, 36, 17002, 6)
+	var crisis36_end: SimulationInvariantChecker.SeasonSnapshot = crisis36.latest()
+	var crisis36_ok: bool = crisis36.seasons_simulated == 36 and crisis36.passed() and crisis36_end != null \
+		and crisis36.min_kut_observed < 30.0 \
+		and crisis36_end.kut >= 45.0 \
+		and not crisis36_end.council_active \
+		and not crisis36_end.coalition_war_active \
+		and crisis36_end.kinship_stage == GameEnums.IntriguePlotStage.LOYAL_CALM
+	_expect(crisis36_ok,
+		"CRISIS_CLAN 36-season (9-year) marathon recovers from early crisis to stable Kut (%.1f -> %.1f), ended council/coalition, and LOYAL_CALM kinship (violations: %s)." % [
+			crisis36.min_kut_observed,
+			crisis36_end.kut if crisis36_end != null else -1.0,
+			", ".join(crisis36.violations)])
+
+	# Restore clean singleton state before remaining tests
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p17_cleanup_restore"))
+	DiplomacyManager.step_seasonal_diplomatic_decay(15)
+	CouncilEventEngine.step_seasonal_council_decay(15)
+	IntelligenceManager.step_seasonal_intelligence_decay(10)
+	CausalChainEngine.reset_continuous_state()
+
 

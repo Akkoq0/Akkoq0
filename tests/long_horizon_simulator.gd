@@ -145,7 +145,7 @@ static func run(host_node: Node, profile: SimulationProfile = SimulationProfile.
 
 	var glory_comp: GloryComponent = GloryComponent.new()
 	host_node.add_child(glory_comp)
-	glory_comp.configure(army_id)
+	glory_comp.configure(army_id, null, pid)
 
 	# Establish clean deterministic starting baselines
 	CausalChainEngine.reset_continuous_state()

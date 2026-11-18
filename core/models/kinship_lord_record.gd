@@ -11,3 +11,4 @@ var grievance: float = 10.0
 var plot_stage: GameEnums.IntriguePlotStage = GameEnums.IntriguePlotStage.LOYAL_CALM
 var defected_troops: int = 0
 var supply_sabotaged: bool = false
+var uprising_kut_applied: bool = false

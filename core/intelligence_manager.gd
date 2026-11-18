@@ -6,11 +6,23 @@ extends Node
 
 const DIPLOMACY_RULES_PATH: String = "res://data/diplomacy/diplomacy_rules.tres"
 const REASON_ENVOY_ASSASSINATED: StringName = &"envoy_assassinated"
+const MAX_CACHED_ARMY_REPORTS: int = 128
+const REPORT_STALENESS_SEASONS: int = 8
+const TOTAL_WAR_MAX_DURATION_SEASONS: int = 8
 
 var _rules: DiplomacyRules = null
 var _army_reports: Dictionary[int, EspionageReport] = {}
+var _report_seasons: Dictionary[int, int] = {}
 var _stances: Dictionary[StringName, GameEnums.DiplomaticStance] = {}
+var _total_war_seasons: Dictionary[StringName, int] = {}
 var _assassinated_envoys: Dictionary[StringName, bool] = {}
+var _season_tick: int = 0
+
+
+static func _safe_float(val: float, fallback: float, min_val: float = -INF, max_val: float = INF) -> float:
+	if is_nan(val) or is_inf(val):
+		return fallback
+	return clampf(val, min_val, max_val)
 
 
 func _ready() -> void:
@@ -20,6 +32,7 @@ func _ready() -> void:
 	else:
 		for error: String in _rules.get_validation_errors():
 			push_error("IntelligenceManager: %s" % error)
+	EventBus.season_changed.connect(_on_season_changed)
 	CommandBus.register_handler(DispatchSpyCommand.ID, _handle_dispatch_spy)
 	CommandBus.register_handler(AssassinateEnvoyCommand.ID, _handle_assassinate_envoy)
 
@@ -33,12 +46,19 @@ func _exit_tree() -> void:
 func evaluate_espionage_chance(commander_leadership: float, terrain: TerrainData, counter_espionage: float = 0.0) -> float:
 	if _rules == null:
 		return 0.0
-	return _rules.calculate_espionage_success_chance(commander_leadership, terrain, counter_espionage)
+	var safe_lead: float = _safe_float(commander_leadership, 0.0, 0.0, 100.0)
+	var safe_counter: float = _safe_float(counter_espionage, 0.0, 0.0, 1.0)
+	return _rules.calculate_espionage_success_chance(safe_lead, terrain, safe_counter)
 
 
 ## Latest successful intelligence report collected on `target_army_id` (or null).
 func get_latest_report_for_army(target_army_id: int) -> EspionageReport:
 	return _army_reports.get(target_army_id, null)
+
+
+## Number of non-expired army espionage reports currently cached.
+func get_cached_report_count() -> int:
+	return _army_reports.size()
 
 
 ## Diplomatic stance between `faction_a` and `faction_b`.
@@ -54,8 +74,41 @@ func is_total_war_active(faction_a: int, faction_b: int) -> bool:
 
 ## Restores a diplomatic truce between `faction_a` and `faction_b` after a war concludes.
 func establish_truce(faction_a: int, faction_b: int) -> void:
+	if faction_a == faction_b:
+		return
 	var key: StringName = _pair_key(faction_a, faction_b)
 	_stances[key] = GameEnums.DiplomaticStance.TRUCE
+	_total_war_seasons.erase(key)
+
+
+## Advances seasonal war exhaustion and prunes expired spy reports so long campaigns
+## do not stay locked in permanent Total War or bloat report caches.
+func step_seasonal_intelligence_decay(cycles: int = 1) -> void:
+	var step_count: int = maxi(cycles, 1)
+	_season_tick += step_count
+
+	var ended_wars: Array[StringName] = []
+	for key: StringName in _total_war_seasons:
+		var next_dur: int = _total_war_seasons[key] + step_count
+		if next_dur >= TOTAL_WAR_MAX_DURATION_SEASONS:
+			ended_wars.append(key)
+		else:
+			_total_war_seasons[key] = next_dur
+	for war_key: StringName in ended_wars:
+		_total_war_seasons.erase(war_key)
+		_stances[war_key] = GameEnums.DiplomaticStance.TRUCE
+
+	var stale_armies: Array[int] = []
+	for army_id: int in _report_seasons:
+		if _season_tick - _report_seasons[army_id] >= REPORT_STALENESS_SEASONS:
+			stale_armies.append(army_id)
+	for army_id: int in stale_armies:
+		_report_seasons.erase(army_id)
+		_army_reports.erase(army_id)
+
+
+func _on_season_changed(_season: SeasonData, _cycle_index: int) -> void:
+	step_seasonal_intelligence_decay(1)
 
 
 func _handle_dispatch_spy(command: GameCommand) -> bool:
@@ -69,8 +122,10 @@ func _handle_dispatch_spy(command: GameCommand) -> bool:
 	if spy_cmd.spy_owner_id == spy_cmd.target_faction_id:
 		return command.reject("Cannot dispatch spy against own faction.")
 
-	var chance: float = _rules.calculate_espionage_success_chance(
-		spy_cmd.commander_leadership, spy_cmd.terrain, spy_cmd.counter_espionage)
+	var safe_lead: float = _safe_float(spy_cmd.commander_leadership, 0.0, 0.0, 100.0)
+	var safe_counter: float = _safe_float(spy_cmd.counter_espionage, 0.0, 0.0, 1.0)
+	var safe_ammo: float = _safe_float(spy_cmd.target_quiver_ammo, 0.0, 0.0, 100.0)
+	var chance: float = _rules.calculate_espionage_success_chance(safe_lead, spy_cmd.terrain, safe_counter)
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = spy_cmd.rng_seed
 	var roll: float = rng.randf()
@@ -82,10 +137,22 @@ func _handle_dispatch_spy(command: GameCommand) -> bool:
 	report.computed_success_chance = chance
 	report.succeeded = roll <= chance
 	if report.succeeded:
-		report.revealed_quiver_ammo = spy_cmd.target_quiver_ammo
+		report.revealed_quiver_ammo = safe_ammo
 		report.revealed_tactic_intent = spy_cmd.target_tactic_intent
 		report.revealed_doctrine_type = spy_cmd.target_doctrine_type
+		if not _army_reports.has(spy_cmd.target_army_id) and _army_reports.size() >= MAX_CACHED_ARMY_REPORTS:
+			var oldest_id: int = -1
+			var oldest_tick: int = _season_tick + 1
+			for cached_id: int in _army_reports:
+				var tick: int = _report_seasons.get(cached_id, 0)
+				if tick < oldest_tick:
+					oldest_tick = tick
+					oldest_id = cached_id
+			if oldest_id != -1:
+				_army_reports.erase(oldest_id)
+				_report_seasons.erase(oldest_id)
 		_army_reports[spy_cmd.target_army_id] = report
+		_report_seasons[spy_cmd.target_army_id] = _season_tick
 	else:
 		report.spy_captured = true
 
@@ -111,6 +178,7 @@ func _handle_assassinate_envoy(command: GameCommand) -> bool:
 
 	var key: StringName = _pair_key(assassinate.instigator_faction_id, assassinate.target_faction_id)
 	_stances[key] = GameEnums.DiplomaticStance.TOTAL_WAR_GREAT_RAID
+	_total_war_seasons[key] = 0
 	_assassinated_envoys[assassinate.envoy_id] = true
 
 	var kut_cmd: ModifyKutCommand = ModifyKutCommand.new(_rules.envoy_assassination_kut_gain, REASON_ENVOY_ASSASSINATED)

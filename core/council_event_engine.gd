@@ -143,8 +143,8 @@ func _handle_enact_decree(command: GameCommand) -> bool:
 ## given active Coalition Wars, envoy assassination backlash, successful espionage
 ## forewarning, and the Khagan's battlefield `glory_score`.
 func evaluate_council_crisis_severity_with_context(current_kut: float = -1.0, active_coalition_override: bool = false, recent_espionage_override: bool = false, glory_override: float = -1.0) -> Dictionary[StringName, float]:
-	var active_kut: float = current_kut if current_kut >= 0.0 else GameManager.get_kut_score()
-	var active_glory: float = glory_override if glory_override >= 0.0 else _tracked_glory_score
+	var active_kut: float = clampf(current_kut, 0.0, 100.0) if (not is_nan(current_kut) and not is_inf(current_kut) and current_kut >= 0.0) else GameManager.get_kut_score()
+	var active_glory: float = clampf(glory_override, 0.0, 100.0) if (not is_nan(glory_override) and not is_inf(glory_override) and glory_override >= 0.0) else _tracked_glory_score
 	_active_coalition_pressure = DiplomacyManager.is_coalition_war_active()
 	var has_coalition: bool = active_coalition_override or _active_coalition_pressure
 	var has_espionage: bool = recent_espionage_override or _espionage_advantage_count > 0
@@ -186,11 +186,14 @@ func step_seasonal_council_decay(cycles: int = 1) -> void:
 	var n: int = maxi(cycles, 1)
 	_assassination_count = maxi(_assassination_count - n, 0)
 	_espionage_advantage_count = maxi(_espionage_advantage_count - n, 0)
+	_active_coalition_pressure = DiplomacyManager.is_coalition_war_active()
 	if not GameManager.is_ak_sakallilar_council_active():
+		_crisis_dilemma_pending = false
 		_active_income_multiplier = 1.0
 		_active_speed_multiplier = 1.0
 		_active_morale_bonus = 0.0
 		_active_loot_multiplier = 1.0
+		_popular_loyalty_bonus = maxf(_popular_loyalty_bonus - 5.0 * float(n), 0.0)
 
 
 func _on_council_convened(_current_kut: float, _legitimacy_penalty: float, _trigger_skirmish: bool) -> void:
@@ -198,21 +201,27 @@ func _on_council_convened(_current_kut: float, _legitimacy_penalty: float, _trig
 
 
 func _on_kut_changed(_previous_kut: float, new_kut: float, _reason: StringName) -> void:
+	if is_nan(new_kut) or is_inf(new_kut):
+		return
 	_active_coalition_pressure = DiplomacyManager.is_coalition_war_active()
 	if new_kut >= 30.0:
 		_crisis_dilemma_pending = false
+	else:
+		_crisis_dilemma_pending = true
 
 
 func _on_espionage_mission_completed(report: EspionageReport) -> void:
 	if report != null and report.succeeded:
-		_espionage_advantage_count += 1
+		_espionage_advantage_count = mini(_espionage_advantage_count + 1, 12)
 
 
 func _on_envoy_assassinated(_instigator_id: int, _target_id: int, _envoy_id: StringName, _kut_gained: float) -> void:
-	_assassination_count += 1
+	_assassination_count = mini(_assassination_count + 1, 12)
 
 
 func _on_kagan_glory_changed(_army_id: int, _previous_glory: float, new_glory: float, _reason: StringName) -> void:
+	if is_nan(new_glory) or is_inf(new_glory):
+		return
 	_tracked_glory_score = clampf(new_glory, 0.0, 100.0)
 
 
