@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BallisticsRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/combat/ballistics_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"steppe_atmospheric_ballistics"
+base_bow_range_m = 120.0
+tailwind_dot_threshold = 0.50
+min_effective_wind_speed_m_per_sec = 2.0
+storm_wind_speed_threshold_m_per_sec = 12.0
+pre_zud_freezing_temp_celsius = -5.0
+tailwind_range_multiplier = 1.25
+tailwind_accuracy_multiplier = 1.20
+tailwind_whistling_morale_multiplier = 1.10
+tailwind_ammo_consumption_multiplier = 1.00
+storm_range_multiplier = 0.70
+storm_accuracy_multiplier = 0.65
+storm_whistling_morale_multiplier = 0.60
+storm_ammo_consumption_multiplier = 1.35
