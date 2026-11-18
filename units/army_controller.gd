@@ -13,6 +13,7 @@ extends Node3D
 @export var turan_tactics: TuranTacticsComponent
 @export var morale_component: MoraleComponent
 @export var espionage_component: EspionageComponent
+@export var glory_component: GloryComponent
 
 var _is_operational: bool = false
 
@@ -27,6 +28,8 @@ func _ready() -> void:
 		turan_tactics.configure(army_id, turan_tactics.doctrine, supply.get_quiver_ammo_reserve())
 	if morale_component != null:
 		morale_component.configure(army_id)
+	if glory_component != null:
+		glory_component.configure(army_id)
 	mobility.passability_check = terrain_sensor.is_position_passable
 	terrain_sensor.terrain_changed.connect(_on_terrain_changed)
 	mobility.destination_reached.connect(_on_destination_reached)

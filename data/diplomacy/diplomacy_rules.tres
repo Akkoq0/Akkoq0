@@ -11,3 +11,10 @@ min_espionage_chance = 0.05
 max_espionage_chance = 0.95
 envoy_assassination_kut_gain = 15.0
 great_raid_loot_multiplier = 1.4
+glory_per_turan_tactic = 18.0
+glory_per_feigned_retreat_lure = 16.0
+glory_per_envoy_assassination = 14.0
+free_warband_recruitment_glory_threshold = 40.0
+rogue_warband_troop_size = 250
+max_glory_score = 100.0
+

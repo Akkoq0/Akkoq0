@@ -19,6 +19,15 @@ extends Resource
 ## Raid loot multiplier active during the inevitable Total War (Büyük Yağma) period.
 @export_range(1.0, 3.0, 0.05) var great_raid_loot_multiplier: float = 1.40
 
+@export_group("Phase 5 Khagan Glory & Free Warband Recruitment")
+@export_range(1.0, 100.0, 0.5) var glory_per_turan_tactic: float = 18.0
+@export_range(1.0, 100.0, 0.5) var glory_per_feigned_retreat_lure: float = 16.0
+@export_range(1.0, 100.0, 0.5) var glory_per_envoy_assassination: float = 14.0
+## Glory threshold above which rogue `Yersiz Yurtsuz Çeriler` warbands join the Khagan's army directly without hostages.
+@export_range(5.0, 100.0, 1.0) var free_warband_recruitment_glory_threshold: float = 40.0
+@export_range(10, 5000) var rogue_warband_troop_size: int = 250
+@export_range(10.0, 500.0, 1.0) var max_glory_score: float = 100.0
+
 
 ## Pure calculation of spy infiltration success probability from commander
 ## leadership (`0..100`), terrain stealth (`SIK_ORMAN` multiplier), and enemy
@@ -42,4 +51,7 @@ func get_validation_errors() -> PackedStringArray:
 		errors.append("DiplomacyRules: sik_orman_stealth_multiplier must be >= 1.0.")
 	if envoy_assassination_kut_gain <= 0.0:
 		errors.append("DiplomacyRules: envoy_assassination_kut_gain must be > 0.")
+	if free_warband_recruitment_glory_threshold <= 0.0 or free_warband_recruitment_glory_threshold > max_glory_score:
+		errors.append("DiplomacyRules: free_warband_recruitment_glory_threshold must lie in (0, max_glory_score].")
 	return errors
+

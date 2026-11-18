@@ -109,6 +109,18 @@ func get_rogue_warband_beys() -> PackedStringArray:
 	return list
 
 
+## Reintegrates an independent rogue warband (`Yersiz Yurtsuz Çeriler`) directly
+## into the Khagan's army without hostages when recruited via high Khagan Glory.
+func reintegrate_rogue_warband(bey_id: StringName) -> bool:
+	if not _rogue_warbands.has(bey_id):
+		return false
+	_rogue_warbands.erase(bey_id)
+	var restored_sat: float = _toy_rules.initial_bey_satisfaction if _toy_rules != null else 65.0
+	_bey_satisfaction[bey_id] = restored_sat
+	return true
+
+
+
 ## True when `army_id`'s supply corridor has been severed (`ISOLATED`).
 func is_army_supply_isolated(army_id: int) -> bool:
 	return _isolated_armies.get(army_id, false)
