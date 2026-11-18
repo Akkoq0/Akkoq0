@@ -20,11 +20,24 @@ signal layer_transition_finished(layer: GameEnums.WorldLayer)
 signal macro_world_generated(world_state: MacroWorldState)
 signal micro_zone_generated(zone_state: MicroZoneState)
 
-# --- Economy ----------------------------------------------------------------
+# --- Economy & 7-Ore Pipeline -----------------------------------------------
 signal resource_amount_changed(player_id: int, ore_id: StringName, new_amount: int, delta: int)
+signal ore_refined(player_id: int, recipe_id: StringName, building_id: StringName, batches: int)
+signal regional_tax_collected(player_id: int, tax_amount: int, authority_multiplier: float)
+signal tamga_authority_updated(player_id: int, multiplier: float)
+signal meteoric_iron_bound(player_id: int, target_id: StringName, for_totem_ascension: bool, consumed_amount: int)
 
-# --- Seasons ----------------------------------------------------------------
+# --- Seasons & Zud ----------------------------------------------------------
 signal season_changed(season: SeasonData, cycle_index: int)
+signal zud_starvation_ticked(food_remaining: int, season: SeasonData)
+
+# --- Kut (Divine Mandate) & Ak Sakallılar Council ---------------------------
+signal kut_changed(previous_kut: float, new_kut: float, reason: StringName)
+signal ak_sakallilar_council_convened(current_kut: float, legitimacy_penalty: float, trigger_skirmish: bool)
+
+# --- Toy & Meat Distribution Siyaseti ---------------------------------------
+signal toy_loot_distributed(bey_id: StringName, total_loot_value: float, allocated_bey_value: float, satisfaction_delta: float)
+signal bey_rebelled_as_rogue_warband(bey_id: StringName, warband_title: String, satisfaction: float)
 
 # --- Totems -----------------------------------------------------------------
 signal totem_summoned(player_id: int, totem_id: StringName, position: Vector3)
