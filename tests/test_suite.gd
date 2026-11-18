@@ -54,6 +54,8 @@ var _kinship_resolved_signal_received: bool = false
 var _battle_wounded_signal_received: bool = false
 var _wounded_recovered_signal_received: bool = false
 var _veteran_shock_signal_received: bool = false
+var _causal_step_propagated_signal_received: bool = false
+var _causal_counterplay_signal_received: bool = false
 
 
 func _ready() -> void:
@@ -93,10 +95,12 @@ func _run_suite() -> void:
 	_test_phase9_steppe_cataclysms_and_natural_destruction()
 	_test_phase9_kinship_intrigue_and_internal_betrayal()
 	_test_phase9_wounded_pool_and_veteran_attrition()
+	_test_causal_friction_calibration_and_threshold_matrix()
+	_test_causal_chains_and_counterplay_recovery()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
-		print("[PASS] Ötüken Phase 1 + Phase 2 + Phase 3 Ultra + Phase 4 Deep + Phase 5 Dynasty + Phase 6 Micro & AI + Phase 7 Ecology & Ballistics + Phase 8 Emergent Sandbox + Phase 9 Cataclysms & Kinship Intrigue validation succeeded (%d assertions, 0 failures)." % _assertions)
+		print("[PASS] Ötüken Full Architecture & Causal Chains validation succeeded (%d assertions, 0 failures)." % _assertions)
 		get_tree().quit(0)
 	else:
 		for failure: String in _failures:
@@ -1415,6 +1419,102 @@ func _test_phase9_wounded_pool_and_veteran_attrition() -> void:
 	casualty_comp.free()
 
 
+func _test_causal_friction_calibration_and_threshold_matrix() -> void:
+	var calib: CausalFrictionCalibration = CausalChainEngine.get_calibration()
+	_expect(calib != null and calib.get_validation_errors().is_empty(),
+		"CausalChainEngine loaded CausalFrictionCalibration (res://data/world/causal_friction_calibration.tres) cleanly.")
+	var parity_errors: PackedStringArray = CausalChainEngine.verify_calibration_parity()
+	_expect(parity_errors.is_empty(),
+		"CausalFrictionCalibration matches KutRules (Kut<30, epidemic 0.50x/8%/12 Kut), CombatRules (fatigue 2.5/s, 1.0x/1.45x/2.1x), and DiplomacyRules (glory>=40).")
+	_expect(is_equal_approx(calib.critical_kut_council_threshold, 30.0) and is_equal_approx(calib.free_warband_glory_threshold, 40.0),
+		"Calibrated governance/glory thresholds enforce Kut < 30.0 council crisis and glory_score >= 40.0 free warband recruitment.")
+	_expect(is_equal_approx(calib.directional_front_multiplier, 1.0) and is_equal_approx(calib.directional_flank_multiplier, 1.45) and is_equal_approx(calib.directional_rear_multiplier, 2.1),
+		"Calibrated directional encirclement matrix enforces 1.0x Front, 1.45x Flank, and 2.1x Rear strike multipliers.")
+
+	# Verify direct Yılkı remount ratio -> Stage 4 Crescent Encirclement Trap wing damping on TuranTacticsComponent
+	var doctrine: TacticalDoctrineData = ResourceLoader.load("res://data/tactics/crescent_encirclement.tres") as TacticalDoctrineData
+	var forest: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	var tactics: TuranTacticsComponent = TuranTacticsComponent.new()
+	add_child(tactics)
+	tactics.configure(88, doctrine, 100.0)
+
+	var left_wing: Vector3 = Vector3(-0.35, 0.0, 0.936).normalized()
+	var right_wing: Vector3 = Vector3(0.35, 0.0, -0.936).normalized()
+	_expect(not tactics.evaluate_crescent_trap_with_remount_ratio(left_wing, right_wing, 0.20, calib, forest),
+		"Depleted Yılkı spare-horse ratio (0.20 < 0.55) damps wing encirclement speed/angle and causes Crescent Trap to fail.")
+	_expect(tactics.evaluate_crescent_trap_with_remount_ratio(left_wing, right_wing, 1.0, calib, forest),
+		"Healthy Yılkı spare-horse ratio (1.0 >= 0.55) reaches full pincer angle (>= PI*0.65) and seals the Crescent Trap.")
+	tactics.free()
+
+
+func _test_causal_chains_and_counterplay_recovery() -> void:
+	_causal_step_propagated_signal_received = false
+	_causal_counterplay_signal_received = false
+	EventBus.causal_chain_step_propagated.connect(_on_causal_chain_step_propagated)
+	EventBus.causal_chain_counterplay_applied.connect(_on_causal_chain_counterplay_applied)
+
+	# 1. Chain 1: Ecological & Logistics Collapse (Pasture depletion -> Zud food zero -> Yılkı slaughter -> Crescent Trap failure -> Rogue warband split)
+	var eco_collapse: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.ECOLOGICAL_LOGISTICS_COLLAPSE, GameEnums.CausalCounterplayAction.NONE, 1, 81)
+	eco_collapse.bey_id = &"chain_eco_bey"
+	_expect(CommandBus.dispatch(eco_collapse) and _causal_step_propagated_signal_received,
+		"Ecological & Logistics Collapse causal chain propagates across PastureEcology, Yılkı logistics, TuranTactics, and Toy rebellion.")
+	_expect(is_equal_approx(eco_collapse.resulting_remount_ratio, 0.20) and not eco_collapse.crescent_trap_succeeded and eco_collapse.rogue_warband_split,
+		"Without counterplay, Yılkı sacrifice drops remount ratio to 0.20, failing Crescent Trap and splitting Yersiz Yurtsuz Çeriler.")
+
+	#    Chain 1 Counterplay: Timely Sefer Arabası migration preserves Yılkı mobility and succeeds in Crescent Trap
+	var eco_counter: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.ECOLOGICAL_LOGISTICS_COLLAPSE, GameEnums.CausalCounterplayAction.MIGRATE_SEFER_ARABASI_OR_RESUPPLY, 1, 81)
+	_expect(CommandBus.dispatch(eco_counter) and _causal_counterplay_signal_received and eco_counter.counterplay_broke_chain and eco_counter.crescent_trap_succeeded,
+		"Sefer Arabası migration counterplay preserves Yılkı remount ratio (1.0) and allows Crescent Trap to succeed.")
+
+	# 2. Chain 2: Combat Fatigue & Psychological Cascade Rout (Prolonged battle -> fatigue momentum decay -> elite vanguard loss -> cascade_rout -> 2.1x rear strike & Toy prisoner capture -> Kut erosion)
+	var combat_collapse: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.COMBAT_FATIGUE_PSYCHOLOGICAL_ROUT, GameEnums.CausalCounterplayAction.NONE, 1, 82)
+	combat_collapse.combat_duration_sec = 28.0
+	_expect(CommandBus.dispatch(combat_collapse) and combat_collapse.accumulated_battle_fatigue >= 70.0 and combat_collapse.fatigue_momentum_multiplier < 1.0,
+		"28s of prolonged combat accumulates 70.0 battle_fatigue and decays lance momentum.")
+	_expect(combat_collapse.cascade_rout_triggered and is_equal_approx(combat_collapse.rear_strike_damage_multiplier, 2.1) and combat_collapse.captured_toy_loot_value > 0.0,
+		"Elite vanguard loss triggers cascade_rout, 2.1x vectorial rear strike, and Toy prisoner/loot capture.")
+
+	#    Chain 2 Counterplay: Reserve rotation / tactical withdrawal resets fatigue and prevents cascade_rout
+	var combat_counter: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.COMBAT_FATIGUE_PSYCHOLOGICAL_ROUT, GameEnums.CausalCounterplayAction.ROTATE_RESERVE_OR_TACTICAL_WITHDRAW, 1, 82)
+	_expect(CommandBus.dispatch(combat_counter) and combat_counter.counterplay_broke_chain and not combat_counter.cascade_rout_triggered,
+		"Reserve rotation counterplay resets battle fatigue and prevents cascade_rout.")
+
+	# 3. Chain 3: Political, Espionage & Coalition Chain (Low Kut/unfair Toy -> rogue warband & coalition war -> reversed by Glory >= 40 & Sık Orman espionage)
+	var pol_collapse: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.POLITICAL_ESPIONAGE_COALITION, GameEnums.CausalCounterplayAction.NONE, 1, 83)
+	pol_collapse.bey_id = &"chain_pol_bey"
+	_expect(CommandBus.dispatch(pol_collapse) and pol_collapse.rogue_warband_split and pol_collapse.coalition_formed,
+		"Low Kut (< 30.0) and unfair Toy share spawn rogue warband and trigger neighboring dynasty coalition war.")
+
+	var pol_counter: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.POLITICAL_ESPIONAGE_COALITION, GameEnums.CausalCounterplayAction.ESPIONAGE_OR_GLORY_WARBAND_RECRUIT, 1, 83)
+	pol_counter.bey_id = &"chain_pol_bey"
+	pol_counter.glory_score = 52.0
+	pol_counter.commander_leadership = 95.0
+	_expect(CommandBus.dispatch(pol_counter) and pol_counter.counterplay_broke_chain and pol_counter.warband_reintegrated_by_glory and pol_counter.coalition_broken_by_espionage_or_glory,
+		"High Khagan Glory (52.0 >= 40.0) freely reintegrates rogue warband and Sık Orman espionage breaks the coalition threat.")
+
+	# 4. Chain 4: Epidemic & Kurgan Purification Chain (Zud + Food <= 0 -> outbreak_epidemic & 8% daily attrition -> halted by Kurgan purification at 12.0 Kut cost)
+	var epi_collapse: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.EPIDEMIC_KURGAN_PURIFICATION, GameEnums.CausalCounterplayAction.NONE, 1, 84)
+	epi_collapse.initial_troops = 200
+	_expect(CommandBus.dispatch(epi_collapse) and epi_collapse.epidemic_active and epi_collapse.remaining_troops_after_epidemic == 184,
+		"Zud starvation (Food <= 0) triggers outbreak_epidemic and inflicts 8% daily troop attrition (200 -> 184).")
+
+	var epi_counter: ExecuteCausalChainCommand = ExecuteCausalChainCommand.new(
+		GameEnums.CausalChainArchetype.EPIDEMIC_KURGAN_PURIFICATION, GameEnums.CausalCounterplayAction.KURGAN_PURIFICATION_RITUAL, 1, 84)
+	epi_counter.initial_troops = 184
+	_expect(CommandBus.dispatch(epi_counter) and epi_counter.counterplay_broke_chain and epi_counter.epidemic_purified and not epi_counter.epidemic_active,
+		"Kurgan Shrine purification ritual spends 12.0 Kut and halts the Zud epidemic.")
+
+	EventBus.causal_chain_step_propagated.disconnect(_on_causal_chain_step_propagated)
+	EventBus.causal_chain_counterplay_applied.disconnect(_on_causal_chain_counterplay_applied)
+
+
 func _test_main_scene_integration() -> void:
 	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
 	var main_instance: Node = main_packed.instantiate()
@@ -1618,6 +1718,14 @@ func _on_wounded_troops_recovered(_a_id: int, _rec: int, _rem_w: int) -> void:
 
 func _on_veteran_casualty_shock_applied(_a_id: int, _v_ratio: float, _tac: float, _coh: float) -> void:
 	_veteran_shock_signal_received = true
+
+
+func _on_causal_chain_step_propagated(_arch: GameEnums.CausalChainArchetype, _cnt: int, _steps: PackedStringArray, _brk: bool) -> void:
+	_causal_step_propagated_signal_received = true
+
+
+func _on_causal_chain_counterplay_applied(_arch: GameEnums.CausalChainArchetype, _cp: GameEnums.CausalCounterplayAction, _sum: StringName) -> void:
+	_causal_counterplay_signal_received = true
 
 
 
