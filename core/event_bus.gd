@@ -67,3 +67,16 @@ signal yilki_horses_sacrificed_for_ration(army_id: int, remaining_remount_ratio:
 signal combat_resolved(result: CombatResult)
 signal sulfur_fire_trap_detonated(player_id: int, target_id: int, area_damage: float, cohesion_drop: float, morale_drop: float)
 signal army_routed(army_id: int, is_annihilated: bool, captured_toy_loot_value: float)
+signal cascade_rout_triggered(army_id: int, destroyed_elite_unit_id: StringName, remaining_morale: float)
+signal routed_troops_enslaved_to_toy(army_id: int, captured_slave_workers: int, added_toy_loot_value: float)
+
+# --- Espionage, Intelligence & Envoy Provocation ----------------------------
+signal espionage_mission_completed(report: EspionageReport)
+signal envoy_assassinated(instigator_faction_id: int, target_faction_id: int, envoy_id: StringName, kut_gained: float)
+signal total_war_declared(instigator_faction_id: int, target_faction_id: int, stance: GameEnums.DiplomaticStance)
+
+# --- Steppe Diseases & Zud Epidemic -----------------------------------------
+signal outbreak_epidemic_started(army_id: int, speed_multiplier: float, daily_attrition_ratio: float)
+signal epidemic_daily_attrition_ticked(army_id: int, remaining_troops: int, casualties: int)
+signal epidemic_purified_at_kurgan(army_id: int, shrine_building_id: StringName, kut_spent: float)
+

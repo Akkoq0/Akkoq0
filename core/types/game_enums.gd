@@ -78,6 +78,20 @@ enum SupplyLineStatus {
 	ISOLATED = 2, ## Active convoy interdicted / severed by raiders.
 }
 
+## Inter-dynasty diplomatic posture on the steppe.
+enum DiplomaticStance {
+	TRUCE = 0, ## Ateşkes / Elçi Dokunulmazlığı
+	BORDER_SKIRMISH = 1, ## Sınır Boyu Akınları
+	TOTAL_WAR_GREAT_RAID = 2, ## Büyük Yağma Dönemi (Total Savaş)
+}
+
+## Zud / Winter biological health status of an army or settlement camp.
+enum EpidemicState {
+	HEALTHY = 0,
+	OUTBREAK_EPIDEMIC = 1, ## Bozkır Vebası / Salgın Hastalık
+	PURIFIED = 2, ## Kurgan / Şifahane Arınma Ritüeli Tamamlandı
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
@@ -86,3 +100,4 @@ const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO
 ## Returns true when `layer_mask` contains the bit for `layer`.
 static func layer_mask_has(layer_mask: int, layer: WorldLayer) -> bool:
 	return (layer_mask & (1 << layer)) != 0
+
