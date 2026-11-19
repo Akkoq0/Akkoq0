@@ -155,6 +155,9 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 		cohesion_loss += _rules.elite_vanguard_loss_cohesion_shock
 		morale_loss += _rules.elite_vanguard_loss_morale_shock * clampf(defender.rookie_troop_ratio, 0.2, 1.5)
 
+	var dread_shock_mult: float = 1.0 + _safe_float(attacker.attacker_dread_morale_shock_ratio, 0.0, 0.0, 0.25)
+	morale_loss *= dread_shock_mult
+
 	result.cohesion_damage_to_defender = maxf(cohesion_loss, 0.0)
 	result.morale_damage_to_defender = maxf(morale_loss, 0.0)
 	result.defender_remaining_cohesion = clampf(defender.cohesion - result.cohesion_damage_to_defender, 0.0, 100.0)

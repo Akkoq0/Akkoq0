@@ -87,6 +87,11 @@ func record_envoy_assassination() -> float:
 	return _add_glory(rules.glory_per_envoy_assassination, REASON_ENVOY_ASSASSINATION)
 
 
+## Awards passive Honor / Töre Glory accrued through honorable steppe leadership.
+func record_honor_glory_bonus(amount: float) -> float:
+	return _add_glory(maxf(amount, 0.0), &"honor_tore_glory")
+
+
 func get_glory_score() -> float:
 	return glory_score
 

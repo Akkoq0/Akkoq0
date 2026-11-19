@@ -162,3 +162,15 @@ signal army_caravan_resupply_delivered(army_id: int, quiver_ammo_amt: float, foo
 signal caravan_intercepted_crisis(caravan_id: StringName, owner_id: int, raider_id: int, dest_army_id: int, ammo_lost: float, supply_drop: float)
 signal artisans_captured(victim_id: int, captor_id: int, captured_masters: int, steel_quality_after: float)
 
+# --- Phase 22 Governance Cap, Ülüş Sabotage, Amanat Pacts & Reputation ------
+signal governance_cap_exceeded(player_id: int, owned_regions: int, direct_cap: int, kut_penalty: float, tax_penalty_ratio: float)
+signal region_delegated_to_vassal(player_id: int, coord: Vector2i, bey_id: StringName, personality_trait: GameEnums.VassalPersonalityTrait)
+signal ulus_contract_settled(bey_id: StringName, fulfilled: bool, shortfall_ratio: float, loyalty_delta: float)
+signal vassal_silent_sabotage_delayed(bey_id: StringName, delay_hours: float, troop_multiplier: float)
+signal amanat_pact_sealed(pact_id: StringName, party_a: int, party_b: int, hostage_type: GameEnums.AmanatHostageType)
+signal amanat_pact_broken(pact_id: StringName, betrayer_id: int, hostage_forfeited: bool, reliability_after: float)
+signal proxy_war_sponsored(sponsor_id: int, warband_id: StringName, target_id: int, silver_cost: int)
+signal proxy_war_exposed_casus_belli(sponsor_id: int, discoverer_id: int, warband_id: StringName, penalty_free_casus_belli: bool)
+signal reputation_memory_changed(player_id: int, word_reliability: float, dread_score: float, honor_tore_score: float)
+
+

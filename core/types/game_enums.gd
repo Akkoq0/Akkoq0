@@ -299,6 +299,21 @@ enum CaravanCargoState {
 	INTERCEPTED = 2,
 }
 
+## Phase 22 Vassal Bey personality traits (`GovernanceManager`).
+enum VassalPersonalityTrait {
+	AMBITIOUS = 0, ## Hırslı: yüksek özerklik & darbe fırsatı arar
+	LOYAL = 1, ## Sadık: küçük ülüş açıklarını tolere eder, düşük sabotaj
+	CAUTIOUS = 2, ## İhtiyatlı: tehlike artınca asker sakınır
+	GREEDY = 3, ## Tamahkâr: ülüş eksikliğinde ağır sessiz sabotaj ve gecikme uygular
+}
+
+## Phase 22 Diplomatic Amanat (hostage / pledge) instrument types (`ReputationAndPactSystem`).
+enum AmanatHostageType {
+	COMMANDER_HOSTAGE = 0,
+	HEIR_HOSTAGE = 1,
+	JADE_TAMGA_SEAL = 2,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

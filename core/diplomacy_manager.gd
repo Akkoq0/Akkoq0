@@ -197,7 +197,14 @@ func evaluate_all_dynasties(player_kut: float, player_army_size: float, raid_fre
 		var profile: DynastyProfile = _profiles[dynasty_id]
 		var current_trust: float = _trust_scores.get(dynasty_id, profile.trust_index)
 		calculate_dynasty_stance(dynasty_id, safe_kut, _player_army_size, _raid_frequency)
-		if profile.should_join_coalition(safe_kut, _player_army_size, _raid_frequency, current_trust):
+		var joins_by_kut: bool = profile.should_join_coalition(safe_kut, _player_army_size, _raid_frequency, current_trust)
+		var joins_by_infamy: bool = false
+		if _recent_assassination_infamy >= 20.0 and profile.ambition >= 0.50:
+			var eff_threat: float = profile.calculate_threat_score(safe_kut, _player_army_size, _raid_frequency, current_trust) + _recent_assassination_infamy
+			if eff_threat > profile.neutral_threshold:
+				joins_by_infamy = true
+				_stances[dynasty_id] = GameEnums.DynastyAttitude.HOSTILE
+		if joins_by_kut or joins_by_infamy:
 			members.append(String(dynasty_id))
 	if not members.is_empty():
 		_coalition_war_active = true

@@ -119,10 +119,12 @@ func get_regional_tax_logistics_multiplier(player_id: int) -> float:
 	return mult
 
 
-## Returns combined political legitimacy (Kut < 30 penalty) and Ak Sakallılar Council income multiplier.
-func get_governance_tax_multiplier() -> float:
-	var mult: float = GameManager.get_legitimacy_multiplier() * CouncilEventEngine.get_active_income_multiplier()
-	return clampf(mult, 0.25, 1.5)
+## Returns combined political legitimacy (Kut < 30 penalty), Ak Sakallılar Council,
+## and Direct Governance Cap tax efficiency multiplier.
+func get_governance_tax_multiplier(player_id: int = 1) -> float:
+	var gov_eff: float = GovernanceManager.get_direct_tax_efficiency(player_id)
+	var mult: float = GameManager.get_legitimacy_multiplier() * CouncilEventEngine.get_active_income_multiplier() * gov_eff
+	return clampf(mult, 0.20, 1.5)
 
 
 ## Attempts `2 Iron + 1 Coal = 1 Steel` smelting constrained by mobile Sefer Arabası / siege capacity.
@@ -165,7 +167,7 @@ func collect_regional_tax(player_id: int, region_count: int, rich_region_count: 
 func calculate_effective_regional_tax_with_logistics(player_id: int, region_count: int, rich_region_count: int = 0) -> int:
 	if _economy_rules == null or region_count <= 0:
 		return 0
-	var effective_mult: float = calculate_jade_authority_multiplier(player_id) * get_regional_tax_logistics_multiplier(player_id) * get_governance_tax_multiplier()
+	var effective_mult: float = calculate_jade_authority_multiplier(player_id) * get_regional_tax_logistics_multiplier(player_id) * get_governance_tax_multiplier(player_id)
 	return _economy_rules.compute_regional_tax(region_count, rich_region_count, effective_mult)
 
 
@@ -270,7 +272,7 @@ func _handle_collect_regional_tax(command: GameCommand) -> bool:
 		return command.reject("controlled_region_count must be positive.")
 	var authority_mult: float = calculate_jade_authority_multiplier(tax_cmd.player_id)
 	var logistics_mult: float = get_regional_tax_logistics_multiplier(tax_cmd.player_id)
-	var governance_mult: float = get_governance_tax_multiplier()
+	var governance_mult: float = get_governance_tax_multiplier(tax_cmd.player_id)
 	var effective_mult: float = authority_mult * logistics_mult * governance_mult
 	var tax_amount: int = _economy_rules.compute_regional_tax(
 		tax_cmd.controlled_region_count, tax_cmd.rich_region_count, effective_mult)

@@ -118,6 +118,7 @@ func _run_suite() -> void:
 	_test_phase19_hybrid_conquest_yaylak_kislak_kurgan()
 	_test_phase20_asymmetric_collapse_exile_vassal_rebirth()
 	_test_phase21_courier_deception_caravans_artisans()
+	_test_phase22_game_theory_politics_and_48_season_audit()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3512,6 +3513,162 @@ func _test_phase21_courier_deception_caravans_artisans() -> void:
 	CaravanLogisticsManager.reset_logistics_state()
 	IntelligenceManager.step_seasonal_intelligence_decay(IntelligenceManager.REPORT_STALENESS_SEASONS)
 	SeasonManager.set_food_reserve(120)
+
+
+func _test_phase22_game_theory_politics_and_48_season_audit() -> void:
+	TerritoryManager.reset_territory_state()
+	GovernanceManager.reset_governance_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p22_init_kut"))
+
+	# 1. Direct Governance Cap & Vassal Delegation Tax/Kut Relief
+	for i: int in range(5):
+		TerritoryManager.register_region(Vector2i(90 + i, 90), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2201, i == 0, false, 90.0)
+	var kut_before_overcap: float = GameManager.get_kut_score()
+	var strain_over: Dictionary[StringName, float] = GovernanceManager.evaluate_governance_strain(2201, true)
+	var tax_over: float = ResourceManager.get_governance_tax_multiplier(2201)
+	var deleg1: DelegateRegionToVassalCommand = DelegateRegionToVassalCommand.new(
+		2201, Vector2i(93, 90), &"bey_alpagut", GameEnums.VassalPersonalityTrait.LOYAL)
+	var deleg2: DelegateRegionToVassalCommand = DelegateRegionToVassalCommand.new(
+		2201, Vector2i(94, 90), &"bey_korsan", GameEnums.VassalPersonalityTrait.GREEDY)
+	_expect(int(strain_over[&"direct_count"]) == 5 and int(strain_over[&"extra_regions"]) == 2 \
+		and GameManager.get_kut_score() < kut_before_overcap - 7.5 \
+		and tax_over <= 0.71 \
+		and CommandBus.dispatch(deleg1) and CommandBus.dispatch(deleg2) \
+		and deleg2.direct_regions_after == 3 \
+		and is_equal_approx(GovernanceManager.get_direct_tax_efficiency(2201), 1.0),
+		"Exceeding Direct Governance Cap (5 > 3) inflicts Kut drain & tax inefficiency until delegated to Vassal Beys.")
+
+	# 2. Ülüş Share Contract & Silent Sabotage (Delayed / Reduced Reinforcements)
+	var loyal_ok: SignUlusContractCommand = SignUlusContractCommand.new(&"bey_alpagut", 100.0, 100.0)
+	var greedy_short: SignUlusContractCommand = SignUlusContractCommand.new(&"bey_korsan", 100.0, 45.0)
+	_expect(CommandBus.dispatch(loyal_ok) and loyal_ok.fulfilled and not loyal_ok.silent_sabotage_triggered \
+		and CommandBus.dispatch(greedy_short) and not greedy_short.fulfilled \
+		and greedy_short.silent_sabotage_triggered \
+		and greedy_short.reinforcement_delay_hours >= 12.0 \
+		and greedy_short.reinforcement_troop_mult <= 0.65,
+		"Greedy Vassal shortchanged on Ülüş share answers with Silent Sabotage (%.1fh delay, %.2fx troops) rather than binary suicide revolt." % [
+			greedy_short.reinforcement_delay_hours, greedy_short.reinforcement_troop_mult])
+
+	# 3. Amanat Pact Seal vs Break + Covert Silver Proxy War + Scout Investigation Casus Belli
+	var seal_cmd: SealAmanatPactCommand = SealAmanatPactCommand.new(
+		&"amanat_kipchak", 2201, 2202, GameEnums.AmanatHostageType.HEIR_HOSTAGE, 6)
+	var rel_before: float = ReputationAndPactSystem.get_word_reliability(2201)
+	var break_cmd: BreakAmanatPactCommand = BreakAmanatPactCommand.new(&"amanat_kipchak", 2201)
+	_expect(CommandBus.dispatch(seal_cmd) \
+		and ReputationAndPactSystem.is_amanat_truce_active(2201, 2202) \
+		and CommandBus.dispatch(break_cmd) and break_cmd.hostage_forfeited \
+		and not ReputationAndPactSystem.is_amanat_truce_active(2201, 2202) \
+		and break_cmd.reliability_after <= rel_before - 34.0,
+		"Breaking an Amanat pact forfeits the pledged heir and slashes Word Reliability (%.1f -> %.1f)." % [
+			rel_before, break_cmd.reliability_after])
+
+	CommandBus.dispatch(DepositResourcesCommand.new(2203, &"silver_gold", 100))
+	var sponsor_cmd: SponsorProxyWarCommand = SponsorProxyWarCommand.new(2203, &"yersiz_pack", 2202, 45, 0.85)
+	var weak_inv: InvestigateProxyWarCommand = InvestigateProxyWarCommand.new(2202, &"yersiz_pack", 30.0)
+	var strong_inv: InvestigateProxyWarCommand = InvestigateProxyWarCommand.new(2202, &"yersiz_pack", 80.0)
+	_expect(CommandBus.dispatch(sponsor_cmd) and sponsor_cmd.concealed \
+		and CommandBus.dispatch(weak_inv) and not weak_inv.discovered \
+		and CommandBus.dispatch(strong_inv) and strong_inv.discovered \
+		and strong_inv.revealed_sponsor_id == 2203 \
+		and strong_inv.penalty_free_casus_belli \
+		and ReputationAndPactSystem.has_penalty_free_casus_belli(2202, 2203),
+		"Covert silver-funded Yersiz Yurtsuz proxy war stays concealed from weak recon until strong scouts grant penalty-free Casus Belli.")
+
+	# 4. Strategic Symmetry Between Dread (Dehşet) and Honor / Töre
+	ReputationAndPactSystem.record_dread_act(2201, 45.0, 15.0)
+	ReputationAndPactSystem.record_honor_act(2204, 30.0, 0.0)
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var dread_att: CombatantStats = CombatantStats.new(2281, 180.0, 100.0, 600.0, 1.0)
+	dread_att.attacker_dread_morale_shock_ratio = ReputationAndPactSystem.get_combat_dread_morale_shock(2201)
+	var plain_att: CombatantStats = CombatantStats.new(2282, 180.0, 100.0, 600.0, 1.0)
+	var targ_dread: CombatantStats = CombatantStats.new(2283, 110.0, 90.0, 600.0, 1.0)
+	var targ_plain: CombatantStats = CombatantStats.new(2284, 110.0, 90.0, 600.0, 1.0)
+	var cmd_dread: ResolveCombatCommand = ResolveCombatCommand.new(dread_att, targ_dread, steppe, 2241)
+	var cmd_plain: ResolveCombatCommand = ResolveCombatCommand.new(plain_att, targ_plain, steppe, 2241)
+	CommandBus.dispatch(cmd_dread)
+	CommandBus.dispatch(cmd_plain)
+	_expect(cmd_dread.result.morale_damage_to_defender > cmd_plain.result.morale_damage_to_defender \
+		and not ReputationAndPactSystem.can_negotiate_easy_truce(2201) \
+		and ReputationAndPactSystem.get_coalition_threat_multiplier(2201) >= 1.99 \
+		and ReputationAndPactSystem.get_seasonal_honor_glory_bonus(2204) > 2.0 \
+		and ReputationAndPactSystem.accepts_voluntary_vassalization(2204),
+		"Dread amplifies enemy combat morale shock yet doubles Coalition threat & blocks easy truces, while Honor earns Glory & voluntary vassals.")
+
+	# 5. 48-Season (12-Year) 5-Archetype Deterministic Stress Audit
+	var all_archetypes: Array[LongHorizonSimulator.StrategicArchetype] = [
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_IMPERIAL_YAYLAK,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_RAIDER_PILLAGER,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_ARTISAN_CARAVAN,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_DREAD_KAN_DAVASI,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_EXILE_VASSAL_KINGMAKER,
+	]
+	var audit_results: Array[LongHorizonSimulator.ArchetypeAuditResult] = []
+	for idx: int in range(all_archetypes.size()):
+		var arch: LongHorizonSimulator.StrategicArchetype = all_archetypes[idx]
+		var audit: LongHorizonSimulator.ArchetypeAuditResult = LongHorizonSimulator.run_archetype_audit(
+			self, arch, 48, 22001 + idx * 17)
+		audit_results.append(audit)
+		var last_snap: SimulationInvariantChecker.SeasonSnapshot = audit.latest()
+		print("[AUDIT-48] Arch=%d Seasons=%d Passed=%s Viol=%d DirectPeak=%d DelegPeak=%d SteelBat=%d SilverEnd=%d EndKut=%.1f MaxDread=%.1f MaxHonor=%.1f MinRel=%.1f CoalSeas=%d TruceBlk=%d Viability=%.1f Collapse=%d" % [
+			int(arch),
+			audit.seasons_simulated,
+			str(audit.passed()),
+			audit.violations.size(),
+			audit.direct_regions_peak,
+			audit.delegated_regions_peak,
+			audit.steel_batches_smelted,
+			audit.silver_end,
+			last_snap.kut if last_snap != null else -1.0,
+			audit.max_dread_observed,
+			audit.max_honor_observed,
+			audit.min_reliability_observed,
+			audit.coalition_seasons,
+			audit.truce_blocked_count,
+			audit.composite_viability_score,
+			int(last_snap.collapse_state) if last_snap != null else -1,
+		])
+		if not audit.passed():
+			for v: String in audit.violations:
+				push_error("[AUDIT-48 VIOLATION Arch=%d] %s" % [int(arch), v])
+		_expect(audit.seasons_simulated == 48 and audit.passed(),
+			"48-Season stress audit for StrategicArchetype %d passed with 0 invariant violations (violations: %d)." % [
+				int(arch), audit.violations.size()])
+
+	var imperial_res: LongHorizonSimulator.ArchetypeAuditResult = audit_results[0]
+	var raider_res: LongHorizonSimulator.ArchetypeAuditResult = audit_results[1]
+	var artisan_res: LongHorizonSimulator.ArchetypeAuditResult = audit_results[2]
+	var dread_res: LongHorizonSimulator.ArchetypeAuditResult = audit_results[3]
+	var exile_res: LongHorizonSimulator.ArchetypeAuditResult = audit_results[4]
+
+	_expect(imperial_res.direct_regions_peak >= 4 and imperial_res.delegated_regions_peak >= 2,
+		"Imperial Yaylak archetype hits Direct Governance Cap peak (%d) and delegates frontier Vassals (%d)." % [
+			imperial_res.direct_regions_peak, imperial_res.delegated_regions_peak])
+	_expect(artisan_res.max_honor_observed >= 75.0 and artisan_res.steel_batches_smelted > raider_res.steel_batches_smelted \
+		and artisan_res.latest() != null and artisan_res.latest().kut >= 60.0 and artisan_res.coalition_seasons <= 4,
+		"Artisan Caravan archetype achieves superior Steel/Honor/Kut balance (%d batches, %.1f honor, %.1f Kut, %d coal seasons vs %d raider steel)." % [
+			artisan_res.steel_batches_smelted, artisan_res.max_honor_observed,
+			artisan_res.latest().kut if artisan_res.latest() != null else 0.0,
+			artisan_res.coalition_seasons, raider_res.steel_batches_smelted])
+	_expect(dread_res.max_dread_observed >= 60.0 and dread_res.truce_blocked_count >= 10 and dread_res.coalition_seasons >= 10,
+		"Dread Kan Davası archetype faces sustained coalition warfare (%d seasons) & blocked easy truces (%d checks)." % [
+			dread_res.coalition_seasons, dread_res.truce_blocked_count])
+	_expect(exile_res.latest() != null and exile_res.latest().collapse_state == GameEnums.CollapseState.FRONTIER_MARCH_LORD,
+		"Exile-Vassal-Kingmaker archetype traverses collapse -> extinction cooldown -> Frontier March rebirth across 48 seasons.")
+
+	# Final clean restoration across all autoloads
+	TerritoryManager.reset_territory_state()
+	GovernanceManager.reset_governance_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p22_cleanup_kut"))
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
 
 
 

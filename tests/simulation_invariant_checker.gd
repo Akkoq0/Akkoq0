@@ -45,6 +45,14 @@ class SeasonSnapshot:
 	var base_speed: float = 8.0
 	var transition_history_size: int = 0
 	var cascade_routing: bool = false
+	var direct_regions_count: int = 0
+	var tax_efficiency_mult: float = 1.0
+	var word_reliability: float = 80.0
+	var dread_score: float = 0.0
+	var honor_score: float = 50.0
+	var artisans_count: int = 8
+	var active_kurgans: int = 0
+	var collapse_state: GameEnums.CollapseState = GameEnums.CollapseState.SOVEREIGN
 
 
 static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, max_food_cap: int = 5000) -> PackedStringArray:
@@ -74,6 +82,10 @@ static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, m
 	_check_finite(errors, tag, "army_fatigue", snap.army_fatigue)
 	_check_finite(errors, tag, "army_speed", snap.army_speed)
 	_check_finite(errors, tag, "base_speed", snap.base_speed)
+	_check_finite(errors, tag, "tax_efficiency_mult", snap.tax_efficiency_mult)
+	_check_finite(errors, tag, "word_reliability", snap.word_reliability)
+	_check_finite(errors, tag, "dread_score", snap.dread_score)
+	_check_finite(errors, tag, "honor_score", snap.honor_score)
 
 	# 2. Bounds, non-negativity & multiplier clamp guarantees
 	if snap.food < 0 or snap.food > max_food_cap:
@@ -129,6 +141,19 @@ static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, m
 	if snap.base_speed > 0.0 and snap.army_speed < snap.base_speed * 0.12 - 0.01:
 		errors.append("%s Army speed %.3f dropped below 12%% base floor (%.3f)." % [
 			tag, snap.army_speed, snap.base_speed * 0.12])
+
+	if snap.direct_regions_count < 0:
+		errors.append("%s Negative direct_regions_count: %d." % [tag, snap.direct_regions_count])
+	if snap.tax_efficiency_mult < 0.20 or snap.tax_efficiency_mult > 1.5001:
+		errors.append("%s Tax efficiency out of bounds [0.20, 1.50]: %.3f." % [tag, snap.tax_efficiency_mult])
+	if snap.word_reliability < 0.0 or snap.word_reliability > 100.0001:
+		errors.append("%s Word reliability out of bounds [0, 100]: %.3f." % [tag, snap.word_reliability])
+	if snap.dread_score < 0.0 or snap.dread_score > 100.0001:
+		errors.append("%s Dread score out of bounds [0, 100]: %.3f." % [tag, snap.dread_score])
+	if snap.honor_score < 0.0 or snap.honor_score > 100.0001:
+		errors.append("%s Honor score out of bounds [0, 100]: %.3f." % [tag, snap.honor_score])
+	if snap.artisans_count < 0 or snap.active_kurgans < 0:
+		errors.append("%s Negative artisan (%d) or kurgan (%d) count." % [tag, snap.artisans_count, snap.active_kurgans])
 
 	for d_id: StringName in snap.dynasty_trust:
 		var trust_val: float = snap.dynasty_trust[d_id]

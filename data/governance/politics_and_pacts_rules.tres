@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="PoliticsAndPactsRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/politics_and_pacts_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"politics_and_pacts_rules"
+direct_governance_cap = 3
+jade_cap_bonus_max = 1
+over_cap_kut_drain_per_extra = 4.0
+over_cap_tax_penalty_per_extra = 0.15
+over_cap_tax_floor = 0.25
+ulus_unmet_silent_delay_hours = 12.0
+ulus_unmet_troop_mult = 0.55
+ulus_fulfillment_loyalty_gain = 8.0
+ulus_shortfall_loyalty_drop = 18.0
+amanat_break_reliability_penalty = 35.0
+amanat_break_trust_penalty = -30.0
+amanat_fulfilled_honor_bonus = 8.0
+proxy_war_sponsor_bullion_cost = 45
+proxy_discovery_scout_threshold = 65.0
+proxy_exposed_infamy_spike = 22.0
+dread_morale_shock_max = 0.25
+dread_truce_block_threshold = 60.0
+dread_coalition_threat_multiplier = 2.0
+honor_glory_per_season_max = 4.0
+honor_voluntary_vassal_threshold = 65.0

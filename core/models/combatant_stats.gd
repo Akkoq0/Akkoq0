@@ -45,6 +45,7 @@ var is_fleeing_rout: bool = false
 var quiver_ammo_ratio: float = 1.0
 var remount_horse_ratio: float = 1.0
 var commander_leadership: float = 50.0
+var attacker_dread_morale_shock_ratio: float = 0.0
 
 
 func _init(p_entity_id: int, p_attack: float, p_defense: float, p_health: float, p_supply_ratio: float) -> void:

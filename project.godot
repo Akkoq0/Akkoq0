@@ -43,6 +43,9 @@ TerritoryManager="*res://core/territory_manager.gd"
 CollapseRecoveryFSM="*res://core/collapse_recovery_fsm.gd"
 CourierDispatchSystem="*res://core/courier_dispatch_system.gd"
 CaravanLogisticsManager="*res://core/caravan_logistics_manager.gd"
+GovernanceManager="*res://core/governance_manager.gd"
+ReputationAndPactSystem="*res://core/reputation_and_pact_system.gd"
+
 
 
 

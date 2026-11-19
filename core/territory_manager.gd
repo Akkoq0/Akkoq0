@@ -165,6 +165,14 @@ func count_owned_regions(player_id: int) -> int:
 	return count
 
 
+func get_owned_region_coords(player_id: int) -> Array[Vector2i]:
+	var coords: Array[Vector2i] = []
+	for coord: Vector2i in _regions:
+		if _regions[coord].owner_id == player_id:
+			coords.append(coord)
+	return coords
+
+
 func count_sacred_kurgans() -> int:
 	var total: int = 0
 	for coord: Vector2i in _regions:
