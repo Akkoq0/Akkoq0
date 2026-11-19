@@ -32,10 +32,19 @@ func _ready() -> void:
 		for err: String in _profile.get_validation_errors():
 			push_error("AICommander: %s" % err)
 	CommandBus.register_handler(StepAICommanderCommand.ID, _handle_step_ai)
+	EventBus.doctrine_matchup_evaluated.connect(_on_doctrine_matchup_evaluated)
+	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
+	EventBus.courier_ambushed_plan_exposed.connect(_on_courier_ambushed_plan_exposed)
 
 
 func _exit_tree() -> void:
 	CommandBus.unregister_handler(StepAICommanderCommand.ID, _handle_step_ai)
+	if EventBus.doctrine_matchup_evaluated.is_connected(_on_doctrine_matchup_evaluated):
+		EventBus.doctrine_matchup_evaluated.disconnect(_on_doctrine_matchup_evaluated)
+	if EventBus.espionage_mission_completed.is_connected(_on_espionage_mission_completed):
+		EventBus.espionage_mission_completed.disconnect(_on_espionage_mission_completed)
+	if EventBus.courier_ambushed_plan_exposed.is_connected(_on_courier_ambushed_plan_exposed):
+		EventBus.courier_ambushed_plan_exposed.disconnect(_on_courier_ambushed_plan_exposed)
 
 
 func get_behavior_profile() -> AIBehaviorProfile:
@@ -141,3 +150,15 @@ func _set_phase(agent_id: StringName, next_phase: GameEnums.AICommanderPhase) ->
 	_agent_phases[agent_id] = next_phase
 	if prev != next_phase:
 		EventBus.ai_commander_phase_changed.emit(agent_id, prev, next_phase)
+
+
+func _on_doctrine_matchup_evaluated(attacker_id: int, defender_id: int, result: DoctrineMatchupResult) -> void:
+	SteppeStrategicAIController.notify_doctrine_matchup(attacker_id, attacker_id, defender_id, defender_id, result)
+
+
+func _on_espionage_mission_completed(report: EspionageReport) -> void:
+	SteppeStrategicAIController.notify_espionage_report(report)
+
+
+func _on_courier_ambushed_plan_exposed(_order_id: StringName, victim_player_id: int, ambusher_id: int, leaked_plan: GameEnums.TuranTacticPhase) -> void:
+	SteppeStrategicAIController.notify_courier_ambushed(victim_player_id, ambusher_id, leaked_plan)

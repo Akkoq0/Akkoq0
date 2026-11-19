@@ -410,6 +410,43 @@ enum CommandEnvelopeStatus {
 	REJECTED_INVALID = 4,
 }
 
+## Phase 32 Bounded-Rationality AI Difficulty Tiers (`AIDifficultyProfile`).
+enum AIDifficultyTier {
+	OYMAK_BEYI = 0, ## Kolay: yüksek karar sıcaklığı, serap/sahte ricat yanılgısına açık
+	SANCAK_BEYI = 1, ## Normal: dengeli Utility puanlaması ve temel karşı doktrin
+	BOZKIR_KURDU = 2, ## Zor: düşük hata payı, hafıza adaptasyonu, sinsilik ve 5 rezonans takibi
+	KAGAN_ZEKASI = 3, ## Usta: en düşük sıcaklık, sıfır hileyle derin öngörü ve Zud/Kara Borsa sömürüsü
+}
+
+## Phase 32 Steppe Tribal AI Personalities (`SteppeAIPersonalityProfile`).
+enum SteppeAIPersonality {
+	AKINCI_BASKINCI = 0, ## Kervan baskını, ikmal kesme ve Börü/Tolgama taarruzu
+	YAYLAK_IMPARATORU = 1, ## Pazar/ticaret dengesi, Zud hazırlığı ve Töre Kurultay ağı
+	GOLGE_SABOTOR = 2, ## Kuyu sabotajı, vekalet savaşı, ulak pususu ve Toz Perdesi
+	DEMIR_SAVUNMACI = 3, ## Araba Kalesi / Tonyukuk savunması, pusu kırma ve su koruması
+}
+
+## Phase 32 Multi-Step AI Deception & Opportunistic Schemes (`AISchemePlanner`).
+enum AISchemeType {
+	NONE = 0,
+	POISONED_WINTER_TRAP = 1, ## Zehirli Kış Kapanı (Kuyu sabotajı + Kervan/Vekalet + Tonyukuk/Kıtlık)
+	DUST_VEIL_COURIER_AMBUSH = 2, ## Toz Perdesi & Ulak Pususu (Toz aç + Ulak/Casus deşifre + Karşı doktrin)
+	OPPORTUNISTIC_CRISIS_STRIKE = 3, ## Fırsatçı Kriz Vuruşu (Yüksek Dehşet/Ülüş/Veraset krizinde koalisyon/baskın)
+}
+
+## Phase 32 Utility AI Action Categories (`AIUtilityEvaluator`).
+enum AIActionCategory {
+	HOLD_AND_GATHER = 0,
+	FORTIFY_AND_SUSTAIN = 1,
+	ASSIGN_COUNTER_DOCTRINE = 2,
+	RAISE_DUST_DECEPTION = 3,
+	SABOTAGE_ENEMY_WATER = 4,
+	AMBUSH_COURIER_OR_SPY = 5,
+	INTERCEPT_CARAVAN_OR_INTERDICT = 6,
+	SPONSOR_PROXY_OR_COALITION = 7,
+	EXECUTE_SCHEME_STEP = 8,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

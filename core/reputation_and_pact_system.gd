@@ -110,6 +110,17 @@ func is_amanat_truce_active(party_a: int, party_b: int) -> bool:
 	return false
 
 
+func get_active_pacts_for_player(player_id: int) -> Array[AmanatPactRecord]:
+	var out: Array[AmanatPactRecord] = []
+	if player_id <= 0:
+		return out
+	for pid: StringName in _pacts:
+		var rec: AmanatPactRecord = _pacts[pid]
+		if rec != null and rec.active and (rec.party_a == player_id or rec.party_b == player_id):
+			out.append(rec)
+	return out
+
+
 func has_penalty_free_casus_belli(attacker_id: int, sponsor_id: int) -> bool:
 	var key: StringName = StringName("%d:%d" % [attacker_id, sponsor_id])
 	if _casus_belli.has(key):

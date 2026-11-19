@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AIDifficultyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/ai_difficulty_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"kagan_zekasi"
+difficulty_tier = 3
+display_name = "Kağan Zekâsı (Usta)"
+decision_temperature = 0.02
+mistake_noise_amplitude = 0.5
+feigned_retreat_susceptibility = 0.02
+anti_spam_memory_weight = 1.0
+dust_veil_pierce_skill = 0.95
+adaptation_learning_rate = 1.25
+synergy_pursuit_weight = 1.4
+scheme_planning_weight = 1.5
+foresight_zud_horizon_weight = 1.45
+terrain_trap_awareness = 1.25

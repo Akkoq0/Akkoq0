@@ -207,3 +207,8 @@ signal session_pause_rejected(sender_player_id: String, reason_code: StringName)
 signal command_envelope_rejected(sequence_id: int, sender_player_id: String, status: GameEnums.CommandEnvelopeStatus, reason: String)
 signal world_state_saved(world_hash: String, schema_version: int)
 signal world_state_loaded(world_hash: String, schema_version: int)
+
+# --- Phase 32 Human-Like Utility AI, Multi-Step Schemes & Narrative Hooks --
+signal ai_utility_decision_made(agent_id: StringName, player_id: int, difficulty_tier: GameEnums.AIDifficultyTier, action_category: GameEnums.AIActionCategory, selected_doctrine_id: StringName, chosen_score: float, envelope_sequence_id: int)
+signal ai_scheme_step_advanced(agent_id: StringName, scheme_type: GameEnums.AISchemeType, step_index: int, total_steps: int, step_action: StringName, completed: bool)
+signal ai_story_agenda_activated(agent_id: StringName, agenda_id: StringName, triggered_reason: StringName)

@@ -19,6 +19,7 @@ const REQUIRED_SECTIONS: Array[String] = [
 	"resource_manager",
 	"season_manager",
 	"session",
+	"strategic_ai",
 	"succession_manager",
 	"territory_manager",
 	"water_route_manager",
@@ -52,6 +53,7 @@ static func export_state_dict() -> Dictionary:
 		"schema_version": SCHEMA_VERSION,
 		"season_manager": SeasonManager.export_state_dict(),
 		"session": SessionClockAuthority.export_state_dict(),
+		"strategic_ai": SteppeStrategicAIController.export_all_state_dict(),
 		"succession_manager": SuccessionManager.export_state_dict(),
 		"synergy_summary": syn_dict,
 		"territory_manager": TerritoryManager.export_state_dict(),
@@ -107,5 +109,7 @@ static func import_state_dict(data: Dictionary) -> bool:
 	if not IntelligenceManager.import_state_dict(DeterministicStateHasher.v_dict(data.get("intelligence_manager"))):
 		return false
 	if not CollapseRecoveryFSM.import_state_dict(DeterministicStateHasher.v_dict(data.get("collapse_recovery_fsm"))):
+		return false
+	if not SteppeStrategicAIController.import_all_state_dict(DeterministicStateHasher.v_dict(data.get("strategic_ai"))):
 		return false
 	return true

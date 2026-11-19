@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SteppeAIPersonalityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/steppe_ai_personality_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"demir_savunmaci"
+personality = 3
+display_name = "Demir Savunmacı"
+aggression_weight = 0.75
+sabotage_weight = 0.7
+economy_weight = 1.3
+deception_weight = 0.85
+diplomacy_weight = 1.15
+doctrine_counter_weight = 1.35
+preferred_scheme = 2
+preferred_doctrine = 3

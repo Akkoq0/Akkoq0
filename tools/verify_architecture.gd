@@ -276,6 +276,12 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as SuccessionRules).get_validation_errors())
 		elif res is SystemicSynergyRules:
 			errors.append_array((res as SystemicSynergyRules).get_validation_errors())
+		elif res is AIDifficultyProfile:
+			errors.append_array((res as AIDifficultyProfile).get_validation_errors())
+		elif res is SteppeAIPersonalityProfile:
+			errors.append_array((res as SteppeAIPersonalityProfile).get_validation_errors())
+		elif res is StoryAgendaResource:
+			errors.append_array((res as StoryAgendaResource).get_validation_errors())
 	return errors
 
 

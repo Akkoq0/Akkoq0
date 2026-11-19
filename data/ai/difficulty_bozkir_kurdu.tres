@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AIDifficultyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/ai_difficulty_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"bozkir_kurdu"
+difficulty_tier = 2
+display_name = "Bozkır Kurdu (Zor)"
+decision_temperature = 0.1
+mistake_noise_amplitude = 3.5
+feigned_retreat_susceptibility = 0.15
+anti_spam_memory_weight = 0.85
+dust_veil_pierce_skill = 0.72
+adaptation_learning_rate = 0.9
+synergy_pursuit_weight = 1.05
+scheme_planning_weight = 1.15
+foresight_zud_horizon_weight = 1.1
+terrain_trap_awareness = 1.0

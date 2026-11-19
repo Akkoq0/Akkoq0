@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SteppeAIPersonalityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/steppe_ai_personality_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"yaylak_imparatoru"
+personality = 1
+display_name = "Yaylak İmparatoru"
+aggression_weight = 0.8
+sabotage_weight = 0.65
+economy_weight = 1.5
+deception_weight = 0.7
+diplomacy_weight = 1.35
+doctrine_counter_weight = 1.0
+preferred_scheme = 3
+preferred_doctrine = 3

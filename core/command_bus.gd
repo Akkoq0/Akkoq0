@@ -394,6 +394,22 @@ func enqueue_envelope(envelope: CommandEnvelope, current_tick: int = -1) -> bool
 		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: player_id mismatch.")
 	if payload.has("owner_id") and DeterministicStateHasher.v_int(payload.get("owner_id"), -1) != sender_pid:
 		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: owner_id mismatch.")
+	if payload.has("saboteur_id") and DeterministicStateHasher.v_int(payload.get("saboteur_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: saboteur_id mismatch.")
+	if payload.has("sponsor_id") and DeterministicStateHasher.v_int(payload.get("sponsor_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: sponsor_id mismatch.")
+	if payload.has("ambusher_faction_id") and DeterministicStateHasher.v_int(payload.get("ambusher_faction_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: ambusher_faction_id mismatch.")
+	if payload.has("spy_owner_id") and DeterministicStateHasher.v_int(payload.get("spy_owner_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: spy_owner_id mismatch.")
+	if payload.has("challenger_id") and DeterministicStateHasher.v_int(payload.get("challenger_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: challenger_id mismatch.")
+	if payload.has("betrayer_id") and DeterministicStateHasher.v_int(payload.get("betrayer_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: betrayer_id mismatch.")
+	if envelope.command_type == "intercept_caravan" and payload.has("raider_id") and DeterministicStateHasher.v_int(payload.get("raider_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: raider_id mismatch.")
+	if envelope.command_type == "interdict_supply_line" and payload.has("raider_player_id") and DeterministicStateHasher.v_int(payload.get("raider_player_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: raider_player_id mismatch.")
 	if payload.has("army_id"):
 		var aid: int = DeterministicStateHasher.v_int(payload.get("army_id"), 0)
 		if _envelope_army_owners.has(aid) and _envelope_army_owners[aid] != sender_pid:
@@ -401,7 +417,7 @@ func enqueue_envelope(envelope: CommandEnvelope, current_tick: int = -1) -> bool
 	if payload.has("region_x") and payload.has("region_y"):
 		var r_coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(payload.get("region_x"), 0), DeterministicStateHasher.v_int(payload.get("region_y"), 0))
 		var reg: RegionData = TerritoryManager.get_region(r_coord)
-		if reg != null and reg.owner_id > 0 and reg.owner_id != sender_pid and envelope.command_type != "sabotage_well":
+		if reg != null and reg.owner_id > 0 and reg.owner_id != sender_pid and envelope.command_type != "sabotage_well" and envelope.command_type != "open_yurt_claim":
 			return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: region owned by another player.")
 
 	var cmd_type: String = envelope.command_type
@@ -573,6 +589,82 @@ func _execute_envelope(envelope: CommandEnvelope) -> bool:
 		"advance_season":
 			SeasonManager.advance_season_cycle(DeterministicStateHasher.v_float(p.get("pasture_yield_multiplier", -1.0), -1.0))
 			return true
+		"ambush_courier":
+			var cmd: AmbushCourierCommand = AmbushCourierCommand.new(
+				StringName(DeterministicStateHasher.v_str(p.get("order_id", ""))),
+				sender_pid)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"intercept_caravan":
+			var cmd: InterceptCaravanCommand = InterceptCaravanCommand.new(
+				StringName(DeterministicStateHasher.v_str(p.get("caravan_id", ""))),
+				sender_pid)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"sponsor_proxy_war":
+			var cmd: SponsorProxyWarCommand = SponsorProxyWarCommand.new(
+				sender_pid,
+				StringName(DeterministicStateHasher.v_str(p.get("warband_id", "exile_raiders"), "exile_raiders")),
+				DeterministicStateHasher.v_int(p.get("target_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("silver_cost", 45), 45),
+				DeterministicStateHasher.v_float(p.get("raid_intensity", 0.75), 0.75))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"interdict_supply_line":
+			var cmd: InterdictSupplyLineCommand = InterdictSupplyLineCommand.new(
+				DeterministicStateHasher.v_int(p.get("target_army_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("depot_id", 1), 1),
+				StringName(DeterministicStateHasher.v_str(p.get("raider_id", str(sender_pid)), str(sender_pid))))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"dispatch_spy":
+			var terrain_path: String = DeterministicStateHasher.v_str(p.get("terrain_path", "res://data/terrain/steppe.tres"), "res://data/terrain/steppe.tres")
+			var terrain_res: TerrainData = ResourceLoader.load(terrain_path) as TerrainData
+			var cmd: DispatchSpyCommand = DispatchSpyCommand.new(
+				sender_pid,
+				DeterministicStateHasher.v_int(p.get("target_faction_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("target_army_id", 1), 1),
+				DeterministicStateHasher.v_float(p.get("commander_leadership", 65.0), 65.0),
+				terrain_res,
+				DeterministicStateHasher.v_float(p.get("target_quiver_ammo", 50.0), 50.0),
+				DeterministicStateHasher.v_int(p.get("target_tactic_intent", int(GameEnums.TuranTacticPhase.RECON_DUST_SCREEN)), int(GameEnums.TuranTacticPhase.RECON_DUST_SCREEN)) as GameEnums.TuranTacticPhase,
+				DeterministicStateHasher.v_int(p.get("target_doctrine_type", int(GameEnums.TacticalDoctrineType.FEIGNED_RETREAT)), int(GameEnums.TacticalDoctrineType.FEIGNED_RETREAT)) as GameEnums.TacticalDoctrineType,
+				DeterministicStateHasher.v_float(p.get("counter_espionage", 0.0), 0.0),
+				DeterministicStateHasher.v_int(p.get("rng_seed", 1), 1))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"evaluate_diplomacy":
+			var cmd: EvaluateDiplomacyCommand = EvaluateDiplomacyCommand.new(
+				DeterministicStateHasher.v_float(p.get("player_kut", 50.0), 50.0),
+				DeterministicStateHasher.v_float(p.get("player_army_size", 1000.0), 1000.0),
+				DeterministicStateHasher.v_float(p.get("raid_frequency", 0.0), 0.0))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"open_yurt_claim":
+			var coord_y: Vector2i = Vector2i(
+				DeterministicStateHasher.v_int(p.get("region_x", 0)),
+				DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: OpenYurtClaimCommand = OpenYurtClaimCommand.new(
+				StringName(DeterministicStateHasher.v_str(p.get("claim_id", ""))),
+				sender_pid,
+				coord_y,
+				DeterministicStateHasher.v_float(p.get("challenger_glory", 25.0), 25.0))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"break_amanat_pact":
+			var cmd: BreakAmanatPactCommand = BreakAmanatPactCommand.new(
+				StringName(DeterministicStateHasher.v_str(p.get("pact_id", ""))),
+				sender_pid)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"step_ai_commander":
+			var cmd: StepAICommanderCommand = StepAICommanderCommand.new(
+				StringName(DeterministicStateHasher.v_str(p.get("agent_id", ""))),
+				DeterministicStateHasher.v_bool(p.get("is_rogue_warband", false), false),
+				DeterministicStateHasher.v_int(p.get("target_player_army_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("target_depot_id", 1), 1))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
 		_:
 			return false
 

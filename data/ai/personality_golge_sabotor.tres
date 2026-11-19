@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="SteppeAIPersonalityProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/steppe_ai_personality_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"golge_sabotor"
+personality = 2
+display_name = "Gölge Sabotör"
+aggression_weight = 0.9
+sabotage_weight = 1.55
+economy_weight = 0.85
+deception_weight = 1.5
+diplomacy_weight = 1.25
+doctrine_counter_weight = 1.15
+preferred_scheme = 1
+preferred_doctrine = 4

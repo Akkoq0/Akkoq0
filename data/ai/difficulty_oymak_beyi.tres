@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="AIDifficultyProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/ai/ai_difficulty_profile.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+profile_id = &"oymak_beyi"
+difficulty_tier = 0
+display_name = "Oymak Beyi (Kolay)"
+decision_temperature = 0.9
+mistake_noise_amplitude = 28.0
+feigned_retreat_susceptibility = 0.8
+anti_spam_memory_weight = 0.15
+dust_veil_pierce_skill = 0.15
+adaptation_learning_rate = 0.25
+synergy_pursuit_weight = 0.2
+scheme_planning_weight = 0.1
+foresight_zud_horizon_weight = 0.25
+terrain_trap_awareness = 0.15
