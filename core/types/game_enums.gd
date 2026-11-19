@@ -445,6 +445,24 @@ enum AIActionCategory {
 	INTERCEPT_CARAVAN_OR_INTERDICT = 6,
 	SPONSOR_PROXY_OR_COALITION = 7,
 	EXECUTE_SCHEME_STEP = 8,
+	RESEARCH_TRADITION = 9,
+}
+
+## Phase 32 Psychological Deception Vectors (`AIDeceptionEngine`).
+enum AIDeceptionVector {
+	NONE = 0,
+	FALSE_WEAKNESS_KURT_KAPANI = 1, ## Sahte zayıflık / Toz Perdesi + Kurt Kapanı yemleme
+	ECONOMIC_CHOKE_SABOTAGE = 2, ## Zud öncesi kuyu + kervan + Kara Borsa tanh boğması
+	OPPORTUNISTIC_COALITION_BETRAYAL = 3, ## Dehşet/Ülüş krizinde antlaşma bozma & vekalet baskısı
+}
+
+## Phase 32 Living Personality Trauma & Vendetta Triggers (`AIPersonalityEvolution`).
+enum AITraumaType {
+	NONE = 0,
+	ZUD_HEAVY_LOSS = 1, ## Ağır Zud / kış kıtlığı kaybı
+	WELL_SABOTAGED = 2, ## Su kuyusunun sabote edilmesi
+	VETERAN_COMMANDER_FALLEN = 3, ## Kıdemli kumandan kaybı
+	AMANAT_BETRAYAL = 4, ## Amanat / Töre barışı ihaneti
 }
 
 ## Faz B Tradition & Military Research branches (`TraditionResearchCatalog`).

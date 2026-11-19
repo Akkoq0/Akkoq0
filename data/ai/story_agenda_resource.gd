@@ -97,7 +97,7 @@ static func from_dict(data: Dictionary) -> StoryAgendaResource:
 		agenda.break_pacts_when_triggered = break_flag
 	else:
 		agenda.break_pacts_when_triggered = str(break_var) == "true" or str(break_var).to_int() != 0
-	var pref_action_int: int = clampi(str(data.get("preferred_action", 0)).to_int(), 0, 8)
+	var pref_action_int: int = clampi(str(data.get("preferred_action", 0)).to_int(), 0, 9)
 	agenda.preferred_action = pref_action_int as GameEnums.AIActionCategory
 	var scheme_int: int = clampi(str(data.get("forced_scheme", 0)).to_int(), 0, 3)
 	agenda.forced_scheme = scheme_int as GameEnums.AISchemeType

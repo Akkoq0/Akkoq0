@@ -347,9 +347,58 @@ func export_state_dict() -> Dictionary:
 	var honor: Dictionary = {}
 	for pid: int in _honor_score:
 		honor[str(pid)] = _honor_score[pid]
+	var pacts_dict: Dictionary = {}
+	var pact_keys: Array[StringName] = _pacts.keys()
+	pact_keys.sort_custom(func(a: StringName, b: StringName) -> bool:
+		return String(a) < String(b)
+	)
+	for pk: StringName in pact_keys:
+		var rec: AmanatPactRecord = _pacts[pk]
+		if rec == null:
+			continue
+		pacts_dict[String(pk)] = {
+			"active": rec.active,
+			"broken_by_id": rec.broken_by_id,
+			"duration_seasons": rec.duration_seasons,
+			"hostage_forfeited": rec.hostage_forfeited,
+			"hostage_type": int(rec.hostage_type),
+			"pact_id": String(rec.pact_id),
+			"party_a": rec.party_a,
+			"party_b": rec.party_b,
+			"remaining_seasons": rec.remaining_seasons,
+		}
+	var proxies_dict: Dictionary = {}
+	var proxy_keys: Array[StringName] = _proxy_wars.keys()
+	proxy_keys.sort_custom(func(a: StringName, b: StringName) -> bool:
+		return String(a) < String(b)
+	)
+	for wk: StringName in proxy_keys:
+		var con: ProxyWarContract = _proxy_wars[wk]
+		if con == null:
+			continue
+		proxies_dict[String(wk)] = {
+			"casus_belli_granted": con.casus_belli_granted,
+			"exposed": con.exposed,
+			"exposed_to_id": con.exposed_to_id,
+			"raid_intensity": con.raid_intensity,
+			"silver_cost": con.silver_cost,
+			"sponsor_id": con.sponsor_id,
+			"target_id": con.target_id,
+			"warband_id": String(con.warband_id),
+		}
+	var cb_dict: Dictionary = {}
+	var cb_keys: Array[StringName] = _casus_belli.keys()
+	cb_keys.sort_custom(func(a: StringName, b: StringName) -> bool:
+		return String(a) < String(b)
+	)
+	for ck: StringName in cb_keys:
+		cb_dict[String(ck)] = _casus_belli[ck]
 	return {
+		"casus_belli": cb_dict,
 		"dread_score": dread,
 		"honor_score": honor,
+		"pacts": pacts_dict,
+		"proxy_wars": proxies_dict,
 		"word_reliability": rel,
 	}
 
@@ -367,4 +416,42 @@ func import_state_dict(data: Dictionary) -> bool:
 	var honor: Dictionary = DeterministicStateHasher.v_dict(data.get("honor_score", {}))
 	for k: Variant in honor:
 		_honor_score[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(honor[k])
+	var pacts_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("pacts", {}))
+	for k: Variant in pacts_dict:
+		var pd: Dictionary = DeterministicStateHasher.v_dict(pacts_dict[k])
+		var pid_sn: StringName = StringName(DeterministicStateHasher.v_str(pd.get("pact_id", DeterministicStateHasher.v_str(k))))
+		if pid_sn == &"":
+			continue
+		var h_type_int: int = clampi(DeterministicStateHasher.v_int(pd.get("hostage_type", 0), 0), 0, 3)
+		var rec: AmanatPactRecord = AmanatPactRecord.new(
+			pid_sn,
+			DeterministicStateHasher.v_int(pd.get("party_a", 0), 0),
+			DeterministicStateHasher.v_int(pd.get("party_b", 0), 0),
+			h_type_int as GameEnums.AmanatHostageType,
+			maxi(DeterministicStateHasher.v_int(pd.get("duration_seasons", 8), 8), 1))
+		rec.remaining_seasons = DeterministicStateHasher.v_int(pd.get("remaining_seasons", rec.duration_seasons), rec.duration_seasons)
+		rec.active = DeterministicStateHasher.v_bool(pd.get("active", true), true)
+		rec.broken_by_id = DeterministicStateHasher.v_int(pd.get("broken_by_id", 0), 0)
+		rec.hostage_forfeited = DeterministicStateHasher.v_bool(pd.get("hostage_forfeited", false), false)
+		_pacts[pid_sn] = rec
+	var proxies_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("proxy_wars", {}))
+	for k: Variant in proxies_dict:
+		var wd: Dictionary = DeterministicStateHasher.v_dict(proxies_dict[k])
+		var wb_sn: StringName = StringName(DeterministicStateHasher.v_str(wd.get("warband_id", DeterministicStateHasher.v_str(k))))
+		if wb_sn == &"":
+			continue
+		var con: ProxyWarContract = ProxyWarContract.new(
+			wb_sn,
+			DeterministicStateHasher.v_int(wd.get("sponsor_id", 0), 0),
+			DeterministicStateHasher.v_int(wd.get("target_id", 0), 0),
+			maxi(DeterministicStateHasher.v_int(wd.get("silver_cost", 45), 45), 0),
+			DeterministicStateHasher.v_float(wd.get("raid_intensity", 0.75), 0.75))
+		con.exposed = DeterministicStateHasher.v_bool(wd.get("exposed", false), false)
+		con.exposed_to_id = DeterministicStateHasher.v_int(wd.get("exposed_to_id", 0), 0)
+		con.casus_belli_granted = DeterministicStateHasher.v_bool(wd.get("casus_belli_granted", false), false)
+		_proxy_wars[wb_sn] = con
+	var cb_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("casus_belli", {}))
+	for k: Variant in cb_dict:
+		var cb_sn: StringName = StringName(DeterministicStateHasher.v_str(k))
+		_casus_belli[cb_sn] = DeterministicStateHasher.v_bool(cb_dict[k], false)
 	return true

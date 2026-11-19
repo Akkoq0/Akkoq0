@@ -390,6 +390,32 @@ func build_next_step_intent(
 	return intent
 
 
+func evaluate_abort_condition(ai_pid: int, belief: AIBeliefModel) -> StringName:
+	if _active_scheme == GameEnums.AISchemeType.NONE:
+		return &""
+	if _ticks_in_scheme >= 6:
+		return &"scheme_timeout"
+	var cur_season: SeasonData = SeasonManager.get_current_season()
+	var s_type: GameEnums.SeasonType = cur_season.season_type if cur_season != null else GameEnums.SeasonType.SPRING
+	var target_coord: Vector2i = _target_coord
+	if target_coord == Vector2i.ZERO and belief != null:
+		target_coord = belief.get_observed_target_region_coord()
+	var raid_allowed: bool = GracePeriodManager.can_perform_action(ai_pid, GameEnums.ToreActionType.BORDER_NODE_RAID, _target_player_id)
+
+	match _active_scheme:
+		GameEnums.AISchemeType.POISONED_WINTER_TRAP:
+			var is_spring_or_summer: bool = s_type == GameEnums.SeasonType.SPRING or s_type == GameEnums.SeasonType.SUMMER
+			if _current_step == 0 and is_spring_or_summer and not raid_allowed and WaterRouteManager.count_sabotaged_water_sources(target_coord) <= 0:
+				return &"winter_truce_invalidated"
+		GameEnums.AISchemeType.OPPORTUNISTIC_CRISIS_STRIKE:
+			if _ticks_in_scheme >= 2 and belief != null and not raid_allowed \
+					and belief.get_observed_enemy_dread() < 25.0 \
+					and belief.get_observed_enemy_regency() == GameEnums.RegencyStatus.STABLE_RULE \
+					and not belief.is_observed_enemy_ulus_strained():
+				return &"crisis_subsided_truce"
+	return &""
+
+
 func _build_spy_payload(ai_pid: int, belief: AIBeliefModel, seed_val: int) -> Dictionary:
 	return {
 		"spy_owner_id": ai_pid,

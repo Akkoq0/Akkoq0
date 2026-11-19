@@ -22,6 +22,10 @@ var personality_profile: SteppeAIPersonalityProfile = null
 var belief_model: AIBeliefModel = null
 var scheme_planner: AISchemePlanner = null
 var agenda_hook: AINarrativeAgendaHook = null
+var personality_evolution: AIPersonalityEvolution = AIPersonalityEvolution.new()
+var theory_of_mind: AITheoryOfMindModel = AITheoryOfMindModel.new()
+var deception_engine: AIDeceptionEngine = AIDeceptionEngine.new()
+var _evolution_synced_with_base: bool = false
 
 var _rng: RandomNumberGenerator = null
 var _rng_seed: int = 32001
@@ -117,8 +121,12 @@ static func notify_doctrine_matchup(
 		var target_is_atk: bool = attacker_id == ctrl.target_player_id or attacker_id == ctrl.target_army_id or attacker_army_id == ctrl.target_army_id
 		if ai_is_atk and target_is_def and result.defender_doctrine_id != &"":
 			ctrl.belief_model.observe_doctrine_id_string(result.defender_doctrine_id, lr)
+			if ctrl.theory_of_mind != null:
+				ctrl.theory_of_mind.observe_opponent_matchup_doctrine(result.defender_doctrine_id, ctrl.difficulty_profile)
 		elif ai_is_def and target_is_atk and result.attacker_doctrine_id != &"":
 			ctrl.belief_model.observe_doctrine_id_string(result.attacker_doctrine_id, lr)
+			if ctrl.theory_of_mind != null:
+				ctrl.theory_of_mind.observe_opponent_matchup_doctrine(result.attacker_doctrine_id, ctrl.difficulty_profile)
 
 
 static func notify_espionage_report(report: EspionageReport) -> void:
@@ -142,6 +150,95 @@ static func notify_courier_ambushed(
 	ctrl.belief_model.observe_tactic_intent(leaked_plan, lr)
 
 
+static func notify_water_sabotaged(region_coord: Vector2i, saboteur_id: int) -> void:
+	var reg: RegionData = TerritoryManager.get_region(region_coord)
+	var owner_pid: int = reg.owner_id if reg != null else 0
+	for ctrl: SteppeStrategicAIController in get_all_ai_agents():
+		if ctrl == null:
+			continue
+		if (owner_pid > 0 and ctrl.ai_player_id == owner_pid) or ctrl.home_coord == region_coord:
+			if ctrl.ai_player_id != saboteur_id:
+				ctrl.record_trauma(GameEnums.AITraumaType.WELL_SABOTAGED, saboteur_id, 1.0, str(region_coord))
+
+
+static func notify_zud_starvation(food_remaining: int) -> void:
+	if food_remaining > 25:
+		return
+	var severity: float = 1.0 if food_remaining <= 10 else 0.60
+	for ctrl: SteppeStrategicAIController in get_all_ai_agents():
+		if ctrl != null:
+			ctrl.record_trauma(GameEnums.AITraumaType.ZUD_HEAVY_LOSS, 0, severity, "food_%d" % food_remaining)
+
+
+static func notify_amanat_pact_broken(
+		pact_id: StringName,
+		betrayer_id: int,
+		party_a: int = 0,
+		party_b: int = 0) -> void:
+	for ctrl: SteppeStrategicAIController in get_all_ai_agents():
+		if ctrl == null or ctrl.ai_player_id == betrayer_id:
+			continue
+		var is_victim: bool = (ctrl.ai_player_id == party_a or ctrl.ai_player_id == party_b)
+		if is_victim or (party_a == 0 and party_b == 0 and ctrl.target_player_id == betrayer_id):
+			ctrl.record_trauma(GameEnums.AITraumaType.AMANAT_BETRAYAL, betrayer_id, 1.0, String(pact_id))
+
+
+static func notify_commander_fallen(victim_player_id: int, killer_player_id: int = 0) -> void:
+	var ctrl: SteppeStrategicAIController = get_ai_agent(victim_player_id)
+	if ctrl == null:
+		return
+	var eff_killer: int = killer_player_id if killer_player_id > 0 else ctrl.target_player_id
+	ctrl.record_trauma(GameEnums.AITraumaType.VETERAN_COMMANDER_FALLEN, eff_killer, 1.0, "commander_fallen")
+
+
+func _ensure_cognitive_modules() -> void:
+	if personality_evolution == null:
+		personality_evolution = AIPersonalityEvolution.new(personality_profile)
+		_evolution_synced_with_base = personality_profile != null
+	elif not _evolution_synced_with_base and personality_profile != null:
+		personality_evolution.apply_base_profile(personality_profile)
+		_evolution_synced_with_base = true
+	if theory_of_mind == null:
+		theory_of_mind = AITheoryOfMindModel.new()
+	if deception_engine == null:
+		deception_engine = AIDeceptionEngine.new()
+
+
+func get_personality_evolution() -> AIPersonalityEvolution:
+	_ensure_cognitive_modules()
+	return personality_evolution
+
+
+func get_theory_of_mind() -> AITheoryOfMindModel:
+	_ensure_cognitive_modules()
+	return theory_of_mind
+
+
+func get_deception_engine() -> AIDeceptionEngine:
+	_ensure_cognitive_modules()
+	return deception_engine
+
+
+func record_trauma(
+		trauma_type: GameEnums.AITraumaType,
+		instigator_pid: int,
+		severity: float = 1.0,
+		detail_tag: String = "") -> float:
+	_ensure_cognitive_modules()
+	var eff_tick: int = SessionClockAuthority.get_current_tick()
+	var prev_zud_tick: int = personality_evolution._last_zud_tick_recorded
+	var vendetta_after: float = personality_evolution.record_trauma(trauma_type, instigator_pid, severity, eff_tick, detail_tag)
+	if trauma_type != GameEnums.AITraumaType.ZUD_HEAVY_LOSS or personality_evolution._last_zud_tick_recorded != prev_zud_tick:
+		EventBus.ai_personality_evolved.emit(
+			agent_id,
+			ai_player_id,
+			trauma_type,
+			instigator_pid,
+			vendetta_after,
+			personality_evolution.trauma_score)
+	return vendetta_after
+
+
 func bind_story_agenda(agenda: StoryAgendaResource) -> void:
 	if agenda_hook == null:
 		agenda_hook = AINarrativeAgendaHook.new()
@@ -159,6 +256,11 @@ func set_difficulty_tier(tier: GameEnums.AIDifficultyTier) -> void:
 
 func set_personality(p: GameEnums.SteppeAIPersonality) -> void:
 	personality_profile = SteppeAIPersonalityProfile.create_preset(p)
+	if personality_evolution == null:
+		personality_evolution = AIPersonalityEvolution.new(personality_profile)
+	else:
+		personality_evolution.apply_base_profile(personality_profile)
+	_evolution_synced_with_base = true
 
 
 func set_remount_ratio(ratio: float) -> void:
@@ -207,13 +309,47 @@ func observe_enemy_doctrine(preset_id: GameEnums.BattleDoctrinePresetId) -> void
 
 
 func step_decision_tick(current_tick: int = -1, auto_flush: bool = true) -> CommandEnvelope:
+	_ensure_cognitive_modules()
 	CommandBus.register_envelope_army_owner(ai_army_id, ai_player_id)
 	var eff_tick: int = current_tick if current_tick >= 0 else SessionClockAuthority.get_current_tick()
 
 	belief_model.refresh_public_and_legitimate_observations(difficulty_profile, target_coord)
+	if scheme_planner != null and scheme_planner.has_active_scheme():
+		var abort_reason: StringName = scheme_planner.evaluate_abort_condition(ai_player_id, belief_model)
+		if abort_reason != &"":
+			var aborted_type: GameEnums.AISchemeType = scheme_planner.get_active_scheme()
+			var aborted_step: int = scheme_planner.get_current_step()
+			scheme_planner.abort_scheme()
+			EventBus.ai_scheme_step_advanced.emit(
+				agent_id,
+				aborted_type,
+				aborted_step,
+				AISchemePlanner.TOTAL_STEPS,
+				abort_reason,
+				false)
+
 	var narrative_dir: AINarrativeAgendaHook.NarrativeWeightDirective = agenda_hook.evaluate_directive(ai_player_id, target_player_id)
 	if narrative_dir.triggered_now:
 		EventBus.ai_story_agenda_activated.emit(agent_id, narrative_dir.agenda_id, narrative_dir.trigger_reason)
+
+	var eff_target_coord: Vector2i = target_coord if target_coord != Vector2i.ZERO else belief_model.get_observed_target_region_coord()
+	var ai_syn_now: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(ai_player_id, ai_army_id, home_coord, false)
+	var own_sabotaged_wells: int = WaterRouteManager.count_sabotaged_water_sources(home_coord)
+	var supply_crisis: bool = SeasonManager.get_food_reserve() <= 25 or (ai_syn_now != null and ai_syn_now.water_logistics_ratio < 0.60)
+	var stress_dir: AIPersonalityEvolution.StressDirective = personality_evolution.evaluate_stress_directive(
+		difficulty_profile, belief_model.get_observed_enemy_dread(), supply_crisis, own_sabotaged_wells)
+	var deception_eval: AIDeceptionEngine.DeceptionEvaluation = deception_engine.evaluate_vectors(
+		ai_player_id,
+		ai_army_id,
+		target_player_id,
+		target_army_id,
+		eff_target_coord,
+		belief_model,
+		theory_of_mind,
+		personality_evolution,
+		difficulty_profile,
+		personality_profile,
+		stress_dir)
 
 	var outcome: AIUtilityEvaluator.EvaluationOutcome = AIUtilityEvaluator.evaluate_candidates(
 		agent_id,
@@ -229,7 +365,10 @@ func step_decision_tick(current_tick: int = -1, auto_flush: bool = true) -> Comm
 		narrative_dir,
 		remount_ratio,
 		_rng,
-		_rng_seed + _decisions_made * 13 + eff_tick)
+		_rng_seed + _decisions_made * 13 + eff_tick,
+		personality_evolution,
+		theory_of_mind,
+		deception_eval)
 	_rng_draws += outcome.draws_consumed
 	_last_outcome = outcome
 
@@ -250,7 +389,7 @@ func step_decision_tick(current_tick: int = -1, auto_flush: bool = true) -> Comm
 			chosen.scheme_to_start,
 			target_player_id,
 			target_army_id,
-			target_coord if target_coord != Vector2i.ZERO else belief_model.get_observed_target_region_coord(),
+			eff_target_coord,
 			eff_tick)
 		active_scheme_type = scheme_planner.get_active_scheme()
 		step_idx_before = scheme_planner.get_current_step()
@@ -304,7 +443,25 @@ func step_decision_tick(current_tick: int = -1, auto_flush: bool = true) -> Comm
 		cooldown = 2
 	elif chosen.category == GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION:
 		cooldown = 2
+	elif chosen.category == GameEnums.AIActionCategory.RESEARCH_TRADITION:
+		cooldown = 1
 	belief_model.record_own_action(chosen.category, doc_preset_int, cooldown)
+
+	var posture_tag: StringName = deception_eval.projected_posture if deception_eval != null else &"neutral"
+	var eff_doc_for_tom: int = doc_preset_int
+	if eff_doc_for_tom < 0:
+		var live_doc: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(ai_army_id)
+		if live_doc != null:
+			eff_doc_for_tom = int(live_doc.preset_id)
+	theory_of_mind.record_ai_visible_action(chosen.category, eff_doc_for_tom, posture_tag, difficulty_profile)
+	var deception_fired: bool = deception_engine.record_executed_action(deception_eval, chosen.category, doc_preset_int, eff_tick)
+	if deception_fired and deception_eval != null:
+		EventBus.ai_deception_triggered.emit(
+			agent_id,
+			ai_player_id,
+			deception_eval.recommended_vector,
+			theory_of_mind.predicted_opponent_counter_doctrine,
+			theory_of_mind.second_order_optimal_doctrine)
 
 	if executing_scheme:
 		var completed_now: bool = scheme_planner.advance_step(accepted, action_tag)
@@ -344,12 +501,14 @@ func step_decision_tick(current_tick: int = -1, auto_flush: bool = true) -> Comm
 
 
 func export_state_dict() -> Dictionary:
+	_ensure_cognitive_modules()
 	return {
 		"agenda_hook": agenda_hook.export_state_dict() if agenda_hook != null else {},
 		"agent_id": String(agent_id),
 		"ai_army_id": ai_army_id,
 		"ai_player_id": ai_player_id,
 		"belief_model": belief_model.export_state_dict() if belief_model != null else {},
+		"deception_engine": deception_engine.export_state_dict() if deception_engine != null else {},
 		"decisions_made": _decisions_made,
 		"difficulty_tier": int(difficulty_profile.difficulty_tier) if difficulty_profile != null else int(GameEnums.AIDifficultyTier.SANCAK_BEYI),
 		"envelope_sequence": _envelope_sequence,
@@ -362,6 +521,7 @@ func export_state_dict() -> Dictionary:
 		"last_decision_score": _last_decision_score,
 		"last_doctrine_preset": int(_last_doctrine_preset),
 		"personality": int(personality_profile.personality) if personality_profile != null else int(GameEnums.SteppeAIPersonality.AKINCI_BASKINCI),
+		"personality_evolution": personality_evolution.export_state_dict() if personality_evolution != null else {},
 		"remount_ratio": remount_ratio,
 		"rng_draws": _rng_draws,
 		"rng_seed": _rng_seed,
@@ -370,6 +530,7 @@ func export_state_dict() -> Dictionary:
 		"target_coord_x": target_coord.x,
 		"target_coord_y": target_coord.y,
 		"target_player_id": target_player_id,
+		"theory_of_mind": theory_of_mind.export_state_dict() if theory_of_mind != null else {},
 	}
 
 
@@ -396,7 +557,7 @@ func import_state_dict(data: Dictionary) -> bool:
 	_decisions_made = maxi(DeterministicStateHasher.v_int(data.get("decisions_made", 0), 0), 0)
 	_envelopes_accepted = maxi(DeterministicStateHasher.v_int(data.get("envelopes_accepted", 0), 0), 0)
 	_envelopes_rejected = maxi(DeterministicStateHasher.v_int(data.get("envelopes_rejected", 0), 0), 0)
-	var cat_int: int = clampi(DeterministicStateHasher.v_int(data.get("last_action_category", 0), 0), 0, 8)
+	var cat_int: int = clampi(DeterministicStateHasher.v_int(data.get("last_action_category", 0), 0), 0, 9)
 	_last_action_category = cat_int as GameEnums.AIActionCategory
 	_last_action_id = StringName(DeterministicStateHasher.v_str(data.get("last_action_id", "")))
 	_last_decision_score = DeterministicStateHasher.v_float(data.get("last_decision_score", 0.0), 0.0)
@@ -419,6 +580,29 @@ func import_state_dict(data: Dictionary) -> bool:
 	if agenda_hook == null:
 		agenda_hook = AINarrativeAgendaHook.new()
 	agenda_hook.import_state_dict(DeterministicStateHasher.v_dict(data.get("agenda_hook", {})))
+	if personality_evolution == null:
+		personality_evolution = AIPersonalityEvolution.new(personality_profile)
+	var evo_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("personality_evolution", {}))
+	if not evo_dict.is_empty():
+		personality_evolution.import_state_dict(evo_dict)
+	else:
+		personality_evolution.apply_base_profile(personality_profile)
+		personality_evolution.reset()
+	_evolution_synced_with_base = true
+	if theory_of_mind == null:
+		theory_of_mind = AITheoryOfMindModel.new()
+	var tom_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("theory_of_mind", {}))
+	if not tom_dict.is_empty():
+		theory_of_mind.import_state_dict(tom_dict)
+	else:
+		theory_of_mind.reset()
+	if deception_engine == null:
+		deception_engine = AIDeceptionEngine.new()
+	var dec_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("deception_engine", {}))
+	if not dec_dict.is_empty():
+		deception_engine.import_state_dict(dec_dict)
+	else:
+		deception_engine.reset()
 	return true
 
 

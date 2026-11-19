@@ -35,6 +35,10 @@ func _ready() -> void:
 	EventBus.doctrine_matchup_evaluated.connect(_on_doctrine_matchup_evaluated)
 	EventBus.espionage_mission_completed.connect(_on_espionage_mission_completed)
 	EventBus.courier_ambushed_plan_exposed.connect(_on_courier_ambushed_plan_exposed)
+	EventBus.water_source_sabotaged.connect(_on_water_source_sabotaged)
+	EventBus.zud_starvation_ticked.connect(_on_zud_starvation_ticked)
+	EventBus.amanat_pact_broken.connect(_on_amanat_pact_broken)
+	EventBus.commander_fallen_in_battle.connect(_on_commander_fallen_in_battle)
 
 
 func _exit_tree() -> void:
@@ -45,6 +49,14 @@ func _exit_tree() -> void:
 		EventBus.espionage_mission_completed.disconnect(_on_espionage_mission_completed)
 	if EventBus.courier_ambushed_plan_exposed.is_connected(_on_courier_ambushed_plan_exposed):
 		EventBus.courier_ambushed_plan_exposed.disconnect(_on_courier_ambushed_plan_exposed)
+	if EventBus.water_source_sabotaged.is_connected(_on_water_source_sabotaged):
+		EventBus.water_source_sabotaged.disconnect(_on_water_source_sabotaged)
+	if EventBus.zud_starvation_ticked.is_connected(_on_zud_starvation_ticked):
+		EventBus.zud_starvation_ticked.disconnect(_on_zud_starvation_ticked)
+	if EventBus.amanat_pact_broken.is_connected(_on_amanat_pact_broken):
+		EventBus.amanat_pact_broken.disconnect(_on_amanat_pact_broken)
+	if EventBus.commander_fallen_in_battle.is_connected(_on_commander_fallen_in_battle):
+		EventBus.commander_fallen_in_battle.disconnect(_on_commander_fallen_in_battle)
 
 
 func get_behavior_profile() -> AIBehaviorProfile:
@@ -162,3 +174,22 @@ func _on_espionage_mission_completed(report: EspionageReport) -> void:
 
 func _on_courier_ambushed_plan_exposed(_order_id: StringName, victim_player_id: int, ambusher_id: int, leaked_plan: GameEnums.TuranTacticPhase) -> void:
 	SteppeStrategicAIController.notify_courier_ambushed(victim_player_id, ambusher_id, leaked_plan)
+
+
+func _on_water_source_sabotaged(region_coord: Vector2i, _source_id: StringName, saboteur_id: int, _duration_seasons: int) -> void:
+	SteppeStrategicAIController.notify_water_sabotaged(region_coord, saboteur_id)
+
+
+func _on_zud_starvation_ticked(food_remaining: int, _season: SeasonData) -> void:
+	SteppeStrategicAIController.notify_zud_starvation(food_remaining)
+
+
+func _on_amanat_pact_broken(pact_id: StringName, betrayer_id: int, _hostage_forfeited: bool, _reliability_after: float) -> void:
+	var pact: AmanatPactRecord = ReputationAndPactSystem.get_pact(pact_id)
+	var pa: int = pact.party_a if pact != null else 0
+	var pb: int = pact.party_b if pact != null else 0
+	SteppeStrategicAIController.notify_amanat_pact_broken(pact_id, betrayer_id, pa, pb)
+
+
+func _on_commander_fallen_in_battle(_commander_id: int, _army_id: int, player_id: int, _morale_shock: float, _cohesion_shock: float) -> void:
+	SteppeStrategicAIController.notify_commander_fallen(player_id, 0)

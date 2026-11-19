@@ -277,8 +277,37 @@ func export_state_dict() -> Dictionary:
 	var ic_dict: Dictionary = {}
 	for pid: int in _intercepted_courier_owners:
 		ic_dict[str(pid)] = _intercepted_courier_owners[pid]
+	var ae_dict: Dictionary = {}
+	for eid: StringName in _assassinated_envoys:
+		ae_dict[String(eid)] = _assassinated_envoys[eid]
+	var rs_dict: Dictionary = {}
+	var rs_keys: Array[int] = _report_seasons.keys()
+	rs_keys.sort()
+	for aid: int in rs_keys:
+		rs_dict[str(aid)] = _report_seasons[aid]
+	var ar_dict: Dictionary = {}
+	var ar_keys: Array[int] = _army_reports.keys()
+	ar_keys.sort()
+	for aid2: int in ar_keys:
+		var rep: EspionageReport = _army_reports.get(aid2, null)
+		if rep == null:
+			continue
+		ar_dict[str(aid2)] = {
+			"computed_success_chance": rep.computed_success_chance,
+			"revealed_doctrine_type": int(rep.revealed_doctrine_type),
+			"revealed_quiver_ammo": rep.revealed_quiver_ammo,
+			"revealed_tactic_intent": int(rep.revealed_tactic_intent),
+			"spy_captured": rep.spy_captured,
+			"spy_owner_id": rep.spy_owner_id,
+			"succeeded": rep.succeeded,
+			"target_army_id": rep.target_army_id,
+			"target_faction_id": rep.target_faction_id,
+		}
 	return {
+		"army_reports": ar_dict,
+		"assassinated_envoys": ae_dict,
 		"intercepted_courier_owners": ic_dict,
+		"report_seasons": rs_dict,
 		"season_tick": _season_tick,
 		"stances": st_dict,
 		"total_war_seasons": tw_dict,
@@ -299,4 +328,26 @@ func import_state_dict(data: Dictionary) -> bool:
 	var ic_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("intercepted_courier_owners", {}))
 	for k: Variant in ic_dict:
 		_intercepted_courier_owners[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_int(ic_dict[k])
+	var ae_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("assassinated_envoys", {}))
+	for k: Variant in ae_dict:
+		_assassinated_envoys[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_bool(ae_dict[k], false)
+	var rs_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("report_seasons", {}))
+	for k: Variant in rs_dict:
+		var aid: int = DeterministicStateHasher.v_str(k).to_int()
+		_report_seasons[aid] = maxi(DeterministicStateHasher.v_int(rs_dict[k], 0), 0)
+	var ar_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("army_reports", {}))
+	for k: Variant in ar_dict:
+		var aid2: int = DeterministicStateHasher.v_str(k).to_int()
+		var rd: Dictionary = DeterministicStateHasher.v_dict(ar_dict[k])
+		var rep: EspionageReport = EspionageReport.new()
+		rep.spy_owner_id = DeterministicStateHasher.v_int(rd.get("spy_owner_id", 0), 0)
+		rep.target_faction_id = DeterministicStateHasher.v_int(rd.get("target_faction_id", 0), 0)
+		rep.target_army_id = DeterministicStateHasher.v_int(rd.get("target_army_id", aid2), aid2)
+		rep.succeeded = DeterministicStateHasher.v_bool(rd.get("succeeded", false), false)
+		rep.computed_success_chance = DeterministicStateHasher.v_float(rd.get("computed_success_chance", 0.0), 0.0)
+		rep.revealed_quiver_ammo = DeterministicStateHasher.v_float(rd.get("revealed_quiver_ammo", -1.0), -1.0)
+		rep.revealed_tactic_intent = clampi(DeterministicStateHasher.v_int(rd.get("revealed_tactic_intent", 0), 0), 0, 10) as GameEnums.TuranTacticPhase
+		rep.revealed_doctrine_type = clampi(DeterministicStateHasher.v_int(rd.get("revealed_doctrine_type", 0), 0), 0, 10) as GameEnums.TacticalDoctrineType
+		rep.spy_captured = DeterministicStateHasher.v_bool(rd.get("spy_captured", false), false)
+		_army_reports[aid2] = rep
 	return true

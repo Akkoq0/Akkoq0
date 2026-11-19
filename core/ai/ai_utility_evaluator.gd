@@ -27,6 +27,13 @@ class EvaluationOutcome:
 	var doctrine_scores: Dictionary[int, float] = {}
 	var draws_consumed: int = 0
 	var predicted_enemy_doctrine: int = -1
+	var tom_predicted_enemy_counter: int = -1
+	var tom_second_order_doctrine: int = -1
+	var active_deception_vector: GameEnums.AIDeceptionVector = GameEnums.AIDeceptionVector.NONE
+	var panic_mode_active: bool = false
+	var gambit_mode_active: bool = false
+	var vendetta_score: float = 0.0
+	var recommended_research_node: StringName = &""
 
 
 static func evaluate_doctrine_utilities(
@@ -137,7 +144,10 @@ static func evaluate_candidates(
 		narrative: AINarrativeAgendaHook.NarrativeWeightDirective,
 		ai_remount_ratio: float,
 		rng: RandomNumberGenerator,
-		seed_bump: int = 1) -> EvaluationOutcome:
+		seed_bump: int = 1,
+		evolution: AIPersonalityEvolution = null,
+		tom: AITheoryOfMindModel = null,
+		deception_eval: AIDeceptionEngine.DeceptionEvaluation = null) -> EvaluationOutcome:
 	var out: EvaluationOutcome = EvaluationOutcome.new()
 	var cur_season: SeasonData = SeasonManager.get_current_season()
 	var s_type: GameEnums.SeasonType = cur_season.season_type if cur_season != null else GameEnums.SeasonType.SPRING
@@ -146,11 +156,44 @@ static func evaluate_candidates(
 	var target_coord: Vector2i = belief.get_observed_target_region_coord()
 
 	var diff: AIDifficultyProfile = difficulty if difficulty != null else AIDifficultyProfile.create_preset(GameEnums.AIDifficultyTier.SANCAK_BEYI)
-	var pers: SteppeAIPersonalityProfile = personality if personality != null else SteppeAIPersonalityProfile.create_preset(GameEnums.SteppeAIPersonality.AKINCI_BASKINCI)
+	var base_pers: SteppeAIPersonalityProfile = personality if personality != null else SteppeAIPersonalityProfile.create_preset(GameEnums.SteppeAIPersonality.AKINCI_BASKINCI)
+	var pers: SteppeAIPersonalityProfile = evolution.build_effective_profile(base_pers) if evolution != null else base_pers
 
-	# 1. Score Doctrines
+	var ai_syn: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(ai_pid, ai_army_id, ai_home_coord, false)
+	var ai_silver: int = ResourceManager.get_amount(ai_pid, &"silver_gold")
+	var ai_iron: int = ResourceManager.get_amount(ai_pid, &"iron")
+	var ai_steel: int = ResourceManager.get_amount(ai_pid, &"steel")
+	var market_mult: float = RegionalMarketEngine.get_regional_scarcity(ai_home_coord, &"steel")
+	var raid_allowed: bool = GracePeriodManager.can_perform_action(ai_pid, GameEnums.ToreActionType.BORDER_NODE_RAID, target_pid)
+	var own_sabotaged_wells: int = WaterRouteManager.count_sabotaged_water_sources(ai_home_coord)
+	var supply_crisis: bool = SeasonManager.get_food_reserve() <= 25 or (ai_syn != null and ai_syn.water_logistics_ratio < 0.60)
+	var stress_dir: AIPersonalityEvolution.StressDirective = null
+	if evolution != null:
+		stress_dir = evolution.evaluate_stress_directive(diff, belief.get_observed_enemy_dread(), supply_crisis, own_sabotaged_wells)
+
+	out.tom_predicted_enemy_counter = tom.predicted_opponent_counter_doctrine if tom != null else -1
+	out.tom_second_order_doctrine = tom.second_order_optimal_doctrine if tom != null else -1
+	out.active_deception_vector = deception_eval.recommended_vector if deception_eval != null else GameEnums.AIDeceptionVector.NONE
+	out.panic_mode_active = stress_dir.in_panic_mode if stress_dir != null else false
+	out.gambit_mode_active = stress_dir.in_cold_gambit_mode if stress_dir != null else false
+	out.vendetta_score = evolution.get_vendetta_score(target_pid) if evolution != null else 0.0
+
+	# 1. Score Doctrines (augmented with 2nd-Order Theory of Mind, Stress/Gambit & Deception Lures)
 	var doc_scores: Dictionary[int, float] = evaluate_doctrine_utilities(
 		ai_pid, ai_army_id, ai_home_coord, belief, diff, pers, narrative)
+	for p_int: int in doc_scores:
+		var adj: float = doc_scores[p_int]
+		if tom != null:
+			adj += tom.get_second_order_doctrine_bonus(p_int, diff)
+		if deception_eval != null and deception_eval.preferred_doctrine == p_int:
+			adj += 22.0
+		if stress_dir != null and stress_dir.in_panic_mode:
+			if p_int == int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI) or p_int == int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI):
+				adj += stress_dir.defensive_panic_bonus * 0.45
+		elif stress_dir != null and stress_dir.in_cold_gambit_mode:
+			if p_int == int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI) or p_int == int(GameEnums.BattleDoctrinePresetId.BORU_KAMASI):
+				adj += stress_dir.gambit_boldness_bonus * 0.40
+		doc_scores[p_int] = maxf(adj, 1.0)
 	out.doctrine_scores = doc_scores
 	out.predicted_enemy_doctrine = belief.get_predicted_enemy_doctrine()
 
@@ -166,13 +209,6 @@ static func evaluate_candidates(
 	var current_doc: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(ai_army_id)
 	var current_doc_int: int = int(current_doc.preset_id) if current_doc != null else -1
 
-	var ai_syn: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(ai_pid, ai_army_id, ai_home_coord, false)
-	var ai_silver: int = ResourceManager.get_amount(ai_pid, &"silver_gold")
-	var ai_iron: int = ResourceManager.get_amount(ai_pid, &"iron")
-	var ai_steel: int = ResourceManager.get_amount(ai_pid, &"steel")
-	var market_mult: float = RegionalMarketEngine.get_regional_scarcity(ai_home_coord, &"steel")
-	var raid_allowed: bool = GracePeriodManager.can_perform_action(ai_pid, GameEnums.ToreActionType.BORDER_NODE_RAID, target_pid)
-
 	# 2A. Active Scheme Step OR Starting a New Multi-Step Scheme
 	if scheme_planner != null and scheme_planner.has_active_scheme():
 		var step_intent: AISchemePlanner.SchemeStepIntent = scheme_planner.build_next_step_intent(
@@ -187,6 +223,8 @@ static func evaluate_candidates(
 			c_scheme.base_score = 135.0 * clampf(diff.scheme_planning_weight, 0.55, 1.50)
 			if narrative != null and narrative.has_active_agenda and narrative.preferred_scheme == scheme_planner.get_active_scheme():
 				c_scheme.base_score += narrative.scheme_bonus
+			if deception_eval != null and deception_eval.preferred_scheme == scheme_planner.get_active_scheme():
+				c_scheme.base_score += deception_eval.scheme_bonus
 			c_scheme.rationale = step_intent.description
 			out.candidates.append(c_scheme)
 	elif scheme_planner != null and belief.get_action_cooldown(GameEnums.AIActionCategory.EXECUTE_SCHEME_STEP) <= 0:
@@ -197,9 +235,14 @@ static func evaluate_candidates(
 			GameEnums.AISchemeType.DUST_VEIL_COURIER_AMBUSH,
 			GameEnums.AISchemeType.OPPORTUNISTIC_CRISIS_STRIKE,
 		]
+		var vendetta_m: float = evolution.get_vendetta_multiplier(target_pid) if evolution != null else 1.0
 		for sc_type: GameEnums.AISchemeType in scheme_list:
 			var sc_val: float = scheme_planner.score_scheme_viability(
 				sc_type, ai_pid, ai_army_id, target_pid, target_coord, belief, pers, diff, narrative)
+			if deception_eval != null and deception_eval.preferred_scheme == sc_type:
+				sc_val += deception_eval.scheme_bonus
+			if evolution != null:
+				sc_val *= vendetta_m
 			if sc_val > best_scheme_sc:
 				best_scheme_sc = sc_val
 				best_scheme = sc_type
@@ -213,7 +256,6 @@ static func evaluate_candidates(
 			out.candidates.append(c_start)
 
 	# 2B. Restore own sabotaged wells / Zud economic buffer
-	var own_sabotaged_wells: int = WaterRouteManager.count_sabotaged_water_sources(ai_home_coord)
 	if own_sabotaged_wells > 0 and ResourceManager.get_amount(ai_pid, &"stone") >= 10:
 		var c_fix: AIActionCandidate = AIActionCandidate.new()
 		c_fix.category = GameEnums.AIActionCategory.FORTIFY_AND_SUSTAIN
@@ -371,18 +413,25 @@ static func evaluate_candidates(
 		c_dip.rationale = "Kriz anında koalisyon/diplomasi değerlendirmesi"
 		out.candidates.append(c_dip)
 
-	# 2H-b. Story-Triggered Amanat Betrayal Candidate
-	if narrative != null and narrative.has_active_agenda and narrative.wants_break_pact:
+	# 2H-b. Story-Triggered or Deception/Vendetta Amanat Betrayal Candidate
+	var deception_wants_break: bool = deception_eval != null and deception_eval.wants_pact_betrayal
+	if (narrative != null and narrative.has_active_agenda and narrative.wants_break_pact) or deception_wants_break:
 		var ai_pacts: Array[AmanatPactRecord] = ReputationAndPactSystem.get_active_pacts_for_player(ai_pid)
 		for pr: AmanatPactRecord in ai_pacts:
 			if pr != null and (pr.party_a == target_pid or pr.party_b == target_pid):
 				var c_break: AIActionCandidate = AIActionCandidate.new()
 				c_break.category = GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION
-				c_break.sub_action_id = &"story_break_amanat_pact"
+				var story_forcing_break: bool = narrative != null and narrative.has_active_agenda and narrative.wants_break_pact
+				c_break.sub_action_id = &"story_break_amanat_pact" if story_forcing_break else &"deception_break_amanat_pact"
 				c_break.command_type = "break_amanat_pact"
 				c_break.payload = {"pact_id": String(pr.pact_id), "betrayer_id": ai_pid}
-				c_break.base_score = 225.0 + narrative.action_bonuses.get(int(GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION), 0.0)
-				c_break.rationale = "Hikâye eşiği nedeniyle Amanat antlaşmasını boz"
+				if story_forcing_break:
+					c_break.base_score = 225.0 + narrative.action_bonuses.get(int(GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION), 0.0)
+					c_break.rationale = "Hikâye eşiği nedeniyle Amanat antlaşmasını boz"
+				else:
+					var vend_break: float = evolution.get_vendetta_multiplier(target_pid) if evolution != null else 1.0
+					c_break.base_score = 84.0 * vend_break
+					c_break.rationale = "Kan Davası / Dehşet krizi fırsatıyla Amanat antlaşmasını boz"
 				out.candidates.append(c_break)
 				break
 
@@ -401,27 +450,106 @@ static func evaluate_candidates(
 	c_hold.rationale = "Ekonomik hazırlık ve lojistik biriktirme"
 	out.candidates.append(c_hold)
 
-	# 3. Apply Story Agenda Weights, Anti-Spam Penalty, and Bounded-Rationality Noise
+	# 2J. Tradition & Military Research Selection (`start_research` CommandEnvelope)
+	if TraditionResearchManager.get_active_node_id(ai_pid) == &"" and belief.get_action_cooldown(GameEnums.AIActionCategory.RESEARCH_TRADITION) <= 0:
+		var best_res_node: TraditionResearchNode = null
+		var best_res_score: float = -1.0
+		var pred_enemy: int = out.predicted_enemy_doctrine
+		for r_node: TraditionResearchNode in TraditionResearchCatalog.get_all_nodes():
+			if r_node == null:
+				continue
+			if TraditionResearchManager.get_node_status(ai_pid, r_node.node_id) != GameEnums.ResearchNodeStatus.RESEARCHABLE:
+				continue
+			if ai_silver < r_node.silver_cost:
+				continue
+			var r_score: float = 0.0
+			match r_node.branch:
+				GameEnums.ResearchBranch.STEPPE_WARFARE:
+					r_score = 22.0 + pers.aggression_weight * 16.0 + pers.doctrine_counter_weight * 12.0
+				GameEnums.ResearchBranch.LOGISTICS_AND_WATER:
+					r_score = 20.0 + pers.economy_weight * 14.0 + pers.sabotage_weight * 8.0 + (24.0 if (own_sabotaged_wells > 0 or is_autumn or is_winter or supply_crisis) else 4.0)
+				GameEnums.ResearchBranch.TORE_AND_KURULTAY:
+					r_score = 18.0 + pers.diplomacy_weight * 15.0 + pers.economy_weight * 10.0 + (18.0 if (belief.get_observed_enemy_dread() >= 45.0 or (stress_dir != null and stress_dir.in_panic_mode)) else 0.0)
+				GameEnums.ResearchBranch.CRAFTS_AND_IRON:
+					r_score = 20.0 + pers.economy_weight * 14.0 + pers.aggression_weight * 12.0 + (18.0 if (ai_steel < 15 or is_winter or market_mult >= 1.35) else 4.0)
+			if pred_enemy == int(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI) or pred_enemy == int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI):
+				if r_node.melee_attack_bonus > 0.0 or r_node.speed_bonus > 0.0:
+					r_score += 14.0
+				if r_node.defense_bonus > 0.0:
+					r_score += 10.0
+			elif pred_enemy == int(GameEnums.BattleDoctrinePresetId.BORU_KAMASI):
+				if r_node.defense_bonus > 0.0 or r_node.steel_craft_bonus > 0.0:
+					r_score += 14.0
+			elif pred_enemy == int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI) or pred_enemy == int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI):
+				if r_node.courier_speed_bonus > 0.0 or r_node.water_resilience_bonus > 0.0 or r_node.melee_attack_bonus > 0.0:
+					r_score += 14.0
+			r_score *= (0.70 + 0.30 * diff.synergy_pursuit_weight)
+			if is_winter and pers.personality == GameEnums.SteppeAIPersonality.GOLGE_SABOTOR and ai_silver < 95:
+				r_score *= 0.55
+			if r_score > best_res_score:
+				best_res_score = r_score
+				best_res_node = r_node
+		if best_res_node != null:
+			out.recommended_research_node = best_res_node.node_id
+			var c_res: AIActionCandidate = AIActionCandidate.new()
+			c_res.category = GameEnums.AIActionCategory.RESEARCH_TRADITION
+			c_res.sub_action_id = StringName("start_research_%s" % String(best_res_node.node_id))
+			c_res.command_type = "start_research"
+			c_res.payload = {"player_id": ai_pid, "node_id": String(best_res_node.node_id)}
+			c_res.base_score = best_res_score
+			c_res.rationale = "Doktrin ve kişilik sinerjisine uygun gelenek araştırması: %s" % best_res_node.title
+			out.candidates.append(c_res)
+
+	# 3. Apply Story Agenda, Deception, Vendetta, Stress/Gambit, Anti-Spam & Noise
 	var temp: float = maxf(diff.decision_temperature, 0.01)
 	var anti_spam: float = diff.anti_spam_memory_weight
+	var vendetta_hostile_mult: float = evolution.get_vendetta_multiplier(target_pid) if evolution != null else 1.0
+	var noise_mult: float = stress_dir.panic_noise_mult if stress_dir != null else 1.0
 	var max_eff: float = -10000.0
 	for cand: AIActionCandidate in out.candidates:
 		var sc: float = cand.base_score
+		var cat_i: int = int(cand.category)
 		if narrative != null and narrative.has_active_agenda:
-			var cat_i: int = int(cand.category)
 			if narrative.action_bonuses.has(cat_i):
 				sc += narrative.action_bonuses[cat_i]
 			if narrative.priority_doctrine >= 0 and cand.doctrine_preset == narrative.priority_doctrine:
 				sc += 32.0
 			if narrative.wants_break_pact and cand.category == GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION:
 				sc += 28.0
+		if deception_eval != null and deception_eval.category_bonuses.has(cat_i):
+			sc += deception_eval.category_bonuses[cat_i]
+		if evolution != null and vendetta_hostile_mult > 1.01 and (
+				cand.category == GameEnums.AIActionCategory.SABOTAGE_ENEMY_WATER \
+				or cand.category == GameEnums.AIActionCategory.INTERCEPT_CARAVAN_OR_INTERDICT \
+				or cand.category == GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION \
+				or cand.category == GameEnums.AIActionCategory.AMBUSH_COURIER_OR_SPY \
+				or cand.category == GameEnums.AIActionCategory.EXECUTE_SCHEME_STEP):
+			sc *= vendetta_hostile_mult
+		if stress_dir != null and stress_dir.in_panic_mode:
+			if cand.category == GameEnums.AIActionCategory.FORTIFY_AND_SUSTAIN:
+				sc += stress_dir.defensive_panic_bonus
+			elif cand.category == GameEnums.AIActionCategory.HOLD_AND_GATHER:
+				sc += stress_dir.defensive_panic_bonus * 0.65
+			elif cand.category == GameEnums.AIActionCategory.ASSIGN_COUNTER_DOCTRINE and (
+					cand.doctrine_preset == int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI) \
+					or cand.doctrine_preset == int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI)):
+				sc += stress_dir.defensive_panic_bonus * 0.55
+			elif cand.category == GameEnums.AIActionCategory.SABOTAGE_ENEMY_WATER or cand.category == GameEnums.AIActionCategory.SPONSOR_PROXY_OR_COALITION:
+				sc *= 0.80
+		elif stress_dir != null and stress_dir.in_cold_gambit_mode:
+			if cand.category == GameEnums.AIActionCategory.EXECUTE_SCHEME_STEP \
+					or cand.category == GameEnums.AIActionCategory.RAISE_DUST_DECEPTION \
+					or cand.category == GameEnums.AIActionCategory.SABOTAGE_ENEMY_WATER \
+					or cand.category == GameEnums.AIActionCategory.INTERCEPT_CARAVAN_OR_INTERDICT \
+					or cand.category == GameEnums.AIActionCategory.ASSIGN_COUNTER_DOCTRINE:
+				sc += stress_dir.gambit_boldness_bonus
 		var rep_cnt: int = belief.get_action_recent_repeats(cand.category)
-		if rep_cnt > 0 and cand.sub_action_id != &"restore_own_water" and cand.category != GameEnums.AIActionCategory.EXECUTE_SCHEME_STEP:
+		if rep_cnt > 0 and cand.sub_action_id != &"restore_own_water" and cand.category != GameEnums.AIActionCategory.EXECUTE_SCHEME_STEP and cand.category != GameEnums.AIActionCategory.RESEARCH_TRADITION:
 			sc -= float(rep_cnt) * 14.0 * anti_spam
 
 		var noise_draw: float = rng.randf() if rng != null else 0.5
 		out.draws_consumed += 1
-		var jitter: float = (noise_draw - 0.5) * 2.0 * diff.mistake_noise_amplitude * temp
+		var jitter: float = (noise_draw - 0.5) * 2.0 * diff.mistake_noise_amplitude * temp * noise_mult
 		cand.effective_score = maxf(sc + jitter, 0.01)
 		if cand.effective_score > max_eff:
 			max_eff = cand.effective_score

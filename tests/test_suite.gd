@@ -134,6 +134,7 @@ func _run_suite() -> void:
 	_test_tradition_research_tree_and_doctrine_preview()
 	_test_full_game_shell_menus_tooltips_and_toasts()
 	_test_online_transport_sync_desync_and_reconnect()
+	_test_phase32_revolutionary_tom_ai_evolution_and_story_hook()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -7235,6 +7236,419 @@ func _test_online_transport_sync_desync_and_reconnect() -> void:
 	ResourceManager.import_state_dict({"stockpiles": {}})
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _setup_p32_rev_deterministic_world() -> void:
+	_reset_p27b_singletons(&"p32_rev_det_kut")
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	TraditionResearchManager.reset_research_state()
+	RegionalMarketEngine.reset_market_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	DiplomacyManager.import_state_dict({
+		"trust_scores": {"default_rival": 50.0, "karluk": 50.0, "kipchak": 50.0, "oghuz": 50.0},
+		"stances": {},
+		"player_army_size": 1000.0,
+		"raid_frequency": 0.0,
+		"coalition_war_active": false,
+		"espionage_deterrence_bonus": 0.0,
+		"spy_exposure_penalty": 0.0,
+		"recent_assassination_infamy": 0.0,
+		"tracked_kagan_glory": 0.0,
+	})
+	GameManager.import_state_dict({
+		"kut_score": 72.0,
+		"state": int(GameEnums.GameState.PLAYING),
+		"layer": int(GameEnums.WorldLayer.MACRO),
+		"consecutive_battle_losses": 0,
+		"council_active": false,
+		"legitimacy_multiplier": 1.0,
+	})
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SeasonManager.import_state_dict({"index": 0, "elapsed_sec": 0.0, "food_reserve": 90, "pasture_yield_multipliers": {}})
+	IntelligenceManager.reset_intelligence_state()
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	SessionClockAuthority.configure_session_mode(GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD, 1.0, 10.0)
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(1, false, Vector2i(10, 10), 1)
+	GracePeriodManager.register_player(3302, false, Vector2i(10, 10), 2)
+	GracePeriodManager.register_player(3303, false, Vector2i(10, 10), 3)
+	GracePeriodManager.advance_world_hours(60.0)
+
+	var c_p1: Vector2i = Vector2i(33, 20)
+	var c_ai2: Vector2i = Vector2i(33, 21)
+	var c_ai3: Vector2i = Vector2i(33, 22)
+	TerritoryManager.register_region(c_p1, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, true, false, 100.0)
+	TerritoryManager.register_region(c_ai2, GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 3302, true, false, 100.0)
+	TerritoryManager.register_region(c_ai3, GameEnums.RegionGeographyClass.FOREST_EDGE, 3303, true, false, 100.0)
+	WaterRouteManager.register_water_source(c_p1, &"well_rev_p1", GameEnums.WaterSourceType.WELL, 1)
+	WaterRouteManager.register_water_source(c_ai2, &"well_rev_a2", GameEnums.WaterSourceType.WELL, 3302)
+	WaterRouteManager.register_water_source(c_ai3, &"well_rev_a3", GameEnums.WaterSourceType.WELL, 3303)
+
+	CommandBus.register_envelope_army_owner(1, 1)
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"iron", 40))
+	CommandBus.dispatch(DepositResourcesCommand.new(3302, &"silver_gold", 180))
+	CommandBus.dispatch(DepositResourcesCommand.new(3302, &"iron", 30))
+	CommandBus.dispatch(DepositResourcesCommand.new(3302, &"stone", 30))
+	CommandBus.dispatch(DepositResourcesCommand.new(3303, &"silver_gold", 180))
+	CommandBus.dispatch(DepositResourcesCommand.new(3303, &"iron", 30))
+	CommandBus.dispatch(SealAmanatPactCommand.new(&"pact_rev_kagan", 1, 3302, GameEnums.AmanatHostageType.JADE_TAMGA_SEAL, 12))
+
+	var ai_kagan: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_kagan", 3302, 3302, c_ai2,
+		GameEnums.AIDifficultyTier.KAGAN_ZEKASI,
+		GameEnums.SteppeAIPersonality.YAYLAK_IMPARATORU,
+		913302, 1, 1, c_p1)
+	var ai_wolf: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_wolf", 3303, 3303, c_ai3,
+		GameEnums.AIDifficultyTier.BOZKIR_KURDU,
+		GameEnums.SteppeAIPersonality.GOLGE_SABOTOR,
+		923303, 1, 1, c_p1)
+	var agenda_wolf: StoryAgendaResource = StoryAgendaResource.new()
+	agenda_wolf.agenda_id = &"rev_wolf_winter_vendetta"
+	agenda_wolf.preferred_season = int(GameEnums.SeasonType.WINTER)
+	agenda_wolf.trigger_on_target_dread_min = 45.0
+	agenda_wolf.preferred_action = GameEnums.AIActionCategory.SABOTAGE_ENEMY_WATER
+	agenda_wolf.action_weight_bonus = 48.0
+	agenda_wolf.target_region_coord = c_p1
+	ai_wolf.bind_story_agenda(agenda_wolf)
+
+	SteppeStrategicAIController.register_ai_agent(ai_kagan)
+	SteppeStrategicAIController.register_ai_agent(ai_wolf)
+
+
+func _advance_p32_rev_seasons(start_season: int, end_season: int, start_p1_seq: int) -> int:
+	var p1_seq: int = start_p1_seq
+	var ai_kagan: SteppeStrategicAIController = SteppeStrategicAIController.get_ai_agent(3302)
+	var ai_wolf: SteppeStrategicAIController = SteppeStrategicAIController.get_ai_agent(3303)
+	for s_idx: int in range(start_season, end_season):
+		var tick: int = SessionClockAuthority.advance_tick(1)
+		if s_idx == 2:
+			CommandBus.dispatch(SabotageWellCommand.new(1, Vector2i(33, 21), &"well_rev_a2", 2))
+		if s_idx == 5:
+			ReputationAndPactSystem.record_dread_act(1, 62.0, 15.0)
+			RegionalMarketEngine.boost_scarcity(Vector2i(33, 20), &"food", 0.75)
+		if s_idx % 4 == 0:
+			var doc_choice: int = int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI if s_idx >= 8 else GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI)
+			var p1_env: CommandEnvelope = CommandEnvelope.new(
+				p1_seq, "1", tick, "assign_battle_doctrine",
+				{"player_id": 1, "army_id": 1, "preset_id": doc_choice, "sync_offline_contingency": true})
+			p1_seq += 1
+			CommandBus.enqueue_envelope(p1_env, tick)
+			CommandBus.flush_envelopes_for_tick(tick)
+		if s_idx == 6 or s_idx == 14:
+			var doc_a: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(1)
+			var doc_b: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(3302)
+			var s_a: CombatantStats = CombatantStats.new(1, 200.0, 120.0, 1200.0, 1.0)
+			s_a.player_id = 1
+			s_a.army_id = 1
+			var s_b: CombatantStats = CombatantStats.new(3302, 200.0, 120.0, 1200.0, 1.0)
+			s_b.player_id = 3302
+			s_b.army_id = 3302
+			CommandBus.dispatch(EvaluateDoctrineMatchupCommand.new(s_a, s_b, doc_a, doc_b))
+		if ai_kagan != null:
+			ai_kagan.step_decision_tick(tick, true)
+		if ai_wolf != null:
+			ai_wolf.step_decision_tick(tick, true)
+		var env_adv: CommandEnvelope = CommandEnvelope.new(
+			p1_seq, "1", tick, "advance_season", {"pasture_yield_multiplier": 1.0})
+		p1_seq += 1
+		CommandBus.enqueue_envelope(env_adv, tick)
+		CommandBus.flush_envelopes_for_tick(tick)
+	return p1_seq
+
+
+func _test_phase32_revolutionary_tom_ai_evolution_and_story_hook() -> void:
+	print("--- Running Phase 32 Revolutionary ToM, Deception, Personality Evolution & Story Hook Tests ---")
+	_reset_p27b_singletons(&"p32_rev_init_kut")
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	TraditionResearchManager.reset_research_state()
+	RegionalMarketEngine.reset_market_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
+	# 1. Architecture DAG & Level-2 Strict Typing Gate
+	var arch_errs: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errs.is_empty(),
+		"Faz 32 revolutionary AI modules (AIPersonalityEvolution, AITheoryOfMindModel, AIDeceptionEngine) keep 0 DAG/typing violations.")
+
+	# 2. Emotional Stress vs KAGAN_ZEKASI Composed Gambit Contrast
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(1, false, Vector2i(10, 10), 1)
+	GracePeriodManager.register_player(3311, false, Vector2i(10, 10), 2)
+	GracePeriodManager.register_player(3312, false, Vector2i(10, 10), 3)
+	GracePeriodManager.advance_world_hours(60.0)
+	var c_t: Vector2i = Vector2i(33, 0)
+	var c_e: Vector2i = Vector2i(33, 1)
+	var c_m: Vector2i = Vector2i(33, 2)
+	TerritoryManager.register_region(c_t, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, true, false, 100.0)
+	TerritoryManager.register_region(c_e, GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 3311, true, false, 100.0)
+	TerritoryManager.register_region(c_m, GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 3312, true, false, 100.0)
+	WaterRouteManager.register_water_source(c_e, &"well_rev_e", GameEnums.WaterSourceType.WELL, 3311)
+	WaterRouteManager.register_water_source(c_m, &"well_rev_m", GameEnums.WaterSourceType.WELL, 3312)
+	WaterRouteManager.contaminate_region_wells(c_e, 2, 1, &"well_rev_e")
+	WaterRouteManager.contaminate_region_wells(c_m, 2, 1, &"well_rev_m")
+	SeasonManager.import_state_dict({"index": 3, "elapsed_sec": 0.0, "food_reserve": 12, "pasture_yield_multipliers": {}})
+	ReputationAndPactSystem.record_dread_act(1, 78.0, 20.0)
+
+	var ai_easy: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_easy", 3311, 3311, c_e,
+		GameEnums.AIDifficultyTier.OYMAK_BEYI,
+		GameEnums.SteppeAIPersonality.AKINCI_BASKINCI, 3311, 1, 1, c_t)
+	var ai_master: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_master", 3312, 3312, c_m,
+		GameEnums.AIDifficultyTier.KAGAN_ZEKASI,
+		GameEnums.SteppeAIPersonality.AKINCI_BASKINCI, 3312, 1, 1, c_t)
+	SteppeStrategicAIController.register_ai_agent(ai_easy)
+	SteppeStrategicAIController.register_ai_agent(ai_master)
+	ai_easy.belief_model.refresh_public_and_legitimate_observations(ai_easy.difficulty_profile, c_t)
+	ai_master.belief_model.refresh_public_and_legitimate_observations(ai_master.difficulty_profile, c_t)
+
+	var sd_easy: AIPersonalityEvolution.StressDirective = ai_easy.get_personality_evolution().evaluate_stress_directive(
+		ai_easy.difficulty_profile, 78.0, true, 1)
+	var sd_master: AIPersonalityEvolution.StressDirective = ai_master.get_personality_evolution().evaluate_stress_directive(
+		ai_master.difficulty_profile, 78.0, true, 1)
+	var out_stress_easy: AIUtilityEvaluator.EvaluationOutcome = AIUtilityEvaluator.evaluate_candidates(
+		&"rev_easy", 3311, 3311, c_e, 1, 1, ai_easy.belief_model, null, ai_easy.difficulty_profile, ai_easy.personality_profile, null, 1.0, ai_easy._rng, 11, ai_easy.get_personality_evolution(), ai_easy.get_theory_of_mind(), null)
+	var out_stress_master: AIUtilityEvaluator.EvaluationOutcome = AIUtilityEvaluator.evaluate_candidates(
+		&"rev_master", 3312, 3312, c_m, 1, 1, ai_master.belief_model, null, ai_master.difficulty_profile, ai_master.personality_profile, null, 1.0, ai_master._rng, 11, ai_master.get_personality_evolution(), ai_master.get_theory_of_mind(), null)
+
+	_expect(sd_easy.in_panic_mode and not sd_easy.in_cold_gambit_mode \
+		and not sd_master.in_panic_mode and sd_master.in_cold_gambit_mode \
+		and sd_easy.panic_noise_mult > sd_master.panic_noise_mult \
+		and out_stress_easy.panic_mode_active and out_stress_master.gambit_mode_active,
+		"OYMAK_BEYI panics under Dread+Zud+Sabotage crisis while KAGAN_ZEKASI stays composed and triggers cold gambit mode.")
+
+	# 3. 2nd-Order Theory of Mind (Recursive Counter Anticipation) & Psychological Deception Vectors
+	SeasonManager.import_state_dict({"index": 0, "elapsed_sec": 0.0, "food_reserve": 120, "pasture_yield_multipliers": {}})
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+
+	var tom: AITheoryOfMindModel = ai_master.get_theory_of_mind()
+	tom.reset()
+	# AI previously played KURT_KAPANI -> Opponent prepares ARABA_KALESI -> AI 2nd-order optimal is TONYUKUK_YIPRATMASI
+	tom.record_ai_visible_action(GameEnums.AIActionCategory.ASSIGN_COUNTER_DOCTRINE, int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI), &"neutral", ai_master.difficulty_profile)
+	var pred_assume_ok: bool = tom.predicted_opponent_assumption_about_me == int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)
+	var pred_cnt_ok: bool = tom.predicted_opponent_counter_doctrine == int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI)
+	var pred_second_ok: bool = tom.second_order_optimal_doctrine == int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI)
+	# Opponent actually plays ARABA_KALESI -> hit count & confidence grow
+	tom.observe_opponent_matchup_doctrine(&"araba_kalesi", ai_master.difficulty_profile)
+	var tom_bonus_master: float = tom.get_second_order_doctrine_bonus(int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI), ai_master.difficulty_profile)
+	var tom_bonus_easy: float = tom.get_second_order_doctrine_bonus(int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI), ai_easy.difficulty_profile)
+	var out_tom_m: AIUtilityEvaluator.EvaluationOutcome = AIUtilityEvaluator.evaluate_candidates(
+		&"rev_master", 3312, 3312, c_m, 1, 1, ai_master.belief_model, null, ai_master.difficulty_profile, ai_master.personality_profile, null, 1.0, ai_master._rng, 19, ai_master.get_personality_evolution(), tom, null)
+
+	_expect(pred_assume_ok and pred_cnt_ok and pred_second_ok \
+		and tom.matched_predictions >= 1 \
+		and tom_bonus_master > tom_bonus_easy + 12.0 \
+		and out_tom_m.tom_predicted_enemy_counter == int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI) \
+		and out_tom_m.tom_second_order_doctrine == int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI) \
+		and out_tom_m.doctrine_scores[int(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI)] > out_tom_m.doctrine_scores[int(GameEnums.BattleDoctrinePresetId.ARABA_KALESI)],
+		"AITheoryOfMindModel computes 2nd-order counter anticipation (KURT_KAPANI -> ARABA_KALESI -> TONYUKUK_YIPRATMASI) and learns from matchup accuracy.")
+
+	# Psychological Deception Vectors via real CommandEnvelopes + EventBus.ai_deception_triggered
+	var deception_events: PackedInt32Array = PackedInt32Array()
+	var dec_cb: Callable = func(ag: StringName, _pid: int, vec: GameEnums.AIDeceptionVector, _pc: int, _so: int) -> void:
+		if ag == &"rev_master":
+			deception_events.append(int(vec))
+	EventBus.ai_deception_triggered.connect(dec_cb)
+
+	# 3A: Vector 1 (False Weakness / Dust Screen lure when ToM predicts BORU_KAMASI)
+	tom.record_ai_visible_action(GameEnums.AIActionCategory.ASSIGN_COUNTER_DOCTRINE, int(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI), &"neutral", ai_master.difficulty_profile)
+	var t_env_1: int = SessionClockAuthority.advance_tick(1)
+	ai_master.step_decision_tick(t_env_1, true)
+	var dec_eval_1: AIDeceptionEngine.DeceptionEvaluation = ai_master.get_deception_engine().evaluate_vectors(
+		3312, 3312, 1, 1, c_t, ai_master.belief_model, tom, ai_master.get_personality_evolution(), ai_master.difficulty_profile, ai_master.personality_profile, sd_master)
+	var vec1_scored_ok: bool = dec_eval_1.vector_scores.get(int(GameEnums.AIDeceptionVector.FALSE_WEAKNESS_KURT_KAPANI), 0.0) > 25.0
+
+	# 3B: Vector 2 (Economic Choke via Winter + Usable Well + Kara Borsa tanh Scarcity)
+	WaterRouteManager.register_water_source(c_t, &"well_rev_t1", GameEnums.WaterSourceType.WELL, 1)
+	RegionalMarketEngine.boost_scarcity(c_t, &"food", 1.15)
+	SeasonManager.import_state_dict({"index": 3, "elapsed_sec": 0.0, "food_reserve": 80, "pasture_yield_multipliers": {}})
+	var dec_eval_2: AIDeceptionEngine.DeceptionEvaluation = ai_master.get_deception_engine().evaluate_vectors(
+		3312, 3312, 1, 1, c_t, ai_master.belief_model, tom, ai_master.get_personality_evolution(), ai_master.difficulty_profile, ai_master.personality_profile, sd_master)
+	var vec2_ok: bool = dec_eval_2.recommended_vector == GameEnums.AIDeceptionVector.ECONOMIC_CHOKE_SABOTAGE \
+		and dec_eval_2.black_market_pressure_index >= 2.0
+
+	# 3C: Vector 3 (Coalition & Pact Betrayal when Amanat pact + high Dread + Vendetta)
+	RegionalMarketEngine.reset_market_state()
+	SeasonManager.import_state_dict({"index": 0, "elapsed_sec": 0.0, "food_reserve": 120, "pasture_yield_multipliers": {}})
+	CommandBus.dispatch(SealAmanatPactCommand.new(&"pact_rev_betray", 1, 3312, GameEnums.AmanatHostageType.JADE_TAMGA_SEAL, 8))
+	ReputationAndPactSystem.record_dread_act(1, 70.0, 20.0)
+	ai_master.record_trauma(GameEnums.AITraumaType.WELL_SABOTAGED, 1, 1.4, "vendetta_trigger")
+	ai_master.belief_model.refresh_public_and_legitimate_observations(ai_master.difficulty_profile, c_t)
+	var dec_eval_3: AIDeceptionEngine.DeceptionEvaluation = ai_master.get_deception_engine().evaluate_vectors(
+		3312, 3312, 1, 1, c_t, ai_master.belief_model, tom, ai_master.get_personality_evolution(), ai_master.difficulty_profile, ai_master.personality_profile, sd_master)
+	var t_env_3: int = SessionClockAuthority.advance_tick(1)
+	var env_dec_3: CommandEnvelope = ai_master.step_decision_tick(t_env_3, true)
+	EventBus.ai_deception_triggered.disconnect(dec_cb)
+
+	_expect(vec1_scored_ok and vec2_ok \
+		and dec_eval_3.recommended_vector == GameEnums.AIDeceptionVector.OPPORTUNISTIC_COALITION_BETRAYAL \
+		and dec_eval_3.wants_pact_betrayal \
+		and deception_events.size() >= 1 \
+		and env_dec_3 != null and env_dec_3.status == GameEnums.CommandEnvelopeStatus.ACCEPTED,
+		"AIDeceptionEngine drives False Weakness lure, Kara Borsa Economic Choke, and Dread/Vendetta Pact Betrayal via authorized CommandEnvelopes.")
+
+	# 4. AIPersonalityEvolution Trauma Bridges (Well Sabotage, Amanat Betrayal, Commander Fallen, Zud)
+	_reset_p27b_singletons(&"p32_evo_kut")
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(1, false, Vector2i(10, 10), 1)
+	GracePeriodManager.register_player(3315, false, Vector2i(10, 10), 2)
+	GracePeriodManager.advance_world_hours(60.0)
+	var c_evo_ai: Vector2i = Vector2i(33, 5)
+	var c_evo_p1: Vector2i = Vector2i(33, 6)
+	TerritoryManager.register_region(c_evo_ai, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 3315, true, false, 100.0)
+	TerritoryManager.register_region(c_evo_p1, GameEnums.RegionGeographyClass.FOREST_EDGE, 1, true, false, 100.0)
+	WaterRouteManager.register_water_source(c_evo_ai, &"well_rev_evo", GameEnums.WaterSourceType.WELL, 3315)
+	CommandBus.dispatch(DepositResourcesCommand.new(3315, &"silver_gold", 150))
+	CommandBus.dispatch(DepositResourcesCommand.new(3315, &"stone", 25))
+	CommandBus.dispatch(SealAmanatPactCommand.new(&"pact_rev_evo", 1, 3315, GameEnums.AmanatHostageType.JADE_TAMGA_SEAL, 10))
+
+	var ai_evo: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_evo", 3315, 3315, c_evo_ai,
+		GameEnums.AIDifficultyTier.BOZKIR_KURDU,
+		GameEnums.SteppeAIPersonality.YAYLAK_IMPARATORU, 3315, 1, 1, c_evo_p1)
+	SteppeStrategicAIController.register_ai_agent(ai_evo)
+	var evo_obj: AIPersonalityEvolution = ai_evo.get_personality_evolution()
+	var base_sab: float = ai_evo.personality_profile.sabotage_weight
+	var base_dip: float = ai_evo.personality_profile.diplomacy_weight
+	var base_agg: float = ai_evo.personality_profile.aggression_weight
+
+	var evo_signals: PackedInt32Array = PackedInt32Array()
+	var evo_cb: Callable = func(ag: StringName, _pid: int, tr: GameEnums.AITraumaType, _inst: int, _ven: float, _tot: float) -> void:
+		if ag == &"rev_evo":
+			evo_signals.append(int(tr))
+	EventBus.ai_personality_evolved.connect(evo_cb)
+
+	CommandBus.dispatch(SabotageWellCommand.new(1, c_evo_ai, &"well_rev_evo", 3))
+	CommandBus.dispatch(BreakAmanatPactCommand.new(&"pact_rev_evo", 1))
+	EventBus.commander_fallen_in_battle.emit(1, 3315, 3315, 25.0, 20.0)
+	EventBus.zud_starvation_ticked.emit(8, SeasonManager.get_current_season())
+	EventBus.ai_personality_evolved.disconnect(evo_cb)
+
+	_expect(evo_signals.has(int(GameEnums.AITraumaType.WELL_SABOTAGED)) \
+		and evo_signals.has(int(GameEnums.AITraumaType.AMANAT_BETRAYAL)) \
+		and evo_signals.has(int(GameEnums.AITraumaType.VETERAN_COMMANDER_FALLEN)) \
+		and evo_signals.has(int(GameEnums.AITraumaType.ZUD_HEAVY_LOSS)) \
+		and evo_obj.evolved_sabotage > base_sab + 0.30 \
+		and evo_obj.evolved_diplomacy < base_dip - 0.15 \
+		and evo_obj.evolved_aggression > base_agg + 0.25 \
+		and evo_obj.get_vendetta_score(1) >= 95.0 \
+		and evo_obj.get_vendetta_multiplier(1) >= 1.60,
+		"Real EventBus trauma signals (Well Sabotage, Amanat Betrayal, Commander Death, Zud) permanently evolve personality weights & deterministic Kan Davası.")
+
+	# 5. Dynamic TraditionResearchManager (`start_research` CommandEnvelope) + Story Hook + Spoof Rejection + Scheme Abort
+	TraditionResearchManager.reset_research_state()
+	SeasonManager.import_state_dict({"index": 0, "elapsed_sec": 0.0, "food_reserve": 140, "pasture_yield_multipliers": {}})
+	var ai_research: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"rev_researcher", 3316, 3316, Vector2i(33, 8),
+		GameEnums.AIDifficultyTier.BOZKIR_KURDU,
+		GameEnums.SteppeAIPersonality.DEMIR_SAVUNMACI, 3316, 1, 1, Vector2i(33, 9))
+	TerritoryManager.register_region(Vector2i(33, 8), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 3316, true, false, 100.0)
+	SteppeStrategicAIController.register_ai_agent(ai_research)
+	CommandBus.dispatch(DepositResourcesCommand.new(3316, &"silver_gold", 160))
+	ai_research.observe_enemy_doctrine(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI)
+
+	# Bind StoryAgenda boosting RESEARCH_TRADITION to confirm full pipeline & Research execution together
+	var agenda_res: StoryAgendaResource = StoryAgendaResource.new()
+	agenda_res.agenda_id = &"rev_craft_doctrine_renaissance"
+	agenda_res.preferred_action = GameEnums.AIActionCategory.RESEARCH_TRADITION
+	agenda_res.action_weight_bonus = 95.0
+	ai_research.bind_story_agenda(agenda_res)
+
+	var r_tick: int = SessionClockAuthority.advance_tick(1)
+	var env_res: CommandEnvelope = ai_research.step_decision_tick(r_tick, true)
+	var active_res_node: StringName = TraditionResearchManager.get_active_node_id(3316)
+
+	# Spoof start_research for Player 1 sent by 3316 MUST fail REJECTED_UNAUTHORIZED
+	var spoof_research_env: CommandEnvelope = CommandEnvelope.new(
+		9910, "3316", r_tick + 1, "start_research",
+		{"player_id": 1, "node_id": "yelme_gozculeri"})
+	var spoof_res_blocked: bool = not CommandBus.enqueue_envelope(spoof_research_env, r_tick + 1)
+
+	# Advance seasons to verify real AI research completion & bonus activation
+	SeasonManager.advance_season_cycle()
+	SeasonManager.advance_season_cycle()
+	SeasonManager.advance_season_cycle()
+	var completed_nodes: Array[StringName] = TraditionResearchManager.get_completed_node_ids(3316)
+
+	# Verify AISchemePlanner abort cleanly cancels stale winter scheme when Spring/truced
+	GracePeriodManager.reset_persistent_world()
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(1, false, Vector2i(10, 10), 1)
+	GracePeriodManager.register_player(3316, false, Vector2i(10, 10), 2)
+	ai_research.scheme_planner.begin_scheme(GameEnums.AISchemeType.POISONED_WINTER_TRAP, 1, 1, Vector2i(33, 9), r_tick)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	var abort_reason: StringName = ai_research.scheme_planner.evaluate_abort_condition(3316, ai_research.belief_model)
+	ai_research.scheme_planner.abort_scheme()
+
+	_expect(env_res != null and env_res.status == GameEnums.CommandEnvelopeStatus.ACCEPTED \
+		and env_res.command_type == "start_research" \
+		and active_res_node != &"" \
+		and spoof_res_blocked and spoof_research_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED \
+		and TraditionResearchManager.get_active_node_id(1) == &"" \
+		and completed_nodes.has(active_res_node) \
+		and abort_reason == &"winter_truce_invalidated" \
+		and not ai_research.scheme_planner.has_active_scheme(),
+		"AI dynamically selects & starts TraditionResearch via CommandEnvelope, blocks spoofed research, completes node on seasons, and aborts invalid schemes cleanly.")
+
+	# 6. Dual 20-Season Determinism & Mid-Evolution Save/Load Resume Parity (SHA-256 Bit-Exact)
+	_setup_p32_rev_deterministic_world()
+	_advance_p32_rev_seasons(0, 20, 1)
+	var hash_run_a: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	_setup_p32_rev_deterministic_world()
+	_advance_p32_rev_seasons(0, 20, 1)
+	var hash_run_b: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	# Run C: Run 0..10 (accumulates ToM hits, well-sabotage trauma/vendetta, Dread deception & active research), Save, Mutate heavily, Load, Resume 10..20!
+	_setup_p32_rev_deterministic_world()
+	var seq_at_10: int = _advance_p32_rev_seasons(0, 10, 1)
+	var hash_mid_10: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	var ai_k10: SteppeStrategicAIController = SteppeStrategicAIController.get_ai_agent(3302)
+	var mid_vendetta_ok: bool = ai_k10 != null and ai_k10.get_personality_evolution().get_vendetta_score(1) > 0.0 \
+		and ai_k10.get_theory_of_mind().last_visible_ai_doctrine >= 0
+	var save_path_rev: String = "user://phase32_rev_mid_verify.json"
+	var saved_rev_ok: bool = SaveLoadRepository.save_to_file(save_path_rev)
+
+	if ai_k10 != null:
+		ai_k10.record_trauma(GameEnums.AITraumaType.AMANAT_BETRAYAL, 1, 2.0, "corrupt_mutation")
+		ai_k10.set_difficulty_tier(GameEnums.AIDifficultyTier.OYMAK_BEYI)
+	CommandBus.dispatch(DepositResourcesCommand.new(3302, &"iron", 999))
+	var hash_mutated: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	var loaded_rev_ok: bool = SaveLoadRepository.load_from_file(save_path_rev)
+	var hash_restored_10: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	if FileAccess.file_exists(save_path_rev):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path_rev))
+	_advance_p32_rev_seasons(10, 20, seq_at_10)
+	var hash_resumed_20: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	_expect(hash_run_a.length() == 64 \
+		and hash_run_a == hash_run_b \
+		and mid_vendetta_ok \
+		and saved_rev_ok and loaded_rev_ok \
+		and hash_mutated != hash_mid_10 \
+		and hash_restored_10 == hash_mid_10 \
+		and hash_resumed_20 == hash_run_a,
+		"20-season dual runs AND mid-evolution Save/Load at Season 10 -> Resumed Season 20 yield bit-for-bit identical SHA-256 hashes.")
+
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	TraditionResearchManager.reset_research_state()
+	RegionalMarketEngine.reset_market_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	_reset_p27b_singletons(&"p32_rev_cleanup_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
 
 
 
