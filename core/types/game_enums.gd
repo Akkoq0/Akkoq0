@@ -328,6 +328,29 @@ enum BarterDirection {
 	SELL_TO_MARKET = 1,
 }
 
+## Phase 24 Regency and Kurultay succession states (`SuccessionManager`).
+enum RegencyStatus {
+	STABLE_RULE = 0, ## Güçlü ve ergin hükümdar yönetiminde istikrarlı düzen
+	AK_SAKALLILAR_REGENCY = 1, ## Çocuk/zayıf veliaht veya rehin Amanat nedeniyle Ak Sakallılar Konseyi naibliği
+	KURULTAY_SUCCESSION_CRISIS = 2, ## Veraset krizi: Hırslı beylerin hak iddiası, sadakat düşüşü ve bölge ihtilafı
+}
+
+## Phase 24 Commander legacy specializations earned across campaigns (`CommanderProfile`).
+enum CommanderTrait {
+	NONE = 0,
+	BOZKIR_KURDU = 1, ## Bozkır Kurdu: Turan taktiği hızı ve kanat çevikliği bonusu
+	BORU_YUREK = 2, ## Börü Yürek: Cascade rout paniğine karşı yüksek direnç ve şok
+	KERVAN_GAZISI = 3, ## Kervan Gazisi: İkmal ve uzun sefer dayanıklılığı
+	SAGIR_YARA = 4, ## Ağır Savaş Yarası: Ek muharebe gaziliği ancak süvari hızında hafif aksama
+}
+
+## Phase 24 Strategic responses to resolve an active Kurultay succession crisis.
+enum SuccessionCrisisResponse {
+	COUNCIL_REGENCY_TRANSITION = 0, ## Ak Sakallılar Konseyi naibliğinde kademeli geçiş
+	PURGE_AMBITIOUS_CLAIMANTS = 1, ## Muhalif beyleri sert bastırma (Yüksek Dehşet, gümüş ve zayiat bedeli)
+	CEDE_AUTONOMY_AND_ULUS = 2, ## Ülüş ve özerklik taviziyle tahtı yatıştırma (Düşük Kut & vergi bedeli)
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

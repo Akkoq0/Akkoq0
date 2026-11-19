@@ -24,6 +24,7 @@ var _current_cohesion: float = 100.0
 var _battle_fatigue: float = 0.0
 var _is_elite_vanguard_alive: bool = true
 var _is_in_cascade_rout: bool = false
+var _commander_rout_resistance: float = 0.0
 
 
 func _ready() -> void:
@@ -31,11 +32,15 @@ func _ready() -> void:
 		rules = ResourceLoader.load(DEFAULT_RULES_PATH) as CombatRules
 	if not EventBus.water_crisis_inflicted.is_connected(_on_water_crisis_inflicted):
 		EventBus.water_crisis_inflicted.connect(_on_water_crisis_inflicted)
+	if not EventBus.commander_fallen_in_battle.is_connected(_on_commander_fallen_in_battle):
+		EventBus.commander_fallen_in_battle.connect(_on_commander_fallen_in_battle)
 
 
 func _exit_tree() -> void:
 	if EventBus.water_crisis_inflicted.is_connected(_on_water_crisis_inflicted):
 		EventBus.water_crisis_inflicted.disconnect(_on_water_crisis_inflicted)
+	if EventBus.commander_fallen_in_battle.is_connected(_on_commander_fallen_in_battle):
+		EventBus.commander_fallen_in_battle.disconnect(_on_commander_fallen_in_battle)
 
 
 ## Configures the component for `p_army_id` and resets morale/fatigue state.
@@ -50,6 +55,7 @@ func configure(p_army_id: int, p_rules: CombatRules = null) -> void:
 	_battle_fatigue = 0.0
 	_is_elite_vanguard_alive = true
 	_is_in_cascade_rout = false
+	_commander_rout_resistance = 0.0
 
 
 static func _safe_float(val: float, fallback: float) -> float:
@@ -216,7 +222,8 @@ func evaluate_layered_vanguard_loss_shock(elite_unit_id: StringName = &"bozkurt_
 		return out
 	_is_elite_vanguard_alive = false
 	var safe_hp: float = maxf(_safe_float(targeted_health, 0.0), 0.0)
-	var damping: float = clampf(1.0 - _veteran_experience_ratio * 0.45 - (_commander_leadership_score / 100.0) * 0.30 + (_battle_fatigue / 100.0) * 0.55, 0.25, 1.65)
+	var base_damping: float = clampf(1.0 - _veteran_experience_ratio * 0.45 - (_commander_leadership_score / 100.0) * 0.30 + (_battle_fatigue / 100.0) * 0.55, 0.25, 1.65)
+	var damping: float = clampf(base_damping * (1.0 - _commander_rout_resistance), 0.20, 1.65)
 	var morale_shock: float = rules.elite_vanguard_loss_morale_shock * damping
 	var cohesion_shock: float = rules.elite_vanguard_loss_cohesion_shock * damping
 	_current_morale = clampf(_current_morale - morale_shock, 0.0, 100.0)
@@ -275,6 +282,27 @@ func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
 	return _battle_fatigue
 
 
+func set_commander_rout_resistance(resistance: float) -> void:
+	_commander_rout_resistance = clampf(_safe_float(resistance, 0.0), 0.0, 0.55)
+
+
+func get_commander_rout_resistance() -> float:
+	return _commander_rout_resistance
+
+
+func apply_commander_death_shock(morale_shock: float, cohesion_shock: float) -> void:
+	var m_drop: float = maxf(_safe_float(morale_shock, 0.0), 0.0)
+	var c_drop: float = maxf(_safe_float(cohesion_shock, 0.0), 0.0)
+	_commander_rout_resistance = 0.0
+	_current_morale = clampf(_current_morale - m_drop, 0.0, 100.0)
+	_current_cohesion = clampf(_current_cohesion - c_drop, 0.0, 100.0)
+
+
 func _on_water_crisis_inflicted(p_army_id: int, _coord: Vector2i, _remount_drain: float, morale_penalty: float, _is_zud_frozen: bool) -> void:
 	if _army_id > 0 and p_army_id == _army_id and morale_penalty > 0.0:
 		_current_morale = clampf(_current_morale - morale_penalty, 0.0, 100.0)
+
+
+func _on_commander_fallen_in_battle(_commander_id: int, p_army_id: int, _player_id: int, morale_shock: float, cohesion_shock: float) -> void:
+	if _army_id > 0 and p_army_id == _army_id:
+		apply_commander_death_shock(morale_shock, cohesion_shock)

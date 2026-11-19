@@ -120,6 +120,7 @@ func _run_suite() -> void:
 	_test_phase21_courier_deception_caravans_artisans()
 	_test_phase22_game_theory_politics_and_48_season_audit()
 	_test_phase23_water_routes_and_scarcity_market()
+	_test_phase24_commander_legacy_and_succession_crisis()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3805,6 +3806,122 @@ func _test_phase23_water_routes_and_scarcity_market() -> void:
 	SeasonManager.set_food_reserve(120)
 	DiplomacyManager.step_seasonal_diplomatic_decay(20)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _test_phase24_commander_legacy_and_succession_crisis() -> void:
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	ReputationAndPactSystem.reset_reputation_state()
+
+	var rules: SuccessionRules = SuccessionManager.get_rules()
+	_expect(rules != null and rules.get_validation_errors().is_empty(),
+		"SuccessionManager loaded valid SuccessionRules cleanly.")
+
+	# 1. CommanderLegacyComponent: Veteran Turan Bonus, Battle Scars, Rout Damping & Instant Death Shock
+	var cmdr: CommanderProfile = SuccessionManager.register_commander(
+		2401, 2401, 2401, &"Kül Tegin", 108, GameEnums.CommanderTrait.BORU_YUREK)
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 2401
+	army.owner_id = 2401
+	add_child(army)
+
+	var base_turan_eff: float = army.turan_tactics.compute_maneuver_execution_efficiency()
+	SuccessionManager.record_commander_battle_experience(2401, 60.0)
+	var boosted_turan_eff: float = army.turan_tactics.compute_maneuver_execution_efficiency()
+	_expect(army.commander_legacy != null \
+		and boosted_turan_eff > base_turan_eff \
+		and army.morale_component.get_commander_rout_resistance() >= 0.15,
+		"Experienced Börü Yürek commander increases Turan maneuver efficiency (%.2f -> %.2f) and builds cascade_rout resistance (%.2f)." % [
+			base_turan_eff, boosted_turan_eff, army.morale_component.get_commander_rout_resistance()])
+
+	var scar_ok: bool = SuccessionManager.inflict_commander_battle_trauma(2401, false)
+	_expect(scar_ok and cmdr.scars == 1 and cmdr.get_scar_combat_bonus(rules) >= 0.10,
+		"Surviving severe wounds leaves battle scar (+10%% combat scar bonus) while advancing veteran experience.")
+
+	var morale_before_death: float = army.morale_component.get_current_morale()
+	var cohesion_before_death: float = army.morale_component.get_current_cohesion()
+	var lethal_ok: bool = SuccessionManager.inflict_commander_battle_trauma(2401, true)
+	_expect(lethal_ok \
+		and not cmdr.is_alive \
+		and not army.commander_legacy.is_commander_alive() \
+		and not army.turan_tactics.is_commander_alive() \
+		and army.morale_component.get_current_morale() <= morale_before_death - rules.commander_death_morale_shock + 0.1 \
+		and army.morale_component.get_current_cohesion() <= cohesion_before_death - rules.commander_death_cohesion_shock + 0.1,
+		"Commander death in battle immediately triggers Turan fallback & heavy morale/cohesion shock.")
+
+	# 2. Prepared Competent Adult Heir -> Smooth Succession without Crisis
+	SuccessionManager.register_dynasty(2401, &"Bilge Kağan", 280, 82.0, &"İnel", 88, 50.0)
+	CommandBus.dispatch(DepositResourcesCommand.new(2401, &"silver_gold", 100))
+	var train_cmd: DesignateAndTrainHeirCommand = DesignateAndTrainHeirCommand.new(2401, &"Bilge Tigin", 92, true)
+	var age_step_cmd: StepSuccessionSeasonCommand = StepSuccessionSeasonCommand.new(2401, 24, false, &"old_age")
+	_expect(CommandBus.dispatch(train_cmd) and train_cmd.resulting_competence >= 60.0 \
+		and CommandBus.dispatch(age_step_cmd) \
+		and age_step_cmd.succession_occurred \
+		and not age_step_cmd.crisis_triggered \
+		and age_step_cmd.resulting_regency_status == GameEnums.RegencyStatus.STABLE_RULE \
+		and age_step_cmd.generation_after == 2 \
+		and is_equal_approx(SuccessionManager.get_regency_tax_multiplier(2401), 1.0),
+		"Trained adult heir inherits cleanly at ruler's old age without triggering Kurultay Succession Crisis.")
+
+	# 3. Weak/Minor/Amanat-Held Heir + Ambitious Vassal -> Kurultay Succession Crisis + Purging/Appeasement
+	TerritoryManager.register_region(Vector2i(24, 1), GameEnums.RegionGeographyClass.SACRED_CORE, 2402, true, true, 100.0)
+	TerritoryManager.register_region(Vector2i(24, 2), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2402, false, false, 100.0)
+	CommandBus.dispatch(DelegateRegionToVassalCommand.new(2402, Vector2i(24, 2), &"ambitious_bars", GameEnums.VassalPersonalityTrait.AMBITIOUS))
+	SuccessionManager.register_dynasty(2402, &"Külüg Kağan", 160, 74.0, &"Kocuk", 36, 42.0)
+	CommandBus.dispatch(SealAmanatPactCommand.new(&"amanat_p24", 2402, 2403, GameEnums.AmanatHostageType.HEIR_HOSTAGE, 6))
+	var heir_profile_2402: DynastyRulerProfile = SuccessionManager.get_dynasty(2402)
+	_expect(heir_profile_2402.heir_held_as_amanat and not heir_profile_2402.is_heir_ready(rules),
+		"Pledging heir as Amanat hostage marks heir locked and ineligible for uncontested inheritance.")
+
+	var crisis_step: StepSuccessionSeasonCommand = StepSuccessionSeasonCommand.new(2402, 2, true, &"battle_slain")
+	var ambitious_vassal: VassalBeyAssignment = GovernanceManager.get_vassal(&"ambitious_bars")
+	_expect(CommandBus.dispatch(crisis_step) \
+		and crisis_step.succession_occurred \
+		and crisis_step.crisis_triggered \
+		and crisis_step.resulting_regency_status == GameEnums.RegencyStatus.KURULTAY_SUCCESSION_CRISIS \
+		and crisis_step.claimant_bey_id == &"ambitious_bars" \
+		and crisis_step.contested_coord == Vector2i(24, 2) \
+		and ambitious_vassal.loyalty < 50.0 \
+		and ambitious_vassal.silent_sabotage_active \
+		and SuccessionManager.get_regency_tax_multiplier(2402) <= 0.70,
+		"Ruler death with Amanat/minor heir + Ambitious Bey ignites Kurultay Succession Crisis, loyalty drop, sabotage, and territory claim.")
+
+	CommandBus.dispatch(DepositResourcesCommand.new(2402, &"silver_gold", 150))
+	var purge_cmd: ResolveSuccessionCrisisCommand = ResolveSuccessionCrisisCommand.new(
+		2402, GameEnums.SuccessionCrisisResponse.PURGE_AMBITIOUS_CLAIMANTS)
+	_expect(CommandBus.dispatch(purge_cmd) \
+		and purge_cmd.resolved \
+		and purge_cmd.resulting_status == GameEnums.RegencyStatus.STABLE_RULE \
+		and purge_cmd.dread_gained >= 15.0 \
+		and not ambitious_vassal.silent_sabotage_active \
+		and ReputationAndPactSystem.get_dread_score(2402) >= 15.0,
+		"Purging succession claimants restores stability & ends sabotage while accruing Silver cost and Dread.")
+
+	# Verify Ak Sakallılar Regency + Appeasement branch cleanly on dynasty 2403
+	SuccessionManager.register_dynasty(2403, &"İstemi", 180, 70.0, &"Küçük_Tigin", 32, 35.0)
+	var regency_step: StepSuccessionSeasonCommand = StepSuccessionSeasonCommand.new(2403, 1, true, &"illness")
+	CommandBus.dispatch(DepositResourcesCommand.new(2403, &"silver_gold", 150))
+	var appease_cmd: ResolveSuccessionCrisisCommand = ResolveSuccessionCrisisCommand.new(
+		2403, GameEnums.SuccessionCrisisResponse.CEDE_AUTONOMY_AND_ULUS)
+	_expect(CommandBus.dispatch(regency_step) \
+		and regency_step.resulting_regency_status == GameEnums.RegencyStatus.AK_SAKALLILAR_REGENCY \
+		and is_equal_approx(SuccessionManager.get_regency_tax_multiplier(2403), rules.regency_tax_efficiency_mult) \
+		and CommandBus.dispatch(appease_cmd) \
+		and appease_cmd.resulting_status == GameEnums.RegencyStatus.STABLE_RULE,
+		"Minor/weak heir without ambitious rivals enters Ak Sakallılar Regency (0.80x tax) until stabilized via concession.")
+
+	army.free()
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p24_cleanup_kut"))
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
 
 
 

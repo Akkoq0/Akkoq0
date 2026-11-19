@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="SuccessionRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/governance/succession_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"succession_rules"
+seasons_per_year = 4
+natural_decline_age_years = 58
+max_natural_lifespan_years = 76
+heir_majority_age_years = 18
+strong_heir_competence_threshold = 55.0
+heir_training_competence_gain = 12.0
+heir_training_bullion_cost = 20
+commander_turan_bonus_per_vet = 0.015
+commander_turan_bonus_max = 0.25
+commander_rout_resistance_per_vet = 0.008
+commander_rout_resistance_max = 0.40
+commander_death_morale_shock = 28.0
+commander_death_cohesion_shock = 24.0
+veteran_scar_combat_bonus = 0.10
+veteran_scar_speed_penalty = 0.06
+max_battle_scars = 3
+regency_tax_efficiency_mult = 0.80
+regency_kut_cap = 65.0
+crisis_ambitious_vassal_loyalty_drop = 22.0
+crisis_purge_silver_cost = 50
+crisis_purge_dread_gain = 18.0
+crisis_appease_silver_cost = 65
+crisis_appease_kut_cost = 10.0

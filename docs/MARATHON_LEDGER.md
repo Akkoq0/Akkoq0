@@ -50,3 +50,13 @@ Bu defter **Faz 18–28** arasındaki tüm mimari kararları, matematiksel denkl
   2. `MoraleComponent._ready()` / `_exit_tree()` içine `EventBus.water_crisis_inflicted` bağlantısı eklendi ve `_test_phase23_water_routes_and_scarcity_market()` + Faz 18/20 parity doğrulamaları `_run_suite()` içine bağlandı.
 - **Test Kapısı:** `51 test fonksiyonu / 801 assertion` (`[PASS]`, 0 uyarı).
 
+## Faz 24 — Komutan Mirası, Yaşlanma, Savaş Yaraları ve Kurultay Veraset Krizi
+- **Temel Dosyalar:** `core/succession_manager.gd`, `data/governance/succession_rules.gd/.tres`, `core/models/dynasty_ruler_profile.gd`, `core/models/commander_profile.gd`, `core/commands/designate_and_train_heir_command.gd`, `core/commands/step_succession_season_command.gd`, `core/commands/resolve_succession_crisis_command.gd`, `units/commander_legacy_component.gd`, `units/turan_tactics_component.gd`, `units/morale_component.gd`
+- **Mekanik & Nedensellik:**
+  - Gazilik (`veteran_score`) ve `Börü Yürek` / `Bozkır Kurdu` özellikleri Turan manevra verimliliğini ve `cascade_rout` direncini yükseltir; ağır yaralanmalar (`SAGIR_YARA`) ek savaş gaziliği kazandırırken komutan ölümü `EventBus.commander_fallen_in_battle` üzerinden anlık `-28.0` moral / `-24.0` düzen şoku ve Turan taktiksel kırılması başlatır.
+  - Yetişkin (`>= 18`), yetkin (`>= 55.0`) ve rehin (`Amanat`) olmayan veliaht veraseti pürüzsüz geçirirken (`STABLE_RULE`); çocuk, yetersiz veya `Amanat` rehinesi veliaht ölümü Hırslı Bey (`AMBITIOUS`) sadakat düşüşü (`-22.0`), sessiz sabotaj ve bölge hak iddiasıyla `KURULTAY_SUCCESSION_CRISIS` (veya hırslı bey yoksa `AK_SAKALLILAR_REGENCY`) tetikler. Kriz konsey naibliği, sert bastırma (gümüş + Dehşet) veya Ülüş taviziyle çözülür.
+- **Yakalanıp Çözülen Sapma:**
+  1. GDScript 4.7 içinde ayrılmış anahtar sözcük olan `trait` kimliği `commander_trait` / `p_commander_trait` olarak yeniden adlandırılıp sıfır uyarı sağlandı.
+- **Test Kapısı:** `52 test fonksiyonu / 810 assertion` (`[PASS]`, 0 uyarı).
+
+

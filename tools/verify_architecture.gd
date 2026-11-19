@@ -272,6 +272,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as PoliticsAndPactsRules).get_validation_errors())
 		elif res is WaterAndMarketRules:
 			errors.append_array((res as WaterAndMarketRules).get_validation_errors())
+		elif res is SuccessionRules:
+			errors.append_array((res as SuccessionRules).get_validation_errors())
 	return errors
 
 

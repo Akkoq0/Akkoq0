@@ -35,6 +35,7 @@ var _last_flank_angle_rad: float = 0.0
 var _own_fatigue: float = 0.0
 var _remount_horse_ratio: float = 1.0
 var _commander_alive: bool = true
+var _commander_readiness_multiplier: float = 1.0
 var _consecutive_stalled_steps: int = 0
 var _last_fallback_reason: StringName = &""
 
@@ -77,6 +78,7 @@ func configure(p_army_id: int, p_doctrine: TacticalDoctrineData, initial_quiver_
 	_own_fatigue = 0.0
 	_remount_horse_ratio = 1.0
 	_commander_alive = true
+	_commander_readiness_multiplier = 1.0
 	_target_entropy = 0.0
 	_target_fatigue = 0.0
 	_target_armor_collapse = 0.0
@@ -451,8 +453,16 @@ func get_remount_horse_ratio() -> float:
 	return _remount_horse_ratio
 
 
-## Computes the tactical maneuver execution efficiency (`0.35..1.15`) based on
-## current unit fatigue, quiver ammunition, Yılkı spare-horse ratio, and terrain.
+func set_commander_readiness_multiplier(mult: float) -> void:
+	_commander_readiness_multiplier = clampf(_safe_float(mult, 1.0), 0.70, 1.45)
+
+
+func get_commander_readiness_multiplier() -> float:
+	return _commander_readiness_multiplier
+
+
+## Computes the tactical maneuver execution efficiency (`0.35..1.15` baseline,
+## scaled by commander veteran readiness) based on fatigue, quiver ammo, remounts, and terrain.
 func compute_maneuver_execution_efficiency(terrain: TerrainData = null) -> float:
 	var fatigue_penalty: float = (_own_fatigue / 100.0) * 0.35
 	var ammo_penalty: float = 0.20 if _quiver_ammo <= 0.0 else clampf((25.0 - _quiver_ammo) / 25.0, 0.0, 1.0) * 0.15
@@ -462,7 +472,10 @@ func compute_maneuver_execution_efficiency(terrain: TerrainData = null) -> float
 	var terrain_bonus: float = 0.0
 	if terrain != null and (terrain.terrain_class == GameEnums.TerrainClass.BEREKET_HAVZASI or terrain.terrain_class == GameEnums.TerrainClass.SIK_ORMAN):
 		terrain_bonus = 0.08
-	return clampf(1.0 - fatigue_penalty - ammo_penalty - remount_penalty + terrain_bonus, 0.35, 1.15)
+	var base_eff: float = clampf(1.0 - fatigue_penalty - ammo_penalty - remount_penalty + terrain_bonus, 0.35, 1.15)
+	if is_equal_approx(_commander_readiness_multiplier, 1.0):
+		return base_eff
+	return clampf(base_eff * _commander_readiness_multiplier, 0.30, 1.45)
 
 
 ## Executes Stage 3 Feigned Retreat while modulating overextension effectiveness

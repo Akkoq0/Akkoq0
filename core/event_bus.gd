@@ -180,4 +180,12 @@ signal water_crisis_inflicted(army_id: int, region_coord: Vector2i, remount_drai
 signal regional_market_scarcity_shifted(region_coord: Vector2i, commodity_id: StringName, scarcity_multiplier: float, reason: StringName)
 signal barter_trade_executed(player_id: int, region_coord: Vector2i, commodity_id: StringName, direction: GameEnums.BarterDirection, quantity: int, silver_delta: int, is_black_market: bool)
 
+# --- Phase 24 Commander Legacy, Aging & Kurultay Succession Crises ----------
+signal ruler_died_succession_started(player_id: int, deceased_name: StringName, new_ruler_name: StringName, generation: int, crisis_triggered: bool, regency_status: GameEnums.RegencyStatus)
+signal kurultay_succession_crisis_triggered(player_id: int, crisis_id: StringName, claimant_bey_id: StringName, contested_coord: Vector2i, reason: StringName)
+signal succession_crisis_resolved(player_id: int, crisis_id: StringName, response: GameEnums.SuccessionCrisisResponse, new_regency_status: GameEnums.RegencyStatus)
+signal commander_legacy_updated(commander_id: int, army_id: int, veteran_score: float, scars: int, commander_trait: GameEnums.CommanderTrait)
+signal commander_fallen_in_battle(commander_id: int, army_id: int, player_id: int, morale_shock: float, cohesion_shock: float)
+
+
 
