@@ -126,6 +126,7 @@ func _run_suite() -> void:
 	_test_phase26a_systemic_synergy_and_equilibrium()
 	_test_phase27b_modular_doctrine_and_matchups()
 	_test_phase28_dual_mode_determinism_and_saveload()
+	_test_phase29_constellation_sundial_and_crucible()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -5640,4 +5641,78 @@ func _test_phase28_dual_mode_determinism_and_saveload() -> void:
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
 	_reset_p27b_singletons(&"p28_cleanup_kut")
+
+
+func _test_phase29_constellation_sundial_and_crucible() -> void:
+	_reset_p27b_singletons(&"p29_baseline_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Phase 29 passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	var coord_p29: Vector2i = Vector2i(29, 4)
+	TerritoryManager.register_region(coord_p29, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, true, false, 100.0)
+	WaterRouteManager.register_water_source(coord_p29, &"well_p29_a", GameEnums.WaterSourceType.WELL, 1)
+	WaterRouteManager.register_water_source(coord_p29, &"well_p29_b", GameEnums.WaterSourceType.WELL, 1)
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"iron", 80))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"steel", 45))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 400))
+	CommandBus.dispatch(SabotageWellCommand.new(2, coord_p29, &"well_p29_a", 3))
+
+	var vm: WorldEcologyViewModel = WorldEcologyViewModel.new(1, 1, coord_p29)
+	var snap: WorldEcologyViewModel.WorldEcologySnapshot = vm.capture_snapshot()
+	_expect(snap.is_yaylak_highland and not snap.is_kislak_valley \
+		and snap.registered_water_sources == 2 and snap.sabotaged_water_sources == 1 \
+		and is_equal_approx(snap.water_purity_ratio, 0.5) \
+		and snap.black_market_scarcity_mult >= 1.0 and snap.black_market_scarcity_mult <= 3.40 \
+		and snap.steel_stock >= 45,
+		"WorldEcologyViewModel captures read-only Yaylak, poisoned water ring (50%%), and <=3.40x black-market crucible telemetry.")
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(1, 1)
+	add_child(hud)
+	var panel: WorldEcologyDrawerPanel = WorldEcologyDrawerPanel.new()
+	panel.set_context(1, 1, coord_p29)
+	var mounted: bool = hud.mount_panel_to_slot(OtukenHudViewModel.SLOT_ECONOMY_WATER, panel)
+	hud.open_drawer(OtukenHudViewModel.SLOT_ECONOMY_WATER)
+	panel.refresh_from_viewmodel()
+
+	var drawer_w: float = panel.get_combined_minimum_size().x
+	var map_ratio: float = hud.compute_open_map_ratio(false)
+	var barter_ok: bool = panel.trigger_barter_iron(2, true)
+	var restore_ok: bool = panel.trigger_restore_water(&"well_p29_a")
+	var snap_after: WorldEcologyViewModel.WorldEcologySnapshot = vm.capture_snapshot()
+
+	_expect(mounted and drawer_w <= float(OtukenHudRoot.DRAWER_WIDTH_PX) and map_ratio >= 0.82 \
+		and panel.get_constellation_widget() != null \
+		and panel.get_sundial_water_widget() != null \
+		and panel.get_crucible_widget() != null \
+		and barter_ok and restore_ok \
+		and snap_after.sabotaged_water_sources == 0 \
+		and is_equal_approx(snap_after.water_purity_ratio, 1.0) \
+		and snap_after.black_market_scarcity_mult <= 3.40,
+		"WorldEcologyDrawerPanel mounts <=332px keeping >=82%% open map and executes water restore + black-market barter via CommandBus.")
+
+	var season_before: int = EventBus.season_changed.get_connections().size()
+	var syn_before: int = EventBus.systemic_synergy_evaluated.get_connections().size()
+	var audit_panel: WorldEcologyDrawerPanel = WorldEcologyDrawerPanel.new()
+	add_child(audit_panel)
+	var season_during: int = EventBus.season_changed.get_connections().size()
+	var syn_during: int = EventBus.systemic_synergy_evaluated.get_connections().size()
+	remove_child(audit_panel)
+	audit_panel.free()
+	var season_after: int = EventBus.season_changed.get_connections().size()
+	var syn_after: int = EventBus.systemic_synergy_evaluated.get_connections().size()
+
+	remove_child(hud)
+	hud.free()
+
+	_expect(season_during == season_before + 1 and syn_during == syn_before + 1 \
+		and season_after == season_before and syn_after == syn_before,
+		"WorldEcologyDrawerPanel disconnects all EventBus subscriptions cleanly on _exit_tree() (0 leaks).")
+
+	_reset_p27b_singletons(&"p29_cleanup_kut")
+
 
