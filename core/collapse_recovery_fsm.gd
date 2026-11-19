@@ -95,6 +95,28 @@ func can_overlord_observe_vassal(overlord_id: int, vassal_id: int) -> bool:
 	return rec.state == GameEnums.CollapseState.VASSAL_BEYLIK and rec.overlord_id == overlord_id
 
 
+func can_vassal_observe_overlord(vassal_id: int, overlord_id: int) -> bool:
+	if not _records.has(vassal_id):
+		return false
+	var rec: CollapseRecord = _records[vassal_id]
+	return rec.state == GameEnums.CollapseState.VASSAL_BEYLIK and rec.overlord_id == overlord_id
+
+
+func get_observed_overlord_status(vassal_id: int, overlord_army_id: int = 1) -> Dictionary[StringName, float]:
+	if not _records.has(vassal_id):
+		return {}
+	var rec: CollapseRecord = _records[vassal_id]
+	if rec.state != GameEnums.CollapseState.VASSAL_BEYLIK or rec.overlord_id <= 0:
+		return {}
+	var overlord_kut: float = GameManager.get_kut_score() if rec.overlord_id == 1 else 75.0
+	var supply_isolated: float = 1.0 if CommandBus.is_army_supply_isolated(overlord_army_id) else 0.0
+	return {
+		&"overlord_id": float(rec.overlord_id),
+		&"overlord_kut": overlord_kut,
+		&"overlord_supply_isolated": supply_isolated,
+	}
+
+
 func can_use_fixed_refining(player_id: int) -> bool:
 	var st: GameEnums.CollapseState = get_player_state(player_id)
 	return st != GameEnums.CollapseState.HOMELESS_EXILE and st != GameEnums.CollapseState.DYNASTY_EXTINCT

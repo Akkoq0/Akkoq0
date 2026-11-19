@@ -44,7 +44,8 @@ func evaluate_doctrine(
 		supply_ratio: float = 1.0,
 		turan_tactics: TuranTacticsComponent = null,
 		candidate_terrains: Array[TerrainData] = [],
-		order_timed_out_offline: bool = false) -> OfflineDoctrineDecision:
+		order_timed_out_offline: bool = false,
+		is_winter_zud: bool = false) -> OfflineDoctrineDecision:
 	var decision: OfflineDoctrineDecision = OfflineDoctrineDecision.new()
 	decision.army_id = _army_id
 
@@ -60,6 +61,10 @@ func evaluate_doctrine(
 	elif safe_sup <= low_supply_retreat_threshold:
 		decision.triggered = true
 		decision.trigger_reason = GameEnums.OfflineDoctrineTrigger.LOW_SUPPLY_OR_AMMO
+	elif is_winter_zud:
+		decision.triggered = true
+		decision.trigger_reason = GameEnums.OfflineDoctrineTrigger.SHELTER_IN_KISLAK
+		decision.sheltered_in_kislak = true
 	elif order_timed_out_offline and safe_enemy > 0.0:
 		decision.triggered = true
 		decision.trigger_reason = GameEnums.OfflineDoctrineTrigger.ORDER_TIMED_OUT_OFFLINE

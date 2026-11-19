@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WaterAndMarketRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://data/economy/water_and_market_rules.gd" id="1_script"]
+
+[resource]
+script = ExtResource("1_script")
+rules_id = &"steppe_water_and_market_rules"
+dehydration_remount_drain_per_season = 0.28
+dehydration_morale_penalty = 18.0
+well_sabotage_duration_seasons = 3
+well_restore_bullion_cost = 25
+well_restore_stone_cost = 20
+min_scarcity_multiplier = 0.6
+max_scarcity_multiplier = 3.2
+caravan_cut_scarcity_boost = 0.45
+quarry_loss_scarcity_boost = 0.35
+bid_ask_spread_ratio = 0.16
+caravan_freight_fee_ratio = 0.08
+black_market_scarcity_bonus = 0.25
+exile_smuggler_sell_bonus = 0.08

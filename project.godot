@@ -45,6 +45,8 @@ CourierDispatchSystem="*res://core/courier_dispatch_system.gd"
 CaravanLogisticsManager="*res://core/caravan_logistics_manager.gd"
 GovernanceManager="*res://core/governance_manager.gd"
 ReputationAndPactSystem="*res://core/reputation_and_pact_system.gd"
+WaterRouteManager="*res://core/water_route_manager.gd"
+RegionalMarketEngine="*res://core/regional_market_engine.gd"
 
 
 

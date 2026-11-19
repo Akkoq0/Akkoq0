@@ -173,4 +173,11 @@ signal proxy_war_sponsored(sponsor_id: int, warband_id: StringName, target_id: i
 signal proxy_war_exposed_casus_belli(sponsor_id: int, discoverer_id: int, warband_id: StringName, penalty_free_casus_belli: bool)
 signal reputation_memory_changed(player_id: int, word_reliability: float, dread_score: float, honor_tore_score: float)
 
+# --- Phase 23 Steppe Water Routes, Well Sabotage & Dynamic Scarcity Market --
+signal water_source_sabotaged(region_coord: Vector2i, source_id: StringName, saboteur_id: int, duration_seasons: int)
+signal water_source_restored(region_coord: Vector2i, source_id: StringName, restorer_id: int)
+signal water_crisis_inflicted(army_id: int, region_coord: Vector2i, remount_drain: float, morale_penalty: float, is_zud_frozen: bool)
+signal regional_market_scarcity_shifted(region_coord: Vector2i, commodity_id: StringName, scarcity_multiplier: float, reason: StringName)
+signal barter_trade_executed(player_id: int, region_coord: Vector2i, commodity_id: StringName, direction: GameEnums.BarterDirection, quantity: int, silver_delta: int, is_black_market: bool)
+
 

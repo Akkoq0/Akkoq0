@@ -119,6 +119,7 @@ func _run_suite() -> void:
 	_test_phase20_asymmetric_collapse_exile_vassal_rebirth()
 	_test_phase21_courier_deception_caravans_artisans()
 	_test_phase22_game_theory_politics_and_48_season_audit()
+	_test_phase23_water_routes_and_scarcity_market()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3106,6 +3107,16 @@ func _test_phase18_persistent_world_peace_and_anti_snowball() -> void:
 		and offline_tactics.get_current_phase() == GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
 		"OfflineDoctrineComponent stays standby at 1.1x ratio and executes Sefer Arabası + Feigned Retreat into Sık Orman when enemy ratio >= 1.5x.")
 
+	var zud_shelter: OfflineDoctrineDecision = offline_comp.evaluate_doctrine(
+		100.0, 20.0, 0.85, offline_tactics, candidates, false, true)
+	_expect(zud_shelter.triggered \
+		and zud_shelter.trigger_reason == GameEnums.OfflineDoctrineTrigger.SHELTER_IN_KISLAK \
+		and zud_shelter.sheltered_in_kislak \
+		and SteppeEntropyCalculator.compute_exponential_consumption(10.0, 400) > SteppeEntropyCalculator.compute_exponential_consumption(10.0, 100) \
+		and SteppeEntropyCalculator.compute_food_spoilage(100, 1.0) >= 8 \
+		and SteppeEntropyCalculator.compute_idle_kut_stagnation(350, 4.0, 1.0) > 0.0,
+		"OfflineDoctrineComponent shelters into Kışlak on Zud winter and SteppeEntropyCalculator matches non-linear anti-snowball math.")
+
 	offline_tactics.free()
 	offline_comp.free()
 	GracePeriodManager.reset_persistent_world()
@@ -3294,8 +3305,13 @@ func _test_phase20_asymmetric_collapse_exile_vassal_rebirth() -> void:
 	_expect(CommandBus.dispatch(vassal_sel) \
 		and is_equal_approx(vassal_sel.applied_tribute_rate, rules.vassal_tribute_rate_max) \
 		and vassal_sel.resulting_state == GameEnums.CollapseState.VASSAL_BEYLIK \
-		and CollapseRecoveryFSM.can_overlord_observe_vassal(2002, 1),
-		"SUBMIT_VASSAL clamps tribute strictly inside [15%%, 25%%] (0.90 -> %.2f) and grants overlord visibility." % vassal_sel.applied_tribute_rate)
+		and CollapseRecoveryFSM.can_overlord_observe_vassal(2002, 1) \
+		and CollapseRecoveryFSM.can_vassal_observe_overlord(1, 2002),
+		"SUBMIT_VASSAL clamps tribute strictly inside [15%%, 25%%] (0.90 -> %.2f) and grants mutual overlord-vassal visibility." % vassal_sel.applied_tribute_rate)
+
+	var observed_overlord: Dictionary[StringName, float] = CollapseRecoveryFSM.get_observed_overlord_status(1, 1)
+	_expect(observed_overlord.has(&"overlord_id") and int(observed_overlord[&"overlord_id"]) == 2002 and observed_overlord.has(&"overlord_kut"),
+		"Vassal Beylik observes overlord Kut and supply telemetry directly to spot coup windows.")
 
 	CommandBus.dispatch(ModifyKutCommand.new(40.0, &"p20_test_vassal_kut_cap"))
 	_expect(GameManager.get_kut_score() <= rules.vassal_max_kut_cap + 0.001,
@@ -3668,6 +3684,128 @@ func _test_phase22_game_theory_politics_and_48_season_audit() -> void:
 	SeasonManager.set_food_reserve(120)
 	DiplomacyManager.step_seasonal_diplomatic_decay(20)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _test_phase23_water_routes_and_scarcity_market() -> void:
+	WaterRouteManager.reset_water_state()
+	RegionalMarketEngine.reset_market_state()
+	TerritoryManager.reset_territory_state()
+	GracePeriodManager.reset_persistent_world()
+	CollapseRecoveryFSM.reset_collapse_state()
+
+	var rules: WaterAndMarketRules = WaterRouteManager.get_rules()
+	_expect(rules != null and rules.get_validation_errors().is_empty(),
+		"WaterRouteManager and RegionalMarketEngine loaded WaterAndMarketRules cleanly.")
+
+	# 1. Steppe Water Sources, Winter Stream Freezing & Kavruk Bozkır Well Contamination
+	var reg_coord: Vector2i = Vector2i(23, 1)
+	TerritoryManager.register_region(reg_coord, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2302, false, false, 100.0)
+	WaterRouteManager.register_water_source(reg_coord, &"well_west", GameEnums.WaterSourceType.WELL, 2302)
+	WaterRouteManager.register_water_source(reg_coord, &"stream_east", GameEnums.WaterSourceType.STEPPE_STREAM, 2302)
+
+	var army_packed: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_packed.instantiate() as ArmyController
+	army.army_id = 2301
+	army.owner_id = 2302
+	add_child(army)
+
+	var summer_check: Dictionary[StringName, float] = WaterRouteManager.evaluate_army_hydration(
+		2301, reg_coord, GameEnums.SeasonType.SUMMER, false)
+	var winter_check: Dictionary[StringName, float] = WaterRouteManager.evaluate_army_hydration(
+		2301, reg_coord, GameEnums.SeasonType.WINTER, true)
+	_expect(is_zero_approx(summer_check[&"dehydrated"]) \
+		and int(summer_check[&"usable_sources"]) == 2 \
+		and is_zero_approx(winter_check[&"dehydrated"]) \
+		and int(winter_check[&"usable_sources"]) == 1,
+		"Steppe stream freezes during Zud Winter (2 -> 1 usable) while deep subterranean Well sustains cavalry.")
+
+	# Personal 48h Töre Peace must drop if player 2301 sabotages player 2302's well cleanly
+	GracePeriodManager.configure_persistent_world(true, 80.0) # Stage 3 Global, late joiner has personal 48h peace
+	GracePeriodManager.register_player(2301, true, Vector2i(12, 12), 1)
+	_expect(GracePeriodManager.has_active_personal_peace(2301),
+		"Late joiner starts with active 48h personal Töre Peace before hostile well sabotage.")
+
+	var sab_well: SabotageWellCommand = SabotageWellCommand.new(2301, reg_coord, &"well_west", 3)
+	var remount_before: float = army.supply.get_remount_horse_ratio()
+	var morale_before: float = army.morale_component.get_current_morale()
+	var sab_ok: bool = CommandBus.dispatch(sab_well)
+	var winter_dehyd: Dictionary[StringName, float] = WaterRouteManager.evaluate_army_hydration(
+		2301, reg_coord, GameEnums.SeasonType.WINTER, true)
+
+	_expect(sab_ok \
+		and not GracePeriodManager.has_active_personal_peace(2301) \
+		and sab_well.remaining_usable_sources <= 1 \
+		and WaterRouteManager.count_usable_water_sources(reg_coord, GameEnums.SeasonType.WINTER, true) == 0 \
+		and is_equal_approx(winter_dehyd[&"dehydrated"], 1.0) \
+		and army.supply.get_remount_horse_ratio() < remount_before - 0.20 \
+		and army.morale_component.get_current_morale() < morale_before - 10.0,
+		"Sabotaging well drops personal Töre Peace, leaves 0 usable winter water, and drains cavalry remount stamina & morale.")
+
+	# Restore well using bullion + stone
+	CommandBus.dispatch(DepositResourcesCommand.new(2302, &"silver_gold", 60))
+	CommandBus.dispatch(DepositResourcesCommand.new(2302, &"stone", 60))
+	var restore_well: RestoreWaterSourceCommand = RestoreWaterSourceCommand.new(2302, reg_coord, &"well_west")
+	_expect(CommandBus.dispatch(restore_well) \
+		and restore_well.remaining_usable_sources == 1 \
+		and is_zero_approx(WaterRouteManager.evaluate_army_hydration(2301, reg_coord, GameEnums.SeasonType.WINTER, true)[&"dehydrated"]),
+		"RestoreWaterSourceCommand cleanses contaminated well using Silver and Stone cleanly.")
+
+	# 2. Kavruk Bozkır (Scorched Earth) automatically contaminates regional wells via EventBus
+	TerritoryManager.register_region(Vector2i(23, 2), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2302, false, false, 100.0)
+	WaterRouteManager.register_water_source(Vector2i(23, 2), &"well_scorch", GameEnums.WaterSourceType.WELL, 2302)
+	CommandBus.dispatch(ResolveConquestAftermathCommand.new(2301, Vector2i(23, 2), GameEnums.ConquestAftermathChoice.SCORCHED_EARTH_PILLAGE))
+	_expect(WaterRouteManager.count_usable_water_sources(Vector2i(23, 2), GameEnums.SeasonType.SUMMER, false) == 0,
+		"Kavruk Bozkır aftermath automatically taints wells in the scorched region.")
+
+	WaterRouteManager.register_water_source(Vector2i(23, 3), &"oasis_south", GameEnums.WaterSourceType.OASIS_SPRING, 2302)
+	_expect(WaterRouteManager.count_usable_water_sources(Vector2i(23, 3), GameEnums.SeasonType.WINTER, true) == 1,
+		"Natural Oasis Springs stay flowing even during harsh Winter Zud freezes.")
+
+	# 3. Regional Dynamic Scarcity, Exile Black Market & Mathematical Anti-Arbitrage Proof
+	EventBus.caravan_intercepted_crisis.emit(&"conv_23", 2302, 2301, 2301, 20.0, 0.35)
+	var steel_scarcity: float = RegionalMarketEngine.get_regional_scarcity(Vector2i(23, 1), &"steel")
+	EventBus.border_node_captured.emit(Vector2i(23, 2), &"pass_p23", 2302, 2301, 220.0, 2)
+	var iron_scarcity: float = RegionalMarketEngine.get_regional_scarcity(Vector2i(23, 2), &"iron")
+	_expect(steel_scarcity >= 1.40 and iron_scarcity >= 1.30,
+		"Caravan interception (%.2fx Steel) & contested quarry raids (%.2fx Iron) dynamically spike regional scarcity." % [
+			steel_scarcity, iron_scarcity])
+
+	# Homeless Exile denied open guild market, permitted on black-market smuggling route
+	CommandBus.dispatch(TriggerCollapseCommand.new(2305, 2301))
+	CommandBus.dispatch(SelectCollapsePathCommand.new(2305, GameEnums.CollapsePathChoice.FLEE_HOMELESS_EXILE))
+	CommandBus.dispatch(DepositResourcesCommand.new(2305, &"iron", 20))
+	var open_denied: ExecuteBarterTradeCommand = ExecuteBarterTradeCommand.new(
+		2305, Vector2i(23, 2), &"iron", GameEnums.BarterDirection.SELL_TO_MARKET, 5, false)
+	var bm_exile: ExecuteBarterTradeCommand = ExecuteBarterTradeCommand.new(
+		2305, Vector2i(23, 2), &"iron", GameEnums.BarterDirection.SELL_TO_MARKET, 5, true)
+	_expect(not CommandBus.dispatch(open_denied) and CommandBus.dispatch(bm_exile) and bm_exile.total_silver_delta > 0,
+		"Homeless Exile smugglers are blocked from formal guild trade yet profit via high-scarcity black market (+%d bullion)." % bm_exile.total_silver_delta)
+
+	# Anti-arbitrage mathematical proof: 8 consecutive buy+sell cycles lose silver strictly
+	CommandBus.dispatch(DepositResourcesCommand.new(2301, &"silver_gold", 5000))
+	var silver_start: int = ResourceManager.get_amount(2301, &"silver_gold")
+	for round_i: int in range(8):
+		var buy_cmd: ExecuteBarterTradeCommand = ExecuteBarterTradeCommand.new(
+			2301, Vector2i(23, 1), &"steel", GameEnums.BarterDirection.BUY_FROM_MARKET, 5, round_i % 2 == 1)
+		var sell_cmd: ExecuteBarterTradeCommand = ExecuteBarterTradeCommand.new(
+			2301, Vector2i(23, 1), &"steel", GameEnums.BarterDirection.SELL_TO_MARKET, 5, round_i % 2 == 1)
+		_expect(CommandBus.dispatch(buy_cmd) and CommandBus.dispatch(sell_cmd),
+			"Round-trip market trade #%d settles cleanly." % round_i)
+	var silver_end: int = ResourceManager.get_amount(2301, &"silver_gold")
+	_expect(silver_end < silver_start - 400,
+		"Anti-arbitrage spread + caravan freight strictly enforces net silver loss on round trips (%d -> %d)." % [silver_start, silver_end])
+
+	army.free()
+	WaterRouteManager.reset_water_state()
+	RegionalMarketEngine.reset_market_state()
+	TerritoryManager.reset_territory_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p23_cleanup_kut"))
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
 
 
 

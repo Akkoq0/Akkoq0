@@ -12,3 +12,4 @@ var packed_sefer_arabasi: bool = false
 var activated_feigned_retreat: bool = false
 var retreat_target_terrain_class: GameEnums.TerrainClass = GameEnums.TerrainClass.SIK_ORMAN
 var target_terrain: TerrainData = null
+var sheltered_in_kislak: bool = false

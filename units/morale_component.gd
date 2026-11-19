@@ -29,6 +29,13 @@ var _is_in_cascade_rout: bool = false
 func _ready() -> void:
 	if rules == null:
 		rules = ResourceLoader.load(DEFAULT_RULES_PATH) as CombatRules
+	if not EventBus.water_crisis_inflicted.is_connected(_on_water_crisis_inflicted):
+		EventBus.water_crisis_inflicted.connect(_on_water_crisis_inflicted)
+
+
+func _exit_tree() -> void:
+	if EventBus.water_crisis_inflicted.is_connected(_on_water_crisis_inflicted):
+		EventBus.water_crisis_inflicted.disconnect(_on_water_crisis_inflicted)
 
 
 ## Configures the component for `p_army_id` and resets morale/fatigue state.
@@ -266,3 +273,8 @@ func recover_fatigue_and_rally(rest_sec: float, supply_ratio: float) -> float:
 	elif _current_morale >= 45.0 and _current_cohesion >= 45.0 and _battle_fatigue < 45.0:
 		_is_in_cascade_rout = false
 	return _battle_fatigue
+
+
+func _on_water_crisis_inflicted(p_army_id: int, _coord: Vector2i, _remount_drain: float, morale_penalty: float, _is_zud_frozen: bool) -> void:
+	if _army_id > 0 and p_army_id == _army_id and morale_penalty > 0.0:
+		_current_morale = clampf(_current_morale - morale_penalty, 0.0, 100.0)

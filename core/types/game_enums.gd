@@ -226,6 +226,7 @@ enum OfflineDoctrineTrigger {
 	ENEMY_POWER_RATIO_EXCEEDED = 1, ## Rakip güç oranı >= eşik: Çatışma, Sefer Arabasını topla ve Sahte Ricat ile geri çekil
 	LOW_SUPPLY_OR_AMMO = 2,
 	ORDER_TIMED_OUT_OFFLINE = 3,
+	SHELTER_IN_KISLAK = 4,
 }
 
 ## Phase 19 Seasonal steppe region geography archetypes (`RegionData`).
@@ -312,6 +313,19 @@ enum AmanatHostageType {
 	COMMANDER_HOSTAGE = 0,
 	HEIR_HOSTAGE = 1,
 	JADE_TAMGA_SEAL = 2,
+}
+
+## Phase 23 Steppe water route sources (`WaterRouteManager`).
+enum WaterSourceType {
+	WELL = 0, ## Yeraltı kuyusu: kışın donmaz, Kavruk Bozkır / sabotajla kirletilebilir
+	STEPPE_STREAM = 1, ## Açık bozkır deresi: Zud kışında yüzeyi donar
+	OASIS_SPRING = 2, ## Korunaklı vahalar / kaplıca pınarı: kışın donmaya kısmen dirençli
+}
+
+## Phase 23 Dynamic scarcity market barter directions (`RegionalMarketEngine`).
+enum BarterDirection {
+	BUY_FROM_MARKET = 0,
+	SELL_TO_MARKET = 1,
 }
 
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.

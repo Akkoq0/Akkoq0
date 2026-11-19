@@ -52,11 +52,14 @@ func _ready() -> void:
 	EventBus.supply_line_restored.connect(_on_supply_line_restored)
 	EventBus.zud_starvation_ticked.connect(_on_zud_starvation_ticked)
 	EventBus.army_caravan_resupply_delivered.connect(_on_army_caravan_resupply_delivered)
+	EventBus.water_crisis_inflicted.connect(_on_water_crisis_inflicted)
 
 
 func _exit_tree() -> void:
 	if EventBus.army_caravan_resupply_delivered.is_connected(_on_army_caravan_resupply_delivered):
 		EventBus.army_caravan_resupply_delivered.disconnect(_on_army_caravan_resupply_delivered)
+	if EventBus.water_crisis_inflicted.is_connected(_on_water_crisis_inflicted):
+		EventBus.water_crisis_inflicted.disconnect(_on_water_crisis_inflicted)
 
 
 ## Reads logistics data. Returns false when required data is missing.
@@ -277,4 +280,12 @@ func _on_zud_starvation_ticked(food_remaining: int, _season: SeasonData) -> void
 func _on_army_caravan_resupply_delivered(p_army_id: int, quiver_ammo_amt: float, _food_amt: int) -> void:
 	if _army_id > 0 and p_army_id == _army_id and quiver_ammo_amt > 0.0:
 		replenish_quiver_ammo(quiver_ammo_amt)
+
+
+func _on_water_crisis_inflicted(p_army_id: int, _coord: Vector2i, remount_drain: float, _morale_penalty: float, _is_zud_frozen: bool) -> void:
+	if _army_id > 0 and p_army_id == _army_id and remount_drain > 0.0:
+		var prev: float = _remount_horse_ratio
+		_remount_horse_ratio = clampf(_remount_horse_ratio - remount_drain, 0.0, 1.0)
+		if _remount_horse_ratio < prev:
+			remount_horse_ratio_changed.emit(_remount_horse_ratio)
 
