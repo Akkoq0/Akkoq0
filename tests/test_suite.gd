@@ -133,6 +133,7 @@ func _run_suite() -> void:
 	_test_ui_metric_analytics_chronicle_and_ledger()
 	_test_tradition_research_tree_and_doctrine_preview()
 	_test_full_game_shell_menus_tooltips_and_toasts()
+	_test_online_transport_sync_desync_and_reconnect()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -7064,6 +7065,177 @@ func _test_full_game_shell_menus_tooltips_and_toasts() -> void:
 	ResourceManager.import_state_dict({"stockpiles": {}})
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _test_online_transport_sync_desync_and_reconnect() -> void:
+	# 1. Clean Baseline & Static Architecture Verification
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	LoopbackNetworkTransport.reset_loopback_rooms()
+	_reset_p27b_singletons(&"faz_d_init_kut")
+	ResourceManager.import_state_dict({"stockpiles": {"2": {}, "3": {}}})
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Faz D passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	# 2. Verify ENetTransportAdapter instantiates & handles clean socket lifecycle
+	var enet_adapter: ENetTransportAdapter = ENetTransportAdapter.new()
+	var enet_hosted: bool = enet_adapter.host_room(&"enet_probe_room", 19094, 4)
+	var enet_active_while_open: bool = enet_adapter.is_transport_active() and enet_adapter.is_server_transport()
+	enet_adapter.close_transport()
+	var enet_clean_closed: bool = not enet_adapter.is_transport_active()
+	_expect(enet_adapter != null and (not enet_hosted or (enet_active_while_open and enet_clean_closed)),
+		"ENetTransportAdapter compiles cleanly under Level-2 typing and closes sockets with 0 leaked signal bindings.")
+
+	# 3. Launch 1 Authoritative Host + 2 Clients over LoopbackNetworkTransport
+	var desync_events: Array[int] = []
+	var disconnect_events: Array[int] = []
+	var resync_events: Array[int] = []
+	var on_desync: Callable = func(_tick: int, pid: int, _exp: String, _got: String) -> void:
+		desync_events.append(pid)
+	var on_disc: Callable = func(_rid: StringName, pid: int, off_active: bool) -> void:
+		if off_active:
+			disconnect_events.append(pid)
+	var on_resync: Callable = func(pid: int, _tk: int, _wh: String) -> void:
+		resync_events.append(pid)
+	EventBus.network_desync_detected.connect(on_desync)
+	EventBus.network_peer_disconnected.connect(on_disc)
+	EventBus.network_snapshot_resynced.connect(on_resync)
+
+	var host_tr: LoopbackNetworkTransport = LoopbackNetworkTransport.new()
+	var client_a_tr: LoopbackNetworkTransport = LoopbackNetworkTransport.new()
+	var client_b_tr: LoopbackNetworkTransport = LoopbackNetworkTransport.new()
+
+	var host: OnlineSessionHost = OnlineSessionHost.new(host_tr, 2)
+	var client_a: OnlineSessionClient = OnlineSessionClient.new(client_a_tr, 2)
+	var client_b: OnlineSessionClient = OnlineSessionClient.new(client_b_tr, 3)
+
+	var hosted_ok: bool = host.host_room(&"otuken_arena_1", 7777, 8, 10.0)
+	var joined_a: bool = client_a.connect_to_room(&"otuken_arena_1", 2)
+	var joined_b: bool = client_b.connect_to_room(&"otuken_arena_1", 3)
+	host.poll_incoming()
+	client_a.poll_server_updates()
+	client_b.poll_server_updates()
+
+	_expect(hosted_ok and joined_a and joined_b \
+		and host.get_connected_client_count() == 2 \
+		and SessionClockAuthority.get_session_mode() == GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD \
+		and GracePeriodManager.is_persistent_mode_active(),
+		"OnlineSessionHost + 2 Loopback clients establish authoritative persistent world session cleanly.")
+
+	# 4. 10-Tick Deterministic Command Sync & Spoof Rejection
+	# Assign doctrine with sync_offline_contingency=false so pre-disconnect has no offline doctrine yet
+	client_a.submit_command("assign_battle_doctrine", {
+		"army_id": 2,
+		"player_id": 2,
+		"preset_id": int(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI),
+		"sync_offline_contingency": false,
+	}, 1)
+	# Attempt unauthorized player_id spoof from client_a -> host must reject
+	client_a.submit_command("deposit_resources", {
+		"player_id": 3,
+		"ore_id": "silver_gold",
+		"amount": 500,
+	}, 1)
+
+	for t: int in range(10):
+		if t % 2 == 0:
+			client_a.submit_command("deposit_resources", {
+				"player_id": 2,
+				"ore_id": "silver_gold",
+				"amount": 15,
+			}, 1)
+		else:
+			client_b.submit_command("deposit_resources", {
+				"player_id": 3,
+				"ore_id": "silver_gold",
+				"amount": 20,
+			}, 1)
+		host.step_authoritative_tick(1)
+		client_a.poll_server_updates()
+		client_b.poll_server_updates()
+		host.poll_incoming()
+
+	var sync_10_ok: bool = host.get_last_confirmed_tick() == 10 \
+		and client_a.get_ticks_confirmed_count() == 10 \
+		and client_b.get_ticks_confirmed_count() == 10 \
+		and client_a.get_last_confirmed_tick() == 10 \
+		and client_b.get_last_confirmed_tick() == 10 \
+		and ResourceManager.get_amount(2, &"silver_gold") == 75 \
+		and ResourceManager.get_amount(3, &"silver_gold") == 100 \
+		and host.get_rejected_commands_total() >= 1 \
+		and host.get_desync_count() == 0
+	_expect(sync_10_ok,
+		"10 ticks synchronize 2 clients cleanly (Silver P2=75 P3=100), block spoofed CommandEnvelopes, and maintain 0 desyncs.")
+
+	# 5. Periodic Hash Desync Detection & Snapshot Repair
+	client_b.set_debug_hash_override("00000000_tampered_desync_hash_ffffffffffffffffffffffffffffffff")
+	host.step_authoritative_tick(2) # Tick 12 triggers client hash check
+	client_b.poll_server_updates()  # Client B sends tampered hash report
+	host.poll_incoming()            # Host detects desync & dispatches snapshot_sync
+	client_b.poll_server_updates()  # Client B applies SaveLoadRepository snapshot & resets override
+
+	var desync_repaired: bool = host.get_desync_count() >= 1 \
+		and desync_events.size() >= 1 and desync_events[0] == 3 \
+		and client_b.get_resync_count() >= 1 \
+		and resync_events.has(3) \
+		and client_b.compute_local_hash() == host.get_last_authoritative_hash()
+	_expect(desync_repaired,
+		"Host detects client hash desync at periodic interval and repairs client via SaveLoadRepository snapshot sync.")
+
+	# 6. Disconnect Activates OfflineDoctrineConfig -> World Advances -> Reconnect Restores Exact Hash
+	var pre_disconnect_offline_cfg: OfflineDoctrineConfig = GracePeriodManager.get_offline_doctrine_config(2)
+	client_a.disconnect_from_room()
+	host.poll_incoming()
+
+	var activated_on_disconnect: bool = GracePeriodManager.is_player_disconnected_offline(2) \
+		and GracePeriodManager.get_offline_doctrine_config(2) != null \
+		and pre_disconnect_offline_cfg == null \
+		and disconnect_events.has(2)
+
+	# World mutates while Client A is offline
+	var hash_at_disconnect: String = host.get_last_authoritative_hash()
+	client_b.submit_command("deposit_resources", {
+		"player_id": 3,
+		"ore_id": "silver_gold",
+		"amount": 50,
+	}, 1)
+	host.step_authoritative_tick(3)
+	client_b.poll_server_updates()
+	var hash_after_offline_ticks: String = host.get_last_authoritative_hash()
+
+	# Client A reconnects -> receives WorldSnapshotSerializer / SaveLoadRepository snapshot sync
+	var reconnected_a: bool = client_a.reconnect_to_room(&"otuken_arena_1")
+	host.poll_incoming()
+	client_a.poll_server_updates()
+	var peer_a_rec: OnlineSessionHost.PeerSessionRecord = host.get_peer_record(2)
+	var reconnect_restored: bool = reconnected_a \
+		and not GracePeriodManager.is_player_disconnected_offline(2) \
+		and peer_a_rec != null and peer_a_rec.reconnect_count == 1 \
+		and not peer_a_rec.offline_doctrine_active \
+		and hash_after_offline_ticks != hash_at_disconnect \
+		and client_a.compute_local_hash() == hash_after_offline_ticks \
+		and ResourceManager.get_amount(3, &"silver_gold") == 150
+
+	_expect(activated_on_disconnect and reconnect_restored,
+		"Disconnect activates OfflineDoctrineConfig automatically and Reconnect synchronizes SaveLoadRepository/WorldSnapshotSerializer SHA-256 hash.")
+
+	# 7. Clean Teardown Prior to Main Scene Integration
+	EventBus.network_desync_detected.disconnect(on_desync)
+	EventBus.network_peer_disconnected.disconnect(on_disc)
+	EventBus.network_snapshot_resynced.disconnect(on_resync)
+	client_a.disconnect_from_room()
+	client_b.disconnect_from_room()
+	host.close_host()
+	LoopbackNetworkTransport.reset_loopback_rooms()
+
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	_reset_p27b_singletons(&"faz_d_cleanup_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
 
 
 

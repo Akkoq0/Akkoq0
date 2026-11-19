@@ -20,6 +20,7 @@ var _personal_peace_forfeited: Dictionary[int, bool] = {}
 var _player_spawn_coords: Dictionary[int, Vector2i] = {}
 var _player_idle_hours: Dictionary[int, float] = {}
 var _offline_doctrine_configs: Dictionary[int, OfflineDoctrineConfig] = {}
+var _offline_disconnected_players: Dictionary[int, bool] = {}
 
 
 static func _safe_float(val: float, fallback: float) -> float:
@@ -61,6 +62,7 @@ func configure_persistent_world(enabled: bool, elapsed_hours: float = 0.0) -> vo
 		_player_spawn_coords.clear()
 		_player_idle_hours.clear()
 		_offline_doctrine_configs.clear()
+		_offline_disconnected_players.clear()
 
 
 func reset_persistent_world() -> void:
@@ -69,6 +71,49 @@ func reset_persistent_world() -> void:
 
 func get_offline_doctrine_config(army_id: int) -> OfflineDoctrineConfig:
 	return _offline_doctrine_configs.get(army_id, null)
+
+
+func activate_offline_doctrine_for_player(p_player_id: int, default_army_id: int = 0) -> OfflineDoctrineConfig:
+	if p_player_id <= 0:
+		return null
+	var target_army_id: int = default_army_id if default_army_id > 0 else p_player_id
+	_offline_disconnected_players[p_player_id] = true
+	var existing: OfflineDoctrineConfig = get_offline_doctrine_config(target_army_id)
+	if existing == null:
+		var cmd: ConfigureOfflineDoctrineCommand = ConfigureOfflineDoctrineCommand.new(
+			target_army_id,
+			p_player_id,
+			GameEnums.OfflineDoctrineTrigger.ENEMY_POWER_RATIO_EXCEEDED,
+			1.5,
+			0.20,
+			GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+			true,
+			true,
+			GameEnums.TerrainClass.SIK_ORMAN,
+			GameEnums.RegionGeographyClass.FOREST_EDGE
+		)
+		CommandBus.dispatch(cmd)
+		existing = get_offline_doctrine_config(target_army_id)
+	elif existing != null:
+		EventBus.offline_doctrine_configured.emit(
+			existing.army_id,
+			existing.trigger_condition,
+			existing.power_ratio_threshold,
+			existing.action_tactic,
+			existing.target_terrain_class,
+			existing.target_geography_class,
+			existing.pack_sefer_arabasi,
+			existing.evade_combat
+		)
+	return existing
+
+
+func clear_player_offline_disconnect(p_player_id: int) -> void:
+	_offline_disconnected_players.erase(p_player_id)
+
+
+func is_player_disconnected_offline(p_player_id: int) -> bool:
+	return _offline_disconnected_players.get(p_player_id, false)
 
 
 func is_persistent_mode_active() -> bool:

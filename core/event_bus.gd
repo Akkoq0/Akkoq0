@@ -217,3 +217,11 @@ signal ai_story_agenda_activated(agent_id: StringName, agenda_id: StringName, tr
 signal tradition_research_started(player_id: int, node_id: StringName, duration_seasons: int, silver_spent: int)
 signal tradition_research_progressed(player_id: int, node_id: StringName, elapsed_seasons: int, total_seasons: int)
 signal tradition_research_completed(player_id: int, node_id: StringName, branch: GameEnums.ResearchBranch, effect_summary: String)
+
+# --- Faz D Authoritative Network Transport, Sync & Reconnect ----------------
+signal network_room_hosted(room_id: StringName, port: int, max_players: int)
+signal network_peer_connected(room_id: StringName, peer_id: int, is_reconnect: bool)
+signal network_peer_disconnected(room_id: StringName, peer_id: int, offline_doctrine_activated: bool)
+signal network_tick_confirmed(tick: int, envelope_count: int, world_hash: String)
+signal network_desync_detected(tick: int, peer_id: int, expected_hash: String, received_hash: String)
+signal network_snapshot_resynced(peer_id: int, tick: int, world_hash: String)
