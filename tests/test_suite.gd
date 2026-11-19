@@ -131,6 +131,7 @@ func _run_suite() -> void:
 	_test_phase31_live_3d_steppe_map_and_lenses()
 	_test_phase32_humanlike_utility_ai_schemes_and_story_hook()
 	_test_ui_metric_analytics_chronicle_and_ledger()
+	_test_tradition_research_tree_and_doctrine_preview()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -4905,6 +4906,7 @@ func _reset_p27b_singletons(reason_tag: StringName) -> void:
 	CaravanLogisticsManager.reset_logistics_state()
 	ReputationAndPactSystem.reset_reputation_state()
 	SteppeStrategicAIController.reset_strategic_ai_state()
+	TraditionResearchManager.reset_research_state()
 	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
 	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
 	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
@@ -6613,6 +6615,224 @@ func _test_ui_metric_analytics_chronicle_and_ledger() -> void:
 	_reset_p27b_singletons(&"faz_a_cleanup_kut")
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _test_tradition_research_tree_and_doctrine_preview() -> void:
+	# 1. Clean Baseline & Static Architecture Verification
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	_reset_p27b_singletons(&"faz_b_init_kut")
+	ResourceManager.import_state_dict({"stockpiles": {"1": {}}})
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Faz B passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	# 2. Catalog Structure (4 Branches, 12 Nodes, Cross-Branch Prereq)
+	var all_nodes: Array[TraditionResearchNode] = TraditionResearchCatalog.get_all_nodes()
+	var gok_node: TraditionResearchNode = TraditionResearchCatalog.get_node_by_id(&"gok_demiri_isleme")
+	var cat_valid: bool = all_nodes.size() == 12 and gok_node != null and gok_node.prerequisites.size() == 2
+	for cn: TraditionResearchNode in all_nodes:
+		if cn == null or not cn.get_validation_errors().is_empty():
+			cat_valid = false
+	_expect(cat_valid,
+		"TraditionResearchCatalog defines 12 valid nodes across 4 branches including cross-branch Gök Demiri prerequisites.")
+
+	# 3. Prerequisite Locking & Zero-Silver Rejection
+	var locked_cmd: StartResearchCommand = StartResearchCommand.new(1, &"kurt_kapani_ustaligi")
+	var locked_ok: bool = CommandBus.dispatch(locked_cmd)
+	var broke_cmd: StartResearchCommand = StartResearchCommand.new(1, &"yelme_gozculeri")
+	var broke_ok: bool = CommandBus.dispatch(broke_cmd)
+	_expect(not locked_ok and locked_cmd.is_rejected() and not locked_cmd.started \
+		and TraditionResearchManager.get_node_status(1, &"kurt_kapani_ustaligi") == GameEnums.ResearchNodeStatus.LOCKED \
+		and not broke_ok and broke_cmd.is_rejected() \
+		and TraditionResearchManager.get_node_status(1, &"yelme_gozculeri") == GameEnums.ResearchNodeStatus.RESEARCHABLE,
+		"StartResearchCommand enforces DAG prerequisite locks and silver affordability without mutating stockpiles on rejection.")
+
+	# 4. Baseline Matchup Evaluation Before Completing Research
+	var step_terrain: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var spr_season: SeasonData = SeasonManager.get_current_season()
+	var p_boru_doc: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.BORU_KAMASI)
+	var p_tolgama_doc: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI)
+
+	var b_atk: CombatantStats = CombatantStats.new(1, 210.0, 140.0, 1200.0, 1.0)
+	b_atk.player_id = 1
+	b_atk.army_id = 1
+	b_atk.troop_count = 120
+	var b_def: CombatantStats = CombatantStats.new(999, 200.0, 140.0, 1200.0, 1.0)
+	b_def.player_id = 999
+	b_def.army_id = 999
+	b_def.troop_count = 120
+	var base_matchup_cmd: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		b_atk, b_def, p_boru_doc, p_tolgama_doc, step_terrain, spr_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false)
+	CommandBus.dispatch(base_matchup_cmd)
+	var atk_mult_before_research: float = base_matchup_cmd.result.attacker_attack_multiplier
+
+	# 5. Interactive TraditionResearchTreePanel + HUD Mount + CommandEnvelope Flow
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 120))
+	var sig_names: Array[StringName] = [
+		&"tradition_research_started",
+		&"tradition_research_progressed",
+		&"tradition_research_completed",
+	]
+	var started_events: Array[StringName] = []
+	var completed_events: Array[StringName] = []
+	var on_res_started: Callable = func(_pid: int, nid: StringName, _dur: int, _cost: int) -> void:
+		started_events.append(nid)
+	var on_res_completed: Callable = func(_pid: int, nid: StringName, _br: GameEnums.ResearchBranch, _sum: String) -> void:
+		completed_events.append(nid)
+	EventBus.tradition_research_started.connect(on_res_started)
+	EventBus.tradition_research_completed.connect(on_res_completed)
+
+	var base_sig_counts: Dictionary[StringName, int] = {}
+	for s_id: StringName in sig_names:
+		base_sig_counts[s_id] = EventBus.get_signal_connection_list(s_id).size()
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(1, 1)
+	add_child(hud)
+
+	var during_sig_ok: bool = true
+	for s_id2: StringName in sig_names:
+		if EventBus.get_signal_connection_list(s_id2).size() != base_sig_counts[s_id2] + 1:
+			during_sig_ok = false
+
+	var open_ratio_closed: float = hud.compute_open_map_ratio(false)
+	var research_btn: Button = hud.get_research_toggle_button()
+	research_btn.pressed.emit()
+	var tree_panel: TraditionResearchTreePanel = hud.get_research_tree_panel()
+	var panel_open_ok: bool = tree_panel != null and tree_panel.visible and tree_panel.get_node_count() == 12 and tree_panel.get_edge_count() >= 9
+
+	# Click node button for yelme_gozculeri and start via CommandEnvelope
+	var yelme_btn: Button = tree_panel.get_node_button(&"yelme_gozculeri")
+	if yelme_btn != null:
+		yelme_btn.pressed.emit()
+	var start_res: ResearchTreeViewModel.StartResearchDispatchResult = tree_panel.trigger_start_selected()
+	var silver_after_t1: int = ResourceManager.get_amount(1, &"silver_gold")
+
+	# Concurrent active research guard
+	var concurrent_res: ResearchTreeViewModel.StartResearchDispatchResult = hud.get_research_view_model().dispatch_start_research(&"yeralti_kuyu_agi")
+	var silver_after_concurrent: int = ResourceManager.get_amount(1, &"silver_gold")
+
+	_expect(during_sig_ok and open_ratio_closed >= 0.82 and panel_open_ok \
+		and start_res.ok and silver_after_t1 == 100 \
+		and started_events.size() == 1 and started_events[0] == &"yelme_gozculeri" \
+		and TraditionResearchManager.get_node_status(1, &"yelme_gozculeri") == GameEnums.ResearchNodeStatus.IN_PROGRESS \
+		and not concurrent_res.ok and silver_after_concurrent == 100,
+		"TraditionResearchTreePanel opens (open=%.3f sig=%s panel=%s start=%s silver=%d conc=%s)" % [
+			open_ratio_closed, str(during_sig_ok), str(panel_open_ok), str(start_res.ok), silver_after_t1, str(concurrent_res.ok)])
+
+	# 6. Seasonal Advancement Completes Node 1, Unlocks Tier 2 & Progresses Multi-Season Node
+	SeasonManager.advance_season_cycle()
+	var yelme_done: bool = TraditionResearchManager.get_node_status(1, &"yelme_gozculeri") == GameEnums.ResearchNodeStatus.COMPLETED
+	var kurt_unlocked: bool = TraditionResearchManager.get_node_status(1, &"kurt_kapani_ustaligi") == GameEnums.ResearchNodeStatus.RESEARCHABLE
+	var b_snap: TraditionResearchManager.ResearchBonusesSnapshot = TraditionResearchManager.get_player_bonuses(1)
+
+	var kurt_btn: Button = tree_panel.get_node_button(&"kurt_kapani_ustaligi")
+	if kurt_btn != null:
+		kurt_btn.pressed.emit()
+	var start_t2: ResearchTreeViewModel.StartResearchDispatchResult = tree_panel.trigger_start_selected()
+	SeasonManager.advance_season_cycle() # 1 of 2 seasons elapsed
+
+	_expect(yelme_done and kurt_unlocked \
+		and completed_events.size() == 1 and completed_events[0] == &"yelme_gozculeri" \
+		and b_snap.completed_count == 1 and b_snap.melee_attack_bonus >= 0.05 and b_snap.speed_bonus >= 0.06 \
+		and start_t2.ok and ResourceManager.get_amount(1, &"silver_gold") == 65 \
+		and TraditionResearchManager.get_node_status(1, &"kurt_kapani_ustaligi") == GameEnums.ResearchNodeStatus.IN_PROGRESS \
+		and TraditionResearchManager.get_active_elapsed_seasons(1) == 1 \
+		and is_equal_approx(TraditionResearchManager.get_active_progress_ratio(1), 0.5),
+		"SeasonManager research prog (yelme=%s kurt=%s comp=%d b=%d atk=%.3f spd=%.3f t2=%s silver=%d el=%d)" % [
+			str(yelme_done), str(kurt_unlocked), completed_events.size(), b_snap.completed_count,
+			b_snap.melee_attack_bonus, b_snap.speed_bonus, str(start_t2.ok),
+			ResourceManager.get_amount(1, &"silver_gold"), TraditionResearchManager.get_active_elapsed_seasons(1)])
+
+	# 7. Save/Load SHA-256 World Hash Parity with Active & Completed Research
+	var hash_before_save: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	var save_path: String = "user://faz_b_research_save.json"
+	var saved_ok: bool = SaveLoadRepository.save_to_file(save_path)
+
+	SeasonManager.advance_season_cycle() # 2/2 completes kurt_kapani_ustaligi -> state mutates
+	var hash_mutated: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	var corrupt_rejected: bool = not SaveLoadRepository.load_save_package("{\"schema_version\":1,\"world_hash\":\"deadbeef\",\"state\":{}}")
+	var hash_after_corrupt: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	var loaded_ok: bool = SaveLoadRepository.load_from_file(save_path)
+	var hash_after_load: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	# Complete second season after load to verify restored timer resumes cleanly
+	SeasonManager.advance_season_cycle()
+	var completed_after_resumed_load: bool = TraditionResearchManager.get_node_status(1, &"kurt_kapani_ustaligi") == GameEnums.ResearchNodeStatus.COMPLETED
+
+	_expect(saved_ok and loaded_ok and corrupt_rejected \
+		and hash_mutated != hash_before_save \
+		and hash_after_corrupt == hash_mutated \
+		and hash_after_load == hash_before_save \
+		and completed_after_resumed_load \
+		and TraditionResearchManager.get_player_bonuses(1).completed_count == 2,
+		"WorldSnapshotSerializer & SaveLoadRepository preserve bit-for-bit SHA-256 parity across mid-research save/load and reject corrupt payloads.")
+
+	# 8. Live Combat Research Bonus + DoctrineMatchupPreviewWidget inside Tactical Drawer (<= 332px)
+	var post_matchup_cmd: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		b_atk, b_def, p_boru_doc, p_tolgama_doc, step_terrain, spr_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false)
+	CommandBus.dispatch(post_matchup_cmd)
+
+	hud.register_drawer_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, "Taktik/Emir", &"jade")
+	var tactical_panel: TacticalCommandDrawerPanel = TacticalCommandDrawerPanel.new()
+	var mounted_tactical: bool = hud.mount_panel_to_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, tactical_panel)
+	tactical_panel.bind_context(1, 1)
+	var m_widget: DoctrineMatchupPreviewWidget = tactical_panel.get_doctrine_matchup_preview()
+	m_widget.set_preview_parameters(
+		GameEnums.BattleDoctrinePresetId.BORU_KAMASI,
+		GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI,
+		GameEnums.CombatEngagementAngle.FRONT,
+		false, false, false)
+	var clear_snap: ResearchTreeViewModel.DoctrineMatchupPreviewSnapshot = m_widget.get_last_preview()
+
+	# Click Çamur + Yamaç + Fırtına hazard buttons interactively
+	m_widget.get_mud_button().pressed.emit()
+	m_widget.get_slope_button().pressed.emit()
+	m_widget.get_storm_button().pressed.emit()
+	var storm_snap: ResearchTreeViewModel.DoctrineMatchupPreviewSnapshot = m_widget.get_last_preview()
+
+	var drawer_w: float = tactical_panel.get_combined_minimum_size().x
+	var esc_ev: InputEventKey = InputEventKey.new()
+	esc_ev.keycode = KEY_ESCAPE
+	esc_ev.pressed = true
+	hud._unhandled_input(esc_ev)
+	var closed_on_esc: bool = not tree_panel.visible
+
+	_expect(post_matchup_cmd.result.attacker_attack_multiplier > atk_mult_before_research \
+		and mounted_tactical and drawer_w <= float(OtukenHudRoot.DRAWER_WIDTH_PX) \
+		and clear_snap != null and clear_snap.raw_result.wedge_pierced_thin_center \
+		and is_equal_approx(clear_snap.attacker_attack_mult, post_matchup_cmd.result.attacker_attack_multiplier) \
+		and storm_snap != null and storm_snap.raw_result.heavy_armor_terrain_collapse \
+		and storm_snap.verdict_tone_id == &"ember" \
+		and closed_on_esc,
+		"DoctrineMatchupPreviewWidget mounts <=332px, reflects completed Research + DoctrineMatchupResolver hazards, and ESC dismisses Research Tree cleanly.")
+
+	# 9. Clean Disconnect & Zero EventBus / Test Signal Leaks
+	remove_child(hud)
+	hud.free()
+
+	var zero_research_leaks: bool = true
+	for s_id3: StringName in sig_names:
+		if EventBus.get_signal_connection_list(s_id3).size() != base_sig_counts[s_id3]:
+			zero_research_leaks = false
+	EventBus.tradition_research_started.disconnect(on_res_started)
+	EventBus.tradition_research_completed.disconnect(on_res_completed)
+	_expect(zero_research_leaks,
+		"TraditionResearchTreePanel, DoctrineMatchupPreviewWidget & OtukenHudRoot disconnect all EventBus research subscriptions with 0 leaks.")
+
+	# Clean up scratch save file if present and restore all singletons prior to _test_main_scene_integration()
+	var dir: DirAccess = DirAccess.open("user://")
+	if dir != null and dir.file_exists("faz_b_research_save.json"):
+		dir.remove("faz_b_research_save.json")
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	_reset_p27b_singletons(&"faz_b_cleanup_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
 
 
 

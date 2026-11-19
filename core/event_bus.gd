@@ -212,3 +212,8 @@ signal world_state_loaded(world_hash: String, schema_version: int)
 signal ai_utility_decision_made(agent_id: StringName, player_id: int, difficulty_tier: GameEnums.AIDifficultyTier, action_category: GameEnums.AIActionCategory, selected_doctrine_id: StringName, chosen_score: float, envelope_sequence_id: int)
 signal ai_scheme_step_advanced(agent_id: StringName, scheme_type: GameEnums.AISchemeType, step_index: int, total_steps: int, step_action: StringName, completed: bool)
 signal ai_story_agenda_activated(agent_id: StringName, agenda_id: StringName, triggered_reason: StringName)
+
+# --- Faz B Tradition & Military Research Tree -------------------------------
+signal tradition_research_started(player_id: int, node_id: StringName, duration_seasons: int, silver_spent: int)
+signal tradition_research_progressed(player_id: int, node_id: StringName, elapsed_seasons: int, total_seasons: int)
+signal tradition_research_completed(player_id: int, node_id: StringName, branch: GameEnums.ResearchBranch, effect_summary: String)

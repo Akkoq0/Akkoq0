@@ -100,6 +100,11 @@ class DrawerSlotRecord:
 		custom_panel_mount = p_mount
 
 
+var _research_vm: ResearchTreeViewModel = null
+var _research_tree_panel: TraditionResearchTreePanel = null
+var _research_toggle_btn: Button = null
+var _research_toggle_cb: Callable = Callable()
+
 @export var drawer_tween_duration_sec: float = DEFAULT_TWEEN_DURATION_SEC
 @export var player_id: int = 1
 @export var tracked_army_id: int = 1
@@ -219,6 +224,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			elif _empire_ledger != null and _empire_ledger.visible:
 				close_ledger()
 				_mark_input_handled()
+			elif _research_tree_panel != null and _research_tree_panel.visible:
+				close_research_tree()
+				_mark_input_handled()
 			elif _chronicle_feed != null and _chronicle_feed.visible:
 				close_chronicle()
 				_mark_input_handled()
@@ -239,6 +247,12 @@ func set_player_context(p_player_id: int, p_tracked_army_id: int = -1) -> void:
 		_analytics_vm = MetricAnalyticsViewModel.new(player_id, tracked_army_id)
 	else:
 		_analytics_vm.set_context(player_id, tracked_army_id)
+	if _research_vm == null:
+		_research_vm = ResearchTreeViewModel.new(player_id, tracked_army_id)
+	else:
+		_research_vm.set_context(player_id, tracked_army_id)
+	if _research_tree_panel != null and _research_tree_panel.visible:
+		_research_tree_panel.refresh_tree()
 	if _ui_built:
 		refresh_from_viewmodel()
 
@@ -253,6 +267,12 @@ func get_analytics_view_model() -> MetricAnalyticsViewModel:
 	if _analytics_vm == null:
 		_analytics_vm = MetricAnalyticsViewModel.new(player_id, tracked_army_id)
 	return _analytics_vm
+
+
+func get_research_view_model() -> ResearchTreeViewModel:
+	if _research_vm == null:
+		_research_vm = ResearchTreeViewModel.new(player_id, tracked_army_id)
+	return _research_vm
 
 
 func get_glossary_tooltip() -> SteppeGlossaryTooltip:
@@ -515,6 +535,11 @@ func bind_analytics_scene_context(
 	if _empire_ledger != null:
 		_empire_ledger.bind_camera(camera)
 		_empire_ledger.refresh_ledger()
+	var rvm: ResearchTreeViewModel = get_research_view_model()
+	if tracked_army != null:
+		rvm.bind_army(tracked_army)
+	if _research_tree_panel != null and _research_tree_panel.visible:
+		_research_tree_panel.refresh_tree()
 
 
 func open_metric_breakdown(metric_id: StringName) -> void:
@@ -594,6 +619,38 @@ func get_empire_ledger_panel() -> EmpireLedgerPanel:
 	return _empire_ledger
 
 
+func open_research_tree(node_id: StringName = &"") -> void:
+	_build_hud_structure()
+	if _research_tree_panel != null:
+		_research_tree_panel.open_tree(node_id)
+		_sync_analytics_dock_buttons()
+
+
+func close_research_tree() -> void:
+	if _research_tree_panel != null:
+		_research_tree_panel.close_tree()
+		_sync_analytics_dock_buttons()
+
+
+func toggle_research_tree() -> bool:
+	_build_hud_structure()
+	if _research_tree_panel != null and _research_tree_panel.visible:
+		close_research_tree()
+		return false
+	open_research_tree()
+	return true
+
+
+func get_research_tree_panel() -> TraditionResearchTreePanel:
+	_build_hud_structure()
+	return _research_tree_panel
+
+
+func get_research_toggle_button() -> Button:
+	_build_hud_structure()
+	return _research_toggle_btn
+
+
 func compute_open_map_ratio(include_drawer: bool = false) -> float:
 	_build_hud_structure()
 	var vp_size: Vector2 = _resolve_viewport_size()
@@ -614,6 +671,8 @@ func compute_open_map_ratio(include_drawer: bool = false) -> float:
 		occupied += _measure_control_area(_chronicle_feed, vp_size)
 	if _empire_ledger != null and _empire_ledger.visible:
 		occupied += _measure_control_area(_empire_ledger, vp_size)
+	if _research_tree_panel != null and _research_tree_panel.visible:
+		occupied += _measure_control_area(_research_tree_panel, vp_size)
 	if _crisis_chip_rail != null and _crisis_chip_rail.visible and not _crisis_chips.is_empty():
 		var chip_h: float = 0.0
 		var chip_w: float = 204.0
@@ -755,9 +814,9 @@ func _build_hud_structure() -> void:
 		_analytics_dock.anchor_top = 1.0
 		_analytics_dock.anchor_right = 0.0
 		_analytics_dock.anchor_bottom = 1.0
-		_analytics_dock.offset_left = 548.0
-		_analytics_dock.offset_top = -44.0
-		_analytics_dock.offset_right = 698.0
+		_analytics_dock.offset_left = 544.0
+		_analytics_dock.offset_top = -36.0
+		_analytics_dock.offset_right = 732.0
 		_analytics_dock.offset_bottom = -8.0
 		_analytics_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_analytics_dock)
@@ -773,22 +832,22 @@ func _build_hud_structure() -> void:
 		_analytics_dock.add_child(_analytics_card)
 
 	var ad_margin: MarginContainer = _analytics_card.get_content_container()
-	ad_margin.add_theme_constant_override(&"margin_left", 6)
-	ad_margin.add_theme_constant_override(&"margin_right", 6)
-	ad_margin.add_theme_constant_override(&"margin_top", 2)
-	ad_margin.add_theme_constant_override(&"margin_bottom", 2)
+	ad_margin.add_theme_constant_override(&"margin_left", 4)
+	ad_margin.add_theme_constant_override(&"margin_right", 4)
+	ad_margin.add_theme_constant_override(&"margin_top", 1)
+	ad_margin.add_theme_constant_override(&"margin_bottom", 1)
 
 	var ad_hbox: HBoxContainer = HBoxContainer.new()
 	ad_hbox.name = "AnalyticsToggleHBox"
 	ad_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	ad_hbox.add_theme_constant_override(&"separation", 4)
+	ad_hbox.add_theme_constant_override(&"separation", 3)
 	ad_margin.add_child(ad_hbox)
 
 	_chronicle_toggle_btn = Button.new()
 	_chronicle_toggle_btn.name = "ChronicleToggleButton"
 	_chronicle_toggle_btn.theme_type_variation = &"LensButton"
 	_chronicle_toggle_btn.text = "Vakanüvis"
-	_chronicle_toggle_btn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_chronicle_toggle_btn.add_theme_font_size_override(&"font_size", 9)
 	_chronicle_toggle_cb = _on_chronicle_toggle_pressed
 	_chronicle_toggle_btn.pressed.connect(_chronicle_toggle_cb)
 	ad_hbox.add_child(_chronicle_toggle_btn)
@@ -797,10 +856,19 @@ func _build_hud_structure() -> void:
 	_ledger_toggle_btn.name = "LedgerToggleButton"
 	_ledger_toggle_btn.theme_type_variation = &"LensButton"
 	_ledger_toggle_btn.text = "Defter"
-	_ledger_toggle_btn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_ledger_toggle_btn.add_theme_font_size_override(&"font_size", 9)
 	_ledger_toggle_cb = _on_ledger_toggle_pressed
 	_ledger_toggle_btn.pressed.connect(_ledger_toggle_cb)
 	ad_hbox.add_child(_ledger_toggle_btn)
+
+	_research_toggle_btn = Button.new()
+	_research_toggle_btn.name = "ResearchToggleButton"
+	_research_toggle_btn.theme_type_variation = &"LensButton"
+	_research_toggle_btn.text = "Araştır"
+	_research_toggle_btn.add_theme_font_size_override(&"font_size", 9)
+	_research_toggle_cb = _on_research_toggle_pressed
+	_research_toggle_btn.pressed.connect(_research_toggle_cb)
+	ad_hbox.add_child(_research_toggle_btn)
 	_sync_analytics_dock_buttons()
 
 	# --- Layer 2B: Unified Session Clock & Tempo Strip (Faz 31) --------------
@@ -996,6 +1064,20 @@ func _build_hud_structure() -> void:
 	_ledger_focus_cb = _on_analytics_focus_requested
 	if not _empire_ledger.ledger_focus_requested.is_connected(_ledger_focus_cb):
 		_empire_ledger.ledger_focus_requested.connect(_ledger_focus_cb)
+
+	_research_tree_panel = get_node_or_null("TraditionResearchTreePanel") as TraditionResearchTreePanel
+	if _research_tree_panel == null:
+		_research_tree_panel = TraditionResearchTreePanel.new()
+		_research_tree_panel.anchor_left = 0.5
+		_research_tree_panel.anchor_top = 0.5
+		_research_tree_panel.anchor_right = 0.5
+		_research_tree_panel.anchor_bottom = 0.5
+		_research_tree_panel.offset_left = -395.0
+		_research_tree_panel.offset_top = -215.0
+		_research_tree_panel.offset_right = 395.0
+		_research_tree_panel.offset_bottom = 215.0
+		add_child(_research_tree_panel)
+	_research_tree_panel.bind_view_model(get_research_view_model())
 
 	# --- Dual-Layer Hover-Lock Steppe Glossary Tooltip -----------------------
 	_glossary_tooltip = get_node_or_null("SteppeGlossaryTooltip") as SteppeGlossaryTooltip
@@ -1383,11 +1465,15 @@ func _sync_analytics_dock_buttons() -> void:
 	if _chronicle_toggle_btn != null:
 		var ch_open: bool = _chronicle_feed != null and _chronicle_feed.visible
 		var ch_col: Color = NeoSteppePalette.GOLD_TAMGA if ch_open else NeoSteppePalette.BRONZE_WEATHERED
-		OtukenThemeFactory.apply_button_semantic_styles(_chronicle_toggle_btn, ch_col, ch_open, 5, 1)
+		OtukenThemeFactory.apply_button_semantic_styles(_chronicle_toggle_btn, ch_col, ch_open, 4, 0)
 	if _ledger_toggle_btn != null:
 		var le_open: bool = _empire_ledger != null and _empire_ledger.visible
 		var le_col: Color = NeoSteppePalette.GOLD_TAMGA if le_open else NeoSteppePalette.BRONZE_WEATHERED
-		OtukenThemeFactory.apply_button_semantic_styles(_ledger_toggle_btn, le_col, le_open, 5, 1)
+		OtukenThemeFactory.apply_button_semantic_styles(_ledger_toggle_btn, le_col, le_open, 4, 0)
+	if _research_toggle_btn != null:
+		var res_open: bool = _research_tree_panel != null and _research_tree_panel.visible
+		var res_col: Color = NeoSteppePalette.JADE_PRIMARY if res_open else NeoSteppePalette.BRONZE_WEATHERED
+		OtukenThemeFactory.apply_button_semantic_styles(_research_toggle_btn, res_col, res_open, 4, 0)
 
 
 func _sync_drawer_slot_visibility() -> void:
@@ -1480,6 +1566,9 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.dynasty_stance_changed, _on_dynasty_stance_changed_hud)
 	_subscribe_bus(EventBus.envoy_assassinated, _on_envoy_assassinated_hud)
 	_subscribe_bus(EventBus.ai_story_agenda_activated, _on_ai_story_agenda_hud)
+	_subscribe_bus(EventBus.tradition_research_started, _on_tradition_research_dirty.unbind(4))
+	_subscribe_bus(EventBus.tradition_research_progressed, _on_tradition_research_dirty.unbind(4))
+	_subscribe_bus(EventBus.tradition_research_completed, _on_tradition_research_dirty.unbind(4))
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:
@@ -1521,6 +1610,11 @@ func _disconnect_ui_signals() -> void:
 		if _ledger_toggle_btn.pressed.is_connected(_ledger_toggle_cb):
 			_ledger_toggle_btn.pressed.disconnect(_ledger_toggle_cb)
 	_ledger_toggle_cb = Callable()
+
+	if _research_toggle_btn != null and is_instance_valid(_research_toggle_btn) and not _research_toggle_cb.is_null():
+		if _research_toggle_btn.pressed.is_connected(_research_toggle_cb):
+			_research_toggle_btn.pressed.disconnect(_research_toggle_cb)
+	_research_toggle_cb = Callable()
 
 	if _metric_popover != null and is_instance_valid(_metric_popover) and not _popover_action_cb.is_null():
 		if _metric_popover.quick_action_requested.is_connected(_popover_action_cb):
@@ -1826,6 +1920,16 @@ func _on_chronicle_toggle_pressed() -> void:
 
 func _on_ledger_toggle_pressed() -> void:
 	toggle_ledger()
+
+
+func _on_research_toggle_pressed() -> void:
+	toggle_research_tree()
+
+
+func _on_tradition_research_dirty() -> void:
+	if _research_tree_panel != null and is_instance_valid(_research_tree_panel) and _research_tree_panel.visible:
+		_research_tree_panel.refresh_tree()
+	_on_telemetry_dirty()
 
 
 func _on_popover_quick_action_requested(primary_slot: StringName, fallback_slot: StringName) -> void:

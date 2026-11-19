@@ -23,6 +23,7 @@ const REQUIRED_SECTIONS: Array[String] = [
 	"succession_manager",
 	"territory_manager",
 	"water_route_manager",
+	"tradition_research",
 ]
 
 
@@ -58,6 +59,7 @@ static func export_state_dict() -> Dictionary:
 		"synergy_summary": syn_dict,
 		"territory_manager": TerritoryManager.export_state_dict(),
 		"water_route_manager": WaterRouteManager.export_state_dict(),
+		"tradition_research": TraditionResearchManager.export_state_dict(),
 	}
 	return raw
 
@@ -111,5 +113,7 @@ static func import_state_dict(data: Dictionary) -> bool:
 	if not CollapseRecoveryFSM.import_state_dict(DeterministicStateHasher.v_dict(data.get("collapse_recovery_fsm"))):
 		return false
 	if not SteppeStrategicAIController.import_all_state_dict(DeterministicStateHasher.v_dict(data.get("strategic_ai"))):
+		return false
+	if not TraditionResearchManager.import_state_dict(DeterministicStateHasher.v_dict(data.get("tradition_research"))):
 		return false
 	return true

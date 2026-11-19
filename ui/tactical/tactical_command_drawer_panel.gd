@@ -47,6 +47,8 @@ var _compass: TuranVectorCompass = null
 var _turan_detail_lbl: Label = null
 
 var _courier_doctrine_panel: CourierAndDoctrinePanel = null
+var _matchup_preview: DoctrineMatchupPreviewWidget = null
+var _research_vm: ResearchTreeViewModel = null
 
 
 func _init() -> void:
@@ -72,8 +74,14 @@ func bind_context(p_player_id: int, p_army_id: int, army: ArmyController = null)
 	vm.set_context(p_player_id, p_army_id)
 	if army != null:
 		vm.bind_army(army)
+	var rvm: ResearchTreeViewModel = get_research_view_model()
+	rvm.set_context(p_player_id, p_army_id)
+	if army != null:
+		rvm.bind_army(army)
 	_ensure_ui()
 	_courier_doctrine_panel.set_view_model(vm)
+	if _matchup_preview != null:
+		_matchup_preview.bind_view_model(rvm)
 	refresh_panel()
 
 
@@ -81,6 +89,12 @@ func get_view_model() -> TacticalCommandViewModel:
 	if _view_model == null:
 		_view_model = TacticalCommandViewModel.new(1, 1)
 	return _view_model
+
+
+func get_research_view_model() -> ResearchTreeViewModel:
+	if _research_vm == null:
+		_research_vm = ResearchTreeViewModel.new(1, 1)
+	return _research_vm
 
 
 func get_compass() -> TuranVectorCompass:
@@ -91,6 +105,11 @@ func get_compass() -> TuranVectorCompass:
 func get_courier_and_doctrine_panel() -> CourierAndDoctrinePanel:
 	_ensure_ui()
 	return _courier_doctrine_panel
+
+
+func get_doctrine_matchup_preview() -> DoctrineMatchupPreviewWidget:
+	_ensure_ui()
+	return _matchup_preview
 
 
 func set_threat_preview(bearing_rad: float, active: bool = true) -> void:
@@ -183,6 +202,9 @@ func refresh_panel() -> void:
 
 	if _courier_doctrine_panel != null:
 		_courier_doctrine_panel.refresh_from_viewmodel(snap)
+	if _matchup_preview != null:
+		_matchup_preview.sync_with_army_preset()
+		_matchup_preview.refresh_preview()
 
 	_sync_preview_buttons()
 	tactical_panel_refreshed.emit(snap.army_id)
@@ -270,6 +292,11 @@ func _ensure_ui() -> void:
 	_courier_doctrine_panel = CourierAndDoctrinePanel.new()
 	_courier_doctrine_panel.set_view_model(get_view_model())
 	add_child(_courier_doctrine_panel)
+
+	# === 4. Live Doctrine Matchup Preview Widget =============================
+	_matchup_preview = DoctrineMatchupPreviewWidget.new()
+	_matchup_preview.bind_view_model(get_research_view_model())
+	add_child(_matchup_preview)
 
 
 func _make_toggle_btn(node_name: String, label_txt: String, cb: Callable) -> Button:

@@ -447,6 +447,22 @@ enum AIActionCategory {
 	EXECUTE_SCHEME_STEP = 8,
 }
 
+## Faz B Tradition & Military Research branches (`TraditionResearchCatalog`).
+enum ResearchBranch {
+	STEPPE_WARFARE = 0, ## Bozkır Harbi
+	LOGISTICS_AND_WATER = 1, ## Lojistik & Su
+	TORE_AND_KURULTAY = 2, ## Töre & Kurultay
+	CRAFTS_AND_IRON = 3, ## Zanaat & Demir
+}
+
+## Faz B Research node unlock & progression states (`TraditionResearchManager`).
+enum ResearchNodeStatus {
+	LOCKED = 0,
+	RESEARCHABLE = 1,
+	IN_PROGRESS = 2,
+	COMPLETED = 3,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

@@ -42,6 +42,7 @@ func _ready() -> void:
 	register_handler(SplitDetachForceCommand.ID, _handle_split_detach_force)
 	register_handler(MergeForcesCommand.ID, _handle_merge_forces)
 	register_handler(RelocateNomadicOutpostCommand.ID, _handle_relocate_nomadic_outpost)
+	register_handler(StartResearchCommand.ID, TraditionResearchManager.handle_start_research)
 
 
 func _exit_tree() -> void:
@@ -665,6 +666,12 @@ func _execute_envelope(envelope: CommandEnvelope) -> bool:
 				DeterministicStateHasher.v_int(p.get("target_depot_id", 1), 1))
 			envelope.executed_command = cmd
 			return dispatch(cmd)
+		"start_research":
+			var sr_cmd: StartResearchCommand = StartResearchCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				StringName(DeterministicStateHasher.v_str(p.get("node_id", ""))))
+			envelope.executed_command = sr_cmd
+			return dispatch(sr_cmd)
 		_:
 			return false
 

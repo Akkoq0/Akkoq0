@@ -55,6 +55,7 @@ func _process(delta: float) -> void:
 		_elapsed_sec -= season.duration_sec
 		_index = _cycle.get_next_index(_index)
 		_broadcast()
+		TraditionResearchManager.step_seasonal_research(1)
 
 
 ## Active season (null until the cycle is loaded).
@@ -113,6 +114,7 @@ func advance_season_cycle(pasture_yield_multiplier: float = -1.0) -> SeasonData:
 		return null
 	_index = _cycle.get_next_index(_index)
 	_broadcast(pasture_yield_multiplier)
+	TraditionResearchManager.step_seasonal_research(1)
 	return get_current_season()
 
 

@@ -282,6 +282,8 @@ static func _check_resources(resources: PackedStringArray) -> PackedStringArray:
 			errors.append_array((res as SteppeAIPersonalityProfile).get_validation_errors())
 		elif res is StoryAgendaResource:
 			errors.append_array((res as StoryAgendaResource).get_validation_errors())
+		elif res is TraditionResearchNode:
+			errors.append_array((res as TraditionResearchNode).get_validation_errors())
 	return errors
 
 

@@ -147,6 +147,7 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 	if atk_doc != null or def_doc != null:
 		matchup = DoctrineMatchupResolver.evaluate(
 			attacker, defender, atk_doc, def_doc, defender_terrain, season, angle)
+		TraditionResearchManager.apply_bonuses_to_matchup(matchup, attacker.player_id, defender.player_id)
 		result.doctrine_matchup = matchup
 		_last_matchup_result = matchup
 
@@ -347,6 +348,9 @@ func _handle_evaluate_doctrine_matchup(command: GameCommand) -> bool:
 		cmd.is_steep_slope,
 		cmd.is_storm,
 		cmd.region_coord)
+	var atk_pid: int = cmd.attacker.player_id if cmd.attacker != null else 0
+	var def_pid: int = cmd.defender.player_id if cmd.defender != null else 0
+	TraditionResearchManager.apply_bonuses_to_matchup(res, atk_pid, def_pid)
 	_last_matchup_result = res
 	cmd.result = res
 	var atk_id: int = cmd.attacker.entity_id if cmd.attacker != null else 0
