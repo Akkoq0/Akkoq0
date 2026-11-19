@@ -122,6 +122,7 @@ func _run_suite() -> void:
 	_test_phase23_water_routes_and_scarcity_market()
 	_test_phase24_commander_legacy_and_succession_crisis()
 	_test_phase25_neo_steppe_ui_and_hud()
+	_test_phase26_tactical_ui_and_compass()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -1547,6 +1548,9 @@ func _test_main_scene_integration() -> void:
 	add_child(main_instance)
 	var move_cmd: MoveArmyCommand = MoveArmyCommand.new(1, Vector3(4.0, 0.0, 4.0))
 	_expect(CommandBus.dispatch(move_cmd), "MoveArmyCommand routed to VanguardArmy via ArmyRegistry.")
+	var hud: OtukenHudRoot = main_instance.get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	_expect(hud != null and hud.has_drawer_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND),
+		"Main scene dynamically registers Taktik & Komuta Phase 26 slot into OtukenHudRoot.")
 	main_instance.free()
 
 
@@ -4036,8 +4040,8 @@ func _test_phase25_neo_steppe_ui_and_hud() -> void:
 	for ti: int in range(turkish_inputs.size()):
 		if SteppeGlossaryTooltip.normalize_term_id(turkish_inputs[ti]) != turkish_expected[ti]:
 			turkish_fold_ok = false
-	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() == 11 and all_terms_valid and turkish_fold_ok,
-		"All 11 Bozkır glossary terms (including Turkish diacritics) resolve cleanly across all 3 structured layers.")
+	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() >= 11 and all_terms_valid and turkish_fold_ok,
+		"All >=11 Bozkır glossary terms (including Turkish diacritics) resolve cleanly across all 3 structured layers.")
 
 	var kut_entry_calm: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kut", vm)
 	CommandBus.dispatch(ModifyKutCommand.new(-55.0, &"p25_glossary_live_kut"))
@@ -4237,3 +4241,312 @@ func _test_phase25_neo_steppe_ui_and_hud() -> void:
 	DiplomacyManager.set_political_intelligence_context(0.0, 0.0, 0.0, 0.0)
 	DiplomacyManager.step_seasonal_diplomatic_decay(20)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _test_phase26_tactical_ui_and_compass() -> void:
+	# Clean baseline before Phase 26 UI & tactical validation
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p26_baseline_kut"))
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+
+	# 1. TacticalCommandViewModel Pure Math, NaN Safety & Read-Only Telemetry Aggregation
+	var sec_front: GameEnums.CombatEngagementAngle = TacticalCommandViewModel.classify_sector_from_bearing(0.0, 0.35)
+	var sec_flank_r: GameEnums.CombatEngagementAngle = TacticalCommandViewModel.classify_sector_from_bearing(PI * 0.5, 0.35)
+	var sec_flank_l: GameEnums.CombatEngagementAngle = TacticalCommandViewModel.classify_sector_from_bearing(-PI * 0.5, 0.35)
+	var sec_rear: GameEnums.CombatEngagementAngle = TacticalCommandViewModel.classify_sector_from_bearing(PI, 0.35)
+	var sec_nan: GameEnums.CombatEngagementAngle = TacticalCommandViewModel.classify_sector_from_bearing(NAN, NAN)
+	_expect(sec_front == GameEnums.CombatEngagementAngle.FRONT \
+		and is_equal_approx(TacticalCommandViewModel.get_sector_damage_multiplier(sec_front), 1.0) \
+		and sec_flank_r == GameEnums.CombatEngagementAngle.FLANK \
+		and sec_flank_l == GameEnums.CombatEngagementAngle.FLANK \
+		and is_equal_approx(TacticalCommandViewModel.get_sector_damage_multiplier(sec_flank_r), 1.45) \
+		and sec_rear == GameEnums.CombatEngagementAngle.REAR \
+		and is_equal_approx(TacticalCommandViewModel.get_sector_damage_multiplier(sec_rear), 2.10) \
+		and sec_nan == GameEnums.CombatEngagementAngle.FRONT,
+		"TacticalCommandViewModel directional exposure sectors (1.0x Front / 1.45x Flank / 2.1x Rear) & NaN guard hold exactly.")
+
+	var c_rules: CourierAndCaravanRules = CourierDispatchSystem.get_rules()
+	var heavy_mult: float = TacticalCommandViewModel.compute_heavy_armor_fatigue_multiplier(true, true, true, true, c_rules)
+	var expected_heavy: float = pow(2.10 * 1.90 * 1.75, 1.35)
+	var light_mult: float = TacticalCommandViewModel.compute_heavy_armor_fatigue_multiplier(false, true, true, true, c_rules)
+	_expect(is_equal_approx(heavy_mult, expected_heavy) and heavy_mult > light_mult * 10.0 and light_mult < 1.0,
+		"Heavy armor terrain+storm exponential fatigue multiplier (%.2fx) drastically exceeds agile light cavalry (%.2fx)." % [
+			heavy_mult, light_mult])
+
+	var bd_clear: Dictionary[StringName, float] = TacticalCommandViewModel.compute_courier_latency_breakdown(180.0, GameEnums.TerrainType.STEPPE, false, c_rules)
+	var bd_storm_mtn: Dictionary[StringName, float] = TacticalCommandViewModel.compute_courier_latency_breakdown(180.0, GameEnums.TerrainType.MOUNTAIN, true, c_rules)
+	var bd_nan: Dictionary[StringName, float] = TacticalCommandViewModel.compute_courier_latency_breakdown(NAN, GameEnums.TerrainType.STEPPE, false, c_rules)
+	_expect(is_equal_approx(bd_clear[&"base_sec"], 10.0) \
+		and is_equal_approx(bd_clear[&"terrain_sec"], 0.0) \
+		and is_equal_approx(bd_clear[&"storm_sec"], 0.0) \
+		and is_equal_approx(bd_storm_mtn[&"base_sec"] + bd_storm_mtn[&"terrain_sec"] + bd_storm_mtn[&"storm_sec"], bd_storm_mtn[&"total_sec"]) \
+		and is_equal_approx(bd_storm_mtn[&"total_sec"], 10.0 * 1.65 * 1.45) \
+		and not is_nan(bd_nan[&"total_sec"]) and bd_nan[&"total_sec"] > 0.0,
+		"Courier latency stacked equation (base + terrain + storm == total = %.3fs) and NaN clamping hold cleanly." % bd_storm_mtn[&"total_sec"])
+
+	var risk_calm: float = TacticalCommandViewModel.compute_courier_ambush_risk_pct(180.0, GameEnums.TerrainType.STEPPE, false, false)
+	var risk_danger: float = TacticalCommandViewModel.compute_courier_ambush_risk_pct(540.0, GameEnums.TerrainType.MOUNTAIN, true, true)
+	_expect(risk_danger > risk_calm + 40.0 and risk_danger <= 96.0 and risk_calm >= 0.0,
+		"Courier ambush risk scales across mountain/storm/isolated corridor (%.0f%% -> %.0f%%)." % [risk_calm, risk_danger])
+
+	# Bind live ArmyController + CommanderProfile and confirm strictly read-only snapshot fidelity
+	var army_scene: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_scene.instantiate() as ArmyController
+	army.army_id = 2601
+	army.owner_id = 2601
+	add_child(army)
+	var cmdr_2601: CommanderProfile = SuccessionManager.register_commander(
+		2601, 2601, 2601, &"Bumin Kağan", 112, GameEnums.CommanderTrait.BOZKIR_KURDU)
+	SuccessionManager.record_commander_battle_experience(2601, 50.0)
+	SuccessionManager.inflict_commander_battle_trauma(2601, false)
+	army.turan_tactics.execute_whistling_arrow_volley()
+	army.morale_component.accumulate_armored_terrain_fatigue(6.0, true, true, false, false, 1.0, c_rules)
+
+	var vm: TacticalCommandViewModel = TacticalCommandViewModel.new(2601, 2601)
+	vm.bind_army(army)
+	var ammo_before: float = army.turan_tactics.get_quiver_ammo()
+	var fat_before: float = army.morale_component.get_battle_fatigue()
+	var snap1: TacticalCommandViewModel.TacticalUnitSnapshot = vm.capture_snapshot()
+	var snap2: TacticalCommandViewModel.TacticalUnitSnapshot = vm.capture_snapshot()
+	_expect(snap1.has_bound_army \
+		and snap1.turan_phase == GameEnums.TuranTacticPhase.WHISTLING_ARROW_HARASSMENT \
+		and is_equal_approx(snap1.quiver_ammo, ammo_before) \
+		and is_equal_approx(snap1.battle_fatigue, fat_before) \
+		and snap1.commander_name == "Bumin Kağan" \
+		and snap1.commander_scars == 1 \
+		and snap1.commander_veteran_score > 0.0 \
+		and is_equal_approx(army.turan_tactics.get_quiver_ammo(), snap2.quiver_ammo) \
+		and is_equal_approx(army.morale_component.get_battle_fatigue(), snap2.battle_fatigue),
+		"TacticalCommandViewModel mirrors Turan phase, quiver ammo, battle fatigue & Gazi Mirası strictly read-only without mutating core state.")
+
+	# 2. TuranVectorCompass Pure Sector Geometry, Node Angles & Edge Clamping
+	var half_cone: float = TuranVectorCompass.compute_flank_half_cone_rad(0.35)
+	var half_cone_nan: float = TuranVectorCompass.compute_flank_half_cone_rad(NAN)
+	var sectors: Array[TuranVectorCompass.SectorArcSpec] = TuranVectorCompass.compute_directional_sectors(0.35)
+	var total_arc_span: float = 0.0
+	for sec_spec: TuranVectorCompass.SectorArcSpec in sectors:
+		total_arc_span += sec_spec.end_angle_rad - sec_spec.start_angle_rad
+	var nodes_clockwise: bool = true
+	var prev_node_ang: float = -INF
+	for p_idx: int in range(5):
+		var cur_ang: float = TuranVectorCompass.compute_turan_phase_node_angle(p_idx)
+		if cur_ang <= prev_node_ang:
+			nodes_clockwise = false
+		prev_node_ang = cur_ang
+	var clamped_low: float = TuranVectorCompass.compute_gauge_arc_end(-1.0, 2.0, -50.0, 100.0)
+	var clamped_high: float = TuranVectorCompass.compute_gauge_arc_end(-1.0, 2.0, 250.0, 100.0)
+	var clamped_nan: float = TuranVectorCompass.compute_gauge_arc_end(-1.0, 2.0, NAN, 100.0)
+	var clamped_neg_max: float = TuranVectorCompass.compute_gauge_arc_end(-1.0, 2.0, 50.0, -5.0)
+	var notch_65: float = TuranVectorCompass.compute_fatigue_notch_angle(2.4, -1.8, 65.0)
+	var notch_85: float = TuranVectorCompass.compute_fatigue_notch_angle(2.4, -1.8, 85.0)
+	_expect(is_equal_approx(half_cone, acos(0.35)) \
+		and is_equal_approx(half_cone_nan, acos(0.35)) \
+		and sectors.size() == 4 \
+		and is_equal_approx(total_arc_span, TAU) \
+		and nodes_clockwise \
+		and is_equal_approx(clamped_low, -1.0) \
+		and is_equal_approx(clamped_high, 1.0) \
+		and not is_nan(clamped_nan) \
+		and is_equal_approx(clamped_neg_max, -1.0) \
+		and is_equal_approx(notch_65, TuranVectorCompass.compute_gauge_arc_end(2.4, -1.8, 65.0, 100.0)) \
+		and is_equal_approx(notch_85, TuranVectorCompass.compute_gauge_arc_end(2.4, -1.8, 85.0, 100.0)),
+		"TuranVectorCompass geometry (4 sectors summing to TAU, 5 clockwise Turan nodes, 65%/85% fatigue notches & NaN/oob clamps) verified.")
+
+	var seg_widths: Dictionary[StringName, float] = CourierLatencyGauge.compute_segment_widths(240.0, 10.0, 6.5, 7.425)
+	var seg_zero: Dictionary[StringName, float] = CourierLatencyGauge.compute_segment_widths(240.0, 0.0, 0.0, 0.0)
+	_expect(is_equal_approx(seg_widths[&"base_w"] + seg_widths[&"terrain_w"] + seg_widths[&"storm_w"], 240.0) \
+		and is_equal_approx(seg_zero[&"base_w"], 0.0) and is_equal_approx(seg_zero[&"storm_w"], 0.0),
+		"CourierLatencyGauge stacked segment widths partition exactly across base, terrain and storm intervals.")
+
+	# 3. TacticalCommandDrawerPanel & CourierAndDoctrinePanel CommandBus Flows
+	var panel: TacticalCommandDrawerPanel = TacticalCommandDrawerPanel.new()
+	add_child(panel)
+	panel.bind_context(2601, 2601, army)
+	panel.set_threat_preview(PI, true)
+	panel.set_armor_weather_preview(true, true, true, true)
+	_expect(panel.get_compass().get_snapshot().threat_sector == GameEnums.CombatEngagementAngle.REAR \
+		and panel.get_compass().custom_minimum_size.x <= 260.0 \
+		and panel.get_fatigue_warning_text().find("AĞIR ZIRH") != -1 \
+		and panel.get_legacy_summary_text().find("Bumin Kağan") != -1,
+		"TacticalCommandDrawerPanel updates TuranVectorCompass, heavy armor storm fatigue warning & Gazi Mirası summary live.")
+
+	var cd_panel: CourierAndDoctrinePanel = panel.get_courier_and_doctrine_panel()
+	cd_panel.set_courier_parameters(360.0, GameEnums.TerrainType.MOUNTAIN, true, GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	var order_id: StringName = cd_panel.trigger_dispatch_courier(&"p26_ui_courier_1")
+	var dispatched_order: CourierDispatchOrder = CourierDispatchSystem.get_order(order_id)
+	_expect(order_id == &"p26_ui_courier_1" \
+		and dispatched_order != null \
+		and CourierDispatchSystem.is_army_awaiting_courier(2601) \
+		and is_equal_approx(dispatched_order.total_delay_sec, 20.0 * 1.65 * 1.45) \
+		and is_equal_approx(cd_panel.get_latency_gauge().get_total_delay_sec(), dispatched_order.total_delay_sec),
+		"CourierAndDoctrinePanel dispatches DispatchCourierOrderCommand via CommandBus with Mountain+Storm delay (%.2fs)." % dispatched_order.total_delay_sec)
+
+	CourierDispatchSystem.step_courier_transit(15.0)
+	_expect(dispatched_order.remaining_delay_sec < dispatched_order.total_delay_sec \
+		and dispatched_order.status == GameEnums.CourierStatus.IN_TRANSIT,
+		"Partial courier transit reduces remaining latency cleanly while in transit.")
+
+	var ambush_cmd: AmbushCourierCommand = AmbushCourierCommand.new(order_id, 2699)
+	_expect(CommandBus.dispatch(ambush_cmd) \
+		and cd_panel.get_latency_gauge().is_plan_leaked() \
+		and cd_panel.get_view_model().capture_snapshot().courier_leaked_tactic == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"Ambushing dispatched courier reflects AMBUSHED_LOST plan leakage in CourierLatencyGauge via EventBus.")
+
+	# Yılkı Toz Perdesi Toggle & Min Remount Rejection
+	var dust_events: Array[bool] = []
+	var on_dust_evt: Callable = func(_aid: int, _pid: int, is_act: bool) -> void:
+		dust_events.append(is_act)
+	EventBus.dust_decoy_toggled.connect(on_dust_evt)
+
+	_expect(cd_panel.trigger_toggle_dust(1) \
+		and CourierDispatchSystem.has_dust_decoy(2601) \
+		and dust_events.has(true) \
+		and is_equal_approx(cd_panel.get_dust_bar().get_perceived_power(), cd_panel.get_dust_bar().get_true_power() * 2.10),
+		"Toz Perdesi toggle activates ToggleDustScreenCommand via CommandBus (~2.1x illusory power bar & EventBus emitted).")
+
+	_expect(cd_panel.trigger_toggle_dust(0) and not CourierDispatchSystem.has_dust_decoy(2601) and dust_events.has(false),
+		"Toz Perdesi toggle cleanly clears decoy state via CommandBus.")
+	EventBus.dust_decoy_toggled.disconnect(on_dust_evt)
+
+	while army.supply.get_remount_horse_ratio() >= 0.25:
+		army.supply.consume_yilki_horses_for_ration()
+	var rejected_dust: bool = cd_panel.trigger_toggle_dust(1)
+	_expect(not rejected_dust and not CourierDispatchSystem.has_dust_decoy(2601) \
+		and cd_panel.get_status_message().find("Reddedildi") != -1,
+		"Low Yılkı remount ratio (< 0.25) strictly rejects ToggleDustScreenCommand via CommandBus with feedback.")
+	army.supply.replenish_yilki_herd(1.0)
+
+	# 3-Block Bozkır Nöbeti Configurator -> ConfigureOfflineDoctrineCommand -> OfflineDoctrineComponent Sync
+	cd_panel.set_doctrine_blocks(3, 1, 1)
+	var expected_preview: String = "EĞER [Kış / Zud Fırtınası] -> YAP [Hilal Pusu (Kargı Hücum)] -> HEDEF [Kışlak Vadisi]"
+	_expect(cd_panel.get_doctrine_preview_text() == expected_preview,
+		"3-Block Bozkır Nöbeti builder formats live rule string: '%s'." % cd_panel.get_doctrine_preview_text())
+
+	_expect(cd_panel.trigger_apply_doctrine(), "ConfigureOfflineDoctrineCommand succeeds via CommandBus.")
+	var stored_cfg: OfflineDoctrineConfig = GracePeriodManager.get_offline_doctrine_config(2601)
+	var decision: OfflineDoctrineDecision = army.offline_doctrine.evaluate_doctrine(
+		100.0, 200.0, 1.0, army.turan_tactics, [], false, true)
+	_expect(stored_cfg != null \
+		and army.offline_doctrine.get_configured_trigger_mode() == GameEnums.OfflineDoctrineTrigger.SHELTER_IN_KISLAK \
+		and army.offline_doctrine.get_configured_tactic_phase() == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP \
+		and army.offline_doctrine.get_preferred_shelter_geography() == GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK \
+		and decision.triggered \
+		and decision.sheltered_in_kislak \
+		and army.turan_tactics.get_current_phase() == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP,
+		"UI doctrine command synchronizes GracePeriodManager & OfflineDoctrineComponent via EventBus and drives CRESCENT execution cleanly.")
+
+	remove_child(panel)
+	panel.free()
+
+	# 4. OtukenHudRoot Layer 3 Integration & Width/Open-Map Preservation
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	add_child(hud)
+	hud.register_drawer_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, "Taktik & Komuta", &"jade")
+	var drawer_panel: TacticalCommandDrawerPanel = TacticalCommandDrawerPanel.new()
+	drawer_panel.bind_context(2601, 2601, army)
+	var mounted_p26: bool = hud.mount_panel_to_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, drawer_panel)
+	var opened_p26: bool = hud.open_drawer(OtukenHudRoot.SLOT_TACTICAL_COMMAND, true)
+	var drawer_node: TamgaCardPanel = hud.get_node_or_null("AnalysisDrawerPanel") as TamgaCardPanel
+	var drawer_min_w: float = drawer_node.get_combined_minimum_size().x if drawer_node != null else 999.0
+	var open_map_ratio: float = hud.compute_open_map_ratio(false)
+	_expect(mounted_p26 and opened_p26 \
+		and hud.is_drawer_open() \
+		and hud.get_active_drawer_slot() == OtukenHudRoot.SLOT_TACTICAL_COMMAND \
+		and not get_tree().paused \
+		and drawer_min_w <= OtukenHudRoot.DRAWER_WIDTH_PX \
+		and open_map_ratio >= 0.82,
+		"TacticalCommandDrawerPanel mounts into Layer 3 drawer <=332px width (%.0fpx) while keeping >=82%% open map & unpaused loop." % drawer_min_w)
+	remove_child(hud)
+	hud.free()
+
+	# 5. Strict _exit_tree() EventBus Lifecycle Audit on TacticalCommandDrawerPanel
+	var audited_bus_signals: Array[StringName] = [
+		&"turan_phase_changed",
+		&"commander_legacy_updated",
+		&"offline_doctrine_configured",
+		&"dust_decoy_toggled",
+		&"courier_dispatched",
+		&"courier_ambushed_plan_exposed",
+		&"wind_weather_changed",
+	]
+	var base_sig_counts: Dictionary[StringName, int] = {}
+	for sig_n: StringName in audited_bus_signals:
+		base_sig_counts[sig_n] = EventBus.get_signal_connection_list(sig_n).size()
+
+	var audit_panel: TacticalCommandDrawerPanel = TacticalCommandDrawerPanel.new()
+	add_child(audit_panel)
+	var inc_ok: bool = true
+	for sig_n: StringName in audited_bus_signals:
+		if EventBus.get_signal_connection_list(sig_n).size() < base_sig_counts[sig_n] + 1:
+			inc_ok = false
+	remove_child(audit_panel)
+	audit_panel.free()
+	var restored_ok: bool = true
+	for sig_n: StringName in audited_bus_signals:
+		if EventBus.get_signal_connection_list(sig_n).size() != base_sig_counts[sig_n]:
+			restored_ok = false
+	_expect(inc_ok and restored_ok,
+		"TacticalCommandDrawerPanel & CourierAndDoctrinePanel disconnect every EventBus listener on _exit_tree() (0 leaked connections).")
+
+	EventBus.turan_phase_changed.emit(999, GameEnums.TuranTacticPhase.RECON_DUST_SCREEN, GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE)
+	EventBus.dust_decoy_toggled.emit(999, 999, false)
+	EventBus.offline_doctrine_configured.emit(999, GameEnums.OfflineDoctrineTrigger.NONE, 1.5, GameEnums.TuranTacticPhase.RECON_DUST_SCREEN, GameEnums.TerrainClass.SIK_ORMAN, GameEnums.RegionGeographyClass.FOREST_EDGE, false, false)
+
+	# 6. 13-Term Glossary Expansion: Kuyu Sabotajı & Gazi Mirası
+	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() == 13 \
+		and SteppeGlossaryTooltip.normalize_term_id(&"Kuyu Sabotajı") == &"kuyu_sabotaji" \
+		and SteppeGlossaryTooltip.normalize_term_id(&"Gazi Mirası") == &"gazi_mirasi",
+		"SteppeGlossaryTooltip covers all 13 canonical terms including Turkish normalization for Kuyu Sabotajı and Gazi Mirası.")
+
+	var hud_vm: OtukenHudViewModel = OtukenHudViewModel.new(2601, 2601)
+	var kuyu_calm: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kuyu_sabotaji", hud_vm)
+	hud_vm.notify_water_crisis_observed(true)
+	var kuyu_crisis: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kuyu_sabotaji", hud_vm)
+	var gazi_alive: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"gazi_mirasi", hud_vm)
+	SuccessionManager.inflict_commander_battle_trauma(2601, true)
+	var gazi_fallen: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"gazi_mirasi", hud_vm)
+	_expect(kuyu_calm.is_valid_three_layer() \
+		and kuyu_crisis.tone_id == &"ember" \
+		and kuyu_crisis.live_impact_line.find("AKTİF") != -1 \
+		and gazi_alive.is_valid_three_layer() \
+		and gazi_fallen.tone_id == &"ember" \
+		and gazi_fallen.live_impact_line.find("DÜŞTÜ") != -1 \
+		and cmdr_2601.scars == 1,
+		"New 3-layer glossary terms reflect live water sabotage & commander trauma/fall telemetry dynamically.")
+
+	# Restore clean state prior to _test_main_scene_integration()
+	remove_child(army)
+	army.free()
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p26_cleanup_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+

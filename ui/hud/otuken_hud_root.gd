@@ -13,6 +13,7 @@ const DRAWER_CLOSED_OFFSET_X: float = -352.0
 const DRAWER_OPEN_OFFSET_X: float = 14.0
 const DEFAULT_TWEEN_DURATION_SEC: float = 0.22
 const MAX_VISIBLE_CRISIS_CHIPS: int = 5
+const SLOT_TACTICAL_COMMAND: StringName = &"tactical_command"
 
 
 class BusSignalSubscription:
@@ -120,7 +121,7 @@ var _tactical_lens_hbox: HBoxContainer = null
 var _analysis_drawer_card: TamgaCardPanel = null
 var _drawer_title_label: Label = null
 var _drawer_close_btn: Button = null
-var _drawer_tabs_hbox: HBoxContainer = null
+var _drawer_tabs_hbox: HFlowContainer = null
 var _drawer_slot_host: MarginContainer = null
 var _glossary_tooltip: SteppeGlossaryTooltip = null
 
@@ -550,6 +551,8 @@ func _build_hud_structure() -> void:
 
 	var drawer_vbox: VBoxContainer = VBoxContainer.new()
 	drawer_vbox.name = "DrawerRootLayout"
+	drawer_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	drawer_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	drawer_vbox.add_theme_constant_override(&"separation", 8)
 	_analysis_drawer_card.get_content_container().add_child(drawer_vbox)
 
@@ -573,18 +576,29 @@ func _build_hud_structure() -> void:
 	_drawer_close_btn.pressed.connect(_on_drawer_close_pressed)
 	drawer_header.add_child(_drawer_close_btn)
 
-	_drawer_tabs_hbox = HBoxContainer.new()
+	_drawer_tabs_hbox = HFlowContainer.new()
 	_drawer_tabs_hbox.name = "DrawerSlotTabs"
-	_drawer_tabs_hbox.add_theme_constant_override(&"separation", 4)
+	_drawer_tabs_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_drawer_tabs_hbox.add_theme_constant_override(&"h_separation", 4)
+	_drawer_tabs_hbox.add_theme_constant_override(&"v_separation", 4)
 	drawer_vbox.add_child(_drawer_tabs_hbox)
 
 	drawer_vbox.add_child(HSeparator.new())
+
+	var drawer_scroll: ScrollContainer = ScrollContainer.new()
+	drawer_scroll.name = "DrawerScrollContainer"
+	drawer_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	drawer_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	drawer_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	drawer_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	drawer_scroll.custom_minimum_size = Vector2(0.0, 220.0)
+	drawer_vbox.add_child(drawer_scroll)
 
 	_drawer_slot_host = MarginContainer.new()
 	_drawer_slot_host.name = "DrawerSlotHost"
 	_drawer_slot_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drawer_slot_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	drawer_vbox.add_child(_drawer_slot_host)
+	drawer_scroll.add_child(_drawer_slot_host)
 
 	# --- Dual-Layer Hover-Lock Steppe Glossary Tooltip -----------------------
 	_glossary_tooltip = get_node_or_null("SteppeGlossaryTooltip") as SteppeGlossaryTooltip
@@ -718,13 +732,15 @@ func _attach_domain_glossary_strip(slot_id: StringName, slot_box: VBoxContainer)
 
 	var terms: Array[StringName] = []
 	if slot_id == OtukenHudViewModel.SLOT_ECONOMY_WATER:
-		terms = [&"zud", &"kara_borsa"]
+		terms = [&"zud", &"kuyu_sabotaji", &"kara_borsa"]
 	elif slot_id == OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY:
 		terms = [&"kut", &"ulus", &"veraset", &"amanat"]
 	elif slot_id == OtukenHudViewModel.SLOT_MILITARY_HERD:
-		terms = [&"yilki", &"tug", &"toy"]
+		terms = [&"yilki", &"tug", &"gazi_mirasi", &"toy"]
 	elif slot_id == OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY:
 		terms = [&"kurgan", &"tore_barisi"]
+	elif slot_id == SLOT_TACTICAL_COMMAND:
+		terms = [&"yilki", &"tug", &"kuyu_sabotaji", &"gazi_mirasi"]
 	else:
 		terms = [&"amanat", &"ulus", &"kara_borsa"]
 
@@ -809,6 +825,11 @@ func _apply_drawer_slot_summaries(snap: OtukenHudViewModel.PulseSummarySnapshot)
 			snap.word_reliability, snap.honor_score, snap.dread_score,
 			"AKTİF" if snap.coalition_active else "Yok", snap.active_intrigue_plots,
 			OtukenHudViewModel.format_collapse_state_short(snap.collapse_state)],
+		SLOT_TACTICAL_COMMAND: "Ordu #%d · İkmal %s · Yedek At %%%.0f\nUlak: %s · Toz Perdesi: %s" % [
+			snap.tracked_army_id, "KESİLDİ" if snap.supply_isolated else "Bağlı",
+			snap.remount_horse_ratio * 100.0,
+			"Yolda" if snap.courier_in_transit else "Hazır",
+			"AÇIK (~2.1x)" if snap.dust_decoy_active else "Kapalı"],
 	}
 	for sid: StringName in texts:
 		var rec: DrawerSlotRecord = _drawer_slots.get(sid, null)
@@ -961,6 +982,8 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.kurultay_succession_crisis_triggered, _on_telemetry_dirty.unbind(5))
 	_subscribe_bus(EventBus.succession_crisis_resolved, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.tactical_lens_changed, _on_tactical_lens_changed)
+	_subscribe_bus(EventBus.dust_decoy_toggled, _on_telemetry_dirty.unbind(3))
+	_subscribe_bus(EventBus.offline_doctrine_configured, _on_telemetry_dirty.unbind(8))
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:

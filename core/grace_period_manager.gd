@@ -19,6 +19,7 @@ var _personal_peace_until_hours: Dictionary[int, float] = {}
 var _personal_peace_forfeited: Dictionary[int, bool] = {}
 var _player_spawn_coords: Dictionary[int, Vector2i] = {}
 var _player_idle_hours: Dictionary[int, float] = {}
+var _offline_doctrine_configs: Dictionary[int, OfflineDoctrineConfig] = {}
 
 
 static func _safe_float(val: float, fallback: float) -> float:
@@ -37,10 +38,12 @@ func _ready() -> void:
 	_steel_ore = ResourceLoader.load(STEEL_ORE_PATH) as OreData
 	_iron_ore = ResourceLoader.load(IRON_ORE_PATH) as OreData
 	CommandBus.register_handler(StepAntiSnowballTickCommand.ID, _handle_step_anti_snowball)
+	CommandBus.register_handler(ConfigureOfflineDoctrineCommand.ID, _handle_configure_offline_doctrine)
 
 
 func _exit_tree() -> void:
 	CommandBus.unregister_handler(StepAntiSnowballTickCommand.ID, _handle_step_anti_snowball)
+	CommandBus.unregister_handler(ConfigureOfflineDoctrineCommand.ID, _handle_configure_offline_doctrine)
 
 
 func get_rules() -> PersistentWorldRules:
@@ -57,10 +60,15 @@ func configure_persistent_world(enabled: bool, elapsed_hours: float = 0.0) -> vo
 		_personal_peace_forfeited.clear()
 		_player_spawn_coords.clear()
 		_player_idle_hours.clear()
+		_offline_doctrine_configs.clear()
 
 
 func reset_persistent_world() -> void:
 	configure_persistent_world(false, 0.0)
+
+
+func get_offline_doctrine_config(army_id: int) -> OfflineDoctrineConfig:
+	return _offline_doctrine_configs.get(army_id, null)
 
 
 func is_persistent_mode_active() -> bool:
@@ -284,6 +292,41 @@ func _handle_step_anti_snowball(command: GameCommand) -> bool:
 		cmd.iron_upkeep_consumed,
 		cmd.kut_stagnation_drain,
 		cmd.exponential_pasture_multiplier)
+	return true
+
+
+func _handle_configure_offline_doctrine(command: GameCommand) -> bool:
+	var cmd: ConfigureOfflineDoctrineCommand = command as ConfigureOfflineDoctrineCommand
+	if cmd == null:
+		return command.reject("Expected ConfigureOfflineDoctrineCommand.")
+	if cmd.army_id <= 0 or cmd.player_id <= 0:
+		return command.reject("ConfigureOfflineDoctrineCommand requires positive army_id and player_id.")
+
+	var cfg: OfflineDoctrineConfig = OfflineDoctrineConfig.new()
+	cfg.army_id = cmd.army_id
+	cfg.player_id = cmd.player_id
+	cfg.trigger_condition = cmd.trigger_condition
+	cfg.power_ratio_threshold = clampf(_safe_float(cmd.power_ratio_threshold, 1.5), 1.05, 10.0)
+	cfg.low_supply_threshold = clampf(_safe_float(cmd.low_supply_threshold, 0.20), 0.05, 0.85)
+	cfg.action_tactic = cmd.action_tactic
+	cfg.pack_sefer_arabasi = cmd.pack_sefer_arabasi
+	cfg.evade_combat = cmd.evade_combat
+	cfg.target_terrain_class = cmd.target_terrain_class
+	cfg.target_geography_class = cmd.target_geography_class
+
+	_offline_doctrine_configs[cmd.army_id] = cfg
+	cmd.applied = true
+	cmd.applied_summary = cfg.format_summary()
+
+	EventBus.offline_doctrine_configured.emit(
+		cfg.army_id,
+		cfg.trigger_condition,
+		cfg.power_ratio_threshold,
+		cfg.action_tactic,
+		cfg.target_terrain_class,
+		cfg.target_geography_class,
+		cfg.pack_sefer_arabasi,
+		cfg.evade_combat)
 	return true
 
 

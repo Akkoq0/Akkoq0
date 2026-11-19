@@ -190,6 +190,6 @@ signal commander_fallen_in_battle(commander_id: int, army_id: int, player_id: in
 # --- Phase 25 Neo-Steppe HUD & Tactical Map Lenses --------------------------
 signal tactical_lens_changed(previous_lens: GameEnums.TacticalMapLens, new_lens: GameEnums.TacticalMapLens)
 
-
-
-
+# --- Phase 26 Tactical Command UI, Compass, Courier & Standing Doctrine -----
+signal offline_doctrine_configured(army_id: int, trigger_condition: GameEnums.OfflineDoctrineTrigger, power_ratio_threshold: float, action_tactic: GameEnums.TuranTacticPhase, target_terrain_class: GameEnums.TerrainClass, target_geography_class: GameEnums.RegionGeographyClass, pack_sefer_arabasi: bool, evade_combat: bool)
+signal dust_decoy_toggled(army_id: int, player_id: int, is_active: bool)

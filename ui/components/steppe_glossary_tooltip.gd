@@ -1,8 +1,8 @@
 class_name SteppeGlossaryTooltip
 extends Control
-## UI Component (rank 4). Dual-layer hover-lock Glossary Tooltip card for all 11
+## UI Component (rank 4). Dual-layer hover-lock Glossary Tooltip card for all 13
 ## core Ötüken steppe concepts (`Kut`, `Zud`, `Yılkı`, `Ülüş`, `Amanat`, `Tuğ`,
-## `Toy`, `Kurgan`, `Töre Barışı`, `Kara Borsa`, `Veraset`).
+## `Toy`, `Kurgan`, `Töre Barışı`, `Kara Borsa`, `Veraset`, `Kuyu Sabotajı`, `Gazi Mirası`).
 ##
 ## Every resolved tooltip strictly presents 3 structured layers:
 ##   1. Native Steppe Term + Plain Functional Equivalent
@@ -24,6 +24,8 @@ const REQUIRED_TERMS: Array[StringName] = [
 	&"tore_barisi",
 	&"kara_borsa",
 	&"veraset",
+	&"kuyu_sabotaji",
+	&"gazi_mirasi",
 ]
 
 class GlossaryEntry:
@@ -154,6 +156,10 @@ static func normalize_term_id(raw_key: StringName) -> StringName:
 			return &"kara_borsa"
 		"veraset":
 			return &"veraset"
+		"kuyu_sabotaji", "kuyu_kirletme":
+			return &"kuyu_sabotaji"
+		"gazi_mirasi", "komutan_mirasi":
+			return &"gazi_mirasi"
 		_:
 			return &""
 
@@ -259,6 +265,27 @@ static func resolve_entry(term_key: StringName, view_model: OtukenHudViewModel =
 			entry.tone_id = &"ember" if snap.regency_status == GameEnums.RegencyStatus.KURULTAY_SUCCESSION_CRISIS else &"jade"
 			entry.live_impact_line = "Canlı Etki: Nesil %d · %s · Vergi %%%.0f" % [
 				snap.generation, OtukenHudViewModel.format_regency_short(snap.regency_status), snap.regency_tax_multiplier * 100.0]
+		&"kuyu_sabotaji":
+			entry.native_name = "Kuyu Sabotajı"
+			entry.plain_equivalent = "Su Hattı Zehirlenmesi & Susuzluk Şoku"
+			entry.gameplay_function = "Bölge kuyularının kirletilmesi veya Zud'da donması kullanılabilir suyu sıfırlayıp Yılkı kaybı ve moral düşüşü yaratır."
+			entry.tone_id = &"ember" if (snap.water_crisis_active or snap.usable_water_sources <= 0) else &"ice"
+			entry.live_impact_line = "Canlı Etki: Aktif Su Kaynağı %d · Su Krizi %s · Yedek At %%%.0f" % [
+				snap.usable_water_sources, "AKTİF" if snap.water_crisis_active else "Güvenli", snap.remount_horse_ratio * 100.0]
+		&"gazi_mirasi":
+			var cmdr: CommanderProfile = SuccessionManager.get_commander_for_army(snap.tracked_army_id)
+			var s_rules: SuccessionRules = SuccessionManager.get_rules()
+			var vet_score: float = cmdr.veteran_score if cmdr != null else 0.0
+			var scars: int = cmdr.scars if cmdr != null else 0
+			var speed_mult: float = cmdr.get_turan_speed_multiplier(s_rules) if cmdr != null else 1.0
+			var rout_res: float = cmdr.get_cascade_rout_resistance(s_rules) if cmdr != null else 0.0
+			var cmdr_alive: bool = cmdr.is_alive if cmdr != null else true
+			entry.native_name = "Gazi Mirası"
+			entry.plain_equivalent = "Komutan Gaziliği, Yara İzi & Panik Direnci"
+			entry.gameplay_function = "Seferde pişen komutanlar Turan manevra hızını ve panik direncini artırır; düşerse ordu anında komuta şokuna girer."
+			entry.tone_id = &"ember" if not cmdr_alive else (&"gold" if scars > 0 else &"jade")
+			entry.live_impact_line = "Canlı Etki: Gazi %.0f · Yara %d · Turan %.2fx · Direnç %%%.0f (%s)" % [
+				vet_score, scars, speed_mult, rout_res * 100.0, "Sağ" if cmdr_alive else "DÜŞTÜ"]
 		_:
 			pass
 

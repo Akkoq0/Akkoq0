@@ -7,6 +7,7 @@ const RULES_PATH: String = "res://data/logistics/courier_and_caravan_rules.tres"
 
 var _rules: CourierAndCaravanRules = null
 var _orders: Dictionary[StringName, CourierDispatchOrder] = {}
+var _latest_order_by_army: Dictionary[int, StringName] = {}
 var _delivered_orders_by_army: Dictionary[int, Array] = {}
 var _active_dust_decoys: Dictionary[int, bool] = {}
 
@@ -20,15 +21,18 @@ func _ready() -> void:
 			push_error("CourierDispatchSystem: %s" % err)
 	CommandBus.register_handler(DispatchCourierOrderCommand.ID, _handle_dispatch_courier)
 	CommandBus.register_handler(AmbushCourierCommand.ID, _handle_ambush_courier)
+	CommandBus.register_handler(ToggleDustScreenCommand.ID, _handle_toggle_dust_screen)
 
 
 func _exit_tree() -> void:
 	CommandBus.unregister_handler(DispatchCourierOrderCommand.ID, _handle_dispatch_courier)
 	CommandBus.unregister_handler(AmbushCourierCommand.ID, _handle_ambush_courier)
+	CommandBus.unregister_handler(ToggleDustScreenCommand.ID, _handle_toggle_dust_screen)
 
 
 func reset_courier_state() -> void:
 	_orders.clear()
+	_latest_order_by_army.clear()
 	_delivered_orders_by_army.clear()
 	_active_dust_decoys.clear()
 
@@ -41,6 +45,31 @@ func get_order(order_id: StringName) -> CourierDispatchOrder:
 	if _orders.has(order_id):
 		return _orders[order_id]
 	return null
+
+
+func get_active_order_for_army(army_id: int) -> CourierDispatchOrder:
+	var latest_id: StringName = _latest_order_by_army.get(army_id, &"")
+	if latest_id != &"" and _orders.has(latest_id):
+		var latest_ord: CourierDispatchOrder = _orders[latest_id]
+		if latest_ord.status == GameEnums.CourierStatus.IN_TRANSIT:
+			return latest_ord
+	for ord_id: StringName in _orders:
+		var order: CourierDispatchOrder = _orders[ord_id]
+		if order.target_army_id == army_id and order.status == GameEnums.CourierStatus.IN_TRANSIT:
+			return order
+	return null
+
+
+func get_latest_order_for_army(army_id: int) -> CourierDispatchOrder:
+	var latest_id: StringName = _latest_order_by_army.get(army_id, &"")
+	if latest_id != &"" and _orders.has(latest_id):
+		return _orders[latest_id]
+	var found: CourierDispatchOrder = null
+	for ord_id: StringName in _orders:
+		var order: CourierDispatchOrder = _orders[ord_id]
+		if order.target_army_id == army_id:
+			found = order
+	return found
 
 
 func is_order_delivered(order_id: StringName) -> bool:
@@ -159,6 +188,7 @@ func _handle_dispatch_courier(command: GameCommand) -> bool:
 	order.remaining_delay_sec = delay_sec
 	order.status = GameEnums.CourierStatus.IN_TRANSIT
 	_orders[cmd.order_id] = order
+	_latest_order_by_army[cmd.target_army_id] = cmd.order_id
 
 	cmd.computed_delay_sec = delay_sec
 	cmd.status = order.status
@@ -188,4 +218,22 @@ func _handle_ambush_courier(command: GameCommand) -> bool:
 
 	EventBus.courier_ambushed_plan_exposed.emit(
 		order.order_id, order.player_id, cmd.ambusher_faction_id, order.intended_tactic)
+	return true
+
+
+func _handle_toggle_dust_screen(command: GameCommand) -> bool:
+	var cmd: ToggleDustScreenCommand = command as ToggleDustScreenCommand
+	if cmd == null:
+		return command.reject("Expected ToggleDustScreenCommand.")
+	if cmd.army_id <= 0 or cmd.player_id <= 0:
+		return command.reject("ToggleDustScreenCommand requires positive army_id and player_id.")
+	if cmd.enable:
+		var ratio: float = 0.0 if (is_nan(cmd.remount_horse_ratio) or is_inf(cmd.remount_horse_ratio)) else cmd.remount_horse_ratio
+		if not activate_dust_decoy(cmd.army_id, ratio):
+			return command.reject("Insufficient Yılkı remount ratio (min 0.25) to raise Toz Perdesi.")
+	else:
+		clear_dust_decoy(cmd.army_id)
+	var now_active: bool = has_dust_decoy(cmd.army_id)
+	cmd.active_after = now_active
+	EventBus.dust_decoy_toggled.emit(cmd.army_id, cmd.player_id, now_active)
 	return true
