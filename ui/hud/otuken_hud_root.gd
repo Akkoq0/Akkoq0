@@ -736,13 +736,13 @@ func _attach_domain_glossary_strip(slot_id: StringName, slot_box: VBoxContainer)
 	elif slot_id == OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY:
 		terms = [&"kut", &"ulus", &"veraset", &"amanat"]
 	elif slot_id == OtukenHudViewModel.SLOT_MILITARY_HERD:
-		terms = [&"yilki", &"tug", &"gazi_mirasi", &"toy"]
+		terms = [&"yilki", &"tug", &"gazi_mirasi", &"savas_nizami", &"toy"]
 	elif slot_id == OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY:
 		terms = [&"kurgan", &"tore_barisi"]
 	elif slot_id == SLOT_TACTICAL_COMMAND:
-		terms = [&"yilki", &"tug", &"kuyu_sabotaji", &"gazi_mirasi"]
+		terms = [&"yilki", &"tug", &"kuyu_sabotaji", &"gazi_mirasi", &"savas_nizami"]
 	else:
-		terms = [&"amanat", &"ulus", &"kara_borsa"]
+		terms = [&"amanat", &"ulus", &"kara_borsa", &"sistemik_sinerji"]
 
 	for tid: StringName in terms:
 		var badge: Button = Button.new()
@@ -806,29 +806,32 @@ func _apply_pulse_cards(snap: OtukenHudViewModel.PulseSummarySnapshot) -> void:
 
 func _apply_drawer_slot_summaries(snap: OtukenHudViewModel.PulseSummarySnapshot) -> void:
 	var texts: Dictionary[StringName, String] = {
-		OtukenHudViewModel.SLOT_ECONOMY_WATER: "Erzak: %d (Kış Ufku %.1f Mevsim)\nSu Kaynağı: %d · Çelik Kıtlık: %.2fx\nGümüş: %d · Çelik: %d · Zanaatkar: %d" % [
+		OtukenHudViewModel.SLOT_ECONOMY_WATER: "Erzak: %d (Kış Ufku %.1f Mevsim)\nSu Kaynağı: %d · Çelik Kıtlık: %.2fx (Sinerji: %.2fx)\nGümüş: %d · Çelik: %d · Zanaatkar: %d" % [
 			snap.food_reserve, snap.winter_horizon_seasons, snap.usable_water_sources,
-			snap.market_scarcity_steel, snap.silver_bullion, snap.steel_stockpile, snap.artisan_count],
-		OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY: "Kut: %.1f/100 · Meşruiyet: %%%.0f\nHükümdar: %s (Nesil %d) · %s\nDoğrudan Bölge: %d/%d · Tâbi: %d (Sabotaj: %d)" % [
-			snap.kut_score, snap.legitimacy_multiplier * 100.0, snap.ruler_name, snap.generation,
+			snap.market_scarcity_steel, snap.synergy_black_market_mult,
+			snap.silver_bullion, snap.steel_stockpile, snap.artisan_count],
+		OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY: "Kut: %.1f/100 (Drift %s%.2f) · Meşruiyet: %%%.0f\nHükümdar: %s (Nesil %d) · %s\nDoğrudan Bölge: %d/%d · Tâbi: %d (Sabotaj: %d)" % [
+			snap.kut_score, "+" if snap.synergy_kut_drift >= 0.0 else "", snap.synergy_kut_drift,
+			snap.legitimacy_multiplier * 100.0, snap.ruler_name, snap.generation,
 			OtukenHudViewModel.format_regency_short(snap.regency_status), snap.direct_regions, snap.direct_cap,
 			snap.delegated_regions, snap.silent_sabotage_beys],
-		OtukenHudViewModel.SLOT_MILITARY_HERD: "Yılkı Sürüsü: %d · Yedek At: %%%.0f\nİkmal: %s · Kervan Açığı: %.1f\nHız Çarpanı: %.2fx · Ulak: %s" % [
-			snap.yilki_herd_count, snap.remount_horse_ratio * 100.0,
-			"KESİLDİ" if snap.supply_isolated else "Bağlı", snap.caravan_ammo_deficit,
+		OtukenHudViewModel.SLOT_MILITARY_HERD: "Yılkı Sürüsü: %d · Yedek At: %%%.0f · Savaş Gücü: %.2fx\nİkmal: %s · Kervan Açığı: %.1f · Tempo: %.2fx\nHız Çarpanı: %.2fx · Ulak: %s" % [
+			snap.yilki_herd_count, snap.remount_horse_ratio * 100.0, snap.synergy_combat_power_mult,
+			"KESİLDİ" if snap.supply_isolated else "Bağlı", snap.caravan_ammo_deficit, snap.synergy_courier_tempo_mult,
 			snap.expedition_speed_mult, "Yolda" if snap.courier_in_transit else "Hazır"],
 		OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY: "Mevsim: %s · %s\nBölge: %d · Kurgan: %d/%d · Tuğ Yarıçapı: %.0fm\nYeşim Otoritesi: %.2fx · Afet: %s" % [
 			snap.season_display_name, OtukenHudViewModel.format_tore_stage_short(snap.tore_stage),
 			snap.owned_regions, snap.player_kurgans, snap.total_kurgans, snap.tug_radius_m,
 			snap.jade_authority_mult, String(snap.active_cataclysm_id) if snap.active_cataclysm_id != &"" else "Yok"],
-		OtukenHudViewModel.SLOT_WORLD_DIPLOMACY: "Söz Güveni: %.0f/100 · Onur: %.0f · Dehşet: %.0f\nKoalisyon: %s · İç Hizip: %d\nÇöküş Durumu: %s" % [
+		OtukenHudViewModel.SLOT_WORLD_DIPLOMACY: "Söz Güveni: %.0f/100 · Onur: %.0f · Dehşet: %.0f\nKoalisyon: %s (Baskı %.1f) · İç Hizip: %d\nÇöküş: %s · Rezonans: %d (%s)" % [
 			snap.word_reliability, snap.honor_score, snap.dread_score,
-			"AKTİF" if snap.coalition_active else "Yok", snap.active_intrigue_plots,
-			OtukenHudViewModel.format_collapse_state_short(snap.collapse_state)],
-		SLOT_TACTICAL_COMMAND: "Ordu #%d · İkmal %s · Yedek At %%%.0f\nUlak: %s · Toz Perdesi: %s" % [
+			"AKTİF" if snap.coalition_active else "Yok", snap.synergy_coalition_pressure, snap.active_intrigue_plots,
+			OtukenHudViewModel.format_collapse_state_short(snap.collapse_state),
+			snap.synergy_active_resonance_count, snap.synergy_primary_resonance_name],
+		SLOT_TACTICAL_COMMAND: "Ordu #%d · İkmal %s · Yedek At %%%.0f · Nizam %.2fx\nUlak: %s (Tempo %.2fx) · Toz Perdesi: %s" % [
 			snap.tracked_army_id, "KESİLDİ" if snap.supply_isolated else "Bağlı",
-			snap.remount_horse_ratio * 100.0,
-			"Yolda" if snap.courier_in_transit else "Hazır",
+			snap.remount_horse_ratio * 100.0, snap.synergy_combat_power_mult,
+			"Yolda" if snap.courier_in_transit else "Hazır", snap.synergy_courier_tempo_mult,
 			"AÇIK (~2.1x)" if snap.dust_decoy_active else "Kapalı"],
 	}
 	for sid: StringName in texts:
@@ -984,6 +987,7 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.tactical_lens_changed, _on_tactical_lens_changed)
 	_subscribe_bus(EventBus.dust_decoy_toggled, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.offline_doctrine_configured, _on_telemetry_dirty.unbind(8))
+	_subscribe_bus(EventBus.systemic_synergy_evaluated, _on_systemic_synergy_evaluated)
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:
@@ -1082,36 +1086,53 @@ func _mark_input_handled() -> void:
 
 
 func _on_telemetry_dirty() -> void:
+	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
+	refresh_from_viewmodel()
+
+
+func _on_systemic_synergy_evaluated(snapshot: SynergyEvaluationSnapshot) -> void:
+	if _view_model != null:
+		_view_model.notify_synergy_snapshot_observed(snapshot)
 	refresh_from_viewmodel()
 
 
 func _on_yilki_sacrificed(army_id: int, remaining_remount_ratio: float, _morale_drop: float, _kut_penalty: float) -> void:
-	if army_id == tracked_army_id and _view_model != null:
-		_view_model.notify_remount_ratio_observed(remaining_remount_ratio)
+	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
+		if army_id == tracked_army_id:
+			_view_model.notify_remount_ratio_observed(remaining_remount_ratio)
 	refresh_from_viewmodel()
 
 
 func _on_water_crisis_inflicted(army_id: int, _coord: Vector2i, _remount_drain: float, _morale_pen: float, _is_frozen: bool) -> void:
-	if (army_id == tracked_army_id or army_id == player_id) and _view_model != null:
-		_view_model.notify_water_crisis_observed(true)
+	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
+		if army_id == tracked_army_id or army_id == player_id:
+			_view_model.notify_water_crisis_observed(true)
 	refresh_from_viewmodel()
 
 
 func _on_water_source_restored(_coord: Vector2i, _source_id: StringName, restorer_id: int) -> void:
-	if restorer_id == player_id and _view_model != null:
-		_view_model.notify_water_crisis_observed(false)
+	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
+		if restorer_id == player_id:
+			_view_model.notify_water_crisis_observed(false)
 	refresh_from_viewmodel()
 
 
 func _on_coalition_war_declared(_dynasties: PackedStringArray, _kut: float) -> void:
 	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
 		_view_model.notify_coalition_observed(true)
 	refresh_from_viewmodel()
 
 
 func _on_great_khagan_proclaimed(_p_id: int, _owned: int, _total: int, coalition_triggered: bool) -> void:
-	if coalition_triggered and _view_model != null:
-		_view_model.notify_coalition_observed(true)
+	if _view_model != null:
+		_view_model.invalidate_synergy_cache()
+		if coalition_triggered:
+			_view_model.notify_coalition_observed(true)
 	refresh_from_viewmodel()
 
 

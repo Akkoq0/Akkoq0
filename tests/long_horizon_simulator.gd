@@ -80,6 +80,12 @@ class ArchetypeAuditResult:
 	var coalition_seasons: int = 0
 	var truce_blocked_count: int = 0
 	var composite_viability_score: float = 0.0
+	var min_synergy_power_observed: float = 99.0
+	var max_synergy_market_observed: float = 1.0
+	var min_synergy_kut_drift_observed: float = 99.0
+	var max_synergy_kut_drift_observed: float = -99.0
+	var max_synergy_coalition_pressure_observed: float = 0.0
+	var total_synergy_resonances_fired: int = 0
 
 	func passed() -> bool:
 		return violations.is_empty()
@@ -502,6 +508,23 @@ static func _capture_snapshot(
 	snap.artisans_count = CaravanLogisticsManager.get_artisan_count(pid)
 	snap.active_kurgans = TerritoryManager.count_player_kurgans(pid)
 	snap.collapse_state = CollapseRecoveryFSM.get_player_state(pid)
+	var syn_snap: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		pid,
+		army_id,
+		cur_coord,
+		false,
+		snap.active_troops,
+		-1.0,
+		snap.turan_phase,
+		snap.glory_score,
+		snap.remount_horse_ratio)
+	if syn_snap != null:
+		snap.synergy_combat_power_mult = syn_snap.effective_combat_power_mult
+		snap.synergy_black_market_mult = syn_snap.black_market_scarcity_mult
+		snap.synergy_kut_drift = syn_snap.kut_entropy_net_drift
+		snap.synergy_courier_tempo_mult = syn_snap.courier_tempo_mult
+		snap.synergy_coalition_pressure = syn_snap.coalition_pressure_score
+		snap.synergy_active_resonances = syn_snap.get_resonance_count()
 	return snap
 
 
@@ -510,6 +533,7 @@ static func _reset_shared_audit_state(pid: int) -> void:
 	TerritoryManager.reset_territory_state()
 	CollapseRecoveryFSM.reset_collapse_state()
 	CourierDispatchSystem.reset_courier_state()
+	IntelligenceManager.reset_intelligence_state()
 	CaravanLogisticsManager.reset_logistics_state()
 	GovernanceManager.reset_governance_state()
 	ReputationAndPactSystem.reset_reputation_state()
@@ -852,6 +876,12 @@ static func run_archetype_audit(
 		result.min_reliability_observed = minf(result.min_reliability_observed, snap.word_reliability)
 		if snap.coalition_war_active:
 			result.coalition_seasons += 1
+		result.min_synergy_power_observed = minf(result.min_synergy_power_observed, snap.synergy_combat_power_mult)
+		result.max_synergy_market_observed = maxf(result.max_synergy_market_observed, snap.synergy_black_market_mult)
+		result.min_synergy_kut_drift_observed = minf(result.min_synergy_kut_drift_observed, snap.synergy_kut_drift)
+		result.max_synergy_kut_drift_observed = maxf(result.max_synergy_kut_drift_observed, snap.synergy_kut_drift)
+		result.max_synergy_coalition_pressure_observed = maxf(result.max_synergy_coalition_pressure_observed, snap.synergy_coalition_pressure)
+		result.total_synergy_resonances_fired += snap.synergy_active_resonances
 
 		var step_errs: PackedStringArray = SimulationInvariantChecker.validate_snapshot(snap, max_ore_cap, 5000)
 		for err: String in step_errs:

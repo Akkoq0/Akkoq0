@@ -84,6 +84,21 @@ func get_proxy_war(warband_id: StringName) -> ProxyWarContract:
 	return null
 
 
+func get_proxy_war_count_by(sponsor_id: int) -> int:
+	if sponsor_id <= 0:
+		return 0
+	var count: int = 0
+	for wb_id: StringName in _proxy_wars:
+		var contract: ProxyWarContract = _proxy_wars[wb_id]
+		if contract != null and contract.sponsor_id == sponsor_id:
+			count += 1
+	return count
+
+
+func has_active_proxy_war_by(sponsor_id: int) -> bool:
+	return get_proxy_war_count_by(sponsor_id) > 0
+
+
 func is_amanat_truce_active(party_a: int, party_b: int) -> bool:
 	for pid: StringName in _pacts:
 		var rec: AmanatPactRecord = _pacts[pid]

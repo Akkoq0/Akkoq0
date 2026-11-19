@@ -360,6 +360,15 @@ enum TacticalMapLens {
 	INTELLIGENCE_DUST = 4, ## İstihbarat ağı & Yılkı Toz Perdesi merceği
 }
 
+## Phase 26A Unified Systemic Synergy cross-domain resonance identifiers (`SystemicSynergyMatrix`).
+enum SynergyResonanceId {
+	SHADOW_FAMINE_STRIKE = 0, ## Gölge Kıtlık Darbesi: Örtülü vekalet savaşı + Kuyu sabotajı + Kara borsa kıtlık sıçraması
+	DREAD_MIRAGE_TRAP = 1, ## Dehşet Serap Kapanı: Yüksek Dehşet + Yılkı Toz Perdesi + Hilal Kuşatma
+	ARTISAN_BORU_SPEARHEAD = 2, ## Zanaatkar Börü Mızrak Başı: Zanaatkar + Gazi komutan + Çelik/Gök Demiri
+	TORE_KURULTAY_NETWORK = 3, ## Töre Kurultayı Ağı: Yönetişim sınırı içi + Yüksek Onur/Töre + Düşük Ülüş küskünlüğü
+	EXILE_KINGMAKER_NET = 4, ## Yersiz Yurtsuz Kral-Yapıcı Ağı: Sürgün + Ele geçirilen ulak + İstihbarat ticareti
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

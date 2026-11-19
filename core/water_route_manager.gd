@@ -88,6 +88,26 @@ func count_usable_water_sources(coord: Vector2i, season_type: GameEnums.SeasonTy
 	return count
 
 
+func count_registered_water_sources(coord: Vector2i) -> int:
+	if not _sources_by_region.has(coord):
+		return 0
+	return _sources_by_region[coord].size()
+
+
+func count_sabotaged_water_sources(coord: Vector2i) -> int:
+	if not _sources_by_region.has(coord):
+		return 0
+	var ids: PackedStringArray = _sources_by_region[coord]
+	var count: int = 0
+	for sid_str: String in ids:
+		var sid: StringName = StringName(sid_str)
+		if _sources_by_id.has(sid):
+			var node: WaterSourceNode = _sources_by_id[sid]
+			if node != null and node.contaminated_seasons_remaining > 0:
+				count += 1
+	return count
+
+
 func contaminate_region_wells(coord: Vector2i, duration_seasons: int = 3, saboteur_id: int = 0, specific_source_id: StringName = &"") -> int:
 	if not _sources_by_region.has(coord):
 		return 0

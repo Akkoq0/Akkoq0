@@ -9,6 +9,7 @@ const BULLION_ORE_PATH: String = "res://data/ores/silver_gold.tres"
 var _rules: CollapseRecoveryRules = null
 var _bullion_ore: OreData = null
 var _records: Dictionary[int, CollapseRecord] = {}
+var _exile_intel_sales_count: Dictionary[int, int] = {}
 
 
 func _ready() -> void:
@@ -30,6 +31,11 @@ func _exit_tree() -> void:
 
 func reset_collapse_state() -> void:
 	_records.clear()
+	_exile_intel_sales_count.clear()
+
+
+func get_exile_intel_sales_count(player_id: int) -> int:
+	return _exile_intel_sales_count.get(player_id, 0)
 
 
 func get_rules() -> CollapseRecoveryRules:
@@ -239,6 +245,7 @@ func perform_exile_intel_sale(exile_id: int, buyer_id: int, target_army_id: int 
 	CommandBus.dispatch(DepositResourcesCommand.new(exile_id, &"meteoric_iron", reward))
 	var hope_gain: float = _rules.exile_hope_gain_per_operation if _rules != null else 18.0
 	rec.exile_hope_loyalty = clampf(rec.exile_hope_loyalty + hope_gain, 0.0, 100.0)
+	_exile_intel_sales_count[exile_id] = _exile_intel_sales_count.get(exile_id, 0) + 1
 	return true
 
 

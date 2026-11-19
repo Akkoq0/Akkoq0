@@ -258,6 +258,23 @@ func get_active_coalition_members() -> PackedStringArray:
 	return _coalition_members
 
 
+## Pure read-only threat sum across rival dynasties and diplomatic escalation incidents.
+func get_total_hostile_threat_events_sum(player_kut: float = -1.0) -> float:
+	var active_kut: float = _safe_float(player_kut, GameManager.get_kut_score(), 0.0, 100.0) if player_kut >= 0.0 else GameManager.get_kut_score()
+	var total: float = _recent_assassination_infamy + _spy_exposure_penalty
+	var glory_det: float = clampf((_tracked_kagan_glory - 30.0) * 0.45, 0.0, 26.0)
+	for dynasty_id: StringName in _profiles:
+		var profile: DynastyProfile = _profiles[dynasty_id]
+		var current_trust: float = _trust_scores.get(dynasty_id, profile.trust_index)
+		var base_threat: float = profile.calculate_threat_score(active_kut, _player_army_size, _raid_frequency, current_trust)
+		var eff_threat: float = clampf(base_threat - _espionage_deterrence_bonus - glory_det, 0.0, 100.0)
+		if eff_threat > profile.neutral_threshold:
+			total += maxf(eff_threat - profile.neutral_threshold, 0.0)
+	if _coalition_war_active:
+		total += 15.0 * float(_coalition_members.size())
+	return clampf(total, 0.0, 500.0)
+
+
 func _handle_evaluate_diplomacy(command: GameCommand) -> bool:
 	var eval_cmd: EvaluateDiplomacyCommand = command as EvaluateDiplomacyCommand
 	if eval_cmd == null:

@@ -1,8 +1,9 @@
 class_name SteppeGlossaryTooltip
 extends Control
-## UI Component (rank 4). Dual-layer hover-lock Glossary Tooltip card for all 13
+## UI Component (rank 4). Dual-layer hover-lock Glossary Tooltip card for all 15
 ## core Ötüken steppe concepts (`Kut`, `Zud`, `Yılkı`, `Ülüş`, `Amanat`, `Tuğ`,
-## `Toy`, `Kurgan`, `Töre Barışı`, `Kara Borsa`, `Veraset`, `Kuyu Sabotajı`, `Gazi Mirası`).
+## `Toy`, `Kurgan`, `Töre Barışı`, `Kara Borsa`, `Veraset`, `Kuyu Sabotajı`,
+## `Gazi Mirası`, `Savaş Nizamı`, `Sistemik Sinerji`).
 ##
 ## Every resolved tooltip strictly presents 3 structured layers:
 ##   1. Native Steppe Term + Plain Functional Equivalent
@@ -26,6 +27,8 @@ const REQUIRED_TERMS: Array[StringName] = [
 	&"veraset",
 	&"kuyu_sabotaji",
 	&"gazi_mirasi",
+	&"savas_nizami",
+	&"sistemik_sinerji",
 ]
 
 class GlossaryEntry:
@@ -160,6 +163,10 @@ static func normalize_term_id(raw_key: StringName) -> StringName:
 			return &"kuyu_sabotaji"
 		"gazi_mirasi", "komutan_mirasi":
 			return &"gazi_mirasi"
+		"savas_nizami", "muharebe_nizami", "ikmal_nizami":
+			return &"savas_nizami"
+		"sistemik_sinerji", "sinerji_matrisi", "denge_motoru":
+			return &"sistemik_sinerji"
 		_:
 			return &""
 
@@ -286,6 +293,24 @@ static func resolve_entry(term_key: StringName, view_model: OtukenHudViewModel =
 			entry.tone_id = &"ember" if not cmdr_alive else (&"gold" if scars > 0 else &"jade")
 			entry.live_impact_line = "Canlı Etki: Gazi %.0f · Yara %d · Turan %.2fx · Direnç %%%.0f (%s)" % [
 				vet_score, scars, speed_mult, rout_res * 100.0, "Sağ" if cmdr_alive else "DÜŞTÜ"]
+		&"savas_nizami":
+			entry.native_name = "Savaş Nizamı"
+			entry.plain_equivalent = "Harmonize İkmal Darboğazı & Çarpımsal Savaş Gücü"
+			entry.gameplay_function = "Su ve Yılkı darboğazını, Zanaatkar ustalığını, Gazi komutan eğrisini ve Ülüş sabotajını bileşik muharebe çarpanında birleştirir."
+			entry.tone_id = &"ember" if snap.synergy_combat_power_mult < 0.70 else (&"gold" if snap.synergy_combat_power_mult < 0.95 else &"jade")
+			entry.live_impact_line = "Canlı Etki: Savaş Gücü %.2fx · Tempo %.2fx · Yedek At %%%.0f" % [
+				snap.synergy_combat_power_mult, snap.synergy_courier_tempo_mult, snap.remount_horse_ratio * 100.0]
+		&"sistemik_sinerji":
+			entry.native_name = "Sistemik Sinerji"
+			entry.plain_equivalent = "Birleşik Denge Matrisi & Çapraz Rezonans"
+			entry.gameplay_function = "Kara borsa kıtlığını, Kut entropisi sürüklenmesini, ulak temposunu ve Dehşet-Onur koalisyon baskısını kapalı form dengede tutar."
+			entry.tone_id = &"ember" if (snap.synergy_kut_drift < -1.5 or snap.synergy_coalition_pressure >= 60.0) else (&"gold" if snap.synergy_active_resonance_count > 0 else &"jade")
+			entry.live_impact_line = "Canlı Etki: Kut Drift %s%.2f · Pazar %.2fx · Rezonans %d (%s)" % [
+				"+" if snap.synergy_kut_drift >= 0.0 else "",
+				snap.synergy_kut_drift,
+				snap.synergy_black_market_mult,
+				snap.synergy_active_resonance_count,
+				snap.synergy_primary_resonance_name]
 		_:
 			pass
 

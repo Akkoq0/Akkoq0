@@ -92,6 +92,27 @@ func get_delivered_order_count(army_id: int) -> int:
 	return _delivered_orders_by_army[army_id].size()
 
 
+func has_ambushed_courier_intercepted_by(ambusher_id: int) -> bool:
+	if ambusher_id <= 0:
+		return false
+	for ord_id: StringName in _orders:
+		var order: CourierDispatchOrder = _orders[ord_id]
+		if order != null and order.status == GameEnums.CourierStatus.AMBUSHED_LOST and order.exposed_to_faction_id == ambusher_id:
+			return true
+	return false
+
+
+func is_player_plan_exposed_by_courier(player_id: int, army_id: int = -1) -> bool:
+	if player_id <= 0:
+		return false
+	for ord_id: StringName in _orders:
+		var order: CourierDispatchOrder = _orders[ord_id]
+		if order != null and order.status == GameEnums.CourierStatus.AMBUSHED_LOST and order.player_id == player_id:
+			if army_id <= 0 or order.target_army_id == army_id:
+				return true
+	return false
+
+
 ## Advances physical transit of all active mounted couriers by `dt_sec` seconds.
 func step_courier_transit(dt_sec: float) -> int:
 	var dt: float = maxf(dt_sec, 0.0)

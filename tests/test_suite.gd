@@ -123,6 +123,7 @@ func _run_suite() -> void:
 	_test_phase24_commander_legacy_and_succession_crisis()
 	_test_phase25_neo_steppe_ui_and_hud()
 	_test_phase26_tactical_ui_and_compass()
+	_test_phase26a_systemic_synergy_and_equilibrium()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -4505,11 +4506,11 @@ func _test_phase26_tactical_ui_and_compass() -> void:
 	EventBus.dust_decoy_toggled.emit(999, 999, false)
 	EventBus.offline_doctrine_configured.emit(999, GameEnums.OfflineDoctrineTrigger.NONE, 1.5, GameEnums.TuranTacticPhase.RECON_DUST_SCREEN, GameEnums.TerrainClass.SIK_ORMAN, GameEnums.RegionGeographyClass.FOREST_EDGE, false, false)
 
-	# 6. 13-Term Glossary Expansion: Kuyu Sabotajı & Gazi Mirası
-	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() == 13 \
+	# 6. Glossary Expansion: Kuyu Sabotajı & Gazi Mirası (+ Phase 26A terms)
+	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() >= 13 \
 		and SteppeGlossaryTooltip.normalize_term_id(&"Kuyu Sabotajı") == &"kuyu_sabotaji" \
 		and SteppeGlossaryTooltip.normalize_term_id(&"Gazi Mirası") == &"gazi_mirasi",
-		"SteppeGlossaryTooltip covers all 13 canonical terms including Turkish normalization for Kuyu Sabotajı and Gazi Mirası.")
+		"SteppeGlossaryTooltip covers >=13 canonical terms including Turkish normalization for Kuyu Sabotajı and Gazi Mirası.")
 
 	var hud_vm: OtukenHudViewModel = OtukenHudViewModel.new(2601, 2601)
 	var kuyu_calm: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kuyu_sabotaji", hud_vm)
@@ -4550,3 +4551,334 @@ func _test_phase26_tactical_ui_and_compass() -> void:
 	DiplomacyManager.step_seasonal_diplomatic_decay(20)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
 
+
+func _test_phase26a_systemic_synergy_and_equilibrium() -> void:
+	# 1. Clean Baseline Reset & Data / DAG Gate
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	RegionalMarketEngine.reset_market_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	IntelligenceManager.reset_intelligence_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p26a_baseline_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+	var syn_rules: SystemicSynergyRules = ResourceLoader.load(SystemicSynergyMatrix.RULES_PATH) as SystemicSynergyRules
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(syn_rules != null and syn_rules.get_validation_errors().is_empty() and arch_errors.is_empty(),
+		"SystemicSynergyRules loads with 0 validation errors and ArchitectureVerifier confirms 0 DAG/typing violations.")
+
+	# 2. Eq 1 Unit + NaN/INF Proofs (Harmonic Bottleneck, Michaelis-Menten Artisans, Inverted-U Commander)
+	var l_full: float = SystemicSynergyMatrix.compute_harmonic_supply_factor(1.0, 1.0, syn_rules)
+	var l_no_water: float = SystemicSynergyMatrix.compute_harmonic_supply_factor(0.0, 1.0, syn_rules)
+	var l_no_yilki: float = SystemicSynergyMatrix.compute_harmonic_supply_factor(1.0, 0.0, syn_rules)
+	var l_nan: float = SystemicSynergyMatrix.compute_harmonic_supply_factor(NAN, -INF, syn_rules)
+	_expect(is_equal_approx(l_full, 1.0) \
+		and l_no_water <= 0.35 and l_no_yilki <= 0.35 and l_no_water < l_no_yilki \
+		and not is_nan(l_nan) and not is_inf(l_nan) and l_nan >= 0.25 and l_nan <= 1.0,
+		"Eq 1A Harmonic Bottleneck drops steeply when either Water (%.3f) or Yılkı (%.3f) is starving and guards NaN/INF." % [
+			l_no_water, l_no_yilki])
+
+	var q_0: float = SystemicSynergyMatrix.compute_artisan_quality_factor(0, syn_rules)
+	var q_8: float = SystemicSynergyMatrix.compute_artisan_quality_factor(8, syn_rules)
+	var q_16: float = SystemicSynergyMatrix.compute_artisan_quality_factor(16, syn_rules)
+	var q_sat: float = SystemicSynergyMatrix.compute_artisan_quality_factor(1000, syn_rules)
+	_expect(is_equal_approx(q_0, 1.0) \
+		and q_8 > q_0 and q_16 > q_8 \
+		and (q_16 - q_8) < (q_8 - q_0) \
+		and q_sat < 1.45,
+		"Eq 1B Michaelis-Menten artisans yield diminishing returns (%.3f -> %.3f -> %.3f) strictly < 1.45." % [
+			q_8, q_16, q_sat])
+
+	var m_rookie: float = SystemicSynergyMatrix.compute_commander_career_factor(0.0, 0.0, 24.0, true, syn_rules)
+	var m_prime: float = SystemicSynergyMatrix.compute_commander_career_factor(60.0, 0.0, 34.0, true, syn_rules)
+	var m_aged_wounded: float = SystemicSynergyMatrix.compute_commander_career_factor(60.0, 70.0, 72.0, true, syn_rules)
+	var m_fallen: float = SystemicSynergyMatrix.compute_commander_career_factor(120.0, 0.0, 34.0, false, syn_rules)
+	_expect(is_equal_approx(m_rookie, 1.0) \
+		and m_prime > m_rookie \
+		and m_aged_wounded < m_prime \
+		and is_equal_approx(m_fallen, 0.55),
+		"Eq 1C Inverted-U Commander Curve peaks in prime veteran age (%.3f), declines with age/wounds (%.3f), drops to 0.55 if fallen." % [
+			m_prime, m_aged_wounded])
+
+	var eq1_extreme: Dictionary[StringName, float] = SystemicSynergyMatrix.compute_combat_power_components(
+		0.0, 500, 1.0, 1.0, 5000.0, 0.0, 30.0, 0.0, true, syn_rules)
+	var eq1_nan: Dictionary[StringName, float] = SystemicSynergyMatrix.compute_combat_power_components(
+		NAN, -5, INF, NAN, NAN, INF, -INF, NAN, true, syn_rules)
+	_expect(eq1_extreme[&"effective_power_mult"] >= 0.0 and eq1_extreme[&"effective_power_mult"] <= 3.0 \
+		and not is_nan(eq1_nan[&"effective_power_mult"]) and not is_inf(eq1_nan[&"effective_power_mult"]) \
+		and eq1_nan[&"effective_power_mult"] >= 0.0 and eq1_nan[&"effective_power_mult"] <= 3.0,
+		"Eq 1 full effective_combat_power_mult stays finite and bounded [0.0, 3.0] under extreme & NaN/INF inputs.")
+
+	# 3. Eq 2 Unit + <= 3.4x Cap & Honor Damping Proof
+	var bm_calm: float = SystemicSynergyMatrix.compute_black_market_multiplier(0.0, 0.0, 0.0, 0, 50.0, syn_rules)
+	var bm_low_honor: float = SystemicSynergyMatrix.compute_black_market_multiplier(0.6, 0.8, 0.5, 2, 0.0, syn_rules)
+	var bm_high_honor: float = SystemicSynergyMatrix.compute_black_market_multiplier(0.6, 0.8, 0.5, 2, 100.0, syn_rules)
+	var bm_extreme: float = SystemicSynergyMatrix.compute_black_market_multiplier(999.0, 999.0, 999.0, 100, 0.0, syn_rules)
+	var bm_inf: float = SystemicSynergyMatrix.compute_black_market_multiplier(INF, NAN, INF, 50, NAN, syn_rules)
+	_expect(is_equal_approx(bm_calm, 1.0) \
+		and bm_high_honor < bm_low_honor \
+		and bm_extreme >= 1.0 and bm_extreme <= 3.4001 \
+		and not is_nan(bm_inf) and not is_inf(bm_inf) and bm_inf >= 1.0 and bm_inf <= 3.4001,
+		"Eq 2 Black Market Tanh elasticity damps via Honor (%.3fx < %.3fx) and strictly caps at <=3.40x (ext=%.4fx)." % [
+			bm_high_honor, bm_low_honor, bm_extreme])
+
+	# 4. Eq 3 Dynamic Kut Entropy / Anti-Snowball Attractor Proof
+	var drift_balanced: float = SystemicSynergyMatrix.compute_kut_entropy_drift(
+		45.0, 2, 75.0, 200, 0, GameEnums.RegencyStatus.STABLE_RULE, 0.0, syn_rules)
+	var drift_overextended: float = SystemicSynergyMatrix.compute_kut_entropy_drift(
+		45.0, 2, 50.0, 380, 3, GameEnums.RegencyStatus.STABLE_RULE, 0.25, syn_rules)
+	var drift_snowball: float = SystemicSynergyMatrix.compute_kut_entropy_drift(
+		60.0, 2, 40.0, 650, 4, GameEnums.RegencyStatus.KURULTAY_SUCCESSION_CRISIS, 0.80, syn_rules)
+	var drift_nan: float = SystemicSynergyMatrix.compute_kut_entropy_drift(
+		INF, 999, NAN, 99999, 50, GameEnums.RegencyStatus.KURULTAY_SUCCESSION_CRISIS, INF, syn_rules)
+	_expect(drift_balanced > 0.0 \
+		and drift_overextended < 0.0 \
+		and drift_snowball < -5.0 and drift_snowball < drift_overextended \
+		and not is_nan(drift_nan) and not is_inf(drift_nan) \
+		and drift_nan >= -18.0 and drift_nan <= 18.0,
+		"Eq 3 Anti-Snowball Attractor sustains balanced rule (%+.2f) while dragging bloated empire (%+.2f) inside [-18, +18]." % [
+			drift_balanced, drift_snowball])
+
+	# 5. Eq 4 & Eq 5 Proofs (Courier Tempo & Coalition Pressure)
+	var tempo_base: float = SystemicSynergyMatrix.compute_courier_tempo_multiplier(1.0, 0.0, 0.0, 0.0, syn_rules)
+	var tempo_boosted: float = SystemicSynergyMatrix.compute_courier_tempo_multiplier(2.1, 1.0, 0.0, 0.0, syn_rules)
+	var tempo_delayed: float = SystemicSynergyMatrix.compute_courier_tempo_multiplier(2.1, 1.0, 25.0, 0.0, syn_rules)
+	var tempo_exposed: float = SystemicSynergyMatrix.compute_courier_tempo_multiplier(2.1, 1.0, 0.0, 1.0, syn_rules)
+	var tempo_nan: float = SystemicSynergyMatrix.compute_courier_tempo_multiplier(INF, NAN, INF, INF, syn_rules)
+	_expect(is_equal_approx(tempo_base, 1.0) \
+		and tempo_boosted > tempo_base \
+		and tempo_delayed < tempo_boosted \
+		and tempo_exposed < tempo_boosted * 0.50 \
+		and not is_nan(tempo_nan) and not is_inf(tempo_nan) and tempo_nan >= 0.35 and tempo_nan <= 1.85,
+		"Eq 4 Courier Tempo rewards mirage+Gazi (%.2fx), damps via log delay (%.2fx), and cuts by 55%% on exposed doctrine (%.2fx)." % [
+			tempo_boosted, tempo_delayed, tempo_exposed])
+
+	var cp_calm: float = SystemicSynergyMatrix.compute_coalition_pressure(0.0, 20.0, 0.0, syn_rules)
+	var cp_dread: float = SystemicSynergyMatrix.compute_coalition_pressure(80.0, 20.0, 0.0, syn_rules)
+	var cp_honor_damped: float = SystemicSynergyMatrix.compute_coalition_pressure(80.0, 20.0, 100.0, syn_rules)
+	var cp_nan: float = SystemicSynergyMatrix.compute_coalition_pressure(INF, INF, NAN, syn_rules)
+	_expect(is_equal_approx(cp_calm, 20.0) \
+		and is_equal_approx(cp_dread, 36.0) \
+		and is_equal_approx(cp_honor_damped, 23.4) \
+		and not is_nan(cp_nan) and not is_inf(cp_nan) and cp_nan >= 0.0 and cp_nan <= 500.0,
+		"Eq 5 Dread-Honor Coalition Pressure scales Dread (%.1f -> %.1f) and applies -35%% max Honor damping (%.1f)." % [
+			cp_calm, cp_dread, cp_honor_damped])
+
+	# 6. All 5 Cross-System Resonances via Live Managers/Commands (Positive & Negative Boundary Checks)
+	var pid_1: int = 2651
+	var victim_1: int = 2659
+	var coord_1: Vector2i = Vector2i(26, 1)
+	GracePeriodManager.configure_persistent_world(true, 0.0)
+	GracePeriodManager.register_player(pid_1, false, Vector2i(12, 12), 1)
+	GracePeriodManager.register_player(victim_1, false, Vector2i(12, 12), 2)
+	GracePeriodManager.advance_world_hours(90.0)
+	TerritoryManager.register_region(coord_1, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, victim_1, false, false, 100.0)
+	WaterRouteManager.register_water_source(coord_1, &"w_2651", GameEnums.WaterSourceType.WELL, victim_1)
+	CommandBus.dispatch(DepositResourcesCommand.new(pid_1, &"silver_gold", 150))
+
+	# 6A. SHADOW_FAMINE_STRIKE
+	var proxy_cmd: SponsorProxyWarCommand = SponsorProxyWarCommand.new(pid_1, &"wb_26a_shadow", victim_1, 45, 0.85)
+	_expect(CommandBus.dispatch(proxy_cmd), "Proxy war sponsored for Shadow Famine resonance verification.")
+	var snap_shadow_neg: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_1, 2651, coord_1, false)
+	var sab_cmd: SabotageWellCommand = SabotageWellCommand.new(pid_1, coord_1, &"w_2651", 3)
+	var sab_dispatched: bool = CommandBus.dispatch(sab_cmd)
+	RegionalMarketEngine.boost_scarcity(coord_1, &"steel", 0.60, &"p26a_shadow_spike")
+	var snap_shadow_pos: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_1, 2651, coord_1, false)
+	_expect(sab_dispatched \
+		and not snap_shadow_neg.has_resonance(GameEnums.SynergyResonanceId.SHADOW_FAMINE_STRIKE) \
+		and snap_shadow_pos.has_resonance(GameEnums.SynergyResonanceId.SHADOW_FAMINE_STRIKE) \
+		and snap_shadow_pos.black_market_scarcity_mult >= 1.45,
+		"Resonance #1 SHADOW_FAMINE_STRIKE stays off without well sabotage and activates once Proxy + Sabotage + Market >=1.45x align.")
+
+	# 6B. DREAD_MIRAGE_TRAP
+	ReputationAndPactSystem.record_dread_act(pid_1, 65.0, 0.0)
+	var snap_dread_nodust: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		pid_1, 2651, coord_1, false, 200, -1.0, GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	CommandBus.dispatch(ToggleDustScreenCommand.new(2651, pid_1, true, 1.0))
+	var snap_dread_wrongphase: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		pid_1, 2651, coord_1, false, 200, -1.0, GameEnums.TuranTacticPhase.RECON_DUST_SCREEN)
+	var snap_dread_pos: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		pid_1, 2651, coord_1, false, 200, -1.0, GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	_expect(not snap_dread_nodust.has_resonance(GameEnums.SynergyResonanceId.DREAD_MIRAGE_TRAP) \
+		and not snap_dread_wrongphase.has_resonance(GameEnums.SynergyResonanceId.DREAD_MIRAGE_TRAP) \
+		and snap_dread_pos.has_resonance(GameEnums.SynergyResonanceId.DREAD_MIRAGE_TRAP),
+		"Resonance #2 DREAD_MIRAGE_TRAP strictly requires high Dread + Dust Screen + Crescent Encirclement simultaneously.")
+
+	# 6C. ARTISAN_BORU_SPEARHEAD
+	var pid_2: int = 2652
+	var army_2: int = 2652
+	var coord_2: Vector2i = Vector2i(26, 2)
+	CommandBus.dispatch(DepositResourcesCommand.new(pid_2, &"steel", 10))
+	SuccessionManager.register_commander(2652, pid_2, army_2, &"Börte", 108, GameEnums.CommanderTrait.BORU_YUREK)
+	SuccessionManager.record_commander_battle_experience(army_2, 45.0)
+	CaravanLogisticsManager.set_artisan_count(pid_2, 5)
+	var snap_art_neg_low: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_2, army_2, coord_2, false)
+	CaravanLogisticsManager.set_artisan_count(pid_2, 10)
+	var snap_art_pos: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_2, army_2, coord_2, false)
+	SuccessionManager.inflict_commander_battle_trauma(army_2, true)
+	var snap_art_neg_dead: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_2, army_2, coord_2, false)
+	_expect(not snap_art_neg_low.has_resonance(GameEnums.SynergyResonanceId.ARTISAN_BORU_SPEARHEAD) \
+		and snap_art_pos.has_resonance(GameEnums.SynergyResonanceId.ARTISAN_BORU_SPEARHEAD) \
+		and not snap_art_neg_dead.has_resonance(GameEnums.SynergyResonanceId.ARTISAN_BORU_SPEARHEAD),
+		"Resonance #3 ARTISAN_BORU_SPEARHEAD activates for >=8 artisans + living veteran commander + Steel and drops upon fallen commander or low artisans.")
+
+	# 6D. TORE_KURULTAY_NETWORK
+	var pid_3: int = 2653
+	TerritoryManager.register_region(Vector2i(26, 10), GameEnums.RegionGeographyClass.SACRED_CORE, pid_3, true, true, 100.0)
+	TerritoryManager.register_region(Vector2i(26, 11), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, pid_3, false, false, 100.0)
+	TerritoryManager.register_region(Vector2i(26, 12), GameEnums.RegionGeographyClass.FOREST_EDGE, pid_3, false, false, 100.0)
+	TerritoryManager.register_region(Vector2i(26, 13), GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, pid_3, false, false, 100.0)
+	CommandBus.dispatch(DelegateRegionToVassalCommand.new(pid_3, Vector2i(26, 13), &"loyal_bey_2653", GameEnums.VassalPersonalityTrait.LOYAL))
+	CommandBus.dispatch(SignUlusContractCommand.new(&"loyal_bey_2653", 50.0, 50.0))
+	ReputationAndPactSystem.record_honor_act(pid_3, 25.0, 0.0)
+	var snap_tore_pos: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_3, 2653, Vector2i(26, 10), false)
+	TerritoryManager.register_region(Vector2i(26, 14), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, pid_3, false, false, 100.0)
+	var snap_tore_neg_cap: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(pid_3, 2653, Vector2i(26, 10), false)
+	_expect(snap_tore_pos.has_resonance(GameEnums.SynergyResonanceId.TORE_KURULTAY_NETWORK) \
+		and not snap_tore_neg_cap.has_resonance(GameEnums.SynergyResonanceId.TORE_KURULTAY_NETWORK),
+		"Resonance #4 TORE_KURULTAY_NETWORK activates within <=3 direct regions + high Honor + loyal Ülüş and cancels at 4th direct region.")
+
+	# 6E. EXILE_KINGMAKER_NET
+	var exile_id: int = 2654
+	var rival_a: int = 2655
+	var rival_army: int = 2655
+	var forest_terrain: TerrainData = ResourceLoader.load("res://data/terrain/forest.tres") as TerrainData
+	CommandBus.dispatch(TriggerCollapseCommand.new(exile_id, rival_a))
+	CommandBus.dispatch(SelectCollapsePathCommand.new(exile_id, GameEnums.CollapsePathChoice.FLEE_HOMELESS_EXILE, 0.20, 1))
+	var snap_exile_neg1: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(exile_id, 2654, Vector2i(26, 20), false)
+	CommandBus.dispatch(DispatchCourierOrderCommand.new(
+		&"ord_26a_leak", rival_a, rival_army, &"redeploy",
+		GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE, Vector3.ZERO, Vector3(180.0, 0.0, 0.0)))
+	CommandBus.dispatch(AmbushCourierCommand.new(&"ord_26a_leak", exile_id))
+	var snap_exile_neg2: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(exile_id, 2654, Vector2i(26, 20), false)
+	var rival_exposed_snap: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(rival_a, rival_army, Vector2i(26, 20), false)
+	var sale_ok: bool = CollapseRecoveryFSM.perform_exile_intel_sale(exile_id, rival_a + 1, rival_army, forest_terrain)
+	var snap_exile_pos: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(exile_id, 2654, Vector2i(26, 20), false)
+	_expect(sale_ok \
+		and not snap_exile_neg1.has_resonance(GameEnums.SynergyResonanceId.EXILE_KINGMAKER_NET) \
+		and not snap_exile_neg2.has_resonance(GameEnums.SynergyResonanceId.EXILE_KINGMAKER_NET) \
+		and rival_exposed_snap.doctrine_exposed and rival_exposed_snap.courier_tempo_mult < 0.50 \
+		and snap_exile_pos.has_resonance(GameEnums.SynergyResonanceId.EXILE_KINGMAKER_NET),
+		"Resonance #5 EXILE_KINGMAKER_NET requires HOMELESS_EXILE + intercepted courier + exile intel sale (and victim courier ambush cuts tempo to %.2fx)." % rival_exposed_snap.courier_tempo_mult)
+
+	# 7. EventBus -> OtukenHudRoot -> OtukenHudViewModel -> 15-Term Glossary & Zero Signal Leak Audit
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var base_syn_subs: int = EventBus.get_signal_connection_list(&"systemic_synergy_evaluated").size()
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(pid_1, 2651)
+	add_child(hud)
+	var sub_added_ok: bool = EventBus.get_signal_connection_list(&"systemic_synergy_evaluated").size() == base_syn_subs + 1
+
+	var emitted_snap: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		pid_1, 2651, coord_1, true, 220, 45.0, GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP)
+	var vm: OtukenHudViewModel = hud.get_view_model()
+	var vm_cached: SynergyEvaluationSnapshot = vm.get_latest_synergy_snapshot()
+	var pulse_snap: OtukenHudViewModel.PulseSummarySnapshot = vm.capture_snapshot()
+	_expect(sub_added_ok \
+		and vm_cached == emitted_snap \
+		and is_equal_approx(pulse_snap.synergy_combat_power_mult, emitted_snap.effective_combat_power_mult) \
+		and is_equal_approx(pulse_snap.synergy_black_market_mult, emitted_snap.black_market_scarcity_mult) \
+		and pulse_snap.synergy_active_resonance_count >= 2,
+		"EventBus.systemic_synergy_evaluated updates OtukenHudRoot -> OtukenHudViewModel snapshot cleanly (%d active resonances)." % pulse_snap.synergy_active_resonance_count)
+
+	var all_15_valid: bool = SteppeGlossaryTooltip.REQUIRED_TERMS.size() == 15
+	for req_tid: StringName in SteppeGlossaryTooltip.REQUIRED_TERMS:
+		var g_entry: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(req_tid, vm)
+		if not g_entry.is_valid_three_layer():
+			all_15_valid = false
+	var e_nizam: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"savas_nizami", vm)
+	var e_sinerji: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"sistemik_sinerji", vm)
+	_expect(all_15_valid \
+		and SteppeGlossaryTooltip.normalize_term_id(&"Savaş Nizamı") == &"savas_nizami" \
+		and SteppeGlossaryTooltip.normalize_term_id(&"Sistemik Sinerji") == &"sistemik_sinerji" \
+		and e_nizam.live_impact_line.find("%.2fx" % emitted_snap.effective_combat_power_mult) != -1 \
+		and e_sinerji.tone_id != &"jade" \
+		and e_sinerji.live_impact_line.find("Rezonans %d" % emitted_snap.get_resonance_count()) != -1,
+		"All 15 Glossary terms resolve 3-layer telemetry and Savaş Nizamı / Sistemik Sinerji track live synergy state dynamically.")
+
+	remove_child(hud)
+	hud.free()
+	var sub_restored_ok: bool = EventBus.get_signal_connection_list(&"systemic_synergy_evaluated").size() == base_syn_subs
+	_expect(sub_restored_ok,
+		"OtukenHudRoot _exit_tree() strictly disconnects EventBus.systemic_synergy_evaluated with 0 leaked connections.")
+	EventBus.systemic_synergy_evaluated.emit(emitted_snap)
+
+	# 8. 48-Season x 5-Archetype Systemic Synergy Equilibrium Audit (240 Seasons)
+	var all_archetypes: Array[LongHorizonSimulator.StrategicArchetype] = [
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_IMPERIAL_YAYLAK,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_RAIDER_PILLAGER,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_ARTISAN_CARAVAN,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_DREAD_KAN_DAVASI,
+		LongHorizonSimulator.StrategicArchetype.ARCHETYPE_EXILE_VASSAL_KINGMAKER,
+	]
+	var audits_26a: Array[LongHorizonSimulator.ArchetypeAuditResult] = []
+	for idx: int in range(all_archetypes.size()):
+		var arch: LongHorizonSimulator.StrategicArchetype = all_archetypes[idx]
+		var res_a: LongHorizonSimulator.ArchetypeAuditResult = LongHorizonSimulator.run_archetype_audit(
+			self, arch, 48, 26001 + idx * 19)
+		audits_26a.append(res_a)
+		print("[AUDIT-26A] Arch=%d PowerMin=%.2f MarketMax=%.2f KutDrift=%.2f..%.2f CoalPressMax=%.1f Resonances=%d Viol=%d" % [
+			int(arch),
+			res_a.min_synergy_power_observed,
+			res_a.max_synergy_market_observed,
+			res_a.min_synergy_kut_drift_observed,
+			res_a.max_synergy_kut_drift_observed,
+			res_a.max_synergy_coalition_pressure_observed,
+			res_a.total_synergy_resonances_fired,
+			res_a.violations.size(),
+		])
+		if not res_a.passed():
+			for v_msg: String in res_a.violations:
+				push_error("[AUDIT-26A VIOLATION Arch=%d] %s" % [int(arch), v_msg])
+		_expect(res_a.seasons_simulated == 48 and res_a.passed(),
+			"48-Season Phase 26A synergy audit for StrategicArchetype %d passed cleanly with 0 violations." % int(arch))
+
+	var imperial_26a: LongHorizonSimulator.ArchetypeAuditResult = audits_26a[0]
+	var artisan_26a: LongHorizonSimulator.ArchetypeAuditResult = audits_26a[2]
+	var dread_26a: LongHorizonSimulator.ArchetypeAuditResult = audits_26a[3]
+	_expect(dread_26a.max_synergy_coalition_pressure_observed > artisan_26a.max_synergy_coalition_pressure_observed \
+		and dread_26a.max_synergy_coalition_pressure_observed > imperial_26a.max_synergy_coalition_pressure_observed \
+		and artisan_26a.total_synergy_resonances_fired >= 1 \
+		and imperial_26a.min_synergy_kut_drift_observed < imperial_26a.max_synergy_kut_drift_observed,
+		"48-Season systemic audit differentiates Dread coalition peak (%.1f) vs Artisan (%d resonances) & Imperial Kut drift bounds (%.2f..%.2f)." % [
+			dread_26a.max_synergy_coalition_pressure_observed,
+			artisan_26a.total_synergy_resonances_fired,
+			imperial_26a.min_synergy_kut_drift_observed,
+			imperial_26a.max_synergy_kut_drift_observed])
+
+	# 9. Full Singleton Restoration Prior to _test_main_scene_integration()
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	RegionalMarketEngine.reset_market_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	IntelligenceManager.reset_intelligence_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p26a_cleanup_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)

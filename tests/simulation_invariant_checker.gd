@@ -53,6 +53,12 @@ class SeasonSnapshot:
 	var artisans_count: int = 8
 	var active_kurgans: int = 0
 	var collapse_state: GameEnums.CollapseState = GameEnums.CollapseState.SOVEREIGN
+	var synergy_combat_power_mult: float = 1.0
+	var synergy_black_market_mult: float = 1.0
+	var synergy_kut_drift: float = 0.0
+	var synergy_courier_tempo_mult: float = 1.0
+	var synergy_coalition_pressure: float = 0.0
+	var synergy_active_resonances: int = 0
 
 
 static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, max_food_cap: int = 5000) -> PackedStringArray:
@@ -86,6 +92,11 @@ static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, m
 	_check_finite(errors, tag, "word_reliability", snap.word_reliability)
 	_check_finite(errors, tag, "dread_score", snap.dread_score)
 	_check_finite(errors, tag, "honor_score", snap.honor_score)
+	_check_finite(errors, tag, "synergy_combat_power_mult", snap.synergy_combat_power_mult)
+	_check_finite(errors, tag, "synergy_black_market_mult", snap.synergy_black_market_mult)
+	_check_finite(errors, tag, "synergy_kut_drift", snap.synergy_kut_drift)
+	_check_finite(errors, tag, "synergy_courier_tempo_mult", snap.synergy_courier_tempo_mult)
+	_check_finite(errors, tag, "synergy_coalition_pressure", snap.synergy_coalition_pressure)
 
 	# 2. Bounds, non-negativity & multiplier clamp guarantees
 	if snap.food < 0 or snap.food > max_food_cap:
@@ -154,6 +165,18 @@ static func validate_snapshot(snap: SeasonSnapshot, max_ore_cap: int = 250000, m
 		errors.append("%s Honor score out of bounds [0, 100]: %.3f." % [tag, snap.honor_score])
 	if snap.artisans_count < 0 or snap.active_kurgans < 0:
 		errors.append("%s Negative artisan (%d) or kurgan (%d) count." % [tag, snap.artisans_count, snap.active_kurgans])
+	if snap.synergy_combat_power_mult < -0.0001 or snap.synergy_combat_power_mult > 3.0001:
+		errors.append("%s Synergy combat power out of bounds [0.0, 3.0]: %.3f." % [tag, snap.synergy_combat_power_mult])
+	if snap.synergy_black_market_mult < 0.9999 or snap.synergy_black_market_mult > 3.4001:
+		errors.append("%s Synergy black market multiplier out of bounds [1.0, 3.4]: %.3f." % [tag, snap.synergy_black_market_mult])
+	if snap.synergy_kut_drift < -18.001 or snap.synergy_kut_drift > 18.001:
+		errors.append("%s Synergy Kut drift out of bounds [-18.0, 18.0]: %.3f." % [tag, snap.synergy_kut_drift])
+	if snap.synergy_courier_tempo_mult < 0.3499 or snap.synergy_courier_tempo_mult > 1.8501:
+		errors.append("%s Synergy courier tempo out of bounds [0.35, 1.85]: %.3f." % [tag, snap.synergy_courier_tempo_mult])
+	if snap.synergy_coalition_pressure < -0.0001 or snap.synergy_coalition_pressure > 500.001:
+		errors.append("%s Synergy coalition pressure out of bounds [0.0, 500.0]: %.3f." % [tag, snap.synergy_coalition_pressure])
+	if snap.synergy_active_resonances < 0:
+		errors.append("%s Negative synergy resonance count: %d." % [tag, snap.synergy_active_resonances])
 
 	for d_id: StringName in snap.dynasty_trust:
 		var trust_val: float = snap.dynasty_trust[d_id]

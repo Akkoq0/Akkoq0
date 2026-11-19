@@ -193,3 +193,6 @@ signal tactical_lens_changed(previous_lens: GameEnums.TacticalMapLens, new_lens:
 # --- Phase 26 Tactical Command UI, Compass, Courier & Standing Doctrine -----
 signal offline_doctrine_configured(army_id: int, trigger_condition: GameEnums.OfflineDoctrineTrigger, power_ratio_threshold: float, action_tactic: GameEnums.TuranTacticPhase, target_terrain_class: GameEnums.TerrainClass, target_geography_class: GameEnums.RegionGeographyClass, pack_sefer_arabasi: bool, evade_combat: bool)
 signal dust_decoy_toggled(army_id: int, player_id: int, is_active: bool)
+
+# --- Phase 26A Unified Systemic Synergy & Equilibrium Matrix ----------------
+signal systemic_synergy_evaluated(snapshot: SynergyEvaluationSnapshot)

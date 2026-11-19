@@ -84,6 +84,15 @@ class PulseSummarySnapshot:
 	var active_intrigue_plots: int = 0
 	var plague_active: bool = false
 
+	# Phase 26A Unified Systemic Synergy read-only telemetry
+	var synergy_combat_power_mult: float = 1.0
+	var synergy_black_market_mult: float = 1.0
+	var synergy_kut_drift: float = 0.0
+	var synergy_courier_tempo_mult: float = 1.0
+	var synergy_coalition_pressure: float = 0.0
+	var synergy_active_resonance_count: int = 0
+	var synergy_primary_resonance_name: String = "Yok"
+
 
 class CrisisChipDescriptor:
 	var crisis_id: StringName = &""
@@ -117,6 +126,8 @@ var _cached_kut_rules: KutRules = null
 var _event_remount_ratio: float = 1.0
 var _event_water_crisis: bool = false
 var _event_coalition_triggered: bool = false
+var _latest_synergy_snapshot: SynergyEvaluationSnapshot = null
+var _synergy_cache_fresh: bool = false
 
 
 func _init(p_player_id: int = 1, p_tracked_army_id: int = 1) -> void:
@@ -125,9 +136,14 @@ func _init(p_player_id: int = 1, p_tracked_army_id: int = 1) -> void:
 
 
 func set_player_context(p_player_id: int, p_tracked_army_id: int = -1) -> void:
+	var prev_pid: int = _player_id
+	var prev_aid: int = _tracked_army_id
 	_player_id = maxi(p_player_id, 1)
 	if p_tracked_army_id > 0:
 		_tracked_army_id = p_tracked_army_id
+	if _player_id != prev_pid or _tracked_army_id != prev_aid:
+		_latest_synergy_snapshot = null
+		_synergy_cache_fresh = false
 
 
 func get_player_id() -> int:
@@ -149,6 +165,22 @@ func notify_water_crisis_observed(active: bool) -> void:
 
 func notify_coalition_observed(active: bool) -> void:
 	_event_coalition_triggered = active
+
+
+func notify_synergy_snapshot_observed(snapshot: SynergyEvaluationSnapshot) -> void:
+	if snapshot == null or not snapshot.is_finite_and_bounded():
+		return
+	if snapshot.player_id == _player_id:
+		_latest_synergy_snapshot = snapshot
+		_synergy_cache_fresh = snapshot.army_id == _tracked_army_id
+
+
+func invalidate_synergy_cache() -> void:
+	_synergy_cache_fresh = false
+
+
+func get_latest_synergy_snapshot() -> SynergyEvaluationSnapshot:
+	return _latest_synergy_snapshot
 
 
 func capture_snapshot() -> PulseSummarySnapshot:
@@ -265,6 +297,28 @@ func capture_snapshot() -> PulseSummarySnapshot:
 		snap.season_tone = &"jade"
 	else:
 		snap.season_tone = &"gold"
+
+	# --- 5. Phase 26A Unified Systemic Synergy (Strictly Read-Only) --------
+	var syn_snap: SynergyEvaluationSnapshot = null
+	if _synergy_cache_fresh \
+			and _latest_synergy_snapshot != null \
+			and _latest_synergy_snapshot.player_id == _player_id \
+			and _latest_synergy_snapshot.army_id == _tracked_army_id:
+		syn_snap = _latest_synergy_snapshot
+	else:
+		syn_snap = SystemicSynergyMatrix.evaluate_player(
+			_player_id,
+			_tracked_army_id,
+			camp_coord,
+			false)
+	if syn_snap != null:
+		snap.synergy_combat_power_mult = syn_snap.effective_combat_power_mult
+		snap.synergy_black_market_mult = syn_snap.black_market_scarcity_mult
+		snap.synergy_kut_drift = syn_snap.kut_entropy_net_drift
+		snap.synergy_courier_tempo_mult = syn_snap.courier_tempo_mult
+		snap.synergy_coalition_pressure = syn_snap.coalition_pressure_score
+		snap.synergy_active_resonance_count = syn_snap.get_resonance_count()
+		snap.synergy_primary_resonance_name = syn_snap.get_primary_resonance_label()
 
 	return snap
 

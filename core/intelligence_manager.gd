@@ -16,6 +16,7 @@ var _report_seasons: Dictionary[int, int] = {}
 var _stances: Dictionary[StringName, GameEnums.DiplomaticStance] = {}
 var _total_war_seasons: Dictionary[StringName, int] = {}
 var _assassinated_envoys: Dictionary[StringName, bool] = {}
+var _intercepted_courier_owners: Dictionary[int, int] = {}
 var _season_tick: int = 0
 
 
@@ -42,6 +43,16 @@ func _exit_tree() -> void:
 	CommandBus.unregister_handler(AssassinateEnvoyCommand.ID, _handle_assassinate_envoy)
 
 
+func reset_intelligence_state() -> void:
+	_army_reports.clear()
+	_report_seasons.clear()
+	_stances.clear()
+	_total_war_seasons.clear()
+	_assassinated_envoys.clear()
+	_intercepted_courier_owners.clear()
+	_season_tick = 0
+
+
 ## Computes the infiltration probability for a commander and terrain.
 func evaluate_espionage_chance(commander_leadership: float, terrain: TerrainData, counter_espionage: float = 0.0) -> float:
 	if _rules == null:
@@ -59,6 +70,20 @@ func get_latest_report_for_army(target_army_id: int) -> EspionageReport:
 ## Number of non-expired army espionage reports currently cached.
 func get_cached_report_count() -> int:
 	return _army_reports.size()
+
+
+func has_successful_intel_report_by(spy_owner_id: int) -> bool:
+	if spy_owner_id <= 0:
+		return false
+	for army_id: int in _army_reports:
+		var rep: EspionageReport = _army_reports[army_id]
+		if rep != null and rep.succeeded and rep.spy_owner_id == spy_owner_id:
+			return true
+	return false
+
+
+func has_intercepted_courier_report_by(spy_owner_id: int) -> bool:
+	return _intercepted_courier_owners.get(spy_owner_id, 0) > 0
 
 
 ## Diplomatic stance between `faction_a` and `faction_b`.
@@ -104,6 +129,8 @@ func record_intercepted_courier_report(
 	rep.computed_success_chance = 1.0
 	rep.succeeded = true
 	rep.revealed_tactic_intent = leaked_plan
+	if spy_owner_id > 0:
+		_intercepted_courier_owners[spy_owner_id] = _intercepted_courier_owners.get(spy_owner_id, 0) + 1
 	if target_army_id > 0:
 		_army_reports[target_army_id] = rep
 		_report_seasons[target_army_id] = _season_tick
