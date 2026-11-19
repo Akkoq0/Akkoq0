@@ -47,6 +47,15 @@ func get_caravan(caravan_id: StringName) -> PhysicalCaravan:
 	return null
 
 
+func get_all_caravans() -> Array[PhysicalCaravan]:
+	var out: Array[PhysicalCaravan] = []
+	for cid: StringName in _caravans:
+		var c: PhysicalCaravan = _caravans[cid]
+		if c != null:
+			out.append(c)
+	return out
+
+
 func get_artisan_count(player_id: int) -> int:
 	if _artisans_by_player.has(player_id):
 		return _artisans_by_player[player_id]

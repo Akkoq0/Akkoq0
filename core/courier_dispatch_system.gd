@@ -47,6 +47,15 @@ func get_order(order_id: StringName) -> CourierDispatchOrder:
 	return null
 
 
+func get_all_orders() -> Array[CourierDispatchOrder]:
+	var out: Array[CourierDispatchOrder] = []
+	for oid: StringName in _orders:
+		var ord: CourierDispatchOrder = _orders[oid]
+		if ord != null:
+			out.append(ord)
+	return out
+
+
 func get_active_order_for_army(army_id: int) -> CourierDispatchOrder:
 	var latest_id: StringName = _latest_order_by_army.get(army_id, &"")
 	if latest_id != &"" and _orders.has(latest_id):

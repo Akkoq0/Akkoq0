@@ -73,6 +73,15 @@ func get_water_source(source_id: StringName) -> WaterSourceNode:
 	return null
 
 
+func get_all_water_sources() -> Array[WaterSourceNode]:
+	var out: Array[WaterSourceNode] = []
+	for sid: StringName in _sources_by_id:
+		var node: WaterSourceNode = _sources_by_id[sid]
+		if node != null:
+			out.append(node)
+	return out
+
+
 func count_usable_water_sources(coord: Vector2i, season_type: GameEnums.SeasonType, is_zud: bool = false) -> int:
 	if not _sources_by_region.has(coord):
 		return 0

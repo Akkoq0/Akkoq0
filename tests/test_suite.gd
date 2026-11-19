@@ -128,6 +128,7 @@ func _run_suite() -> void:
 	_test_phase28_dual_mode_determinism_and_saveload()
 	_test_phase29_constellation_sundial_and_crucible()
 	_test_phase30_kurultai_commander_and_collapse_ui()
+	_test_phase31_live_3d_steppe_map_and_lenses()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -5789,6 +5790,218 @@ func _test_phase30_kurultai_commander_and_collapse_ui() -> void:
 		"SovereigntyDrawerPanel disconnects all EventBus subscriptions cleanly on _exit_tree() (0 leaks).")
 
 	_reset_p27b_singletons(&"p30_cleanup_kut")
+
+
+func _test_phase31_live_3d_steppe_map_and_lenses() -> void:
+	# 1. Clean Baseline Reset & DAG/Typing Gate
+	_reset_p27b_singletons(&"p31_baseline_kut")
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Phase 31 passes ArchitectureVerifier cleanly with 0 DAG or Level-2 typing violations.")
+
+	# 2. Seed Territory, Border Tuğ & Water Sources then instantiate full main.tscn
+	TerritoryManager.register_region(Vector2i(0, 0), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, true, true, 100.0)
+	TerritoryManager.register_region(Vector2i(1, 0), GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 2, false, false, 65.0)
+	TerritoryManager.add_border_node(Vector2i(0, 0), &"p31_tug_north", GameEnums.BorderNodeType.WATCHTOWER_HILL_NODE, Vector3(0.0, 0.0, 0.0), &"", 1)
+	WaterRouteManager.register_water_source(Vector2i(0, 0), &"p31_well_0", GameEnums.WaterSourceType.WELL, 1)
+
+	var main_packed: PackedScene = ResourceLoader.load("res://scenes/main.tscn") as PackedScene
+	var main_node: Node = main_packed.instantiate()
+	add_child(main_node)
+
+	var macro_gen: MacroWorldGenerator = main_node.get_node_or_null("MacroWorldGenerator") as MacroWorldGenerator
+	var map_3d: Steppe3DMapController = main_node.get_node_or_null("Steppe3DMapController") as Steppe3DMapController
+	var sun_light: DirectionalLight3D = main_node.get_node_or_null("DirectionalLight3D") as DirectionalLight3D
+	var cam: DualLayerCamera = main_node.get_node_or_null("DualLayerCamera") as DualLayerCamera
+	var hud: OtukenHudRoot = main_node.get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	var cmd_input: PlayerCommandInput = main_node.get_node_or_null("PlayerCommandInput") as PlayerCommandInput
+	var tact_panel: TacticalCommandDrawerPanel = hud.get_drawer_slot_container(OtukenHudRoot.SLOT_TACTICAL_COMMAND).get_node_or_null("TacticalCommandDrawerPanel") as TacticalCommandDrawerPanel
+	var eco_panel: WorldEcologyDrawerPanel = hud.get_drawer_slot_container(OtukenHudViewModel.SLOT_ECONOMY_WATER).get_node_or_null("WorldEcologyDrawerPanel") as WorldEcologyDrawerPanel
+	var sov_panel: SovereigntyDrawerPanel = hud.get_drawer_slot_container(OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY).get_node_or_null("SovereigntyDrawerPanel") as SovereigntyDrawerPanel
+
+	if macro_gen != null:
+		macro_gen.generate()
+
+	_expect(map_3d != null and sun_light != null and cam != null and hud != null and cmd_input != null \
+		and tact_panel != null and eco_panel != null and sov_panel != null \
+		and map_3d.get_region_tile_count() > 0 \
+		and map_3d.get_tug_ring_count() >= 1 \
+		and map_3d.get_water_marker_count() >= 1,
+		"Main scene wires Steppe3DMapController, HUD, Faz 29/30/31 panels, live region tiles, Tuğ rings, and water markers.")
+
+	# 3. Seasonal Zud Lighting, Caravan/Courier Markers, Doctrine Silhouettes & Dust Veil
+	var spring_col: Color = sun_light.light_color if sun_light != null else Color.WHITE
+	var spring_energy: float = sun_light.light_energy if sun_light != null else 1.0
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.WINTER:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(15)
+	map_3d.sync_from_viewmodel()
+	var winter_snap: Steppe3DMapViewModel.MapSnapshot = map_3d.get_last_snapshot()
+	var zud_lighting_shifted: bool = winter_snap != null and winter_snap.is_zud_active \
+		and (sun_light.light_color != spring_col or sun_light.light_energy < spring_energy)
+
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"iron", 25))
+	var caravan_ore: Dictionary[StringName, int] = {}
+	caravan_ore[&"iron"] = 10
+	var caravan_cmd: DispatchPhysicalCaravanCommand = DispatchPhysicalCaravanCommand.new(
+		&"p31_caravan_1", 1, 1, Vector2i(0, 0), Vector2i(1, 0), 140.0, caravan_ore, 5, 15.0)
+	var courier_cmd: DispatchCourierOrderCommand = DispatchCourierOrderCommand.new(
+		&"p31_courier_1", 1, 1, &"move_order", GameEnums.TuranTacticPhase.RECON_DUST_SCREEN,
+		Vector3.ZERO, Vector3(180.0, 0.0, 0.0), GameEnums.TerrainType.STEPPE, false)
+	var caravan_dispatched_ok: bool = CommandBus.dispatch(caravan_cmd)
+	var courier_dispatched_ok: bool = CommandBus.dispatch(courier_cmd)
+
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(1, 1, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, true))
+	var shape_kama: StringName = map_3d.get_army_formation_shape(1)
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(1, 1, null, GameEnums.BattleDoctrinePresetId.ARABA_KALESI, true))
+	var shape_cember: StringName = map_3d.get_army_formation_shape(1)
+	CommandBus.dispatch(ToggleDustScreenCommand.new(1, 1, true, 1.0))
+	var dust_veil_on: bool = map_3d.is_army_dust_veil_visible(1)
+
+	_expect(zud_lighting_shifted \
+		and caravan_dispatched_ok and courier_dispatched_ok \
+		and map_3d.get_route_marker_count() >= 2 \
+		and shape_kama == &"kama" \
+		and shape_cember == &"cember" \
+		and dust_veil_on,
+		"Steppe3DMapController applies Winter/Zud lighting, renders moving caravan/courier markers, doctrine silhouettes (kama/cember), and dust veil.")
+
+	# 4. All 5 TacticalMapLens transitions modify 3D tile shading & summary telemetry
+	var lens_sequence: Array[GameEnums.TacticalMapLens] = [
+		GameEnums.TacticalMapLens.NORMAL,
+		GameEnums.TacticalMapLens.LOGISTICS_WATER_COURIER,
+		GameEnums.TacticalMapLens.YAYLAK_KISLAK,
+		GameEnums.TacticalMapLens.TUG_CONTROL,
+		GameEnums.TacticalMapLens.INTELLIGENCE_DUST,
+	]
+	var distinct_colors_00: Array[Color] = []
+	var all_lenses_synced: bool = true
+	var prev_summary: String = ""
+	var distinct_summaries: int = 0
+	for lens: GameEnums.TacticalMapLens in lens_sequence:
+		hud.select_lens(lens, true)
+		if map_3d.get_active_lens() != lens:
+			all_lenses_synced = false
+		var c00: Color = map_3d.get_region_visual_color(Vector2i(0, 0))
+		var seen_col: bool = false
+		for existing: Color in distinct_colors_00:
+			if existing.is_equal_approx(c00):
+				seen_col = true
+				break
+		if not seen_col:
+			distinct_colors_00.append(c00)
+		var cur_sum: String = map_3d.get_lens_summary_text()
+		if cur_sum.is_empty():
+			all_lenses_synced = false
+		elif cur_sum != prev_summary:
+			distinct_summaries += 1
+			prev_summary = cur_sum
+
+	hud.select_lens(GameEnums.TacticalMapLens.YAYLAK_KISLAK, true)
+	var yaylak_col: Color = map_3d.get_region_visual_color(Vector2i(0, 0))
+	var kislak_col: Color = map_3d.get_region_visual_color(Vector2i(1, 0))
+
+	_expect(all_lenses_synced and distinct_colors_00.size() >= 3 and distinct_summaries == 5 \
+		and not yaylak_col.is_equal_approx(kislak_col),
+		"All 5 TacticalMapLens modes synchronize via EventBus to shade 3D regions dynamically (Yaylak vs Kislak & lens summaries).")
+
+	# 5. Camera Pan/Zoom + Two-way Region/Army Selection Sync
+	var cam_before: Vector3 = cam.position
+	var cam_after: Vector3 = map_3d.pan_camera(Vector2(18.0, -12.0))
+	var zoom_before: float = cam.get_zoom_factor()
+	var zoom_after: float = map_3d.zoom_camera(-0.35)
+
+	cmd_input.controlled_army_id = 999
+	map_3d.select_region(Vector2i(1, 0), true)
+	map_3d.select_army(1, false)
+	var eco_status_lbl: Label = eco_panel.find_child("WorldEcologyStatusLabel", true, false) as Label
+	var eco_synced_region: bool = eco_status_lbl != null and eco_status_lbl.text.find("(1,0)") != -1
+
+	_expect(not cam_after.is_equal_approx(cam_before) \
+		and not is_equal_approx(zoom_after, zoom_before) \
+		and map_3d.get_selected_region_coord() == Vector2i(1, 0) \
+		and map_3d.get_selected_army_id() == 1 \
+		and cmd_input.controlled_army_id == 1 \
+		and hud.tracked_army_id == 1 \
+		and eco_synced_region,
+		"Camera pan/zoom and 3D region/army selection synchronize WorldEcologyDrawerPanel, PlayerCommandInput, and HUD context.")
+
+	# 6. SessionClockDock Singleplayer Speed/Pause + Online Pause Rejection + Screen Budget
+	SessionClockAuthority.configure_session_mode(GameEnums.SessionMode.SINGLEPLAYER_SESSION, 1.0, 10.0)
+	hud.refresh_from_viewmodel()
+	hud.get_session_speed_button(2).pressed.emit()
+	var sp_2x: bool = is_equal_approx(SessionClockAuthority.get_speed_scale(), 2.0)
+	hud.get_session_speed_button(4).pressed.emit()
+	var sp_4x: bool = is_equal_approx(SessionClockAuthority.get_speed_scale(), 4.0)
+	hud.get_session_pause_button().pressed.emit()
+	var sp_paused: bool = SessionClockAuthority.is_paused() and hud.get_session_clock_mode_text().find("DURAKLADI") != -1
+	hud.get_session_pause_button().pressed.emit()
+	var sp_resumed: bool = not SessionClockAuthority.is_paused()
+
+	SessionClockAuthority.configure_session_mode(GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD, 1.0, 10.0)
+	hud.refresh_from_viewmodel()
+	var online_speed_locked: bool = hud.get_session_speed_button(2).disabled \
+		and hud.get_session_speed_button(4).disabled \
+		and is_equal_approx(SessionClockAuthority.get_speed_scale(), 1.0)
+	hud.get_session_pause_button().pressed.emit()
+	var online_rej_ok: bool = not SessionClockAuthority.is_paused() \
+		and SessionClockAuthority.get_last_pause_rejection_code() == &"REJECTED_PAUSE_IN_ONLINE" \
+		and hud.get_session_clock_mode_text().find("DURAKLATMA REDDİ") != -1 \
+		and hud.get_node_or_null("CrisisChipRail/CrisisChip_online_pause_rejected") != null
+
+	var drawer_p31: TamgaCardPanel = hud.get_node_or_null("AnalysisDrawerPanel") as TamgaCardPanel
+	var drawer_w_p31: float = drawer_p31.get_combined_minimum_size().x if drawer_p31 != null else 999.0
+	var open_ratio_p31: float = hud.compute_open_map_ratio(false)
+
+	_expect(sp_2x and sp_4x and sp_paused and sp_resumed \
+		and online_speed_locked and online_rej_ok \
+		and drawer_w_p31 <= float(OtukenHudRoot.DRAWER_WIDTH_PX) \
+		and open_ratio_p31 >= 0.82,
+		"SessionClockDock controls Singleplayer 1x/2x/4x/pause, guards Online pause (REJECTED_PAUSE_IN_ONLINE), keeps <=332px drawer and >=82%% open map.")
+
+	# 7. Clean Teardown & Strict _exit_tree() EventBus Leak Audit
+	remove_child(main_node)
+	main_node.free()
+
+	var audit_sigs: Array[StringName] = [
+		&"tactical_lens_changed",
+		&"macro_world_generated",
+		&"session_tempo_changed",
+		&"session_pause_rejected",
+		&"battle_doctrine_assigned",
+	]
+	var sig_before: Dictionary[StringName, int] = {}
+	for s_name: StringName in audit_sigs:
+		sig_before[s_name] = EventBus.get_signal_connection_list(s_name).size()
+
+	var audit_map: Steppe3DMapController = Steppe3DMapController.new()
+	var audit_hud: OtukenHudRoot = OtukenHudRoot.new()
+	add_child(audit_map)
+	add_child(audit_hud)
+
+	var sig_during: Dictionary[StringName, int] = {}
+	for s_name: StringName in audit_sigs:
+		sig_during[s_name] = EventBus.get_signal_connection_list(s_name).size()
+
+	remove_child(audit_map)
+	audit_map.free()
+	remove_child(audit_hud)
+	audit_hud.free()
+
+	var sigs_clean: bool = true
+	for s_name: StringName in audit_sigs:
+		if sig_during[s_name] <= sig_before[s_name]:
+			sigs_clean = false
+		if EventBus.get_signal_connection_list(s_name).size() != sig_before[s_name]:
+			sigs_clean = false
+	_expect(sigs_clean,
+		"Steppe3DMapController and OtukenHudRoot disconnect 100%% of EventBus subscriptions on _exit_tree() (0 leaks).")
+
+	_reset_p27b_singletons(&"p31_cleanup_kut")
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
 
 
 

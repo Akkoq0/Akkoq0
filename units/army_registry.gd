@@ -23,6 +23,23 @@ func get_army_count() -> int:
 	return _armies.size()
 
 
+func get_army(army_id: int) -> ArmyController:
+	if _armies.has(army_id):
+		var a: ArmyController = _armies[army_id]
+		if a != null and is_instance_valid(a):
+			return a
+	return null
+
+
+func get_all_armies() -> Array[ArmyController]:
+	var out: Array[ArmyController] = []
+	for aid: int in _armies:
+		var a: ArmyController = _armies[aid]
+		if a != null and is_instance_valid(a):
+			out.append(a)
+	return out
+
+
 func _handle_move(command: GameCommand) -> bool:
 	var move: MoveArmyCommand = command as MoveArmyCommand
 	if move == null:

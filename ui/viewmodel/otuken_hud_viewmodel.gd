@@ -102,6 +102,8 @@ class PulseSummarySnapshot:
 	var session_mode: GameEnums.SessionMode = GameEnums.SessionMode.SINGLEPLAYER_SESSION
 	var session_paused: bool = false
 	var session_speed_scale: float = 1.0
+	var session_tick: int = 0
+	var offline_protection_active: bool = false
 	var online_pause_rejected: bool = false
 
 
@@ -344,6 +346,8 @@ func capture_snapshot() -> PulseSummarySnapshot:
 	snap.session_mode = SessionClockAuthority.get_session_mode()
 	snap.session_paused = SessionClockAuthority.is_paused()
 	snap.session_speed_scale = SessionClockAuthority.get_speed_scale()
+	snap.session_tick = SessionClockAuthority.get_current_tick()
+	snap.offline_protection_active = SessionClockAuthority.is_offline_doctrine_protection_active()
 	snap.online_pause_rejected = SessionClockAuthority.get_last_pause_rejection_code() == &"REJECTED_PAUSE_IN_ONLINE"
 
 	return snap

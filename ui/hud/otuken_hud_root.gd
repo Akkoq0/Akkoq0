@@ -118,6 +118,14 @@ var _crisis_chip_rail: VBoxContainer = null
 var _tactical_lens_dock: Control = null
 var _tactical_lens_card: TamgaCardPanel = null
 var _tactical_lens_hbox: HBoxContainer = null
+var _session_clock_dock: Control = null
+var _session_clock_card: TamgaCardPanel = null
+var _clock_mode_label: Label = null
+var _clock_pause_btn: Button = null
+var _clock_pause_cb: Callable = Callable()
+var _clock_speed_buttons: Dictionary[int, Button] = {}
+var _clock_speed_callbacks: Dictionary[Button, Callable] = {}
+var _clock_envelope_seq: int = 0
 var _analysis_drawer_card: TamgaCardPanel = null
 var _drawer_title_label: Label = null
 var _drawer_close_btn: Button = null
@@ -393,6 +401,62 @@ func mount_panel_to_slot(slot_id: StringName, panel: Control) -> bool:
 	return true
 
 
+func get_session_clock_dock() -> Control:
+	_build_hud_structure()
+	return _session_clock_dock
+
+
+func get_session_clock_mode_text() -> String:
+	_build_hud_structure()
+	return _clock_mode_label.text if _clock_mode_label != null else ""
+
+
+func get_session_pause_button() -> Button:
+	_build_hud_structure()
+	return _clock_pause_btn
+
+
+func get_session_speed_button(speed_scale_int: int) -> Button:
+	_build_hud_structure()
+	return _clock_speed_buttons.get(speed_scale_int, null)
+
+
+func request_session_pause(paused: bool) -> bool:
+	var sender_str: String = str(player_id)
+	var base_seq: int = maxi(CommandBus.get_last_sequence_for_sender(sender_str), _clock_envelope_seq)
+	_clock_envelope_seq = base_seq + CommandBus.get_pending_envelope_count() + 1
+	var cur_tick: int = SessionClockAuthority.get_current_tick()
+	var env: CommandEnvelope = CommandEnvelope.new(
+		_clock_envelope_seq,
+		sender_str,
+		cur_tick,
+		"pause_session" if paused else "resume_session",
+		{"paused": paused})
+	var accepted: bool = CommandBus.enqueue_envelope(env, cur_tick)
+	if accepted:
+		CommandBus.flush_envelopes_for_tick(cur_tick)
+	refresh_from_viewmodel()
+	return accepted
+
+
+func request_session_speed(speed_scale: float) -> bool:
+	var sender_str: String = str(player_id)
+	var base_seq: int = maxi(CommandBus.get_last_sequence_for_sender(sender_str), _clock_envelope_seq)
+	_clock_envelope_seq = base_seq + CommandBus.get_pending_envelope_count() + 1
+	var cur_tick: int = SessionClockAuthority.get_current_tick()
+	var env: CommandEnvelope = CommandEnvelope.new(
+		_clock_envelope_seq,
+		sender_str,
+		cur_tick,
+		"set_tempo_speed",
+		{"speed_scale": speed_scale})
+	var accepted: bool = CommandBus.enqueue_envelope(env, cur_tick)
+	if accepted:
+		CommandBus.flush_envelopes_for_tick(cur_tick)
+	refresh_from_viewmodel()
+	return accepted
+
+
 func compute_open_map_ratio(include_drawer: bool = false) -> float:
 	_build_hud_structure()
 	var vp_size: Vector2 = _resolve_viewport_size()
@@ -403,6 +467,8 @@ func compute_open_map_ratio(include_drawer: bool = false) -> float:
 		occupied += _measure_control_area(_top_pulse_margin, vp_size)
 	if _tactical_lens_dock != null and _tactical_lens_dock.visible:
 		occupied += _measure_control_area(_tactical_lens_dock, vp_size)
+	if _session_clock_dock != null and _session_clock_dock.visible:
+		occupied += _measure_control_area(_session_clock_dock, vp_size)
 	if _crisis_chip_rail != null and _crisis_chip_rail.visible and not _crisis_chips.is_empty():
 		var chip_h: float = 0.0
 		var chip_w: float = 204.0
@@ -424,6 +490,7 @@ func refresh_from_viewmodel() -> void:
 	var snap: OtukenHudViewModel.PulseSummarySnapshot = _view_model.capture_snapshot()
 	_apply_pulse_cards(snap)
 	_apply_drawer_slot_summaries(snap)
+	_apply_session_clock_controls(snap)
 	_rebuild_crisis_chips(_view_model.collect_active_crises(snap))
 	if _glossary_tooltip != null and _glossary_tooltip.visible and _glossary_tooltip.get_active_term_id() != &"":
 		_glossary_tooltip.show_for_term(_glossary_tooltip.get_active_term_id(), Rect2(Vector2(24.0, 74.0), Vector2(180.0, 48.0)), _view_model)
@@ -488,13 +555,13 @@ func _build_hud_structure() -> void:
 	if _tactical_lens_dock == null:
 		_tactical_lens_dock = Control.new()
 		_tactical_lens_dock.name = "TacticalLensDock"
-		_tactical_lens_dock.anchor_left = 0.5
+		_tactical_lens_dock.anchor_left = 0.0
 		_tactical_lens_dock.anchor_top = 1.0
-		_tactical_lens_dock.anchor_right = 0.5
+		_tactical_lens_dock.anchor_right = 0.0
 		_tactical_lens_dock.anchor_bottom = 1.0
-		_tactical_lens_dock.offset_left = -356.0
+		_tactical_lens_dock.offset_left = 14.0
 		_tactical_lens_dock.offset_top = -50.0
-		_tactical_lens_dock.offset_right = 356.0
+		_tactical_lens_dock.offset_right = 684.0
 		_tactical_lens_dock.offset_bottom = -8.0
 		_tactical_lens_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_tactical_lens_dock)
@@ -527,6 +594,74 @@ func _build_hud_structure() -> void:
 	_add_lens_option(GameEnums.TacticalMapLens.TUG_CONTROL, 4, "4 Tuğ & Denetim", &"jade")
 	_add_lens_option(GameEnums.TacticalMapLens.INTELLIGENCE_DUST, 5, "5 İstihbarat/Toz", &"ember")
 	_sync_lens_buttons()
+
+	# --- Layer 2B: Unified Session Clock & Tempo Strip (Faz 31) --------------
+	_session_clock_dock = get_node_or_null("SessionClockDock") as Control
+	if _session_clock_dock == null:
+		_session_clock_dock = Control.new()
+		_session_clock_dock.name = "SessionClockDock"
+		_session_clock_dock.anchor_left = 1.0
+		_session_clock_dock.anchor_top = 1.0
+		_session_clock_dock.anchor_right = 1.0
+		_session_clock_dock.anchor_bottom = 1.0
+		_session_clock_dock.offset_left = -290.0
+		_session_clock_dock.offset_top = -50.0
+		_session_clock_dock.offset_right = -14.0
+		_session_clock_dock.offset_bottom = -8.0
+		_session_clock_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_session_clock_dock)
+
+	_session_clock_card = _session_clock_dock.get_node_or_null("SessionClockCard") as TamgaCardPanel
+	if _session_clock_card == null:
+		_session_clock_card = TamgaCardPanel.new()
+		_session_clock_card.name = "SessionClockCard"
+		_session_clock_card.card_id = &"session_clock_bar"
+		_session_clock_card.semantic_tone = &"gold"
+		_session_clock_card.clickable = false
+		_session_clock_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_session_clock_dock.add_child(_session_clock_card)
+
+	var clock_margin: MarginContainer = _session_clock_card.get_content_container()
+	clock_margin.add_theme_constant_override(&"margin_left", 8)
+	clock_margin.add_theme_constant_override(&"margin_right", 8)
+	clock_margin.add_theme_constant_override(&"margin_top", 4)
+	clock_margin.add_theme_constant_override(&"margin_bottom", 4)
+
+	var clock_hbox: HBoxContainer = HBoxContainer.new()
+	clock_hbox.name = "SessionClockHBox"
+	clock_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	clock_hbox.add_theme_constant_override(&"separation", 4)
+	clock_margin.add_child(clock_hbox)
+
+	_clock_mode_label = Label.new()
+	_clock_mode_label.name = "SessionClockModeLabel"
+	_clock_mode_label.theme_type_variation = &"CaptionLabel"
+	_clock_mode_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_clock_mode_label.clip_text = true
+	_clock_mode_label.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_clock_mode_label.text = "TEKİL · T0"
+	clock_hbox.add_child(_clock_mode_label)
+
+	_clock_pause_btn = Button.new()
+	_clock_pause_btn.name = "SessionPauseButton"
+	_clock_pause_btn.theme_type_variation = &"LensButton"
+	_clock_pause_btn.text = "Duraklat"
+	_clock_pause_btn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_clock_pause_cb = _on_clock_pause_pressed
+	_clock_pause_btn.pressed.connect(_clock_pause_cb)
+	clock_hbox.add_child(_clock_pause_btn)
+
+	for speed_val: int in [1, 2, 4]:
+		var sbtn: Button = Button.new()
+		sbtn.name = "ClockSpeedBtn_%d" % speed_val
+		sbtn.theme_type_variation = &"LensButton"
+		sbtn.text = "%dx" % speed_val
+		sbtn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+		var scb: Callable = _on_clock_speed_pressed.bind(float(speed_val))
+		sbtn.pressed.connect(scb)
+		clock_hbox.add_child(sbtn)
+		_clock_speed_buttons[speed_val] = sbtn
+		_clock_speed_callbacks[sbtn] = scb
 
 	# --- Layer 3: Modular Sliding Analysis Drawer ----------------------------
 	_analysis_drawer_card = get_node_or_null("AnalysisDrawerPanel") as TamgaCardPanel
@@ -841,6 +976,60 @@ func _apply_drawer_slot_summaries(snap: OtukenHudViewModel.PulseSummarySnapshot)
 			rec.summary_label.text = texts[sid]
 
 
+func _apply_session_clock_controls(snap: OtukenHudViewModel.PulseSummarySnapshot) -> void:
+	if _session_clock_dock == null:
+		return
+	var is_online: bool = snap.session_mode == GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD
+	if _session_clock_card != null:
+		var card_tone: StringName = &"jade"
+		if snap.online_pause_rejected or snap.session_paused:
+			card_tone = &"ember"
+		elif is_online:
+			card_tone = &"ice"
+		_session_clock_card.set_semantic_tone(card_tone, 0.0)
+
+	if _clock_mode_label != null:
+		if snap.online_pause_rejected:
+			_clock_mode_label.text = "DURAKLATMA REDDİ!"
+			_clock_mode_label.add_theme_color_override(&"font_color", NeoSteppePalette.EMBER_RED)
+		elif is_online:
+			var online_prefix: String = "CANLI NÖBET" if snap.offline_protection_active else "CANLI 1x"
+			_clock_mode_label.text = "%s · T%d" % [online_prefix, snap.session_tick]
+			_clock_mode_label.add_theme_color_override(&"font_color", NeoSteppePalette.ICE_FROST)
+		elif snap.session_paused:
+			_clock_mode_label.text = "DURAKLADI · T%d" % snap.session_tick
+			_clock_mode_label.add_theme_color_override(&"font_color", NeoSteppePalette.EMBER_BRIGHT)
+		else:
+			_clock_mode_label.text = "TEKİL %dx · T%d" % [clampi(roundi(snap.session_speed_scale), 1, 4), snap.session_tick]
+			_clock_mode_label.add_theme_color_override(&"font_color", NeoSteppePalette.JADE_BRIGHT)
+
+	if _clock_pause_btn != null:
+		_clock_pause_btn.disabled = false
+		if is_online:
+			_clock_pause_btn.text = "Duraklat"
+		elif snap.session_paused:
+			_clock_pause_btn.text = "Devam"
+		else:
+			_clock_pause_btn.text = "Duraklat"
+		var pause_col: Color = NeoSteppePalette.JADE_PRIMARY
+		if snap.online_pause_rejected or snap.session_paused:
+			pause_col = NeoSteppePalette.EMBER_BRIGHT
+		elif is_online:
+			pause_col = NeoSteppePalette.ICE_BLUE
+		OtukenThemeFactory.apply_button_semantic_styles(_clock_pause_btn, pause_col, snap.session_paused or snap.online_pause_rejected, 5, 2)
+
+	var active_spd_int: int = 1 if is_online else clampi(roundi(snap.session_speed_scale), 1, 4)
+	for spd_key: int in _clock_speed_buttons:
+		var sbtn: Button = _clock_speed_buttons[spd_key]
+		if sbtn == null:
+			continue
+		var locked: bool = is_online and spd_key > 1
+		sbtn.disabled = locked
+		var is_selected: bool = (spd_key == active_spd_int)
+		var scol: Color = NeoSteppePalette.ICE_BLUE if is_online else (NeoSteppePalette.JADE_PRIMARY if is_selected else NeoSteppePalette.BRONZE_WEATHERED)
+		OtukenThemeFactory.apply_button_semantic_styles(sbtn, scol, is_selected, 5, 2)
+
+
 func _rebuild_crisis_chips(crises: Array[OtukenHudViewModel.CrisisChipDescriptor]) -> void:
 	var capped_count: int = mini(crises.size(), MAX_VISIBLE_CRISIS_CHIPS)
 	var sig_parts: PackedStringArray = PackedStringArray()
@@ -1030,6 +1219,19 @@ func _disconnect_ui_signals() -> void:
 	if _drawer_close_btn != null and is_instance_valid(_drawer_close_btn) and _drawer_close_btn.pressed.is_connected(_on_drawer_close_pressed):
 		_drawer_close_btn.pressed.disconnect(_on_drawer_close_pressed)
 
+	if _clock_pause_btn != null and is_instance_valid(_clock_pause_btn):
+		if not _clock_pause_cb.is_null() and _clock_pause_btn.pressed.is_connected(_clock_pause_cb):
+			_clock_pause_btn.pressed.disconnect(_clock_pause_cb)
+	_clock_pause_cb = Callable()
+
+	for sbtn: Button in _clock_speed_callbacks:
+		if sbtn != null and is_instance_valid(sbtn):
+			var scb: Callable = _clock_speed_callbacks.get(sbtn, Callable())
+			if not scb.is_null() and sbtn.pressed.is_connected(scb):
+				sbtn.pressed.disconnect(scb)
+	_clock_speed_callbacks.clear()
+	_clock_speed_buttons.clear()
+
 	for badge: Button in _glossary_badges:
 		if badge != null and is_instance_valid(badge):
 			var gcb: Callable = _glossary_click_callbacks.get(badge, Callable())
@@ -1191,3 +1393,14 @@ func _on_drawer_close_tween_finished() -> void:
 		_analysis_drawer_card.visible = false
 		_analysis_drawer_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_drawer_tween = null
+
+
+func _on_clock_pause_pressed() -> void:
+	if SessionClockAuthority.get_session_mode() == GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD:
+		request_session_pause(true)
+	else:
+		request_session_pause(not SessionClockAuthority.is_paused())
+
+
+func _on_clock_speed_pressed(scale_val: float) -> void:
+	request_session_speed(scale_val)

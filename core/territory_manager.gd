@@ -102,6 +102,24 @@ func get_border_node(node_id: StringName) -> BorderNode:
 	return null
 
 
+func get_all_regions() -> Array[RegionData]:
+	var out: Array[RegionData] = []
+	for coord: Vector2i in _regions:
+		var reg: RegionData = _regions[coord]
+		if reg != null:
+			out.append(reg)
+	return out
+
+
+func get_all_border_nodes() -> Array[BorderNode]:
+	var out: Array[BorderNode] = []
+	for nid: StringName in _nodes_by_id:
+		var node: BorderNode = _nodes_by_id[nid]
+		if node != null:
+			out.append(node)
+	return out
+
+
 ## Computes player's Bozkır Tuğu sphere radius scaled by Jade Tamga/Authority.
 func compute_effective_tug_radius(player_id: int) -> float:
 	var base_r: float = _rules.base_tug_radius_m if _rules != null else 120.0
