@@ -351,6 +351,15 @@ enum SuccessionCrisisResponse {
 	CEDE_AUTONOMY_AND_ULUS = 2, ## Ülüş ve özerklik taviziyle tahtı yatıştırma (Düşük Kut & vergi bedeli)
 }
 
+## Phase 25 (UI 1/5) Single-key tactical map lens modes broadcast via `EventBus.tactical_lens_changed`.
+enum TacticalMapLens {
+	NORMAL = 0, ## Varsayılan Bozkır görünümü
+	LOGISTICS_WATER_COURIER = 1, ## Lojistik / Su Hatları & Ulak rotaları merceği
+	YAYLAK_KISLAK = 2, ## Mevsimsel Yaylak / Kışlak ve mera sağlığı merceği
+	TUG_CONTROL = 3, ## Bozkır Tuğu etki küreleri & bölge denetim merceği
+	INTELLIGENCE_DUST = 4, ## İstihbarat ağı & Yılkı Toz Perdesi merceği
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

@@ -187,5 +187,9 @@ signal succession_crisis_resolved(player_id: int, crisis_id: StringName, respons
 signal commander_legacy_updated(commander_id: int, army_id: int, veteran_score: float, scars: int, commander_trait: GameEnums.CommanderTrait)
 signal commander_fallen_in_battle(commander_id: int, army_id: int, player_id: int, morale_shock: float, cohesion_shock: float)
 
+# --- Phase 25 Neo-Steppe HUD & Tactical Map Lenses --------------------------
+signal tactical_lens_changed(previous_lens: GameEnums.TacticalMapLens, new_lens: GameEnums.TacticalMapLens)
+
+
 
 

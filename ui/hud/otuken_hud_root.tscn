@@ -1,0 +1,130 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://ui/hud/otuken_hud_root.gd" id="1_hud_root"]
+[ext_resource type="Script" path="res://ui/components/tamga_card_panel.gd" id="2_tamga_card"]
+[ext_resource type="Script" path="res://ui/components/steppe_glossary_tooltip.gd" id="3_glossary"]
+
+[node name="OtukenHudRoot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_hud_root")
+
+[node name="TopPulseMargin" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 14.0
+offset_top = 8.0
+offset_right = -14.0
+offset_bottom = 64.0
+grow_horizontal = 2
+mouse_filter = 2
+
+[node name="TopPulseHBox" type="HBoxContainer" parent="TopPulseMargin"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="PulseCardEconomy" type="PanelContainer" parent="TopPulseMargin/TopPulseHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_tamga_card")
+card_id = &"economy_water"
+semantic_tone = &"jade"
+clickable = true
+
+[node name="PulseCardKut" type="PanelContainer" parent="TopPulseMargin/TopPulseHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_tamga_card")
+card_id = &"governance_dynasty"
+semantic_tone = &"jade"
+clickable = true
+
+[node name="PulseCardYilki" type="PanelContainer" parent="TopPulseMargin/TopPulseHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_tamga_card")
+card_id = &"military_herd"
+semantic_tone = &"jade"
+clickable = true
+
+[node name="PulseCardSeason" type="PanelContainer" parent="TopPulseMargin/TopPulseHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+script = ExtResource("2_tamga_card")
+card_id = &"territory_ecology"
+semantic_tone = &"jade"
+clickable = true
+
+[node name="CrisisChipRail" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 72.0
+offset_right = -14.0
+offset_bottom = 320.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="TacticalLensDock" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -356.0
+offset_top = -50.0
+offset_right = 356.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="TacticalLensCard" type="PanelContainer" parent="TacticalLensDock"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_tamga_card")
+card_id = &"tactical_lens_bar"
+semantic_tone = &"gold"
+
+[node name="AnalysisDrawerPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = -352.0
+offset_top = 72.0
+offset_right = -20.0
+offset_bottom = -60.0
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_tamga_card")
+card_id = &"analysis_drawer"
+semantic_tone = &"gold"
+
+[node name="SteppeGlossaryTooltip" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("3_glossary")

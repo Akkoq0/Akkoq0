@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://world/macro/macro_world_generator.gd" id="2_macro_gen"]
@@ -18,6 +18,7 @@
 [ext_resource type="Script" path="res://camera/dual_layer_camera.gd" id="16_cam"]
 [ext_resource type="Resource" path="res://data/camera/camera_profile.tres" id="17_cam_prof"]
 [ext_resource type="Script" path="res://input/player_command_input.gd" id="18_input"]
+[ext_resource type="PackedScene" path="res://ui/hud/otuken_hud_root.tscn" id="19_hud"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -86,3 +87,8 @@ mouse_filter = 2
 [node name="PlayerCommandInput" type="Node" parent="."]
 script = ExtResource("18_input")
 controlled_army_id = 1
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="OtukenHudRoot" parent="HudLayer" instance=ExtResource("19_hud")]

@@ -121,6 +121,7 @@ func _run_suite() -> void:
 	_test_phase22_game_theory_politics_and_48_season_audit()
 	_test_phase23_water_routes_and_scarcity_market()
 	_test_phase24_commander_legacy_and_succession_crisis()
+	_test_phase25_neo_steppe_ui_and_hud()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -3923,10 +3924,316 @@ func _test_phase24_commander_legacy_and_succession_crisis() -> void:
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
 
 
+func _test_phase25_neo_steppe_ui_and_hud() -> void:
+	# Ensure calm baseline telemetry before constructing the HUD
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	var prior_beys: Array[StringName] = [
+		&"inel_tigin_bey", &"p12_ambitious_bey", &"p17_osc_bey",
+		&"sim_bey_0_14001", &"sim_bey_1_14001", &"sim_bey_5_17001",
+		&"sim_bey_22_15011", &"sim_bey_43_15022", &"sim_bey_64_15033", &"sim_bey_66_17002",
+		&"arch_bey_0_22001", &"arch_bey_1_22018", &"arch_bey_2_22035", &"arch_bey_3_22052", &"arch_bey_4_22069",
+	]
+	for bey_id: StringName in prior_beys:
+		if KinshipIntrigueManager.get_lord_plot_stage(bey_id) != GameEnums.IntriguePlotStage.LOYAL_CALM:
+			CommandBus.dispatch(ResolveKinshipIntrigueCommand.new(1, bey_id, GameEnums.IntrigueResolutionAction.SUPPRESS_WITH_LOYAL_GUARD))
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p25_baseline_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	for d_id: StringName in [&"default_rival", &"karluk", &"kipchak", &"oghuz"]:
+		var d_prof: DynastyProfile = DiplomacyManager.get_dynasty_profile(d_id)
+		if d_prof != null:
+			DiplomacyManager.set_dynasty_trust(d_id, d_prof.trust_index)
+	DiplomacyManager.set_political_intelligence_context(0.0, 0.0, 0.0, 0.0)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
 
+	# 1. Bozkır Modernizmi Theme System & Palette Tokens (zero bare default buttons)
+	var neo_theme: Theme = OtukenThemeFactory.create_theme()
+	_expect(neo_theme != null, "OtukenThemeFactory.create_theme() returns a valid Theme.")
+	_expect(neo_theme.default_font_size == NeoSteppePalette.FONT_SIZE_BODY,
+		"Theme configures unified Neo-Steppe body font size (%d)." % neo_theme.default_font_size)
 
+	var btn_styles_ok: bool = true
+	for variation_name: StringName in [&"Button", &"LensButton", &"SteppeCrisisChip", &"ActionButton", &"GhostIconButton"]:
+		var normal_sb: StyleBox = neo_theme.get_stylebox(&"normal", variation_name)
+		if not (normal_sb is StyleBoxFlat):
+			btn_styles_ok = false
+	_expect(btn_styles_ok,
+		"All button variations (Button, LensButton, SteppeCrisisChip, ActionButton, GhostIconButton) use styled StyleBoxFlat skins (no bare Godot buttons).")
 
+	var panel_obs: StyleBoxFlat = neo_theme.get_stylebox(&"panel", &"ObsidianCard") as StyleBoxFlat
+	var panel_tip: StyleBoxFlat = neo_theme.get_stylebox(&"panel", &"TooltipCard") as StyleBoxFlat
+	var panel_drw: StyleBoxFlat = neo_theme.get_stylebox(&"panel", &"DrawerPanel") as StyleBoxFlat
+	_expect(panel_obs != null and panel_tip != null and panel_drw != null \
+		and panel_tip.border_color == NeoSteppePalette.GOLD_TAMGA \
+		and panel_obs.bg_color == NeoSteppePalette.OBSIDIAN_GLASS,
+		"ObsidianCard, TooltipCard and DrawerPanel variations carry deep obsidian glass & gold/bronze borders.")
 
+	_expect(neo_theme.get_color(&"font_color", &"DisplayLabel") == NeoSteppePalette.GOLD_PALE \
+		and neo_theme.get_font_size(&"font_size", &"TitleLabel") == NeoSteppePalette.FONT_SIZE_TITLE \
+		and neo_theme.get_font_size(&"font_size", &"MetricLabel") == NeoSteppePalette.FONT_SIZE_METRIC \
+		and neo_theme.get_font_size(&"font_size", &"CaptionLabel") == NeoSteppePalette.FONT_SIZE_CAPTION \
+		and NeoSteppePalette.get_semantic_color(&"jade") == NeoSteppePalette.JADE_PRIMARY \
+		and NeoSteppePalette.get_semantic_color(&"ice") == NeoSteppePalette.ICE_BLUE \
+		and NeoSteppePalette.get_semantic_color(&"ember") == NeoSteppePalette.EMBER_RED,
+		"Typography hierarchy variations & Yeşim/Buz Mavisi/Köz Kızılı semantic accents map accurately.")
 
+	# 2. Custom CanvasItem Glass/Obsidian & Status Pill Shader Compilation
+	var card_shader: Shader = OtukenThemeFactory.load_card_shader()
+	var pill_shader: Shader = OtukenThemeFactory.load_pill_shader()
+	var card_uniforms: Array = card_shader.get_shader_uniform_list() if card_shader != null else []
+	var pill_uniforms: Array = pill_shader.get_shader_uniform_list() if pill_shader != null else []
+	var has_card_accent: bool = false
+	for u_info: Dictionary in card_uniforms:
+		if str(u_info.get("name", "")) == "semantic_accent_color":
+			has_card_accent = true
+	var has_pill_pulse: bool = false
+	for p_info: Dictionary in pill_uniforms:
+		if str(p_info.get("name", "")) == "urgent_pulse":
+			has_pill_pulse = true
+	_expect(card_shader != null and not card_shader.code.is_empty() and has_card_accent \
+		and pill_shader != null and not pill_shader.code.is_empty() and has_pill_pulse,
+		"Card and status pill CanvasItem shaders compile cleanly with exposed semantic uniforms.")
 
+	var standalone_card: TamgaCardPanel = TamgaCardPanel.new()
+	add_child(standalone_card)
+	standalone_card.set_semantic_tone(&"ice", 0.5)
+	var standalone_mat: ShaderMaterial = standalone_card.get_shader_material()
+	_expect(standalone_mat != null and standalone_mat.shader == card_shader \
+		and standalone_card.get_semantic_color() == NeoSteppePalette.ICE_BLUE,
+		"TamgaCardPanel binds neo_steppe_card.gdshader ShaderMaterial & semantic tone cleanly.")
+	standalone_card.free()
 
+	var standalone_chip: CrisisChipButton = CrisisChipButton.new()
+	add_child(standalone_chip)
+	var chip_mat: ShaderMaterial = standalone_chip.get_shader_material()
+	_expect(chip_mat != null and chip_mat.shader == pill_shader,
+		"CrisisChipButton binds neo_steppe_status_pill.gdshader ShaderMaterial cleanly.")
+	standalone_chip.free()
+
+	# 3. Dual-Layer Smart Glossary Tooltip: all 11 steppe terms, Turkish normalization, live impact & hover-lock
+	var vm: OtukenHudViewModel = OtukenHudViewModel.new(1, 1)
+	var all_terms_valid: bool = true
+	for req_term: StringName in SteppeGlossaryTooltip.REQUIRED_TERMS:
+		var resolved: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(req_term, vm)
+		if not resolved.is_valid_three_layer():
+			all_terms_valid = false
+	var turkish_inputs: Array[StringName] = [&"Ülüş", &"Yılkı", &"Tuğ", &"Töre Barışı", &"Kara Borsa", &"Veraset"]
+	var turkish_expected: Array[StringName] = [&"ulus", &"yilki", &"tug", &"tore_barisi", &"kara_borsa", &"veraset"]
+	var turkish_fold_ok: bool = true
+	for ti: int in range(turkish_inputs.size()):
+		if SteppeGlossaryTooltip.normalize_term_id(turkish_inputs[ti]) != turkish_expected[ti]:
+			turkish_fold_ok = false
+	_expect(SteppeGlossaryTooltip.REQUIRED_TERMS.size() == 11 and all_terms_valid and turkish_fold_ok,
+		"All 11 Bozkır glossary terms (including Turkish diacritics) resolve cleanly across all 3 structured layers.")
+
+	var kut_entry_calm: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kut", vm)
+	CommandBus.dispatch(ModifyKutCommand.new(-55.0, &"p25_glossary_live_kut"))
+	var kut_entry_crisis: SteppeGlossaryTooltip.GlossaryEntry = SteppeGlossaryTooltip.resolve_entry(&"kut", vm)
+	_expect(kut_entry_calm.tone_id == &"jade" \
+		and kut_entry_crisis.tone_id == &"ember" \
+		and kut_entry_crisis.live_impact_line != kut_entry_calm.live_impact_line \
+		and kut_entry_crisis.live_impact_line.find("AKTİF") != -1,
+		"Glossary live impact row reacts immediately to core Kut simulation drop (20.0 < 30, Konsey AKTİF).")
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p25_glossary_restore_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+
+	var tooltip: SteppeGlossaryTooltip = SteppeGlossaryTooltip.new()
+	add_child(tooltip)
+	tooltip.set_view_model(vm)
+	var lock_events: Array[bool] = []
+	var on_lock_changed: Callable = func(_tid: StringName, locked_now: bool) -> void:
+		lock_events.append(locked_now)
+	tooltip.tooltip_locked_changed.connect(on_lock_changed)
+
+	_expect(tooltip.begin_hover(&"amanat", Rect2(Vector2(24.0, 74.0), Vector2(140.0, 40.0)), vm) \
+		and tooltip.visible and not tooltip.is_hover_locked(),
+		"Hovering glossary trigger opens 3-layer tooltip unlocked initially.")
+	tooltip.end_hover()
+	_expect(not tooltip.visible, "Leaving glossary trigger before hover-lock closes tooltip cleanly.")
+
+	tooltip.begin_hover(&"veraset", Rect2(Vector2(24.0, 74.0), Vector2(140.0, 40.0)), vm)
+	var did_lock: bool = tooltip.step_hover_timer(tooltip.hover_lock_delay_sec + 0.05)
+	tooltip.end_hover()
+	var layers: Dictionary[StringName, String] = tooltip.get_layer_texts()
+	_expect(did_lock and tooltip.is_hover_locked() and tooltip.visible \
+		and lock_events.has(true) \
+		and not layers[&"native"].is_empty() and not layers[&"plain"].is_empty() \
+		and not layers[&"function"].is_empty() and not layers[&"live_impact"].is_empty(),
+		"Hover delay locks glossary card so mouse exit keeps all 3 layers pinned on screen.")
+	tooltip.unlock_tooltip(true)
+	_expect(not tooltip.is_hover_locked() and not tooltip.visible and lock_events.has(false),
+		"Unlocking pinned glossary card hides it and emits unlock signal cleanly.")
+	tooltip.tooltip_locked_changed.disconnect(on_lock_changed)
+	tooltip.free()
+
+	# 4. 3-Layer HUD Shell: Top Pulse Bar, >=82% Open Map Invariant, Crisis Rail, Lens Hotkeys & Drawer
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	_expect(hud_scene != null and hud_scene.can_instantiate(),
+		"otuken_hud_root.tscn loads and instantiates cleanly.")
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	add_child(hud)
+
+	var calm_ratio: float = hud.compute_open_map_ratio()
+	_expect(hud.get_top_pulse_card_count() == 4 \
+		and hud.get_lens_button_count() == 5 \
+		and hud.get_active_crisis_chip_count() == 0 \
+		and calm_ratio >= 0.82,
+		"Calm HUD renders 4 pulse cards, 5 lens toggles, 0 emergency chips, and keeps %.1f%% open map (>=82%%)." % (calm_ratio * 100.0))
+
+	# Trigger genuine multi-crisis state: Kut < 30 + Winter Zud (Food = 0) + Water Sabotage Crisis
+	CommandBus.dispatch(ModifyKutCommand.new(-52.0, &"p25_hud_crisis_kut"))
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.WINTER:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(0)
+	SeasonManager.evaluate_zud_starvation(SeasonManager.get_current_season())
+	EventBus.water_crisis_inflicted.emit(1, Vector2i.ZERO, 0.15, 10.0, true)
+
+	var crisis_ratio: float = hud.compute_open_map_ratio()
+	var crisis_count: int = hud.get_active_crisis_chip_count()
+	_expect(crisis_count >= 2 and crisis_ratio >= 0.82,
+		"Active crises populate %d right-edge emergency chips while retaining %.1f%% open map (>=82%%)." % [
+			crisis_count, crisis_ratio * 100.0])
+
+	# Simulate activating a crisis chip -> opens matching Layer 3 drawer slot cleanly
+	var first_chip: CrisisChipButton = hud.get_node("CrisisChipRail").get_child(0) as CrisisChipButton
+	first_chip.pressed.emit()
+	_expect(hud.is_drawer_open() and hud.get_active_drawer_slot() == first_chip.target_drawer_slot,
+		"Activating crisis chip opens non-blocking Layer 3 drawer directly on '%s'." % String(first_chip.target_drawer_slot))
+
+	# Test Layer 2 Single-Key Tactical Lens Selection (1..5 hotkeys + EventBus emission)
+	var observed_lenses: Array[GameEnums.TacticalMapLens] = []
+	var on_lens_changed: Callable = func(_prev: GameEnums.TacticalMapLens, next_lens: GameEnums.TacticalMapLens) -> void:
+		observed_lenses.append(next_lens)
+	EventBus.tactical_lens_changed.connect(on_lens_changed)
+
+	var key2: InputEventKey = InputEventKey.new()
+	key2.keycode = KEY_2
+	key2.pressed = true
+	hud._unhandled_input(key2)
+	var key4: InputEventKey = InputEventKey.new()
+	key4.keycode = KEY_4
+	key4.pressed = true
+	hud._unhandled_input(key4)
+	var key5: InputEventKey = InputEventKey.new()
+	key5.keycode = KEY_5
+	key5.pressed = true
+	hud._unhandled_input(key5)
+	hud.select_lens(GameEnums.TacticalMapLens.YAYLAK_KISLAK)
+	hud.select_lens(GameEnums.TacticalMapLens.NORMAL)
+
+	_expect(observed_lenses.size() == 5 \
+		and observed_lenses[0] == GameEnums.TacticalMapLens.LOGISTICS_WATER_COURIER \
+		and observed_lenses[1] == GameEnums.TacticalMapLens.TUG_CONTROL \
+		and observed_lenses[2] == GameEnums.TacticalMapLens.INTELLIGENCE_DUST \
+		and observed_lenses[3] == GameEnums.TacticalMapLens.YAYLAK_KISLAK \
+		and observed_lenses[4] == GameEnums.TacticalMapLens.NORMAL \
+		and hud.get_active_lens() == GameEnums.TacticalMapLens.NORMAL,
+		"Single-key hotkeys (2, 4, 5) and all 5 TacticalMapLens transitions broadcast via EventBus cleanly.")
+	EventBus.tactical_lens_changed.disconnect(on_lens_changed)
+
+	# Test Layer 3 Modular Analysis Drawer Tween & Extensibility + Non-blocking invariant
+	hud.close_drawer(true)
+	_expect(not hud.is_drawer_open(), "Drawer closes cleanly before testing animated toggle.")
+	hud.open_drawer(OtukenHudViewModel.SLOT_WORLD_DIPLOMACY, false)
+	var tween_started: bool = hud.is_drawer_tween_running()
+	var world_unpaused: bool = not get_tree().paused
+
+	var custom_phase26_panel: Label = Label.new()
+	custom_phase26_panel.name = "MockPhase26Widget"
+	custom_phase26_panel.text = "Faz 26 Panel Yuvası Testi"
+	var mounted_ok: bool = hud.mount_panel_to_slot(OtukenHudViewModel.SLOT_ECONOMY_WATER, custom_phase26_panel)
+	var slot_ids: PackedStringArray = hud.get_registered_slot_ids()
+	_expect(hud.is_drawer_open() and tween_started and world_unpaused \
+		and slot_ids.size() == 5 and mounted_ok \
+		and custom_phase26_panel.get_parent() == hud.get_drawer_slot_container(OtukenHudViewModel.SLOT_ECONOMY_WATER),
+		"Layer 3 drawer slides via non-blocking Tween (paused=false), registers 5 modular slots, and mounts external widgets cleanly.")
+
+	# Dismiss crisis state cleanly so HUD frees without dangling emergency states
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p25_hud_restore_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	EventBus.water_source_restored.emit(Vector2i.ZERO, &"well_restore_p25", 1)
+	_expect(hud.get_active_crisis_chip_count() == 0,
+		"Crisis chips hide automatically once emergency conditions resolve cleanly.")
+
+	remove_child(hud)
+	hud.free()
+
+	# 5. Strict _exit_tree() EventBus Signal Cleanup Verification (zero leaked connections)
+	var audited_signals: Array[StringName] = [
+		&"kut_changed",
+		&"season_changed",
+		&"yilki_horses_sacrificed_for_ration",
+		&"water_crisis_inflicted",
+		&"coalition_war_declared",
+		&"tactical_lens_changed",
+	]
+	var baseline_counts: Dictionary[StringName, int] = {}
+	for sig_name: StringName in audited_signals:
+		baseline_counts[sig_name] = EventBus.get_signal_connection_list(sig_name).size()
+
+	var hud_lifecycle: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	add_child(hud_lifecycle)
+	var all_increased: bool = true
+	for sig_name: StringName in audited_signals:
+		var mounted_count: int = EventBus.get_signal_connection_list(sig_name).size()
+		if mounted_count != baseline_counts[sig_name] + 1:
+			all_increased = false
+	_expect(all_increased,
+		"Mounted OtukenHudRoot subscribes exactly +1 handler per audited EventBus signal.")
+
+	remove_child(hud_lifecycle)
+	hud_lifecycle.free()
+
+	var all_restored: bool = true
+	for sig_name: StringName in audited_signals:
+		var after_free_count: int = EventBus.get_signal_connection_list(sig_name).size()
+		if after_free_count != baseline_counts[sig_name]:
+			all_restored = false
+	_expect(all_restored,
+		"_exit_tree() strictly disconnects every EventBus subscription (0 leaked connections after free).")
+
+	# Verify post-free EventBus emissions cause zero dangling callable errors
+	EventBus.kut_changed.emit(75.0, 75.0, &"p25_post_free_probe")
+	EventBus.tactical_lens_changed.emit(GameEnums.TacticalMapLens.NORMAL, GameEnums.TacticalMapLens.NORMAL)
+	EventBus.water_crisis_inflicted.emit(999, Vector2i.ZERO, 0.0, 0.0, false)
+
+	# Full baseline restore prior to main scene integration check
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), &"p25_cleanup_kut"))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	for d_id: StringName in [&"default_rival", &"karluk", &"kipchak", &"oghuz"]:
+		var d_prof: DynastyProfile = DiplomacyManager.get_dynasty_profile(d_id)
+		if d_prof != null:
+			DiplomacyManager.set_dynasty_trust(d_id, d_prof.trust_index)
+	DiplomacyManager.set_political_intelligence_context(0.0, 0.0, 0.0, 0.0)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
