@@ -105,6 +105,12 @@ var _research_tree_panel: TraditionResearchTreePanel = null
 var _research_toggle_btn: Button = null
 var _research_toggle_cb: Callable = Callable()
 
+var _toast_stack: AlertToastStack = null
+var _rich_tooltip: RichTermTooltipController = null
+var _game_shell: GameShellCoordinator = null
+var _toast_activated_cb: Callable = Callable()
+var _shell_settings_cb: Callable = Callable()
+
 @export var drawer_tween_duration_sec: float = DEFAULT_TWEEN_DURATION_SEC
 @export var player_id: int = 1
 @export var tracked_army_id: int = 1
@@ -217,8 +223,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_5, KEY_KP_5:
 			select_lens(GameEnums.TacticalMapLens.INTELLIGENCE_DUST)
 			_mark_input_handled()
+		KEY_F10:
+			_build_hud_structure()
+			if _game_shell != null:
+				if _game_shell.is_any_screen_visible():
+					_game_shell.close_all_menus()
+				else:
+					_game_shell.open_pause_menu()
+				_mark_input_handled()
 		KEY_ESCAPE:
-			if _metric_popover != null and _metric_popover.visible:
+			if _game_shell != null and _game_shell.is_any_screen_visible() and _game_shell.get_active_screen_id() != &"main_menu":
+				_game_shell.close_all_menus()
+				_mark_input_handled()
+			elif _rich_tooltip != null and _rich_tooltip.visible:
+				_rich_tooltip.hide_tooltip()
+				_mark_input_handled()
+			elif _metric_popover != null and _metric_popover.visible:
 				close_metric_breakdown()
 				_mark_input_handled()
 			elif _empire_ledger != null and _empire_ledger.visible:
@@ -232,6 +252,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_mark_input_handled()
 			elif _drawer_open:
 				close_drawer(false)
+				_mark_input_handled()
+			elif _game_shell != null:
+				_game_shell.open_pause_menu()
 				_mark_input_handled()
 
 
@@ -651,6 +674,34 @@ func get_research_toggle_button() -> Button:
 	return _research_toggle_btn
 
 
+func get_alert_toast_stack() -> AlertToastStack:
+	_build_hud_structure()
+	return _toast_stack
+
+
+func get_rich_tooltip_controller() -> RichTermTooltipController:
+	_build_hud_structure()
+	return _rich_tooltip
+
+
+func get_game_shell() -> GameShellCoordinator:
+	_build_hud_structure()
+	return _game_shell
+
+
+func push_alert_toast(
+		title: String,
+		detail: String,
+		tone_id: StringName = &"gold",
+		focus_coord: Vector2i = Vector2i.ZERO,
+		target_drawer_slot: StringName = &"",
+		auto_dismiss_sec: float = 6.5) -> StringName:
+	_build_hud_structure()
+	if _toast_stack == null:
+		return &""
+	return _toast_stack.push_toast(title, detail, tone_id, focus_coord, target_drawer_slot, auto_dismiss_sec)
+
+
 func compute_open_map_ratio(include_drawer: bool = false) -> float:
 	_build_hud_structure()
 	var vp_size: Vector2 = _resolve_viewport_size()
@@ -673,6 +724,8 @@ func compute_open_map_ratio(include_drawer: bool = false) -> float:
 		occupied += _measure_control_area(_empire_ledger, vp_size)
 	if _research_tree_panel != null and _research_tree_panel.visible:
 		occupied += _measure_control_area(_research_tree_panel, vp_size)
+	if _toast_stack != null and _toast_stack.visible and _toast_stack.get_active_toast_count() > 0:
+		occupied += _measure_control_area(_toast_stack, vp_size)
 	if _crisis_chip_rail != null and _crisis_chip_rail.visible and not _crisis_chips.is_empty():
 		var chip_h: float = 0.0
 		var chip_w: float = 204.0
@@ -1079,6 +1132,22 @@ func _build_hud_structure() -> void:
 		add_child(_research_tree_panel)
 	_research_tree_panel.bind_view_model(get_research_view_model())
 
+	_toast_stack = get_node_or_null("AlertToastStack") as AlertToastStack
+	if _toast_stack == null:
+		_toast_stack = AlertToastStack.new()
+		_toast_stack.anchor_left = 1.0
+		_toast_stack.anchor_top = 1.0
+		_toast_stack.anchor_right = 1.0
+		_toast_stack.anchor_bottom = 1.0
+		_toast_stack.offset_left = -280.0
+		_toast_stack.offset_top = -310.0
+		_toast_stack.offset_right = -14.0
+		_toast_stack.offset_bottom = -58.0
+		add_child(_toast_stack)
+	_toast_activated_cb = _on_toast_activated
+	if not _toast_stack.toast_activated.is_connected(_toast_activated_cb):
+		_toast_stack.toast_activated.connect(_toast_activated_cb)
+
 	# --- Dual-Layer Hover-Lock Steppe Glossary Tooltip -----------------------
 	_glossary_tooltip = get_node_or_null("SteppeGlossaryTooltip") as SteppeGlossaryTooltip
 	if _glossary_tooltip == null:
@@ -1087,6 +1156,24 @@ func _build_hud_structure() -> void:
 		add_child(_glossary_tooltip)
 	_glossary_tooltip.set_view_model(get_view_model())
 	move_child(_glossary_tooltip, get_child_count() - 1)
+
+	_rich_tooltip = get_node_or_null("RichTermTooltipController") as RichTermTooltipController
+	if _rich_tooltip == null:
+		_rich_tooltip = RichTermTooltipController.new()
+		add_child(_rich_tooltip)
+	_rich_tooltip.set_hud_view_model(get_view_model())
+	move_child(_rich_tooltip, get_child_count() - 1)
+
+	_game_shell = get_node_or_null("GameShellCoordinator") as GameShellCoordinator
+	if _game_shell == null:
+		_game_shell = GameShellCoordinator.new()
+		add_child(_game_shell)
+	_game_shell.bind_analytics_view_model(get_analytics_view_model())
+	_shell_settings_cb = _on_shell_settings_applied
+	var sp_panel: SettingsPanel = _game_shell.get_settings_panel()
+	if sp_panel != null and not sp_panel.settings_applied.is_connected(_shell_settings_cb):
+		sp_panel.settings_applied.connect(_shell_settings_cb)
+	move_child(_game_shell, get_child_count() - 1)
 
 	# Register the 5 standard Phase 26-28 modular drawer slots cleanly
 	register_drawer_slot(OtukenHudViewModel.SLOT_ECONOMY_WATER, "Erzak/Su", &"ice")
@@ -1568,7 +1655,7 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.ai_story_agenda_activated, _on_ai_story_agenda_hud)
 	_subscribe_bus(EventBus.tradition_research_started, _on_tradition_research_dirty.unbind(4))
 	_subscribe_bus(EventBus.tradition_research_progressed, _on_tradition_research_dirty.unbind(4))
-	_subscribe_bus(EventBus.tradition_research_completed, _on_tradition_research_dirty.unbind(4))
+	_subscribe_bus(EventBus.tradition_research_completed, _on_tradition_research_completed_hud)
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:
@@ -1630,6 +1717,17 @@ func _disconnect_ui_signals() -> void:
 		if _empire_ledger.ledger_focus_requested.is_connected(_ledger_focus_cb):
 			_empire_ledger.ledger_focus_requested.disconnect(_ledger_focus_cb)
 	_ledger_focus_cb = Callable()
+
+	if _toast_stack != null and is_instance_valid(_toast_stack) and not _toast_activated_cb.is_null():
+		if _toast_stack.toast_activated.is_connected(_toast_activated_cb):
+			_toast_stack.toast_activated.disconnect(_toast_activated_cb)
+	_toast_activated_cb = Callable()
+
+	if _game_shell != null and is_instance_valid(_game_shell) and not _shell_settings_cb.is_null():
+		var sp: SettingsPanel = _game_shell.get_settings_panel()
+		if sp != null and is_instance_valid(sp) and sp.settings_applied.is_connected(_shell_settings_cb):
+			sp.settings_applied.disconnect(_shell_settings_cb)
+	_shell_settings_cb = Callable()
 
 	for opt: LensOptionWidgets in _lens_options:
 		if opt.button != null and is_instance_valid(opt.button) and opt.button.pressed.is_connected(opt.pressed_cb):
@@ -1786,6 +1884,15 @@ func _on_kurultay_crisis_hud(_pid: int, crisis_id: StringName, claimant_bey_id: 
 func _on_courier_ambushed_hud(order_id: StringName, victim_pid: int, ambusher_id: int, leaked_plan: GameEnums.TuranTacticPhase) -> void:
 	if _analytics_vm != null:
 		_analytics_vm.ingest_courier_ambush(order_id, victim_pid, ambusher_id, leaked_plan)
+	if _toast_stack != null and victim_pid == player_id:
+		_toast_stack.push_toast(
+			"Ulak Pusuya Düştü!",
+			"Emir #%s sızdırıldı (Pusu: Boy %d)." % [String(order_id), ambusher_id],
+			&"ember",
+			PastureEcologyManager.get_player_camp_region(player_id),
+			SLOT_TACTICAL_COMMAND,
+			6.0
+		)
 	_on_telemetry_dirty()
 
 
@@ -1930,6 +2037,40 @@ func _on_tradition_research_dirty() -> void:
 	if _research_tree_panel != null and is_instance_valid(_research_tree_panel) and _research_tree_panel.visible:
 		_research_tree_panel.refresh_tree()
 	_on_telemetry_dirty()
+
+
+func _on_tradition_research_completed_hud(
+		pid: int,
+		node_id: StringName,
+		_branch: GameEnums.ResearchBranch,
+		effect_summary: String) -> void:
+	if pid == player_id and _toast_stack != null:
+		var n: TraditionResearchNode = TraditionResearchCatalog.get_node_by_id(node_id)
+		var label: String = n.title if n != null else String(node_id)
+		_toast_stack.push_toast(
+			"Gelenek Tamamlandı: %s" % label,
+			effect_summary,
+			&"jade",
+			PastureEcologyManager.get_player_camp_region(player_id),
+			OtukenHudViewModel.SLOT_MILITARY_HERD,
+			6.5
+		)
+	_on_tradition_research_dirty()
+
+
+func _on_toast_activated(_toast_id: StringName, focus_coord: Vector2i, target_drawer_slot: StringName) -> void:
+	var wp: Vector3 = Vector3(float(focus_coord.x) * 16.0 + 8.0, 0.0, float(focus_coord.y) * 16.0 + 8.0)
+	_on_analytics_focus_requested(focus_coord, wp)
+	if target_drawer_slot != &"" and has_drawer_slot(target_drawer_slot):
+		open_drawer(target_drawer_slot, false)
+
+
+func _on_shell_settings_applied(settings: GameShellViewModel.UserSettingsSnapshot) -> void:
+	if settings == null:
+		return
+	scale = Vector2(settings.ui_scale, settings.ui_scale)
+	if _rich_tooltip != null and is_instance_valid(_rich_tooltip):
+		_rich_tooltip.set_touch_friendly(settings.touch_friendly_layout)
 
 
 func _on_popover_quick_action_requested(primary_slot: StringName, fallback_slot: StringName) -> void:

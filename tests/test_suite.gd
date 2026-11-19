@@ -132,6 +132,7 @@ func _run_suite() -> void:
 	_test_phase32_humanlike_utility_ai_schemes_and_story_hook()
 	_test_ui_metric_analytics_chronicle_and_ledger()
 	_test_tradition_research_tree_and_doctrine_preview()
+	_test_full_game_shell_menus_tooltips_and_toasts()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -6832,6 +6833,238 @@ func _test_tradition_research_tree_and_doctrine_preview() -> void:
 	ResourceManager.import_state_dict({"stockpiles": {}})
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _test_full_game_shell_menus_tooltips_and_toasts() -> void:
+	# 1. Clean Baseline & ArchitectureVerifier
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	_reset_p27b_singletons(&"faz_c_init_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Faz C passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	var test_saves_dir: String = "user://faz_c_saves_test"
+	var test_settings_path: String = "user://faz_c_settings_test.json"
+	if DirAccess.dir_exists_absolute(test_saves_dir):
+		var old_d: DirAccess = DirAccess.open(test_saves_dir)
+		if old_d != null:
+			old_d.list_dir_begin()
+			var old_f: String = old_d.get_next()
+			while not old_f.is_empty():
+				if not old_d.current_is_dir():
+					old_d.remove(old_f)
+				old_f = old_d.get_next()
+			old_d.list_dir_end()
+
+	# 2. HUD Root Mount & GameShellCoordinator Wiring
+	var audit_sigs: Array[StringName] = [
+		&"resource_amount_changed",
+		&"kut_changed",
+		&"season_changed",
+		&"tradition_research_completed",
+	]
+	var base_counts: Dictionary[StringName, int] = {}
+	for s_name: StringName in audit_sigs:
+		base_counts[s_name] = EventBus.get_signal_connection_list(s_name).size()
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(1, 1)
+	add_child(hud)
+
+	var shell: GameShellCoordinator = hud.get_game_shell()
+	var shell_vm: GameShellViewModel = shell.get_view_model()
+	shell_vm.set_saves_directory(test_saves_dir)
+	shell_vm.set_settings_path(test_settings_path)
+
+	# 3. MainMenuScreen -> NewGameSetupPanel (Mode, 4 Personalities, 4 AI Tiers, Seed)
+	shell.open_main_menu()
+	var main_menu: MainMenuScreen = shell.get_main_menu()
+	var continue_disabled_before_save: bool = main_menu.get_button(&"continue").disabled
+	main_menu.get_button(&"new_game").pressed.emit()
+
+	var setup_panel: NewGameSetupPanel = shell.get_new_game_setup_panel()
+	var setup_opened: bool = setup_panel.visible and shell.get_active_screen_id() == &"new_game_setup"
+	setup_panel.select_session_mode(GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD)
+	setup_panel.get_personality_button(GameEnums.SteppeAIPersonality.YAYLAK_IMPARATORU).pressed.emit()
+	setup_panel.get_difficulty_button(GameEnums.AIDifficultyTier.KAGAN_ZEKASI).pressed.emit()
+	setup_panel.set_world_seed(1453)
+	var diff_desc_ok: bool = setup_panel.get_difficulty_description_text().find("0 Hile") != -1
+	setup_panel.get_start_button().pressed.emit()
+
+	var ai_agent: SteppeStrategicAIController = SteppeStrategicAIController.get_ai_agent(2)
+	var launched_ok: bool = not shell.is_any_screen_visible() \
+		and SessionClockAuthority.get_session_mode() == GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD \
+		and ai_agent != null and ai_agent.difficulty_profile.difficulty_tier == GameEnums.AIDifficultyTier.KAGAN_ZEKASI
+
+	_expect(continue_disabled_before_save and setup_opened and diff_desc_ok and launched_ok,
+		"MainMenuScreen & NewGameSetupPanel configure Online Mode, Personalities, 4 AI Difficulty profiles & Seed cleanly.")
+
+	# 4. SaveLoadMenuPanel (SaveLoadRepository Integration, Continue Enable & Corrupt Rejection)
+	CommandBus.dispatch(ModifyKutCommand.new(10.0, &"faz_c_save_kut"))
+	var saved_kut: float = GameManager.get_kut_score()
+	shell.open_save_load_menu(true)
+	var save_panel: SaveLoadMenuPanel = shell.get_save_load_panel()
+	var save_res: GameShellViewModel.SaveActionResult = save_panel.save_current_slot("faz_c_sefer_1")
+
+	# Write tampered corrupt save file cleanly into test saves dir
+	var corrupt_path: String = test_saves_dir.path_join("bozuk_sefer.json")
+	var cf: FileAccess = FileAccess.open(corrupt_path, FileAccess.WRITE)
+	if cf != null:
+		cf.store_string("{\"schema_version\":1,\"world_hash\":\"deadbeef0000\",\"state\":{}}")
+		cf.close()
+
+	shell.open_main_menu()
+	var continue_enabled_after_save: bool = not main_menu.get_button(&"continue").disabled
+	CommandBus.dispatch(ModifyKutCommand.new(-25.0, &"faz_c_mutated_kut"))
+	var kut_after_mutation: float = GameManager.get_kut_score()
+
+	shell.open_save_load_menu(true)
+	var slots: Array[GameShellViewModel.SaveSlotSummary] = shell_vm.list_save_slots()
+	var found_corrupt_flag: bool = false
+	for sl: GameShellViewModel.SaveSlotSummary in slots:
+		if sl != null and sl.slot_id == "bozuk_sefer" and not sl.is_valid:
+			found_corrupt_flag = true
+	save_panel.select_slot("bozuk_sefer")
+	var corrupt_load_res: GameShellViewModel.SaveActionResult = save_panel.load_selected_slot()
+	var kut_after_corrupt_load: float = GameManager.get_kut_score()
+
+	save_panel.select_slot("faz_c_sefer_1")
+	var valid_load_res: GameShellViewModel.SaveActionResult = save_panel.load_selected_slot()
+	var kut_after_valid_load: float = GameManager.get_kut_score()
+
+	_expect(save_res.ok and continue_enabled_after_save and found_corrupt_flag \
+		and not corrupt_load_res.ok and is_equal_approx(kut_after_corrupt_load, kut_after_mutation) \
+		and valid_load_res.ok and is_equal_approx(kut_after_valid_load, saved_kut) \
+		and not shell.is_any_screen_visible(),
+		"SaveLoadMenuPanel saves via SaveLoadRepository, enables Continue, flags/rejects corrupt saves safely, and restores exact state.")
+
+	# 5. SettingsPanel Persistence & PauseMenuPanel Singleplayer vs Online Semantics
+	shell.open_settings()
+	var settings_panel: SettingsPanel = shell.get_settings_panel()
+	settings_panel.set_working_values(0.50, 0.40, 0.75, 1, 1.15, true)
+	settings_panel.get_apply_button().pressed.emit()
+	var verifier_vm: GameShellViewModel = GameShellViewModel.new()
+	verifier_vm.set_settings_path(test_settings_path)
+	var reloaded_settings: GameShellViewModel.UserSettingsSnapshot = verifier_vm.load_user_settings()
+
+	# Online pause mode still opens PauseMenu without freezing clock; SP mode pauses clock
+	shell.open_pause_menu()
+	var pause_in_online_visible: bool = shell.get_pause_panel().visible and not SessionClockAuthority.is_paused()
+	SessionClockAuthority.configure_session_mode(GameEnums.SessionMode.SINGLEPLAYER_SESSION, 1.0, 10.0)
+	shell.open_pause_menu()
+	var pause_in_sp_paused: bool = shell.get_pause_panel().visible and SessionClockAuthority.is_paused()
+
+	# 6. MatchSummaryScreen Multi-Series Chart & Turning Points
+	shell.get_pause_panel().get_button(&"summary").pressed.emit()
+	var sum_screen: MatchSummaryScreen = shell.get_match_summary_screen()
+	var sum_ok: bool = sum_screen.visible and sum_screen.get_series_count() >= 3 and sum_screen.get_turning_point_count() >= 1
+	sum_screen.get_main_menu_button().pressed.emit()
+	var returned_to_main: bool = shell.get_active_screen_id() == &"main_menu"
+	shell.close_all_menus()
+
+	_expect(is_equal_approx(reloaded_settings.master_volume, 0.50) \
+		and reloaded_settings.graphics_quality == 1 \
+		and is_equal_approx(reloaded_settings.ui_scale, 1.15) \
+		and reloaded_settings.touch_friendly_layout \
+		and pause_in_online_visible and pause_in_sp_paused \
+		and sum_ok and returned_to_main,
+		"SettingsPanel persists audio/gfx/scale/touch config; PauseMenu & MatchSummaryScreen multi-series flow transition cleanly.")
+
+	# 7. RichTermTooltipController (Hover + Touch Long-Press) & AlertToastStack (>=82% Open Map)
+	var rt: RichTermTooltipController = hud.get_rich_tooltip_controller()
+	var terms_valid: bool = true
+	for r_term: StringName in [&"kut", &"ulus", &"zud", &"yilki", &"toz_perdesi", &"tolgama"]:
+		var r_entry: RichTermTooltipController.RichTermEntry = RichTermTooltipController.resolve_rich_term(r_term, hud.get_view_model())
+		if r_entry.title.is_empty() or r_entry.summary.is_empty() or r_entry.tactical_tip.is_empty():
+			terms_valid = false
+
+	var dummy_ctrl: Button = Button.new()
+	dummy_ctrl.position = Vector2(180.0, 120.0)
+	dummy_ctrl.size = Vector2(90.0, 28.0)
+	hud.add_child(dummy_ctrl)
+	rt.bind_term(dummy_ctrl, &"toz_perdesi")
+	dummy_ctrl.mouse_entered.emit()
+	rt.step_timers(0.25)
+	var hover_opened_toz: bool = rt.visible and rt.get_active_term_id() == &"toz_perdesi" and not rt.is_locked()
+	dummy_ctrl.mouse_exited.emit()
+	var hover_exited_closed: bool = not rt.visible
+
+	var touch_ev: InputEventScreenTouch = InputEventScreenTouch.new()
+	touch_ev.pressed = true
+	dummy_ctrl.gui_input.emit(touch_ev)
+	rt.step_timers(0.40)
+	var long_press_locked_toz: bool = rt.visible and rt.get_active_term_id() == &"toz_perdesi" and rt.is_locked()
+	rt.hide_tooltip()
+	rt.unbind_term(dummy_ctrl)
+	hud.remove_child(dummy_ctrl)
+	dummy_ctrl.queue_free()
+
+	var ts: AlertToastStack = hud.get_alert_toast_stack()
+	var toast_id: StringName = hud.push_alert_toast(
+		"Tolgama İkmali Kesildi",
+		"Sağ kenar bildirimi odak testi",
+		&"ember",
+		Vector2i(2, 2),
+		OtukenHudRoot.SLOT_TACTICAL_COMMAND,
+		6.0
+	)
+	var toast_active: bool = ts.get_active_toast_count() == 1 and ts.visible
+	var activated_toasts: Array[StringName] = []
+	var on_t_act: Callable = func(tid: StringName, _c: Vector2i, _sl: StringName) -> void:
+		activated_toasts.append(tid)
+	ts.toast_activated.connect(on_t_act)
+	ts.activate_toast(toast_id)
+	ts.toast_activated.disconnect(on_t_act)
+	ts.clear_all_toasts()
+	var ratio_after_toast_close: float = hud.compute_open_map_ratio(false)
+
+	_expect(terms_valid and hover_opened_toz and hover_exited_closed \
+		and long_press_locked_toz and toast_active \
+		and activated_toasts.size() == 1 and activated_toasts[0] == toast_id \
+		and ts.get_active_toast_count() == 0 and not ts.visible and ratio_after_toast_close >= 0.82,
+		"RichTermTooltipController handles hover + touch long-press across Kut/Ülüş/Zud/Yılkı/Toz Perdesi/Tolgama and AlertToastStack keeps >=82%% map open on dismiss.")
+
+	# 8. Zero Signal Leaks & Full Workspace Cleanup Before Next Test
+	remove_child(hud)
+	hud.free()
+
+	var zero_shell_leaks: bool = true
+	for s_name2: StringName in audit_sigs:
+		if EventBus.get_signal_connection_list(s_name2).size() != base_counts[s_name2]:
+			zero_shell_leaks = false
+	_expect(zero_shell_leaks,
+		"GameShellCoordinator, RichTermTooltipController & AlertToastStack release all EventBus subscriptions with 0 leaks on free().")
+
+	# Remove temp test files and reset audio/singletons
+	var master_idx: int = AudioServer.get_bus_index("Master")
+	if master_idx >= 0:
+		AudioServer.set_bus_volume_db(master_idx, 0.0)
+	var root_dir: DirAccess = DirAccess.open("user://")
+	if root_dir != null and root_dir.file_exists("faz_c_settings_test.json"):
+		root_dir.remove("faz_c_settings_test.json")
+	if DirAccess.dir_exists_absolute(test_saves_dir):
+		var d2: DirAccess = DirAccess.open(test_saves_dir)
+		if d2 != null:
+			d2.list_dir_begin()
+			var f2: String = d2.get_next()
+			while not f2.is_empty():
+				if not d2.current_is_dir():
+					d2.remove(f2)
+				f2 = d2.get_next()
+			d2.list_dir_end()
+		if root_dir != null:
+			root_dir.remove("faz_c_saves_test")
+
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	_reset_p27b_singletons(&"faz_c_cleanup_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
 
 
 

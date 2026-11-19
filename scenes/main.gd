@@ -8,6 +8,7 @@ var _tactical_panel: TacticalCommandDrawerPanel = null
 var _world_ecology_panel: WorldEcologyDrawerPanel = null
 var _sovereignty_panel: SovereigntyDrawerPanel = null
 var _map_3d_controller: Steppe3DMapController = null
+var _shell_launch_cb: Callable = Callable()
 
 var _player_id: int = 1
 var _army_id: int = 1
@@ -31,6 +32,12 @@ func _exit_tree() -> void:
 			_map_3d_controller.region_selected.disconnect(_on_map_region_selected)
 		if _map_3d_controller.army_selected.is_connected(_on_map_army_selected):
 			_map_3d_controller.army_selected.disconnect(_on_map_army_selected)
+	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	if hud != null and is_instance_valid(hud) and _shell_launch_cb.is_valid():
+		var sh: GameShellCoordinator = hud.get_game_shell()
+		if sh != null and is_instance_valid(sh) and sh.campaign_launch_requested.is_connected(_shell_launch_cb):
+			sh.campaign_launch_requested.disconnect(_shell_launch_cb)
+	_shell_launch_cb = Callable()
 
 
 func get_tactical_panel() -> TacticalCommandDrawerPanel:
@@ -54,6 +61,11 @@ func _mount_hud_panels(vanguard: ArmyController) -> void:
 	if hud == null:
 		return
 	hud.set_player_context(_player_id, _army_id)
+	var sh: GameShellCoordinator = hud.get_game_shell()
+	if sh != null:
+		_shell_launch_cb = _on_campaign_launch_requested
+		if not sh.campaign_launch_requested.is_connected(_shell_launch_cb):
+			sh.campaign_launch_requested.connect(_shell_launch_cb)
 
 	_world_ecology_panel = WorldEcologyDrawerPanel.new()
 	_world_ecology_panel.set_context(_player_id, _army_id, _selected_region)
@@ -130,3 +142,16 @@ func _on_macro_world_generated(world_state: MacroWorldState) -> void:
 		var army_reg: ArmyRegistry = get_node_or_null("ArmyRegistry") as ArmyRegistry
 		hud.bind_analytics_scene_context(cam, world_state, army_reg, null)
 	CommandBus.dispatch(ChangeGameStateCommand.new(GameEnums.GameState.PLAYING))
+
+
+func _on_campaign_launch_requested(cfg: GameShellViewModel.NewGameLaunchConfig) -> void:
+	if cfg == null:
+		return
+	var macro_gen: MacroWorldGenerator = get_node_or_null("MacroWorldGenerator") as MacroWorldGenerator
+	if macro_gen != null and macro_gen.config != null:
+		macro_gen.config.world_seed = maxi(cfg.world_seed, 1)
+		var state: MacroWorldState = macro_gen.generate()
+		_on_macro_world_generated(state)
+	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	if hud != null:
+		hud.refresh_from_viewmodel()
