@@ -127,6 +127,7 @@ func _run_suite() -> void:
 	_test_phase27b_modular_doctrine_and_matchups()
 	_test_phase28_dual_mode_determinism_and_saveload()
 	_test_phase29_constellation_sundial_and_crucible()
+	_test_phase30_kurultai_commander_and_collapse_ui()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -5714,5 +5715,80 @@ func _test_phase29_constellation_sundial_and_crucible() -> void:
 		"WorldEcologyDrawerPanel disconnects all EventBus subscriptions cleanly on _exit_tree() (0 leaks).")
 
 	_reset_p27b_singletons(&"p29_cleanup_kut")
+
+
+func _test_phase30_kurultai_commander_and_collapse_ui() -> void:
+	_reset_p27b_singletons(&"p30_baseline_kut")
+	ResourceManager.import_state_dict({"stockpiles": {}})
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Phase 30 passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	var coord_vassal: Vector2i = Vector2i(30, 1)
+	var coord_conq: Vector2i = Vector2i(30, 2)
+	TerritoryManager.register_region(coord_vassal, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, false, false, 100.0)
+	TerritoryManager.register_region(coord_conq, GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 2, false, false, 100.0)
+	CommandBus.dispatch(DelegateRegionToVassalCommand.new(1, coord_vassal, &"bey_p30", GameEnums.VassalPersonalityTrait.AMBITIOUS))
+	SuccessionManager.register_dynasty(1, &"Bilge Kağan", 120, 82.0)
+	SuccessionManager.register_commander(3001, 1, 1, &"Kül Tigin", 112, GameEnums.CommanderTrait.BORU_YUREK)
+	var cmd_prof: CommanderProfile = SuccessionManager.get_commander_for_army(1)
+	if cmd_prof != null:
+		cmd_prof.scars = 2
+		cmd_prof.veteran_score = 38.0
+
+	var vm: SovereigntyViewModel = SovereigntyViewModel.new(1, 1, coord_conq)
+	var snap: SovereigntyViewModel.SovereigntySnapshot = vm.capture_snapshot()
+	_expect(snap.vassals.size() == 1 and snap.commander_scars == 2 \
+		and is_equal_approx(snap.commander_veteran_score, 38.0) \
+		and snap.collapse_state == GameEnums.CollapseState.SOVEREIGN,
+		"SovereigntyViewModel captures Kurultai vassal ring, commander scars/veteran score, and sovereign state read-only.")
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(1, 1)
+	add_child(hud)
+	var panel: SovereigntyDrawerPanel = SovereigntyDrawerPanel.new()
+	panel.set_context(1, 1, coord_conq)
+	var mounted: bool = hud.mount_panel_to_slot(OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY, panel)
+	hud.open_drawer(OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY)
+	panel.refresh_from_viewmodel()
+
+	var drawer_w: float = panel.get_combined_minimum_size().x
+	var map_ratio: float = hud.compute_open_map_ratio(false)
+	var cc_panel: HybridConquestAndCollapsePanel = panel.get_conquest_collapse_panel()
+	var conq_ok: bool = cc_panel.trigger_conquest_aftermath(GameEnums.ConquestAftermathChoice.HOLD_GARRISON_CONTROL)
+	var trig_ok: bool = CommandBus.dispatch(TriggerCollapseCommand.new(1, 2))
+	var collapse_ok: bool = cc_panel.trigger_collapse_path(GameEnums.CollapsePathChoice.FLEE_HOMELESS_EXILE)
+	var snap_after: SovereigntyViewModel.SovereigntySnapshot = vm.capture_snapshot()
+
+	_expect(mounted and drawer_w <= float(OtukenHudRoot.DRAWER_WIDTH_PX) and map_ratio >= 0.82 \
+		and panel.get_kurultai_ring() != null \
+		and panel.get_medallion_balance() != null \
+		and cc_panel != null \
+		and conq_ok and trig_ok and collapse_ok \
+		and snap_after.collapse_state == GameEnums.CollapseState.HOMELESS_EXILE,
+		"SovereigntyDrawerPanel mounts <=332px keeping >=82%% open map and executes hybrid conquest + 3-way collapse recovery via CommandBus.")
+
+	var rep_before: int = EventBus.reputation_memory_changed.get_connections().size()
+	var col_before: int = EventBus.collapse_path_selected.get_connections().size()
+	var audit_panel: SovereigntyDrawerPanel = SovereigntyDrawerPanel.new()
+	add_child(audit_panel)
+	var rep_during: int = EventBus.reputation_memory_changed.get_connections().size()
+	var col_during: int = EventBus.collapse_path_selected.get_connections().size()
+	remove_child(audit_panel)
+	audit_panel.free()
+	var rep_after: int = EventBus.reputation_memory_changed.get_connections().size()
+	var col_after: int = EventBus.collapse_path_selected.get_connections().size()
+
+	remove_child(hud)
+	hud.free()
+
+	_expect(rep_during == rep_before + 1 and col_during == col_before + 1 \
+		and rep_after == rep_before and col_after == col_before,
+		"SovereigntyDrawerPanel disconnects all EventBus subscriptions cleanly on _exit_tree() (0 leaks).")
+
+	_reset_p27b_singletons(&"p30_cleanup_kut")
+
 
 
