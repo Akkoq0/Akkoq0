@@ -105,6 +105,7 @@ class DrawerSlotRecord:
 @export var tracked_army_id: int = 1
 
 var _view_model: OtukenHudViewModel = null
+var _analytics_vm: MetricAnalyticsViewModel = null
 var _ui_built: bool = false
 var _active_lens: GameEnums.TacticalMapLens = GameEnums.TacticalMapLens.NORMAL
 var _drawer_open: bool = false
@@ -118,6 +119,19 @@ var _crisis_chip_rail: VBoxContainer = null
 var _tactical_lens_dock: Control = null
 var _tactical_lens_card: TamgaCardPanel = null
 var _tactical_lens_hbox: HBoxContainer = null
+var _analytics_dock: Control = null
+var _analytics_card: TamgaCardPanel = null
+var _chronicle_toggle_btn: Button = null
+var _ledger_toggle_btn: Button = null
+var _chronicle_toggle_cb: Callable = Callable()
+var _ledger_toggle_cb: Callable = Callable()
+var _metric_popover: MetricBreakdownPopover = null
+var _chronicle_feed: SteppeChronicleFeed = null
+var _empire_ledger: EmpireLedgerPanel = null
+var _popover_action_cb: Callable = Callable()
+var _chronicle_focus_cb: Callable = Callable()
+var _ledger_focus_cb: Callable = Callable()
+var _camera_ref: WeakRef = null
 var _session_clock_dock: Control = null
 var _session_clock_card: TamgaCardPanel = null
 var _clock_mode_label: Label = null
@@ -141,6 +155,8 @@ var _crisis_chips: Array[CrisisChipButton] = []
 var _chip_activated_callbacks: Dictionary[CrisisChipButton, Callable] = {}
 var _glossary_badges: Array[Button] = []
 var _glossary_click_callbacks: Dictionary[Button, Callable] = {}
+var _metric_chip_buttons: Dictionary[StringName, Button] = {}
+var _metric_chip_callbacks: Dictionary[Button, Callable] = {}
 var _card_click_callbacks: Dictionary[TamgaCardPanel, Callable] = {}
 var _bus_subscriptions: Array[BusSignalSubscription] = []
 var _signals_connected: bool = false
@@ -158,6 +174,10 @@ func _ready() -> void:
 		_view_model = OtukenHudViewModel.new(player_id, tracked_army_id)
 	else:
 		_view_model.set_player_context(player_id, tracked_army_id)
+	if _analytics_vm == null:
+		_analytics_vm = MetricAnalyticsViewModel.new(player_id, tracked_army_id)
+	else:
+		_analytics_vm.set_context(player_id, tracked_army_id)
 	_build_hud_structure()
 	_connect_event_bus()
 	refresh_from_viewmodel()
@@ -193,7 +213,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			select_lens(GameEnums.TacticalMapLens.INTELLIGENCE_DUST)
 			_mark_input_handled()
 		KEY_ESCAPE:
-			if _drawer_open:
+			if _metric_popover != null and _metric_popover.visible:
+				close_metric_breakdown()
+				_mark_input_handled()
+			elif _empire_ledger != null and _empire_ledger.visible:
+				close_ledger()
+				_mark_input_handled()
+			elif _chronicle_feed != null and _chronicle_feed.visible:
+				close_chronicle()
+				_mark_input_handled()
+			elif _drawer_open:
 				close_drawer(false)
 				_mark_input_handled()
 
@@ -206,6 +235,10 @@ func set_player_context(p_player_id: int, p_tracked_army_id: int = -1) -> void:
 		_view_model = OtukenHudViewModel.new(player_id, tracked_army_id)
 	else:
 		_view_model.set_player_context(player_id, tracked_army_id)
+	if _analytics_vm == null:
+		_analytics_vm = MetricAnalyticsViewModel.new(player_id, tracked_army_id)
+	else:
+		_analytics_vm.set_context(player_id, tracked_army_id)
 	if _ui_built:
 		refresh_from_viewmodel()
 
@@ -214,6 +247,12 @@ func get_view_model() -> OtukenHudViewModel:
 	if _view_model == null:
 		_view_model = OtukenHudViewModel.new(player_id, tracked_army_id)
 	return _view_model
+
+
+func get_analytics_view_model() -> MetricAnalyticsViewModel:
+	if _analytics_vm == null:
+		_analytics_vm = MetricAnalyticsViewModel.new(player_id, tracked_army_id)
+	return _analytics_vm
 
 
 func get_glossary_tooltip() -> SteppeGlossaryTooltip:
@@ -457,6 +496,104 @@ func request_session_speed(speed_scale: float) -> bool:
 	return accepted
 
 
+func bind_analytics_scene_context(
+		camera: DualLayerCamera,
+		world_state: MacroWorldState = null,
+		army_registry: ArmyRegistry = null,
+		tracked_army: ArmyController = null) -> void:
+	_camera_ref = weakref(camera) if camera != null else null
+	var vm: MetricAnalyticsViewModel = get_analytics_view_model()
+	if world_state != null:
+		vm.bind_world_state(world_state)
+	if army_registry != null:
+		vm.bind_army_registry(army_registry)
+	if tracked_army != null:
+		vm.bind_tracked_army(tracked_army)
+	if _chronicle_feed != null:
+		_chronicle_feed.bind_camera(camera)
+		_chronicle_feed.refresh_chronicle()
+	if _empire_ledger != null:
+		_empire_ledger.bind_camera(camera)
+		_empire_ledger.refresh_ledger()
+
+
+func open_metric_breakdown(metric_id: StringName) -> void:
+	_build_hud_structure()
+	if _metric_popover != null:
+		_metric_popover.open_metric(metric_id, get_analytics_view_model())
+
+
+func close_metric_breakdown() -> void:
+	if _metric_popover != null:
+		_metric_popover.close_popover()
+
+
+func get_metric_breakdown_popover() -> MetricBreakdownPopover:
+	_build_hud_structure()
+	return _metric_popover
+
+
+func get_metric_button(metric_id: StringName) -> Button:
+	_build_hud_structure()
+	if _metric_chip_buttons.has(metric_id):
+		return _metric_chip_buttons[metric_id]
+	return null
+
+
+func open_chronicle(filter_category: StringName = &"") -> void:
+	_build_hud_structure()
+	if _chronicle_feed != null:
+		_chronicle_feed.open_feed(filter_category)
+		_sync_analytics_dock_buttons()
+
+
+func close_chronicle() -> void:
+	if _chronicle_feed != null:
+		_chronicle_feed.close_feed()
+		_sync_analytics_dock_buttons()
+
+
+func toggle_chronicle() -> bool:
+	_build_hud_structure()
+	if _chronicle_feed != null and _chronicle_feed.visible:
+		close_chronicle()
+		return false
+	open_chronicle()
+	return true
+
+
+func get_chronicle_feed() -> SteppeChronicleFeed:
+	_build_hud_structure()
+	return _chronicle_feed
+
+
+func open_ledger(tab_id: StringName = &"") -> void:
+	_build_hud_structure()
+	if _empire_ledger != null:
+		_empire_ledger.open_ledger(tab_id)
+		_sync_analytics_dock_buttons()
+
+
+func close_ledger() -> void:
+	if _empire_ledger != null:
+		_empire_ledger.close_ledger()
+		_sync_analytics_dock_buttons()
+
+
+func toggle_ledger() -> bool:
+	_build_hud_structure()
+	if _empire_ledger != null and _empire_ledger.visible:
+		close_ledger()
+		return false
+	open_ledger()
+	return true
+
+
+func get_empire_ledger_panel() -> EmpireLedgerPanel:
+	_build_hud_structure()
+	return _empire_ledger
+
+
 func compute_open_map_ratio(include_drawer: bool = false) -> float:
 	_build_hud_structure()
 	var vp_size: Vector2 = _resolve_viewport_size()
@@ -467,8 +604,16 @@ func compute_open_map_ratio(include_drawer: bool = false) -> float:
 		occupied += _measure_control_area(_top_pulse_margin, vp_size)
 	if _tactical_lens_dock != null and _tactical_lens_dock.visible:
 		occupied += _measure_control_area(_tactical_lens_dock, vp_size)
+	if _analytics_dock != null and _analytics_dock.visible:
+		occupied += _measure_control_area(_analytics_dock, vp_size)
 	if _session_clock_dock != null and _session_clock_dock.visible:
 		occupied += _measure_control_area(_session_clock_dock, vp_size)
+	if _metric_popover != null and _metric_popover.visible:
+		occupied += _measure_control_area(_metric_popover, vp_size)
+	if _chronicle_feed != null and _chronicle_feed.visible:
+		occupied += _measure_control_area(_chronicle_feed, vp_size)
+	if _empire_ledger != null and _empire_ledger.visible:
+		occupied += _measure_control_area(_empire_ledger, vp_size)
 	if _crisis_chip_rail != null and _crisis_chip_rail.visible and not _crisis_chips.is_empty():
 		var chip_h: float = 0.0
 		var chip_w: float = 204.0
@@ -492,6 +637,12 @@ func refresh_from_viewmodel() -> void:
 	_apply_drawer_slot_summaries(snap)
 	_apply_session_clock_controls(snap)
 	_rebuild_crisis_chips(_view_model.collect_active_crises(snap))
+	if _metric_popover != null and _metric_popover.visible:
+		_metric_popover.refresh_active_metric()
+	if _chronicle_feed != null and _chronicle_feed.visible:
+		_chronicle_feed.refresh_chronicle()
+	if _empire_ledger != null and _empire_ledger.visible:
+		_empire_ledger.refresh_ledger()
 	if _glossary_tooltip != null and _glossary_tooltip.visible and _glossary_tooltip.get_active_term_id() != &"":
 		_glossary_tooltip.show_for_term(_glossary_tooltip.get_active_term_id(), Rect2(Vector2(24.0, 74.0), Vector2(180.0, 48.0)), _view_model)
 
@@ -527,10 +678,10 @@ func _build_hud_structure() -> void:
 		_top_pulse_hbox.add_theme_constant_override(&"separation", 10)
 		_top_pulse_margin.add_child(_top_pulse_hbox)
 
-	_ensure_pulse_card("PulseCardEconomy", OtukenHudViewModel.SLOT_ECONOMY_WATER, "ERZAK / SU & KIŞ UFKU", &"zud", "Zud")
-	_ensure_pulse_card("PulseCardKut", OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY, "KUT & VERASET DENGESİ", &"kut", "Kut")
-	_ensure_pulse_card("PulseCardYilki", OtukenHudViewModel.SLOT_MILITARY_HERD, "YILKI & MANEVRA GÜCÜ", &"yilki", "Yılkı")
-	_ensure_pulse_card("PulseCardSeason", OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY, "MEVSİM / TÖRE BARIŞI", &"tore_barisi", "Töre")
+	_ensure_pulse_card("PulseCardEconomy", OtukenHudViewModel.SLOT_ECONOMY_WATER, "ERZAK / SU & KIŞ UFKU", &"zud", "Zud", [MetricAnalyticsViewModel.METRIC_SU, MetricAnalyticsViewModel.METRIC_HAZINE])
+	_ensure_pulse_card("PulseCardKut", OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY, "KUT & VERASET DENGESİ", &"kut", "Kut", [MetricAnalyticsViewModel.METRIC_NUFUS, MetricAnalyticsViewModel.METRIC_KUT, MetricAnalyticsViewModel.METRIC_ULUS])
+	_ensure_pulse_card("PulseCardYilki", OtukenHudViewModel.SLOT_MILITARY_HERD, "YILKI & MANEVRA GÜCÜ", &"yilki", "Yılkı", [MetricAnalyticsViewModel.METRIC_YILKI, MetricAnalyticsViewModel.METRIC_ORDU])
+	_ensure_pulse_card("PulseCardSeason", OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY, "MEVSİM / TÖRE BARIŞI", &"tore_barisi", "Töre", [])
 
 	# --- Layer 1B: Right-edge Crisis Chip Rail (active emergencies only) -----
 	_crisis_chip_rail = get_node_or_null("CrisisChipRail") as VBoxContainer
@@ -560,8 +711,8 @@ func _build_hud_structure() -> void:
 		_tactical_lens_dock.anchor_right = 0.0
 		_tactical_lens_dock.anchor_bottom = 1.0
 		_tactical_lens_dock.offset_left = 14.0
-		_tactical_lens_dock.offset_top = -50.0
-		_tactical_lens_dock.offset_right = 684.0
+		_tactical_lens_dock.offset_top = -44.0
+		_tactical_lens_dock.offset_right = 540.0
 		_tactical_lens_dock.offset_bottom = -8.0
 		_tactical_lens_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_tactical_lens_dock)
@@ -577,23 +728,80 @@ func _build_hud_structure() -> void:
 		_tactical_lens_dock.add_child(_tactical_lens_card)
 
 	var lens_margin: MarginContainer = _tactical_lens_card.get_content_container()
-	lens_margin.add_theme_constant_override(&"margin_left", 8)
-	lens_margin.add_theme_constant_override(&"margin_right", 8)
-	lens_margin.add_theme_constant_override(&"margin_top", 4)
-	lens_margin.add_theme_constant_override(&"margin_bottom", 4)
+	lens_margin.add_theme_constant_override(&"margin_left", 6)
+	lens_margin.add_theme_constant_override(&"margin_right", 6)
+	lens_margin.add_theme_constant_override(&"margin_top", 2)
+	lens_margin.add_theme_constant_override(&"margin_bottom", 2)
 
 	_tactical_lens_hbox = HBoxContainer.new()
 	_tactical_lens_hbox.name = "TacticalLensButtons"
 	_tactical_lens_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	_tactical_lens_hbox.add_theme_constant_override(&"separation", 6)
+	_tactical_lens_hbox.add_theme_constant_override(&"separation", 4)
 	lens_margin.add_child(_tactical_lens_hbox)
 
 	_add_lens_option(GameEnums.TacticalMapLens.NORMAL, 1, "1 Normal", &"gold")
-	_add_lens_option(GameEnums.TacticalMapLens.LOGISTICS_WATER_COURIER, 2, "2 Lojistik/Su", &"ice")
-	_add_lens_option(GameEnums.TacticalMapLens.YAYLAK_KISLAK, 3, "3 Yaylak/Kışlak", &"jade")
-	_add_lens_option(GameEnums.TacticalMapLens.TUG_CONTROL, 4, "4 Tuğ & Denetim", &"jade")
-	_add_lens_option(GameEnums.TacticalMapLens.INTELLIGENCE_DUST, 5, "5 İstihbarat/Toz", &"ember")
+	_add_lens_option(GameEnums.TacticalMapLens.LOGISTICS_WATER_COURIER, 2, "2 Su", &"ice")
+	_add_lens_option(GameEnums.TacticalMapLens.YAYLAK_KISLAK, 3, "3 Yaylak", &"jade")
+	_add_lens_option(GameEnums.TacticalMapLens.TUG_CONTROL, 4, "4 Tuğ", &"jade")
+	_add_lens_option(GameEnums.TacticalMapLens.INTELLIGENCE_DUST, 5, "5 Toz", &"ember")
 	_sync_lens_buttons()
+
+	# --- Layer 2A: Compact Chronicle & Empire Ledger Toggle Strip ------------
+	_analytics_dock = get_node_or_null("AnalyticsOverlayDock") as Control
+	if _analytics_dock == null:
+		_analytics_dock = Control.new()
+		_analytics_dock.name = "AnalyticsOverlayDock"
+		_analytics_dock.anchor_left = 0.0
+		_analytics_dock.anchor_top = 1.0
+		_analytics_dock.anchor_right = 0.0
+		_analytics_dock.anchor_bottom = 1.0
+		_analytics_dock.offset_left = 548.0
+		_analytics_dock.offset_top = -44.0
+		_analytics_dock.offset_right = 698.0
+		_analytics_dock.offset_bottom = -8.0
+		_analytics_dock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_analytics_dock)
+
+	_analytics_card = _analytics_dock.get_node_or_null("AnalyticsOverlayCard") as TamgaCardPanel
+	if _analytics_card == null:
+		_analytics_card = TamgaCardPanel.new()
+		_analytics_card.name = "AnalyticsOverlayCard"
+		_analytics_card.card_id = &"analytics_toggle_dock"
+		_analytics_card.semantic_tone = &"gold"
+		_analytics_card.clickable = false
+		_analytics_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_analytics_dock.add_child(_analytics_card)
+
+	var ad_margin: MarginContainer = _analytics_card.get_content_container()
+	ad_margin.add_theme_constant_override(&"margin_left", 6)
+	ad_margin.add_theme_constant_override(&"margin_right", 6)
+	ad_margin.add_theme_constant_override(&"margin_top", 2)
+	ad_margin.add_theme_constant_override(&"margin_bottom", 2)
+
+	var ad_hbox: HBoxContainer = HBoxContainer.new()
+	ad_hbox.name = "AnalyticsToggleHBox"
+	ad_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	ad_hbox.add_theme_constant_override(&"separation", 4)
+	ad_margin.add_child(ad_hbox)
+
+	_chronicle_toggle_btn = Button.new()
+	_chronicle_toggle_btn.name = "ChronicleToggleButton"
+	_chronicle_toggle_btn.theme_type_variation = &"LensButton"
+	_chronicle_toggle_btn.text = "Vakanüvis"
+	_chronicle_toggle_btn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_chronicle_toggle_cb = _on_chronicle_toggle_pressed
+	_chronicle_toggle_btn.pressed.connect(_chronicle_toggle_cb)
+	ad_hbox.add_child(_chronicle_toggle_btn)
+
+	_ledger_toggle_btn = Button.new()
+	_ledger_toggle_btn.name = "LedgerToggleButton"
+	_ledger_toggle_btn.theme_type_variation = &"LensButton"
+	_ledger_toggle_btn.text = "Defter"
+	_ledger_toggle_btn.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
+	_ledger_toggle_cb = _on_ledger_toggle_pressed
+	_ledger_toggle_btn.pressed.connect(_ledger_toggle_cb)
+	ad_hbox.add_child(_ledger_toggle_btn)
+	_sync_analytics_dock_buttons()
 
 	# --- Layer 2B: Unified Session Clock & Tempo Strip (Faz 31) --------------
 	_session_clock_dock = get_node_or_null("SessionClockDock") as Control
@@ -735,6 +943,60 @@ func _build_hud_structure() -> void:
 	_drawer_slot_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	drawer_scroll.add_child(_drawer_slot_host)
 
+	# --- Floating Faz A Analytical Popover, Chronicle Feed & Empire Ledger ---
+	var vm_analytics: MetricAnalyticsViewModel = get_analytics_view_model()
+
+	_metric_popover = get_node_or_null("MetricBreakdownPopover") as MetricBreakdownPopover
+	if _metric_popover == null:
+		_metric_popover = MetricBreakdownPopover.new()
+		_metric_popover.anchor_left = 0.5
+		_metric_popover.anchor_top = 0.0
+		_metric_popover.anchor_right = 0.5
+		_metric_popover.anchor_bottom = 0.0
+		_metric_popover.offset_left = -230.0
+		_metric_popover.offset_top = 74.0
+		_metric_popover.offset_right = 230.0
+		_metric_popover.offset_bottom = 456.0
+		add_child(_metric_popover)
+	_metric_popover.bind_view_model(vm_analytics)
+	_popover_action_cb = _on_popover_quick_action_requested
+	if not _metric_popover.quick_action_requested.is_connected(_popover_action_cb):
+		_metric_popover.quick_action_requested.connect(_popover_action_cb)
+
+	_chronicle_feed = get_node_or_null("SteppeChronicleFeed") as SteppeChronicleFeed
+	if _chronicle_feed == null:
+		_chronicle_feed = SteppeChronicleFeed.new()
+		_chronicle_feed.anchor_left = 0.0
+		_chronicle_feed.anchor_top = 1.0
+		_chronicle_feed.anchor_right = 0.0
+		_chronicle_feed.anchor_bottom = 1.0
+		_chronicle_feed.offset_left = 14.0
+		_chronicle_feed.offset_top = -410.0
+		_chronicle_feed.offset_right = 414.0
+		_chronicle_feed.offset_bottom = -58.0
+		add_child(_chronicle_feed)
+	_chronicle_feed.bind_view_model(vm_analytics)
+	_chronicle_focus_cb = _on_analytics_focus_requested
+	if not _chronicle_feed.chronicle_focus_requested.is_connected(_chronicle_focus_cb):
+		_chronicle_feed.chronicle_focus_requested.connect(_chronicle_focus_cb)
+
+	_empire_ledger = get_node_or_null("EmpireLedgerPanel") as EmpireLedgerPanel
+	if _empire_ledger == null:
+		_empire_ledger = EmpireLedgerPanel.new()
+		_empire_ledger.anchor_left = 0.5
+		_empire_ledger.anchor_top = 0.5
+		_empire_ledger.anchor_right = 0.5
+		_empire_ledger.anchor_bottom = 0.5
+		_empire_ledger.offset_left = -330.0
+		_empire_ledger.offset_top = -200.0
+		_empire_ledger.offset_right = 330.0
+		_empire_ledger.offset_bottom = 200.0
+		add_child(_empire_ledger)
+	_empire_ledger.bind_view_model(vm_analytics)
+	_ledger_focus_cb = _on_analytics_focus_requested
+	if not _empire_ledger.ledger_focus_requested.is_connected(_ledger_focus_cb):
+		_empire_ledger.ledger_focus_requested.connect(_ledger_focus_cb)
+
 	# --- Dual-Layer Hover-Lock Steppe Glossary Tooltip -----------------------
 	_glossary_tooltip = get_node_or_null("SteppeGlossaryTooltip") as SteppeGlossaryTooltip
 	if _glossary_tooltip == null:
@@ -771,7 +1033,8 @@ func _ensure_pulse_card(
 		slot_id: StringName,
 		header_text: String,
 		glossary_term: StringName,
-		badge_text: String) -> void:
+		badge_text: String,
+		metric_chips: Array[StringName] = []) -> void:
 	var card: TamgaCardPanel = _top_pulse_hbox.get_node_or_null(node_name) as TamgaCardPanel
 	if card == null:
 		card = TamgaCardPanel.new()
@@ -784,10 +1047,10 @@ func _ensure_pulse_card(
 	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	var card_margin: MarginContainer = card.get_content_container()
-	card_margin.add_theme_constant_override(&"margin_left", 9)
-	card_margin.add_theme_constant_override(&"margin_right", 9)
-	card_margin.add_theme_constant_override(&"margin_top", 4)
-	card_margin.add_theme_constant_override(&"margin_bottom", 4)
+	card_margin.add_theme_constant_override(&"margin_left", 7)
+	card_margin.add_theme_constant_override(&"margin_right", 7)
+	card_margin.add_theme_constant_override(&"margin_top", 2)
+	card_margin.add_theme_constant_override(&"margin_bottom", 2)
 
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.name = "PulseCardVBox"
@@ -821,15 +1084,35 @@ func _ensure_pulse_card(
 	primary_lbl.name = "PrimaryMetricLabel"
 	primary_lbl.theme_type_variation = &"MetricLabel"
 	primary_lbl.clip_text = true
-	primary_lbl.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_BODY)
+	primary_lbl.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_CAPTION)
 	vbox.add_child(primary_lbl)
+
+	var bottom_row: HBoxContainer = HBoxContainer.new()
+	bottom_row.name = "CardBottomRow"
+	bottom_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom_row.add_theme_constant_override(&"separation", 3)
+	vbox.add_child(bottom_row)
 
 	var secondary_lbl: Label = Label.new()
 	secondary_lbl.name = "SecondaryDetailLabel"
 	secondary_lbl.theme_type_variation = &"MutedLabel"
+	secondary_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	secondary_lbl.clip_text = true
-	secondary_lbl.add_theme_font_size_override(&"font_size", NeoSteppePalette.FONT_SIZE_MICRO)
-	vbox.add_child(secondary_lbl)
+	secondary_lbl.add_theme_font_size_override(&"font_size", 9)
+	bottom_row.add_child(secondary_lbl)
+
+	for mid: StringName in metric_chips:
+		var mbtn: Button = Button.new()
+		mbtn.name = "MetricChipBtn_%s" % String(mid)
+		mbtn.theme_type_variation = &"GhostIconButton"
+		mbtn.text = MetricBreakdownPopover.SWITCH_LABELS[mid] if MetricBreakdownPopover.SWITCH_LABELS.has(mid) else String(mid)
+		mbtn.add_theme_font_size_override(&"font_size", 9)
+		OtukenThemeFactory.apply_button_semantic_styles(mbtn, NeoSteppePalette.GOLD_TAMGA, false, 4, 0)
+		var mcb: Callable = _on_metric_chip_pressed.bind(mid)
+		mbtn.pressed.connect(mcb)
+		bottom_row.add_child(mbtn)
+		_metric_chip_buttons[mid] = mbtn
+		_metric_chip_callbacks[mbtn] = mcb
 
 	var card_cb: Callable = _on_pulse_card_clicked
 	if not card.card_clicked.is_connected(card_cb):
@@ -1093,7 +1376,18 @@ func _sync_lens_buttons() -> void:
 	for opt: LensOptionWidgets in _lens_options:
 		var is_sel: bool = opt.lens == _active_lens
 		var opt_color: Color = active_color if is_sel else NeoSteppePalette.get_semantic_color(opt.tone_id)
-		OtukenThemeFactory.apply_button_semantic_styles(opt.button, opt_color, is_sel, 9, 4)
+		OtukenThemeFactory.apply_button_semantic_styles(opt.button, opt_color, is_sel, 5, 1)
+
+
+func _sync_analytics_dock_buttons() -> void:
+	if _chronicle_toggle_btn != null:
+		var ch_open: bool = _chronicle_feed != null and _chronicle_feed.visible
+		var ch_col: Color = NeoSteppePalette.GOLD_TAMGA if ch_open else NeoSteppePalette.BRONZE_WEATHERED
+		OtukenThemeFactory.apply_button_semantic_styles(_chronicle_toggle_btn, ch_col, ch_open, 5, 1)
+	if _ledger_toggle_btn != null:
+		var le_open: bool = _empire_ledger != null and _empire_ledger.visible
+		var le_col: Color = NeoSteppePalette.GOLD_TAMGA if le_open else NeoSteppePalette.BRONZE_WEATHERED
+		OtukenThemeFactory.apply_button_semantic_styles(_ledger_toggle_btn, le_col, le_open, 5, 1)
 
 
 func _sync_drawer_slot_visibility() -> void:
@@ -1128,12 +1422,12 @@ func _connect_event_bus() -> void:
 	_signals_connected = true
 
 	_subscribe_bus(EventBus.resource_amount_changed, _on_telemetry_dirty.unbind(4))
-	_subscribe_bus(EventBus.season_changed, _on_telemetry_dirty.unbind(2))
-	_subscribe_bus(EventBus.zud_starvation_ticked, _on_telemetry_dirty.unbind(2))
+	_subscribe_bus(EventBus.season_changed, _on_season_changed_hud)
+	_subscribe_bus(EventBus.zud_starvation_ticked, _on_zud_starvation_hud)
 	_subscribe_bus(EventBus.regional_tax_collected, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.tamga_authority_updated, _on_telemetry_dirty.unbind(2))
 	_subscribe_bus(EventBus.kut_changed, _on_telemetry_dirty.unbind(3))
-	_subscribe_bus(EventBus.ak_sakallilar_council_convened, _on_telemetry_dirty.unbind(3))
+	_subscribe_bus(EventBus.ak_sakallilar_council_convened, _on_ak_sakallilar_hud)
 	_subscribe_bus(EventBus.council_decree_enacted, _on_telemetry_dirty.unbind(6))
 	_subscribe_bus(EventBus.army_supply_changed, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.supply_line_severed, _on_telemetry_dirty.unbind(4))
@@ -1143,10 +1437,10 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.epidemic_purified_at_kurgan, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.coalition_war_declared, _on_coalition_war_declared)
 	_subscribe_bus(EventBus.great_khagan_candidate_proclaimed, _on_great_khagan_proclaimed)
-	_subscribe_bus(EventBus.pasture_depleted_starving_livestock, _on_telemetry_dirty.unbind(3))
+	_subscribe_bus(EventBus.pasture_depleted_starving_livestock, _on_pasture_depleted_hud)
 	_subscribe_bus(EventBus.camp_migrated_by_sefer_arabasi, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.overgrazing_rebellion_triggered, _on_telemetry_dirty.unbind(3))
-	_subscribe_bus(EventBus.cataclysm_erupted, _on_telemetry_dirty.unbind(7))
+	_subscribe_bus(EventBus.cataclysm_erupted, _on_cataclysm_erupted_hud)
 	_subscribe_bus(EventBus.cataclysm_subsided, _on_telemetry_dirty.unbind(2))
 	_subscribe_bus(EventBus.kinship_plot_escalated, _on_telemetry_dirty.unbind(5))
 	_subscribe_bus(EventBus.internal_betrayal_triggered, _on_telemetry_dirty.unbind(5))
@@ -1160,28 +1454,32 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.dynasty_reborn_at_frontier, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.courier_dispatched, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.courier_order_delivered, _on_telemetry_dirty.unbind(4))
-	_subscribe_bus(EventBus.caravan_intercepted_crisis, _on_telemetry_dirty.unbind(6))
+	_subscribe_bus(EventBus.caravan_intercepted_crisis, _on_caravan_intercepted_hud)
 	_subscribe_bus(EventBus.governance_cap_exceeded, _on_telemetry_dirty.unbind(5))
 	_subscribe_bus(EventBus.region_delegated_to_vassal, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.vassal_silent_sabotage_delayed, _on_telemetry_dirty.unbind(3))
-	_subscribe_bus(EventBus.amanat_pact_sealed, _on_telemetry_dirty.unbind(4))
-	_subscribe_bus(EventBus.amanat_pact_broken, _on_telemetry_dirty.unbind(4))
+	_subscribe_bus(EventBus.amanat_pact_sealed, _on_amanat_sealed_hud)
+	_subscribe_bus(EventBus.amanat_pact_broken, _on_amanat_broken_hud)
 	_subscribe_bus(EventBus.reputation_memory_changed, _on_telemetry_dirty.unbind(4))
-	_subscribe_bus(EventBus.water_source_sabotaged, _on_telemetry_dirty.unbind(4))
+	_subscribe_bus(EventBus.water_source_sabotaged, _on_water_sabotaged_hud)
 	_subscribe_bus(EventBus.water_source_restored, _on_water_source_restored)
 	_subscribe_bus(EventBus.water_crisis_inflicted, _on_water_crisis_inflicted)
 	_subscribe_bus(EventBus.regional_market_scarcity_shifted, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.ruler_died_succession_started, _on_telemetry_dirty.unbind(6))
-	_subscribe_bus(EventBus.kurultay_succession_crisis_triggered, _on_telemetry_dirty.unbind(5))
+	_subscribe_bus(EventBus.kurultay_succession_crisis_triggered, _on_kurultay_crisis_hud)
 	_subscribe_bus(EventBus.succession_crisis_resolved, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.tactical_lens_changed, _on_tactical_lens_changed)
 	_subscribe_bus(EventBus.dust_decoy_toggled, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.offline_doctrine_configured, _on_telemetry_dirty.unbind(8))
 	_subscribe_bus(EventBus.battle_doctrine_assigned, _on_telemetry_dirty.unbind(4))
-	_subscribe_bus(EventBus.courier_ambushed_plan_exposed, _on_telemetry_dirty.unbind(4))
+	_subscribe_bus(EventBus.courier_ambushed_plan_exposed, _on_courier_ambushed_hud)
 	_subscribe_bus(EventBus.systemic_synergy_evaluated, _on_systemic_synergy_evaluated)
 	_subscribe_bus(EventBus.session_pause_rejected, _on_telemetry_dirty.unbind(2))
 	_subscribe_bus(EventBus.session_tempo_changed, _on_telemetry_dirty.unbind(4))
+	_subscribe_bus(EventBus.combat_resolved, _on_combat_resolved_hud)
+	_subscribe_bus(EventBus.dynasty_stance_changed, _on_dynasty_stance_changed_hud)
+	_subscribe_bus(EventBus.envoy_assassinated, _on_envoy_assassinated_hud)
+	_subscribe_bus(EventBus.ai_story_agenda_activated, _on_ai_story_agenda_hud)
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:
@@ -1205,6 +1503,39 @@ func _disconnect_ui_signals() -> void:
 			if not cb.is_null() and pw.card.card_clicked.is_connected(cb):
 				pw.card.card_clicked.disconnect(cb)
 	_card_click_callbacks.clear()
+
+	for mbtn: Button in _metric_chip_callbacks:
+		if mbtn != null and is_instance_valid(mbtn):
+			var mcb: Callable = _metric_chip_callbacks[mbtn]
+			if not mcb.is_null() and mbtn.pressed.is_connected(mcb):
+				mbtn.pressed.disconnect(mcb)
+	_metric_chip_callbacks.clear()
+	_metric_chip_buttons.clear()
+
+	if _chronicle_toggle_btn != null and is_instance_valid(_chronicle_toggle_btn) and not _chronicle_toggle_cb.is_null():
+		if _chronicle_toggle_btn.pressed.is_connected(_chronicle_toggle_cb):
+			_chronicle_toggle_btn.pressed.disconnect(_chronicle_toggle_cb)
+	_chronicle_toggle_cb = Callable()
+
+	if _ledger_toggle_btn != null and is_instance_valid(_ledger_toggle_btn) and not _ledger_toggle_cb.is_null():
+		if _ledger_toggle_btn.pressed.is_connected(_ledger_toggle_cb):
+			_ledger_toggle_btn.pressed.disconnect(_ledger_toggle_cb)
+	_ledger_toggle_cb = Callable()
+
+	if _metric_popover != null and is_instance_valid(_metric_popover) and not _popover_action_cb.is_null():
+		if _metric_popover.quick_action_requested.is_connected(_popover_action_cb):
+			_metric_popover.quick_action_requested.disconnect(_popover_action_cb)
+	_popover_action_cb = Callable()
+
+	if _chronicle_feed != null and is_instance_valid(_chronicle_feed) and not _chronicle_focus_cb.is_null():
+		if _chronicle_feed.chronicle_focus_requested.is_connected(_chronicle_focus_cb):
+			_chronicle_feed.chronicle_focus_requested.disconnect(_chronicle_focus_cb)
+	_chronicle_focus_cb = Callable()
+
+	if _empire_ledger != null and is_instance_valid(_empire_ledger) and not _ledger_focus_cb.is_null():
+		if _empire_ledger.ledger_focus_requested.is_connected(_ledger_focus_cb):
+			_empire_ledger.ledger_focus_requested.disconnect(_ledger_focus_cb)
+	_ledger_focus_cb = Callable()
 
 	for opt: LensOptionWidgets in _lens_options:
 		if opt.button != null and is_instance_valid(opt.button) and opt.button.pressed.is_connected(opt.pressed_cb):
@@ -1298,6 +1629,125 @@ func _on_telemetry_dirty() -> void:
 	refresh_from_viewmodel()
 
 
+func _on_season_changed_hud(_season: SeasonData, _cycle_index: int) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.record_season_point()
+	_on_telemetry_dirty()
+
+
+func _on_zud_starvation_hud(food_remaining: int, season: SeasonData) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_zud_starvation(food_remaining, season)
+	_on_telemetry_dirty()
+
+
+func _on_ak_sakallilar_hud(current_kut: float, legitimacy_penalty: float, _trigger_skirmish: bool) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_council_convened(current_kut, legitimacy_penalty)
+	_on_telemetry_dirty()
+
+
+func _on_pasture_depleted_hud(region_coord: Vector2i, herd_size: int, migration_required: bool) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_pasture_depleted(region_coord, herd_size, migration_required)
+	_on_telemetry_dirty()
+
+
+func _on_cataclysm_erupted_hud(
+		cataclysm_id: StringName,
+		_cat_type: GameEnums.CataclysmType,
+		region_coord: Vector2i,
+		_p_mult: float,
+		_c_mult: float,
+		_s_wear: float,
+		_refugees: int) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_cataclysm_erupted(cataclysm_id, region_coord)
+	_on_telemetry_dirty()
+
+
+func _on_caravan_intercepted_hud(caravan_id: StringName, owner_id: int, raider_id: int, dest_army_id: int, _ammo_lost: float, _sup_drop: float) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.record_chronicle_entry(
+			MetricAnalyticsViewModel.CHRONICLE_AMBUSH_SABOTAGE,
+			"Kervan Baskını (%s)" % String(caravan_id),
+			"Boy %d kervanı Boy %d tarafından vuruldu (Ordu #%d)." % [owner_id, raider_id, dest_army_id],
+			PastureEcologyManager.get_player_camp_region(player_id),
+			&"ember")
+	_on_telemetry_dirty()
+
+
+func _on_water_sabotaged_hud(region_coord: Vector2i, source_id: StringName, saboteur_id: int, duration_seasons: int) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_water_sabotaged(region_coord, source_id, saboteur_id, duration_seasons)
+	_on_telemetry_dirty()
+
+
+func _on_kurultay_crisis_hud(_pid: int, crisis_id: StringName, claimant_bey_id: StringName, contested_coord: Vector2i, _reason: StringName) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_succession_crisis(crisis_id, claimant_bey_id, contested_coord)
+	_on_telemetry_dirty()
+
+
+func _on_courier_ambushed_hud(order_id: StringName, victim_pid: int, ambusher_id: int, leaked_plan: GameEnums.TuranTacticPhase) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_courier_ambush(order_id, victim_pid, ambusher_id, leaked_plan)
+	_on_telemetry_dirty()
+
+
+func _on_combat_resolved_hud(result: CombatResult) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_combat_resolved(result)
+	_on_telemetry_dirty()
+
+
+func _on_dynasty_stance_changed_hud(dynasty_id: StringName, _prev_s: GameEnums.DynastyAttitude, new_s: GameEnums.DynastyAttitude, trust_index: float) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_diplomacy_event(
+			"Boy Tutumu Değişti (%s)" % String(dynasty_id),
+			"Yeni tutum: %s · Güven: %.0f" % [MetricAnalyticsViewModel._format_dynasty_attitude(new_s), trust_index],
+			&"ember" if new_s == GameEnums.DynastyAttitude.HOSTILE else &"gold")
+	refresh_from_viewmodel()
+
+
+func _on_amanat_sealed_hud(pact_id: StringName, party_a: int, party_b: int, _hostage_type: GameEnums.AmanatHostageType) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_diplomacy_event(
+			"Amanat Antlaşması (%s)" % String(pact_id),
+			"Boy %d ve Boy %d arasında rehine teminatı kuruldu." % [party_a, party_b],
+			&"jade")
+	_on_telemetry_dirty()
+
+
+func _on_amanat_broken_hud(pact_id: StringName, betrayer_id: int, _forfeited: bool, reliability_after: float) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_diplomacy_event(
+			"Amanat İhlali (%s)" % String(pact_id),
+			"Boy %d antlaşmayı bozdu; söz güveni %.0f seviyesine düştü." % [betrayer_id, reliability_after],
+			&"ember")
+	_on_telemetry_dirty()
+
+
+func _on_envoy_assassinated_hud(instigator_id: int, target_id: int, envoy_id: StringName, _kut_gained: float) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.record_chronicle_entry(
+			MetricAnalyticsViewModel.CHRONICLE_AMBUSH_SABOTAGE,
+			"Elçi Suikastı (%s)" % String(envoy_id),
+			"Boy %d elçisi Boy %d tarafından infaz edildi; topyekûn baskın riski." % [target_id, instigator_id],
+			PastureEcologyManager.get_player_camp_region(player_id),
+			&"ember")
+	refresh_from_viewmodel()
+
+
+func _on_ai_story_agenda_hud(agent_id: StringName, agenda_id: StringName, triggered_reason: StringName) -> void:
+	if _analytics_vm != null:
+		_analytics_vm.ingest_diplomacy_event(
+			"Bozkır Güç Gündemi: %s" % String(agent_id),
+			"Niyet: %s (%s)" % [String(agenda_id), String(triggered_reason)],
+			&"gold")
+	refresh_from_viewmodel()
+
+
 func _on_systemic_synergy_evaluated(snapshot: SynergyEvaluationSnapshot) -> void:
 	if _view_model != null:
 		_view_model.notify_synergy_snapshot_observed(snapshot)
@@ -1309,6 +1759,8 @@ func _on_yilki_sacrificed(army_id: int, remaining_remount_ratio: float, _morale_
 		_view_model.invalidate_synergy_cache()
 		if army_id == tracked_army_id:
 			_view_model.notify_remount_ratio_observed(remaining_remount_ratio)
+	if _analytics_vm != null and army_id == tracked_army_id:
+		_analytics_vm.notify_remount_ratio_observed(remaining_remount_ratio)
 	refresh_from_viewmodel()
 
 
@@ -1317,21 +1769,32 @@ func _on_water_crisis_inflicted(army_id: int, _coord: Vector2i, _remount_drain: 
 		_view_model.invalidate_synergy_cache()
 		if army_id == tracked_army_id or army_id == player_id:
 			_view_model.notify_water_crisis_observed(true)
+	if _analytics_vm != null and (army_id == tracked_army_id or army_id == player_id):
+		_analytics_vm.notify_water_crisis_observed(true)
 	refresh_from_viewmodel()
 
 
-func _on_water_source_restored(_coord: Vector2i, _source_id: StringName, restorer_id: int) -> void:
+func _on_water_source_restored(coord: Vector2i, source_id: StringName, restorer_id: int) -> void:
 	if _view_model != null:
 		_view_model.invalidate_synergy_cache()
 		if restorer_id == player_id:
 			_view_model.notify_water_crisis_observed(false)
+	if _analytics_vm != null:
+		if restorer_id == player_id:
+			_analytics_vm.notify_water_crisis_observed(false)
+		_analytics_vm.ingest_water_restored(coord, source_id, restorer_id)
 	refresh_from_viewmodel()
 
 
-func _on_coalition_war_declared(_dynasties: PackedStringArray, _kut: float) -> void:
+func _on_coalition_war_declared(dynasties: PackedStringArray, kut: float) -> void:
 	if _view_model != null:
 		_view_model.invalidate_synergy_cache()
 		_view_model.notify_coalition_observed(true)
+	if _analytics_vm != null:
+		_analytics_vm.ingest_diplomacy_event(
+			"Koalisyon Savaşı İlanı",
+			"%d boy koalisyon kurdu (Kut %.1f)." % [dynasties.size(), kut],
+			&"ember")
 	refresh_from_viewmodel()
 
 
@@ -1351,6 +1814,32 @@ func _on_tactical_lens_changed(_previous_lens: GameEnums.TacticalMapLens, new_le
 
 func _on_pulse_card_clicked(card_id: StringName) -> void:
 	toggle_drawer(card_id, false)
+
+
+func _on_metric_chip_pressed(metric_id: StringName) -> void:
+	open_metric_breakdown(metric_id)
+
+
+func _on_chronicle_toggle_pressed() -> void:
+	toggle_chronicle()
+
+
+func _on_ledger_toggle_pressed() -> void:
+	toggle_ledger()
+
+
+func _on_popover_quick_action_requested(primary_slot: StringName, fallback_slot: StringName) -> void:
+	var target: StringName = primary_slot if has_drawer_slot(primary_slot) else fallback_slot
+	open_drawer(target, false)
+
+
+func _on_analytics_focus_requested(_coord: Vector2i, world_pos: Vector3) -> void:
+	if _camera_ref != null:
+		var obj: Object = _camera_ref.get_ref()
+		if obj != null and is_instance_valid(obj):
+			var cam: DualLayerCamera = obj as DualLayerCamera
+			if cam != null:
+				cam.focus_world_position(world_pos)
 
 
 func _on_lens_button_pressed(lens: GameEnums.TacticalMapLens) -> void:

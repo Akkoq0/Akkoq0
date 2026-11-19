@@ -71,10 +71,14 @@ func _mount_hud_panels(vanguard: ArmyController) -> void:
 
 func _bind_3d_map_bridge() -> void:
 	_map_3d_controller = get_node_or_null("Steppe3DMapController") as Steppe3DMapController
-	if _map_3d_controller == null:
-		return
 	var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
 	var army_reg: ArmyRegistry = get_node_or_null("ArmyRegistry") as ArmyRegistry
+	var vanguard: ArmyController = army_reg.get_army(_army_id) if army_reg != null else null
+	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	if hud != null:
+		hud.bind_analytics_scene_context(cam, null, army_reg, vanguard)
+	if _map_3d_controller == null:
+		return
 	var macro_gen: MacroWorldGenerator = get_node_or_null("MacroWorldGenerator") as MacroWorldGenerator
 	var sun_light: DirectionalLight3D = get_node_or_null("DirectionalLight3D") as DirectionalLight3D
 	_map_3d_controller.bind_scene_context(cam, army_reg, macro_gen, sun_light, _player_id, _army_id)
@@ -92,6 +96,7 @@ func _on_map_region_selected(coord: Vector2i) -> void:
 		_sovereignty_panel.set_context(_player_id, _army_id, _selected_region)
 	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
 	if hud != null:
+		hud.get_analytics_view_model().set_context(_player_id, _army_id, _selected_region)
 		hud.refresh_from_viewmodel()
 
 
@@ -110,6 +115,8 @@ func _on_map_army_selected(selected_army_id: int) -> void:
 		_sovereignty_panel.set_context(_player_id, _army_id, _selected_region)
 	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
 	if hud != null:
+		var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
+		hud.bind_analytics_scene_context(cam, null, army_reg, selected_army)
 		hud.set_player_context(_player_id, _army_id)
 
 
@@ -117,4 +124,9 @@ func _on_macro_world_generated(world_state: MacroWorldState) -> void:
 	if _map_3d_controller != null and world_state != null:
 		_map_3d_controller.get_view_model().set_macro_world_state(world_state)
 		_map_3d_controller.sync_from_viewmodel()
+	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
+	if hud != null and world_state != null:
+		var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
+		var army_reg: ArmyRegistry = get_node_or_null("ArmyRegistry") as ArmyRegistry
+		hud.bind_analytics_scene_context(cam, world_state, army_reg, null)
 	CommandBus.dispatch(ChangeGameStateCommand.new(GameEnums.GameState.PLAYING))

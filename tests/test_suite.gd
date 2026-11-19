@@ -130,6 +130,7 @@ func _run_suite() -> void:
 	_test_phase30_kurultai_commander_and_collapse_ui()
 	_test_phase31_live_3d_steppe_map_and_lenses()
 	_test_phase32_humanlike_utility_ai_schemes_and_story_hook()
+	_test_ui_metric_analytics_chronicle_and_ledger()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -6397,6 +6398,222 @@ func _test_phase32_humanlike_utility_ai_schemes_and_story_hook() -> void:
 	_reset_p27b_singletons(&"p32_cleanup_kut")
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _test_ui_metric_analytics_chronicle_and_ledger() -> void:
+	print("--- Running FAZ A Analytics Charts, Chronicle & Empire Ledger Tests ---")
+	_reset_p27b_singletons(&"faz_a_init_kut")
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	CourierDispatchSystem.reset_courier_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	RegionalMarketEngine.reset_market_state()
+
+	# Prepare multi-region world, water wells, commander & enemy Dust-Screened AI
+	var r0: RegionData = TerritoryManager.register_region(Vector2i(2, 2), GameEnums.RegionGeographyClass.SACRED_CORE, 1, true, true, 92.0)
+	var r1: RegionData = TerritoryManager.register_region(Vector2i(4, 3), GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 1, false, false, 64.0)
+	var r2: RegionData = TerritoryManager.register_region(Vector2i(5, 5), GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 1, false, false, 38.0)
+	var r3: RegionData = TerritoryManager.register_region(Vector2i(1, 5), GameEnums.RegionGeographyClass.FOREST_EDGE, 1, false, false, 82.0)
+	var _regs_keep: Array[RegionData] = [r0, r1, r2, r3]
+
+	WaterRouteManager.register_water_source(Vector2i(4, 3), &"well_faz_a_1", GameEnums.WaterSourceType.WELL, 1)
+	WaterRouteManager.register_water_source(Vector2i(5, 5), &"well_faz_a_2", GameEnums.WaterSourceType.OASIS_SPRING, 1)
+	WaterRouteManager.contaminate_region_wells(Vector2i(5, 5), 2, 3301, &"well_faz_a_2")
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"silver_gold", 140))
+	CommandBus.dispatch(DepositResourcesCommand.new(1, &"steel", 24))
+	SuccessionManager.register_commander(1, 1, 1, &"Kül Tegin", 45.0)
+	SuccessionManager.register_commander(2, 1, 2, &"Tonyukuk", 85.0)
+
+	var cam_prof: CameraProfile = ResourceLoader.load("res://data/camera/camera_profile.tres") as CameraProfile
+	var cam: DualLayerCamera = DualLayerCamera.new()
+	cam.profile = cam_prof
+	var cam_3d: Camera3D = Camera3D.new()
+	cam.add_child(cam_3d)
+	cam.camera = cam_3d
+	var veil: ColorRect = ColorRect.new()
+	cam.add_child(veil)
+	cam.cloud_veil = veil
+	add_child(cam)
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	_expect(hud_scene != null and hud_scene.can_instantiate(),
+		"otuken_hud_root.tscn instantiates cleanly for Faz A verification.")
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	add_child(hud)
+	hud.bind_analytics_scene_context(cam)
+
+	var idle_ratio: float = hud.compute_open_map_ratio()
+	_expect(hud.get_top_pulse_card_count() == 4 and idle_ratio >= 0.82,
+		"Faz A HUD preserves 4 top cards and %.1f%% open map (>=82%%) with bottom toggles closed." % (idle_ratio * 100.0))
+
+	# 1. Verify all 7 top HUD metrics are clickable & populate chart peaks, 3M projection and +/- factors
+	var popover: MetricBreakdownPopover = hud.get_metric_breakdown_popover()
+	var chart: SteppeTrendChartWidget = popover.get_chart_widget()
+	var all_seven_ok: bool = true
+	for mid: StringName in MetricAnalyticsViewModel.METRIC_ORDER:
+		var mbtn: Button = hud.get_metric_button(mid)
+		if mbtn == null:
+			all_seven_ok = false
+			break
+		mbtn.pressed.emit()
+		var pb: Vector2 = chart.get_peak_bounds()
+		if not popover.visible or popover.get_active_metric_id() != mid \
+				or chart.get_projection_point_count() != 3 \
+				or chart.get_total_point_count() < 9 \
+				or pb.y < pb.x \
+				or popover.get_factor_count() < 1:
+			all_seven_ok = false
+			break
+	_expect(all_seven_ok,
+		"All 7 HUD metric chips (Nüfus/Kut/Ülüş/Yılkı/Su/Hazine/Ordu) open MetricBreakdownPopover with curves, min/max peaks, 3-season projections, and +/- factors.")
+
+	# Verify chart interactive point selection & Kut overextension negative factor + quick drawer navigation
+	hud.open_metric_breakdown(MetricAnalyticsViewModel.METRIC_KUT)
+	var chart_select_events: Array[bool] = []
+	var pt_cb: Callable = func(_idx: int, is_proj: bool, _lbl: String, _val: float) -> void:
+		chart_select_events.append(is_proj)
+	chart.point_selected.connect(pt_cb)
+	chart.select_point(chart.get_total_point_count() - 1)
+	chart.point_selected.disconnect(pt_cb)
+	_expect(chart_select_events.size() == 1 and chart_select_events[0] == true \
+		and chart.get_selected_readout_text().find("Tahmin") != -1,
+		"Selecting a future projection node on SteppeTrendChartWidget emits signal and renders exact Tahmin readout.")
+
+	popover.get_quick_action_button().pressed.emit()
+	_expect(hud.is_drawer_open() and hud.get_active_drawer_slot() == OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY,
+		"Popover quick-action shortcut opens authoritative Layer 3 drawer directly on '%s'." % String(OtukenHudViewModel.SLOT_GOVERNANCE_DYNASTY))
+	popover.close_popover()
+	hud.close_drawer(true)
+
+	# 2. Verify Bozkır Vakanüvisi chronicle ingestion, category filter, and DualLayerCamera focus jump
+	var combat_res: CombatResult = CombatResult.new()
+	combat_res.attacker_id = 1
+	combat_res.defender_id = 3301
+	combat_res.damage_to_defender = 120.0
+	combat_res.defender_remaining_morale = 42.0
+	EventBus.combat_resolved.emit(combat_res)
+	EventBus.water_source_sabotaged.emit(Vector2i(4, 3), &"well_faz_a_1", 3301, 2)
+	EventBus.courier_ambushed_plan_exposed.emit(&"ord_faz_a_1", 1, 3301, GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE)
+	EventBus.zud_starvation_ticked.emit(0, SeasonManager.get_current_season())
+	EventBus.dynasty_stance_changed.emit(&"karluk", GameEnums.DynastyAttitude.NEUTRAL, GameEnums.DynastyAttitude.HOSTILE, 24.0)
+
+	hud.toggle_chronicle()
+	var chronicle: SteppeChronicleFeed = hud.get_chronicle_feed()
+	var total_all: int = chronicle.get_visible_entry_count()
+	chronicle.set_filter(MetricAnalyticsViewModel.CHRONICLE_AMBUSH_SABOTAGE)
+	var total_sabotage: int = chronicle.get_visible_entry_count()
+	chronicle.set_filter(MetricAnalyticsViewModel.CHRONICLE_ZUD_ECOLOGY)
+	var total_zud: int = chronicle.get_visible_entry_count()
+	chronicle.set_filter(MetricAnalyticsViewModel.CHRONICLE_AMBUSH_SABOTAGE)
+
+	cam.position = Vector3(-9.0, 0.0, -9.0)
+	var focus_coords: Array[Vector2i] = []
+	var focus_cb: Callable = func(coord: Vector2i, _wp: Vector3) -> void:
+		focus_coords.append(coord)
+	chronicle.chronicle_focus_requested.connect(focus_cb)
+	# Index 0 is newest ambush (fallback coord) or water sabotage ([4, 3] at index 1); activate sabotage entry
+	var sab_clicked: bool = chronicle.activate_entry_at(1)
+	chronicle.chronicle_focus_requested.disconnect(focus_cb)
+	var expected_focus_wp: Vector3 = hud.get_analytics_view_model().coord_to_world_pos(Vector2i(4, 3))
+
+	_expect(chronicle.visible and total_all >= 5 and total_sabotage == 2 and total_zud >= 1 \
+		and sab_clicked and focus_coords.size() == 1 and focus_coords[0] == Vector2i(4, 3) \
+		and is_equal_approx(cam.position.x, expected_focus_wp.x) \
+		and is_equal_approx(cam.position.z, expected_focus_wp.z),
+		"SteppeChronicleFeed filters categories cleanly and clicking an event entry moves DualLayerCamera smoothly to [4, 3].")
+	chronicle.close_feed()
+
+	# 3. Verify 5-Tab Sortable Devlet Defteri + Strict Fog-of-War Compliance on Rival Tribes
+	var ai_rival: SteppeStrategicAIController = SteppeStrategicAIController.new(
+		&"karluk_fog_test", 3301, 3301, Vector2i(6, 2),
+		GameEnums.AIDifficultyTier.SANCAK_BEYI,
+		GameEnums.SteppeAIPersonality.AKINCI_BASKINCI, 3301, 1, 1, Vector2i(2, 2))
+	SteppeStrategicAIController.register_ai_agent(ai_rival)
+	CommandBus.dispatch(ToggleDustScreenCommand.new(3301, 3301, true, 0.90))
+
+	hud.toggle_ledger()
+	var ledger: EmpireLedgerPanel = hud.get_empire_ledger_panel()
+	ledger.select_tab(MetricAnalyticsViewModel.LEDGER_TAB_REGIONS)
+	ledger.sort_by("control", 1)
+	var first_asc: String = ledger.get_row_cell_text(0, "control")
+	ledger.sort_by("control", 0)
+	var first_desc: String = ledger.get_row_cell_text(0, "control")
+
+	ledger.select_tab(MetricAnalyticsViewModel.LEDGER_TAB_COMMANDERS)
+	var cmdr_count: int = ledger.get_visible_row_count()
+
+	ledger.select_tab(MetricAnalyticsViewModel.LEDGER_TAB_ROUTES)
+	var routes_count: int = ledger.get_visible_row_count()
+
+	ledger.select_tab(MetricAnalyticsViewModel.LEDGER_TAB_ARMIES)
+	var armies_count: int = ledger.get_visible_row_count()
+
+	ledger.select_tab(MetricAnalyticsViewModel.LEDGER_TAB_RIVALS)
+	var rival_row_idx: int = -1
+	for ri: int in range(ledger.get_visible_row_count()):
+		if ledger.get_row_cell_text(ri, "tribe").find("3301") != -1:
+			rival_row_idx = ri
+			break
+	var masked_doctrine: String = ledger.get_row_cell_text(rival_row_idx, "doctrine") if rival_row_idx >= 0 else ""
+	var masked_power: String = ledger.get_row_cell_text(rival_row_idx, "power") if rival_row_idx >= 0 else ""
+
+	# Now expose the rival plan via courier ambush and confirm Fog lifts legitimately
+	CommandBus.dispatch(DispatchCourierOrderCommand.new(
+		&"rival_ord_1", 3301, 3301, &"assign_battle_doctrine",
+		GameEnums.TuranTacticPhase.FEIGNED_RETREAT_LURE,
+		Vector3.ZERO, Vector3(120.0, 0.0, 0.0), GameEnums.TerrainType.STEPPE, false))
+	CommandBus.dispatch(AmbushCourierCommand.new(&"rival_ord_1", 1))
+	ledger.refresh_ledger()
+	var revealed_doctrine: String = ledger.get_row_cell_text(rival_row_idx, "doctrine") if rival_row_idx >= 0 else ""
+
+	_expect(ledger.visible and first_asc == "%38" and first_desc == "%92" \
+		and cmdr_count >= 2 and routes_count >= 2 and armies_count >= 1 \
+		and masked_doctrine.find("Sis") != -1 and masked_power.find("Toz Perdesi") != -1 \
+		and revealed_doctrine.find("İfşası") != -1,
+		"EmpireLedgerPanel sorts regions ascending/descending across all 5 tabs and hides unrevealed rival doctrines/power behind Fog & Toz Perdesi until scouted.")
+	ledger.close_ledger()
+
+	# Clean up HUD + camera cleanly and run strict EventBus 0-leak audit
+	remove_child(hud)
+	hud.free()
+	remove_child(cam)
+	cam.free()
+
+	var audit_sigs: Array[StringName] = [
+		&"kut_changed",
+		&"season_changed",
+		&"combat_resolved",
+		&"dynasty_stance_changed",
+		&"water_source_sabotaged",
+		&"courier_ambushed_plan_exposed",
+		&"tactical_lens_changed",
+	]
+	var base_cnt: Dictionary[StringName, int] = {}
+	for sig: StringName in audit_sigs:
+		base_cnt[sig] = EventBus.get_signal_connection_list(sig).size()
+
+	var hud_leak_probe: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	add_child(hud_leak_probe)
+	remove_child(hud_leak_probe)
+	hud_leak_probe.free()
+
+	var zero_leaks: bool = true
+	for sig: StringName in audit_sigs:
+		if EventBus.get_signal_connection_list(sig).size() != base_cnt[sig]:
+			zero_leaks = false
+	_expect(zero_leaks,
+		"Faz A HUD overlays & EventBus chronicle subscriptions release with strictly 0 leaked connections after _exit_tree() + free().")
+
+	# Full reset before _test_main_scene_integration()
+	SteppeStrategicAIController.reset_strategic_ai_state()
+	_reset_p27b_singletons(&"faz_a_cleanup_kut")
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
 
 
 
