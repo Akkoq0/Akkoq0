@@ -101,6 +101,22 @@ class TacticalUnitSnapshot:
 	var doctrine_summary: String = ""
 	var last_decision_triggered: bool = false
 
+	# Phase 27B Modular Battle Doctrine & Phase 26A Synergy Read-Only Telemetry
+	var active_doctrine_id: StringName = &""
+	var active_doctrine_name: String = "Atanmamış"
+	var active_doctrine_summary: String = "Yok"
+	var active_doctrine_preset: GameEnums.BattleDoctrinePresetId = GameEnums.BattleDoctrinePresetId.KURT_KAPANI
+	var active_doctrine_center_ratio: float = 0.34
+	var active_doctrine_flank_ratio: float = 0.46
+	var active_doctrine_reserve_ratio: float = 0.20
+	var active_doctrine_opening: GameEnums.OpeningTactic = GameEnums.OpeningTactic.YELME_HARASSMENT
+	var active_doctrine_maneuver: GameEnums.DecisiveManeuver = GameEnums.DecisiveManeuver.KURT_KAPANI_FEIGNED_RETREAT
+	var courier_plan_exposed_global: bool = false
+	var synergy_combat_power_mult: float = 1.0
+	var synergy_courier_tempo_mult: float = 1.0
+	var synergy_active_resonance_count: int = 0
+	var synergy_primary_resonance_name: String = "Yok"
+
 
 var _player_id: int = 1
 var _army_id: int = 1
@@ -348,6 +364,51 @@ func capture_snapshot() -> TacticalUnitSnapshot:
 	if army != null and army.offline_doctrine != null:
 		var last_dec: OfflineDoctrineDecision = army.offline_doctrine.get_last_decision()
 		snap.last_decision_triggered = last_dec != null and last_dec.triggered
+
+	# Phase 27B Modular Battle Doctrine & Phase 26A Synergy Read-Only Hookup
+	var active_bdoc: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(_army_id)
+	if active_bdoc != null:
+		snap.active_doctrine_id = active_bdoc.doctrine_id
+		snap.active_doctrine_name = active_bdoc.display_name
+		snap.active_doctrine_summary = active_bdoc.format_summary()
+		snap.active_doctrine_preset = active_bdoc.preset_id
+		snap.active_doctrine_center_ratio = active_bdoc.center_ratio
+		snap.active_doctrine_flank_ratio = active_bdoc.flank_ratio
+		snap.active_doctrine_reserve_ratio = active_bdoc.reserve_ratio
+		snap.active_doctrine_opening = active_bdoc.opening_tactic
+		snap.active_doctrine_maneuver = active_bdoc.decisive_maneuver
+
+	snap.courier_plan_exposed_global = CourierDispatchSystem.is_player_plan_exposed_by_courier(_player_id, _army_id)
+	if snap.courier_plan_exposed_global:
+		snap.courier_plan_leaked = true
+
+	var syn_camp: Vector2i = PastureEcologyManager.get_player_camp_region(_player_id)
+	var syn_troops: int = -1
+	if army != null and army.template != null:
+		var t_sum: int = 0
+		for st: UnitStack in army.template.stacks:
+			if st != null and st.is_populated():
+				t_sum += st.count
+		if t_sum > 0:
+			syn_troops = t_sum
+	var syn_vet: float = snap.commander_veteran_score if cmdr_prof != null else -1.0
+	var syn_snap: SynergyEvaluationSnapshot = SystemicSynergyMatrix.evaluate_player(
+		_player_id,
+		_army_id,
+		syn_camp,
+		false,
+		syn_troops,
+		syn_vet,
+		snap.turan_phase,
+		-1.0,
+		snap.remount_horse_ratio)
+	if syn_snap != null and syn_snap.is_finite_and_bounded():
+		snap.synergy_combat_power_mult = syn_snap.effective_combat_power_mult
+		snap.synergy_courier_tempo_mult = syn_snap.courier_tempo_mult
+		snap.synergy_active_resonance_count = syn_snap.get_resonance_count()
+		snap.synergy_primary_resonance_name = syn_snap.get_primary_resonance_label()
+		if syn_snap.doctrine_exposed:
+			snap.courier_plan_exposed_global = true
 
 	return snap
 

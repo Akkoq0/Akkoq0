@@ -196,3 +196,7 @@ signal dust_decoy_toggled(army_id: int, player_id: int, is_active: bool)
 
 # --- Phase 26A Unified Systemic Synergy & Equilibrium Matrix ----------------
 signal systemic_synergy_evaluated(snapshot: SynergyEvaluationSnapshot)
+
+# --- Phase 27B Modular Battle Doctrine & Counter-Tactic Matchups -----------
+signal battle_doctrine_assigned(army_id: int, player_id: int, doctrine_id: StringName, preset_id: GameEnums.BattleDoctrinePresetId)
+signal doctrine_matchup_evaluated(attacker_id: int, defender_id: int, result: DoctrineMatchupResult)

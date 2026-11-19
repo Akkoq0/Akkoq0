@@ -93,6 +93,11 @@ class PulseSummarySnapshot:
 	var synergy_active_resonance_count: int = 0
 	var synergy_primary_resonance_name: String = "Yok"
 
+	# Phase 27B Active Battle Doctrine & Plan Exposure Telemetry
+	var active_battle_doctrine_id: StringName = &""
+	var active_battle_doctrine_name: String = "Atanmamış"
+	var doctrine_plan_exposed: bool = false
+
 
 class CrisisChipDescriptor:
 	var crisis_id: StringName = &""
@@ -320,6 +325,15 @@ func capture_snapshot() -> PulseSummarySnapshot:
 		snap.synergy_active_resonance_count = syn_snap.get_resonance_count()
 		snap.synergy_primary_resonance_name = syn_snap.get_primary_resonance_label()
 
+	# --- 6. Phase 27B Battle Doctrine & Plan Exposure (Strictly Read-Only) ---
+	var active_bdoc: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(_tracked_army_id)
+	if active_bdoc != null:
+		snap.active_battle_doctrine_id = active_bdoc.doctrine_id
+		snap.active_battle_doctrine_name = active_bdoc.display_name
+	snap.doctrine_plan_exposed = CourierDispatchSystem.is_player_plan_exposed_by_courier(_player_id, _tracked_army_id)
+	if syn_snap != null and syn_snap.doctrine_exposed:
+		snap.doctrine_plan_exposed = true
+
 	return snap
 
 
@@ -410,6 +424,15 @@ func collect_active_crises(snap: PulseSummarySnapshot = null) -> Array[CrisisChi
 			&"gold",
 			SLOT_WORLD_DIPLOMACY,
 			&"kara_borsa"))
+
+	if s.doctrine_plan_exposed:
+		crises.append(CrisisChipDescriptor.new(
+			&"doctrine_exposed",
+			"Savaş Nizamı İfşa",
+			"Ordu #%d ulağı esir (-%%25)" % s.tracked_army_id,
+			&"ember",
+			SLOT_MILITARY_HERD,
+			&"savas_nizami"))
 
 	return crises
 

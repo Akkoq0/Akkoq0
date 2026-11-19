@@ -815,10 +815,11 @@ func _apply_drawer_slot_summaries(snap: OtukenHudViewModel.PulseSummarySnapshot)
 			snap.legitimacy_multiplier * 100.0, snap.ruler_name, snap.generation,
 			OtukenHudViewModel.format_regency_short(snap.regency_status), snap.direct_regions, snap.direct_cap,
 			snap.delegated_regions, snap.silent_sabotage_beys],
-		OtukenHudViewModel.SLOT_MILITARY_HERD: "Yılkı Sürüsü: %d · Yedek At: %%%.0f · Savaş Gücü: %.2fx\nİkmal: %s · Kervan Açığı: %.1f · Tempo: %.2fx\nHız Çarpanı: %.2fx · Ulak: %s" % [
+		OtukenHudViewModel.SLOT_MILITARY_HERD: "Yılkı Sürüsü: %d · Yedek At: %%%.0f · Savaş Gücü: %.2fx\nNizam: %s · İkmal: %s · Kervan Açığı: %.1f · Tempo: %.2fx\nHız Çarpanı: %.2fx · Ulak: %s" % [
 			snap.yilki_herd_count, snap.remount_horse_ratio * 100.0, snap.synergy_combat_power_mult,
+			snap.active_battle_doctrine_name,
 			"KESİLDİ" if snap.supply_isolated else "Bağlı", snap.caravan_ammo_deficit, snap.synergy_courier_tempo_mult,
-			snap.expedition_speed_mult, "Yolda" if snap.courier_in_transit else "Hazır"],
+			snap.expedition_speed_mult, "İFŞA" if snap.doctrine_plan_exposed else ("Yolda" if snap.courier_in_transit else "Hazır")],
 		OtukenHudViewModel.SLOT_TERRITORY_ECOLOGY: "Mevsim: %s · %s\nBölge: %d · Kurgan: %d/%d · Tuğ Yarıçapı: %.0fm\nYeşim Otoritesi: %.2fx · Afet: %s" % [
 			snap.season_display_name, OtukenHudViewModel.format_tore_stage_short(snap.tore_stage),
 			snap.owned_regions, snap.player_kurgans, snap.total_kurgans, snap.tug_radius_m,
@@ -828,10 +829,10 @@ func _apply_drawer_slot_summaries(snap: OtukenHudViewModel.PulseSummarySnapshot)
 			"AKTİF" if snap.coalition_active else "Yok", snap.synergy_coalition_pressure, snap.active_intrigue_plots,
 			OtukenHudViewModel.format_collapse_state_short(snap.collapse_state),
 			snap.synergy_active_resonance_count, snap.synergy_primary_resonance_name],
-		SLOT_TACTICAL_COMMAND: "Ordu #%d · İkmal %s · Yedek At %%%.0f · Nizam %.2fx\nUlak: %s (Tempo %.2fx) · Toz Perdesi: %s" % [
-			snap.tracked_army_id, "KESİLDİ" if snap.supply_isolated else "Bağlı",
+		SLOT_TACTICAL_COMMAND: "Ordu #%d (%s) · İkmal %s · Yedek At %%%.0f · Nizam %.2fx\nUlak: %s (Tempo %.2fx) · Toz Perdesi: %s" % [
+			snap.tracked_army_id, snap.active_battle_doctrine_name, "KESİLDİ" if snap.supply_isolated else "Bağlı",
 			snap.remount_horse_ratio * 100.0, snap.synergy_combat_power_mult,
-			"Yolda" if snap.courier_in_transit else "Hazır", snap.synergy_courier_tempo_mult,
+			"İFŞA" if snap.doctrine_plan_exposed else ("Yolda" if snap.courier_in_transit else "Hazır"), snap.synergy_courier_tempo_mult,
 			"AÇIK (~2.1x)" if snap.dust_decoy_active else "Kapalı"],
 	}
 	for sid: StringName in texts:
@@ -987,6 +988,8 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.tactical_lens_changed, _on_tactical_lens_changed)
 	_subscribe_bus(EventBus.dust_decoy_toggled, _on_telemetry_dirty.unbind(3))
 	_subscribe_bus(EventBus.offline_doctrine_configured, _on_telemetry_dirty.unbind(8))
+	_subscribe_bus(EventBus.battle_doctrine_assigned, _on_telemetry_dirty.unbind(4))
+	_subscribe_bus(EventBus.courier_ambushed_plan_exposed, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.systemic_synergy_evaluated, _on_systemic_synergy_evaluated)
 
 

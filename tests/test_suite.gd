@@ -124,6 +124,7 @@ func _run_suite() -> void:
 	_test_phase25_neo_steppe_ui_and_hud()
 	_test_phase26_tactical_ui_and_compass()
 	_test_phase26a_systemic_synergy_and_equilibrium()
+	_test_phase27b_modular_doctrine_and_matchups()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -4882,3 +4883,554 @@ func _test_phase26a_systemic_synergy_and_equilibrium() -> void:
 	SeasonManager.set_food_reserve(120)
 	DiplomacyManager.step_seasonal_diplomatic_decay(20)
 	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _reset_p27b_singletons(reason_tag: StringName) -> void:
+	CombatCalculator.reset_doctrine_state()
+	SuccessionManager.reset_succession_state()
+	GovernanceManager.reset_governance_state()
+	TerritoryManager.reset_territory_state()
+	WaterRouteManager.reset_water_state()
+	RegionalMarketEngine.reset_market_state()
+	CollapseRecoveryFSM.reset_collapse_state()
+	GracePeriodManager.reset_persistent_world()
+	CourierDispatchSystem.reset_courier_state()
+	IntelligenceManager.reset_intelligence_state()
+	CaravanLogisticsManager.reset_logistics_state()
+	ReputationAndPactSystem.reset_reputation_state()
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+	CommandBus.dispatch(RestoreSupplyLineCommand.new(1, 1))
+	ResourceManager.set_camp_migration_and_supply_state(1, false, false)
+	CommandBus.dispatch(ModifyKutCommand.new(75.0 - GameManager.get_kut_score(), reason_tag))
+	CouncilEventEngine.step_seasonal_council_decay(5)
+	while SeasonManager.get_current_season().season_type != GameEnums.SeasonType.SPRING:
+		SeasonManager.advance_season_cycle()
+	SeasonManager.set_food_reserve(120)
+	for d_id: StringName in [&"default_rival", &"karluk", &"kipchak", &"oghuz"]:
+		var d_prof: DynastyProfile = DiplomacyManager.get_dynasty_profile(d_id)
+		if d_prof != null:
+			DiplomacyManager.set_dynasty_trust(d_id, d_prof.trust_index)
+	DiplomacyManager.set_political_intelligence_context(0.0, 0.0, 0.0, 0.0)
+	DiplomacyManager.step_seasonal_diplomatic_decay(20)
+	DiplomacyManager.evaluate_all_dynasties(75.0, 1000.0, 0.2)
+
+
+func _test_phase27b_modular_doctrine_and_matchups() -> void:
+	# 1. Clean Baseline Reset & DAG/Typing Gate
+	_reset_p27b_singletons(&"p27b_baseline_kut")
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Phase 27B passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	# 2. BattleDoctrineResource Schema Validation, Ratio Normalization & 5 Presets
+	var bad_doc: BattleDoctrineResource = BattleDoctrineResource.new()
+	bad_doc.doctrine_id = &""
+	bad_doc.display_name = "   "
+	bad_doc.center_ratio = 0.65
+	bad_doc.flank_ratio = 0.50
+	bad_doc.reserve_ratio = -0.15
+	bad_doc.laager_mobility_multiplier = 0.0
+	bad_doc.contingency_power_ratio_threshold = 0.50
+	var bad_errs: PackedStringArray = bad_doc.get_validation_errors()
+
+	var nan_doc: BattleDoctrineResource = BattleDoctrineResource.new()
+	nan_doc.doctrine_id = &"nan_probe"
+	nan_doc.display_name = "NaN Probe"
+	nan_doc.center_ratio = NAN
+	nan_doc.flank_ratio = -2.0
+	nan_doc.reserve_ratio = 0.0
+	var nan_thin_before: bool = nan_doc.has_thin_center()
+	var nan_valid_before: bool = nan_doc.is_valid()
+	nan_doc.normalize_ratios()
+
+	var norm_doc: BattleDoctrineResource = BattleDoctrineResource.new()
+	norm_doc.doctrine_id = &"custom_pincer"
+	norm_doc.display_name = "Özel Kıskaç"
+	norm_doc.center_ratio = 2.0
+	norm_doc.flank_ratio = 4.0
+	norm_doc.reserve_ratio = 2.0
+	norm_doc.normalize_ratios()
+	_expect(not bad_doc.is_valid() and bad_errs.size() >= 5 \
+		and nan_doc.has_non_finite_ratios() == false \
+		and not nan_valid_before and not nan_thin_before \
+		and nan_doc.is_valid() and is_equal_approx(nan_doc.get_allocation_sum(), 1.0) \
+		and norm_doc.is_valid() \
+		and is_equal_approx(norm_doc.center_ratio, 0.25) \
+		and is_equal_approx(norm_doc.flank_ratio, 0.50) \
+		and is_equal_approx(norm_doc.reserve_ratio, 0.25) \
+		and norm_doc.has_thin_center(),
+		"BattleDoctrineResource rejects invalid/NaN/sum allocations and normalizes ratios safely with <0.30 thin-center threshold.")
+
+	var presets: Array[BattleDoctrineResource] = DoctrinePresetCatalog.create_all_presets()
+	var preset_ids_seen: Dictionary[StringName, bool] = {}
+	var presets_all_valid: bool = presets.size() == 5
+	for p_doc: BattleDoctrineResource in presets:
+		if p_doc == null or not p_doc.is_valid() or preset_ids_seen.has(p_doc.doctrine_id):
+			presets_all_valid = false
+		if p_doc != null:
+			preset_ids_seen[p_doc.doctrine_id] = true
+	var p_kurt: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)
+	var p_boru: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.BORU_KAMASI)
+	var p_tolgama: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI)
+	var p_araba: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.ARABA_KALESI)
+	var p_tonyukuk: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI)
+	_expect(presets_all_valid \
+		and p_kurt != DoctrinePresetCatalog.create_preset(GameEnums.BattleDoctrinePresetId.KURT_KAPANI) \
+		and p_boru.is_heavy_armor_doctrine and is_equal_approx(p_boru.center_ratio, 0.60) \
+		and p_tolgama.has_thin_center() and is_equal_approx(p_tolgama.center_ratio, 0.20) \
+		and p_araba.decisive_maneuver == GameEnums.DecisiveManeuver.WAGON_CIRCLE_LAAGER \
+		and is_equal_approx(p_araba.laager_mobility_multiplier, 0.55) \
+		and p_tonyukuk.decisive_maneuver == GameEnums.DecisiveManeuver.TONYUKUK_WATER_CARAVAN_ATTRITION,
+		"DoctrinePresetCatalog creates 5 fresh, distinct, validated steppe battle doctrines.")
+
+	# 3. AssignBattleDoctrineCommand: Rejection, EventBus, Immutability & Layer-4 Sync
+	var assigned_events: Array[StringName] = []
+	var on_doctrine_assigned: Callable = func(_aid: int, _pid: int, doc_id: StringName, _preset: GameEnums.BattleDoctrinePresetId) -> void:
+		assigned_events.append(doc_id)
+	var offline_events: Array[GameEnums.OfflineDoctrineTrigger] = []
+	var on_offline_cfg: Callable = func(_aid: int, trig: GameEnums.OfflineDoctrineTrigger, _ratio: float, _tac: GameEnums.TuranTacticPhase, _tc: GameEnums.TerrainClass, _gc: GameEnums.RegionGeographyClass, _pack: bool, _ev: bool) -> void:
+		offline_events.append(trig)
+	EventBus.battle_doctrine_assigned.connect(on_doctrine_assigned)
+	EventBus.offline_doctrine_configured.connect(on_offline_cfg)
+
+	var reject_assign: AssignBattleDoctrineCommand = AssignBattleDoctrineCommand.new(
+		2701, 2701, bad_doc, GameEnums.BattleDoctrinePresetId.KURT_KAPANI, true)
+	var assign_tolgama: AssignBattleDoctrineCommand = AssignBattleDoctrineCommand.new(
+		2701, 2701, null, GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI, true)
+	var assign_custom: AssignBattleDoctrineCommand = AssignBattleDoctrineCommand.new(
+		2702, 2702, norm_doc, GameEnums.BattleDoctrinePresetId.KURT_KAPANI, true)
+	var rej_ok: bool = not CommandBus.dispatch(reject_assign)
+	var ok_tolgama: bool = CommandBus.dispatch(assign_tolgama)
+	var ok_custom: bool = CommandBus.dispatch(assign_custom)
+	norm_doc.display_name = "Dışarıdan Mutasyon Denemesi"
+	var stored_custom: BattleDoctrineResource = CombatCalculator.get_assigned_doctrine(2702)
+	var synced_cfg: OfflineDoctrineConfig = GracePeriodManager.get_offline_doctrine_config(2701)
+	_expect(rej_ok and ok_tolgama and ok_custom \
+		and assigned_events.has(&"tolgama_kiskaci") and assigned_events.has(&"custom_pincer") \
+		and offline_events.has(GameEnums.OfflineDoctrineTrigger.LOW_SUPPLY_OR_AMMO) \
+		and synced_cfg != null \
+		and synced_cfg.trigger_condition == GameEnums.OfflineDoctrineTrigger.LOW_SUPPLY_OR_AMMO \
+		and synced_cfg.action_tactic == GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP \
+		and synced_cfg.target_terrain_class == GameEnums.TerrainClass.DAMARLI_YAMAC \
+		and synced_cfg.target_geography_class == GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK \
+		and stored_custom != null and stored_custom.display_name == "Özel Kıskaç",
+		"AssignBattleDoctrineCommand rejects invalid schemas, stores immutable copy, emits EventBus and syncs Layer-4 Bozkır Nöbeti.")
+	EventBus.battle_doctrine_assigned.disconnect(on_doctrine_assigned)
+	EventBus.offline_doctrine_configured.disconnect(on_offline_cfg)
+
+	var steppe: TerrainData = ResourceLoader.load("res://data/terrain/steppe.tres") as TerrainData
+	var mountain: TerrainData = ResourceLoader.load("res://data/terrain/mountain.tres") as TerrainData
+	var spring_season: SeasonData = ResourceLoader.load("res://data/seasons/spring.tres") as SeasonData
+
+	# 4. Matchup #1: Kurt Kapanı vs Rookie / Veteran Gazi / High-Dread Commander
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2711, 2711, null, GameEnums.BattleDoctrinePresetId.KURT_KAPANI, false))
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2712, 2712, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, false))
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2713, 2713, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, false))
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2714, 2714, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, false))
+
+	SuccessionManager.register_commander(2712, 2712, 2712, &"Acemi Toy", 88, GameEnums.CommanderTrait.NONE)
+	SuccessionManager.register_commander(2713, 2713, 2713, &"Gazi Kül", 120, GameEnums.CommanderTrait.KERVAN_GAZISI)
+	SuccessionManager.record_commander_battle_experience(2713, 90.0)
+	SuccessionManager.register_commander(2714, 2714, 2714, &"Dehşetli Börü", 112, GameEnums.CommanderTrait.BOZKIR_KURDU)
+	SuccessionManager.record_commander_battle_experience(2714, 60.0)
+
+	var atk_kurt: CombatantStats = CombatantStats.new(2711, 220.0, 120.0, 1200.0, 1.0)
+	atk_kurt.player_id = 2711
+	atk_kurt.army_id = 2711
+	atk_kurt.attack_vector = Vector3.BACK
+
+	var def_rookie: CombatantStats = CombatantStats.new(2712, 210.0, 140.0, 1400.0, 1.0)
+	def_rookie.player_id = 2712
+	def_rookie.army_id = 2712
+	def_rookie.facing_vector = Vector3.FORWARD
+
+	var def_vet: CombatantStats = CombatantStats.new(2713, 210.0, 140.0, 1400.0, 1.0)
+	def_vet.player_id = 2713
+	def_vet.army_id = 2713
+	def_vet.facing_vector = Vector3.FORWARD
+
+	var ev_rookie: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_kurt, def_rookie, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT)
+	var ev_vet: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_kurt, def_vet, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT)
+	CommandBus.dispatch(ev_rookie)
+	CommandBus.dispatch(ev_vet)
+
+	var cbt_rookie: ResolveCombatCommand = ResolveCombatCommand.new(atk_kurt, def_rookie, steppe, 2701)
+	var atk_kurt_2: CombatantStats = CombatantStats.new(2711, 220.0, 120.0, 1200.0, 1.0)
+	atk_kurt_2.player_id = 2711
+	atk_kurt_2.army_id = 2711
+	atk_kurt_2.attack_vector = Vector3.BACK
+	var def_vet_2: CombatantStats = CombatantStats.new(2713, 210.0, 140.0, 1400.0, 1.0)
+	def_vet_2.player_id = 2713
+	def_vet_2.army_id = 2713
+	def_vet_2.facing_vector = Vector3.FORWARD
+	var cbt_vet: ResolveCombatCommand = ResolveCombatCommand.new(atk_kurt_2, def_vet_2, steppe, 2701)
+	CommandBus.dispatch(cbt_rookie)
+	CommandBus.dispatch(cbt_vet)
+
+	var def_dread_vet: CombatantStats = CombatantStats.new(2714, 210.0, 140.0, 1400.0, 1.0)
+	def_dread_vet.player_id = 2714
+	def_dread_vet.army_id = 2714
+	def_dread_vet.facing_vector = Vector3.FORWARD
+	var ev_dread_before: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_kurt, def_dread_vet, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT)
+	CommandBus.dispatch(ev_dread_before)
+	ReputationAndPactSystem.record_dread_act(2714, 70.0, 15.0)
+	var ev_dread_after: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_kurt, def_dread_vet, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT)
+	CommandBus.dispatch(ev_dread_after)
+
+	_expect(ev_rookie.result.feigned_retreat_lure_succeeded \
+		and ev_rookie.result.force_rear_exposure \
+		and ev_rookie.result.bonus_defender_armor_collapse_ratio >= 0.15 \
+		and ev_rookie.result.has_tag("kurt_kapani_sprung") \
+		and cbt_rookie.result.engagement_angle == GameEnums.CombatEngagementAngle.REAR \
+		and is_equal_approx(cbt_rookie.result.directional_damage_multiplier, 2.10) \
+		and ev_vet.result.feigned_retreat_broken_off_early \
+		and not ev_vet.result.force_rear_exposure \
+		and is_zero_approx(ev_vet.result.bonus_defender_armor_collapse_ratio) \
+		and ev_vet.result.has_tag("kurt_kapani_broken_off_early") \
+		and cbt_vet.result.engagement_angle == GameEnums.CombatEngagementAngle.FRONT \
+		and cbt_rookie.result.damage_to_defender > cbt_vet.result.damage_to_defender * 2.0 \
+		and ev_dread_before.result.feigned_retreat_broken_off_early \
+		and ev_dread_after.result.feigned_retreat_lure_succeeded \
+		and ev_dread_after.result.force_rear_exposure,
+		"Matchup #1 Kurt Kapanı baits Rookies (2.1x REAR strike) and High-Dread commanders, while calm Veteran Gazi cuts pursuit early.")
+
+	# 5. Matchup #2: Börü Heavy Wedge vs Thin-Center Tolgama vs Mud + Steep Slope + Pre-Zud Storm
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2721, 2721, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, false))
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2722, 2722, null, GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI, false))
+
+	var thick_no_laager: BattleDoctrineResource = BattleDoctrineResource.new()
+	thick_no_laager.doctrine_id = &"kalin_merkez_duz"
+	thick_no_laager.display_name = "Kalın Merkez"
+	thick_no_laager.center_ratio = 0.50
+	thick_no_laager.flank_ratio = 0.30
+	thick_no_laager.reserve_ratio = 0.20
+	thick_no_laager.decisive_maneuver = GameEnums.DecisiveManeuver.KURT_KAPANI_FEIGNED_RETREAT
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2723, 2723, thick_no_laager, GameEnums.BattleDoctrinePresetId.KURT_KAPANI, false))
+
+	var atk_boru: CombatantStats = CombatantStats.new(2721, 260.0, 180.0, 1400.0, 1.0)
+	atk_boru.player_id = 2721
+	atk_boru.army_id = 2721
+	atk_boru.combat_duration_sec = 10.0
+
+	var def_thin: CombatantStats = CombatantStats.new(2722, 180.0, 140.0, 1200.0, 1.0)
+	def_thin.player_id = 2722
+	def_thin.army_id = 2722
+
+	var def_thick: CombatantStats = CombatantStats.new(2723, 180.0, 140.0, 1200.0, 1.0)
+	def_thick.player_id = 2723
+	def_thick.army_id = 2723
+
+	var ev_pierce: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_boru, def_thin, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false)
+	var ev_no_pierce: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_boru, def_thick, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false)
+	var ev_mud_collapse: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_boru, def_thin, null, null, mountain, spring_season, GameEnums.CombatEngagementAngle.FRONT, true, true, true)
+	CommandBus.dispatch(ev_pierce)
+	CommandBus.dispatch(ev_no_pierce)
+	CommandBus.dispatch(ev_mud_collapse)
+
+	var atk_clear_cbt: CombatantStats = CombatantStats.new(2721, 260.0, 180.0, 1400.0, 1.0)
+	atk_clear_cbt.player_id = 2721
+	atk_clear_cbt.army_id = 2721
+	atk_clear_cbt.combat_duration_sec = 2.0
+	var def_thin_clear: CombatantStats = CombatantStats.new(2722, 180.0, 140.0, 1200.0, 1.0)
+	def_thin_clear.player_id = 2722
+	def_thin_clear.army_id = 2722
+	var cbt_clear_boru: ResolveCombatCommand = ResolveCombatCommand.new(atk_clear_cbt, def_thin_clear, steppe, 2720)
+	CommandBus.dispatch(cbt_clear_boru)
+
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -28.0), 40.0, true)
+	var atk_storm_cbt: CombatantStats = CombatantStats.new(2721, 260.0, 180.0, 1400.0, 1.0)
+	atk_storm_cbt.player_id = 2721
+	atk_storm_cbt.army_id = 2721
+	atk_storm_cbt.combat_duration_sec = 2.0
+	atk_storm_cbt.is_mud_terrain = true
+	var def_thin_storm: CombatantStats = CombatantStats.new(2722, 180.0, 140.0, 1200.0, 1.0)
+	def_thin_storm.player_id = 2722
+	def_thin_storm.army_id = 2722
+	var cbt_storm_boru: ResolveCombatCommand = ResolveCombatCommand.new(atk_storm_cbt, def_thin_storm, mountain, 2720)
+	CommandBus.dispatch(cbt_storm_boru)
+	BallisticsEngine.set_steppe_wind_weather(Vector3(0.0, 0.0, -6.0), 14.0, false)
+
+	var expected_heavy_fat: float = clampf(pow(2.10 * 1.90 * 1.75, 1.35), 1.0, 14.0)
+	_expect(ev_pierce.result.wedge_pierced_thin_center \
+		and not ev_pierce.result.heavy_armor_terrain_collapse \
+		and ev_pierce.result.attacker_attack_multiplier >= 1.25 \
+		and ev_pierce.result.defender_cohesion_damage_multiplier >= 1.40 \
+		and ev_pierce.result.has_tag("wedge_pierced_thin_center") \
+		and not ev_no_pierce.result.wedge_pierced_thin_center \
+		and ev_mud_collapse.result.heavy_armor_terrain_collapse \
+		and not ev_mud_collapse.result.wedge_pierced_thin_center \
+		and is_equal_approx(ev_mud_collapse.result.attacker_fatigue_multiplier, expected_heavy_fat) \
+		and ev_mud_collapse.result.attacker_mobility_multiplier <= 0.45 \
+		and ev_mud_collapse.result.attacker_attack_multiplier < 0.85 \
+		and ev_mud_collapse.result.has_tag("heavy_armor_terrain_collapse") \
+		and atk_storm_cbt.fatigue > atk_clear_cbt.fatigue * 5.0 \
+		and cbt_storm_boru.result.attacker_fatigue_momentum_multiplier < cbt_clear_boru.result.attacker_fatigue_momentum_multiplier,
+		"Matchup #2 Börü Wedge pierces Tolgama's 20%% center cleanly yet bogs down exponentially (%.2fx fatigue) in Mud+Slope+Pre-Zud storm." % expected_heavy_fat)
+
+	# 6. Matchup #3: Araba Kalesi Mobility Tradeoff, Flank/Rear Damping & Kurt Kapanı Block
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2731, 2731, null, GameEnums.BattleDoctrinePresetId.ARABA_KALESI, false))
+	var ev_laager_flank: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_clear_cbt, def_thick, p_tolgama, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FLANK)
+	var def_araba_stats: CombatantStats = CombatantStats.new(2731, 170.0, 140.0, 1400.0, 1.0)
+	def_araba_stats.player_id = 2731
+	def_araba_stats.army_id = 2731
+	def_araba_stats.facing_vector = Vector3.FORWARD
+	var ev_laager_flank_live: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_clear_cbt, def_araba_stats, p_tolgama, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FLANK)
+	var ev_laager_vs_kurt: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_kurt, def_araba_stats, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT)
+	CommandBus.dispatch(ev_laager_flank)
+	CommandBus.dispatch(ev_laager_flank_live)
+	CommandBus.dispatch(ev_laager_vs_kurt)
+
+	var atk_rear_a: CombatantStats = CombatantStats.new(2722, 230.0, 120.0, 1200.0, 1.0)
+	atk_rear_a.player_id = 2722
+	atk_rear_a.army_id = 2722
+	atk_rear_a.attack_vector = Vector3.FORWARD
+	var def_rear_plain: CombatantStats = CombatantStats.new(2723, 170.0, 140.0, 1400.0, 1.0)
+	def_rear_plain.player_id = 2723
+	def_rear_plain.army_id = 2723
+	def_rear_plain.facing_vector = Vector3.FORWARD
+	var cbt_rear_plain: ResolveCombatCommand = ResolveCombatCommand.new(atk_rear_a, def_rear_plain, steppe, 2730)
+
+	var atk_rear_b: CombatantStats = CombatantStats.new(2722, 230.0, 120.0, 1200.0, 1.0)
+	atk_rear_b.player_id = 2722
+	atk_rear_b.army_id = 2722
+	atk_rear_b.attack_vector = Vector3.FORWARD
+	var def_rear_laager: CombatantStats = CombatantStats.new(2731, 170.0, 140.0, 1400.0, 1.0)
+	def_rear_laager.player_id = 2731
+	def_rear_laager.army_id = 2731
+	def_rear_laager.facing_vector = Vector3.FORWARD
+	var cbt_rear_laager: ResolveCombatCommand = ResolveCombatCommand.new(atk_rear_b, def_rear_laager, steppe, 2730)
+	CommandBus.dispatch(cbt_rear_plain)
+	CommandBus.dispatch(cbt_rear_laager)
+
+	_expect(not ev_laager_flank.result.laager_encirclement_damped \
+		and ev_laager_flank_live.result.laager_encirclement_damped \
+		and is_equal_approx(ev_laager_flank_live.result.defender_mobility_multiplier, 0.55) \
+		and is_equal_approx(ev_laager_flank_live.result.flank_rear_damping_ratio, 0.65) \
+		and not ev_laager_vs_kurt.result.force_rear_exposure \
+		and is_zero_approx(ev_laager_vs_kurt.result.bonus_defender_armor_collapse_ratio) \
+		and is_equal_approx(cbt_rear_laager.result.directional_damage_multiplier, lerpf(1.0, 2.10, 0.30)) \
+		and cbt_rear_laager.result.damage_to_defender < cbt_rear_plain.result.damage_to_defender * 0.60 \
+		and cbt_rear_laager.result.cohesion_damage_to_defender < cbt_rear_plain.result.cohesion_damage_to_defender * 0.65 \
+		and cbt_rear_laager.result.morale_damage_to_defender < cbt_rear_plain.result.morale_damage_to_defender * 0.65,
+		"Matchup #3 Araba Kalesi trades mobility to 0.55x, damps 1.45x/2.1x encirclement by 65-70%%, and blocks Kurt Kapanı lure.")
+
+	# 7. Matchup #4: Tonyukuk Water & Caravan Attrition vs Large Army vs Raider Band
+	var tony_coord: Vector2i = Vector2i(27, 4)
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(2741, false, Vector2i(12, 12), 1)
+	GracePeriodManager.register_player(2742, false, Vector2i(12, 12), 2)
+	GracePeriodManager.advance_world_hours(60.0)
+	TerritoryManager.register_region(tony_coord, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2742, false, false, 100.0)
+	WaterRouteManager.register_water_source(tony_coord, &"well_2742", GameEnums.WaterSourceType.WELL, 2742)
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2741, 2741, null, GameEnums.BattleDoctrinePresetId.TONYUKUK_YIPRATMASI, false))
+
+	var atk_tony: CombatantStats = CombatantStats.new(2741, 200.0, 130.0, 1100.0, 1.0)
+	atk_tony.player_id = 2741
+	atk_tony.army_id = 2741
+	var def_big: CombatantStats = CombatantStats.new(2742, 240.0, 160.0, 2200.0, 1.0)
+	def_big.player_id = 2742
+	def_big.army_id = 2742
+	def_big.troop_count = 220
+	def_big.region_coord = tony_coord
+
+	var ev_tony_healthy: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_tony, def_big, null, p_boru, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false, tony_coord)
+	CommandBus.dispatch(ev_tony_healthy)
+
+	var sab_2741: SabotageWellCommand = SabotageWellCommand.new(2741, tony_coord, &"well_2742", 3)
+	var int_2742: InterdictSupplyLineCommand = InterdictSupplyLineCommand.new(2742, 1, &"raider_tony_27b")
+	var sab_ok: bool = CommandBus.dispatch(sab_2741)
+	var int_ok: bool = CommandBus.dispatch(int_2742)
+
+	var ev_tony_strained: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_tony, def_big, null, p_boru, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false, tony_coord)
+	CommandBus.dispatch(ev_tony_strained)
+
+	var def_raider: CombatantStats = CombatantStats.new(2743, 120.0, 90.0, 500.0, 0.45)
+	def_raider.player_id = 2742
+	def_raider.army_id = 2743
+	def_raider.troop_count = 35
+	def_raider.region_coord = tony_coord
+	CommandBus.dispatch(InterdictSupplyLineCommand.new(2743, 1, &"raider_tony_27b"))
+	var ev_tony_raider: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_tony, def_raider, null, p_tolgama, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false, tony_coord)
+	CommandBus.dispatch(ev_tony_raider)
+
+	_expect(sab_ok and int_ok \
+		and not ev_tony_healthy.result.tonyukuk_attrition_triggered \
+		and ev_tony_strained.result.tonyukuk_attrition_triggered \
+		and ev_tony_strained.result.tonyukuk_attrition_drain >= 0.14 \
+		and ev_tony_strained.result.defender_defense_multiplier < 0.90 \
+		and ev_tony_strained.result.defender_morale_damage_multiplier > 1.10 \
+		and ev_tony_strained.result.has_tag("tonyukuk_attrition_effective") \
+		and not ev_tony_raider.result.tonyukuk_attrition_triggered \
+		and is_zero_approx(ev_tony_raider.result.tonyukuk_attrition_drain) \
+		and ev_tony_raider.result.attacker_attack_multiplier < 1.0 \
+		and ev_tony_raider.result.has_tag("tonyukuk_ineffective_vs_raiders"),
+		"Matchup #4 Tonyukuk Attrition wears down 220-troop army via well sabotage/caravan cut yet fails vs 35-troop raider band.")
+
+	# 8. Cross-Domain Hooks: Ülüş Sabotage, Courier Exposure, Synergy Matrix, NaN Guard, ArmyController & UI/HUD Leak Audit
+	var pid_s: int = 2751
+	var coord_s: Vector2i = Vector2i(27, 10)
+	TerritoryManager.register_region(coord_s, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, pid_s, false, false, 100.0)
+	CommandBus.dispatch(DelegateRegionToVassalCommand.new(pid_s, coord_s, &"amb_bey_27b", GameEnums.VassalPersonalityTrait.AMBITIOUS))
+	var ulus_cmd: SignUlusContractCommand = SignUlusContractCommand.new(&"amb_bey_27b", 100.0, 10.0)
+	CommandBus.dispatch(ulus_cmd)
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(pid_s, pid_s, null, GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI, false))
+
+	var atk_sab_stats: CombatantStats = CombatantStats.new(pid_s, 200.0, 120.0, 1100.0, 1.0)
+	atk_sab_stats.player_id = pid_s
+	atk_sab_stats.army_id = pid_s
+	atk_sab_stats.region_coord = coord_s
+	var ev_sab: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_sab_stats, def_thick, null, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FLANK, false, false, false, coord_s)
+	CommandBus.dispatch(ev_sab)
+	_expect(ulus_cmd.silent_sabotage_triggered \
+		and ev_sab.result.ulus_flank_penalty > 0.0 \
+		and ev_sab.result.attacker_effective_flank_ratio < p_tolgama.flank_ratio \
+		and ev_sab.result.has_tag("ulus_flank_sabotage"),
+		"Ülüş silent sabotage shrinks Tolgama effective flank ratio (%.2f -> %.2f)." % [
+			p_tolgama.flank_ratio, ev_sab.result.attacker_effective_flank_ratio])
+
+	var captured_matchups: Array[DoctrineMatchupResult] = []
+	var on_matchup_bus: Callable = func(_aid: int, _did: int, m_res: DoctrineMatchupResult) -> void:
+		captured_matchups.append(m_res)
+	EventBus.doctrine_matchup_evaluated.connect(on_matchup_bus)
+
+	CommandBus.dispatch(DispatchCourierOrderCommand.new(
+		&"ord_27b_exp", pid_s, pid_s, &"redeploy",
+		GameEnums.TuranTacticPhase.CRESCENT_ENCIRCLEMENT_TRAP, Vector3.ZERO, Vector3(200.0, 0.0, 0.0)))
+	CommandBus.dispatch(AmbushCourierCommand.new(&"ord_27b_exp", 2752))
+	var ev_exposed: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_sab_stats, def_rookie, p_kurt, p_boru, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, false, false, false, coord_s)
+	CommandBus.dispatch(ev_exposed)
+	_expect(captured_matchups.size() == 1 \
+		and captured_matchups[0] == ev_exposed.result \
+		and CombatCalculator.get_last_matchup_result() == ev_exposed.result \
+		and ev_exposed.result.plan_exposed_by_courier \
+		and is_equal_approx(ev_exposed.result.exposed_counter_penalty, 0.25) \
+		and not ev_exposed.result.feigned_retreat_lure_succeeded \
+		and ev_exposed.result.has_tag("doctrine_plan_exposed"),
+		"Ambushing courier exposes battle doctrine (-25%% attack, cancels Feigned Retreat surprise) and emits EventBus.doctrine_matchup_evaluated.")
+	EventBus.doctrine_matchup_evaluated.disconnect(on_matchup_bus)
+
+	# Phase 26A SystemicSynergyMatrix scaling + NaN/INF poisoning guard
+	var pid_syn_weak: int = 2755
+	var pid_syn_strong: int = 2756
+	CaravanLogisticsManager.set_artisan_count(pid_syn_weak, 0)
+	CaravanLogisticsManager.set_artisan_count(pid_syn_strong, 12)
+	CommandBus.dispatch(DepositResourcesCommand.new(pid_syn_strong, &"steel", 12))
+	SuccessionManager.register_commander(2756, pid_syn_strong, 2756, &"Bilge Noyan", 116, GameEnums.CommanderTrait.BORU_YUREK)
+	SuccessionManager.record_commander_battle_experience(2756, 65.0)
+	var atk_weak: CombatantStats = CombatantStats.new(pid_syn_weak, 180.0, 120.0, 900.0, 0.5)
+	atk_weak.player_id = pid_syn_weak
+	atk_weak.army_id = pid_syn_weak
+	atk_weak.remount_horse_ratio = 0.20
+	var atk_strong: CombatantStats = CombatantStats.new(pid_syn_strong, 180.0, 120.0, 900.0, 1.0)
+	atk_strong.player_id = pid_syn_strong
+	atk_strong.army_id = pid_syn_strong
+	atk_strong.remount_horse_ratio = 1.0
+	var ev_syn_weak: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_weak, def_thick, p_tolgama, p_boru, steppe, spring_season)
+	var ev_syn_strong: EvaluateDoctrineMatchupCommand = EvaluateDoctrineMatchupCommand.new(
+		atk_strong, def_thick, p_tolgama, p_boru, steppe, spring_season)
+	CommandBus.dispatch(ev_syn_weak)
+	CommandBus.dispatch(ev_syn_strong)
+
+	var atk_nan: CombatantStats = CombatantStats.new(2759, NAN, INF, 500.0, NAN)
+	atk_nan.player_id = 2759
+	atk_nan.army_id = 2759
+	atk_nan.remount_horse_ratio = INF
+	var nan_matchup: DoctrineMatchupResult = DoctrineMatchupResolver.evaluate(
+		atk_nan, def_thick, nan_doc, null, steppe, spring_season, GameEnums.CombatEngagementAngle.FRONT, true, false, true)
+	_expect(ev_syn_strong.result.attacker_synergy_power_mult > ev_syn_weak.result.attacker_synergy_power_mult \
+		and ev_syn_strong.result.attacker_attack_multiplier > ev_syn_weak.result.attacker_attack_multiplier \
+		and nan_matchup.is_finite_and_bounded(),
+		"DoctrineMatchupResolver scales smoothly via SystemicSynergyMatrix (%.2fx > %.2fx) and bounds NaN/INF inputs cleanly." % [
+			ev_syn_strong.result.attacker_synergy_power_mult,
+			ev_syn_weak.result.attacker_synergy_power_mult])
+
+	# ArmyController.get_combatant_stats() integration
+	var army_scene: PackedScene = ResourceLoader.load("res://units/army.tscn") as PackedScene
+	var army: ArmyController = army_scene.instantiate() as ArmyController
+	army.army_id = 2761
+	army.owner_id = 2761
+	add_child(army)
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(2761, 2761, null, GameEnums.BattleDoctrinePresetId.BORU_KAMASI, true))
+	var army_stats: CombatantStats = army.get_combatant_stats()
+	_expect(army_stats != null \
+		and army_stats.player_id == 2761 \
+		and army_stats.army_id == 2761 \
+		and army_stats.troop_count == 20 \
+		and army_stats.battle_doctrine != null \
+		and army_stats.battle_doctrine.doctrine_id == &"boru_kamasi",
+		"ArmyController.get_combatant_stats() populates player_id, army_id, troop_count=20, and active BattleDoctrineResource.")
+
+	# Read-only TacticalCommandDrawerPanel & OtukenHudRoot Crisis Chip / Width / EventBus Leak Audit
+	var sigs_27b: Array[StringName] = [
+		&"battle_doctrine_assigned",
+		&"systemic_synergy_evaluated",
+		&"courier_ambushed_plan_exposed",
+	]
+	var base_27b_counts: Dictionary[StringName, int] = {}
+	for s_name: StringName in sigs_27b:
+		base_27b_counts[s_name] = EventBus.get_signal_connection_list(s_name).size()
+
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(pid_s, pid_s)
+	add_child(hud)
+	hud.register_drawer_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, "Taktik & Komuta", &"jade")
+	var drawer_panel: TacticalCommandDrawerPanel = TacticalCommandDrawerPanel.new()
+	drawer_panel.bind_context(pid_s, pid_s, null)
+	hud.mount_panel_to_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, drawer_panel)
+	hud.open_drawer(OtukenHudRoot.SLOT_TACTICAL_COMMAND, true)
+
+	var text_before: String = drawer_panel.get_doctrine_synergy_text()
+	CommandBus.dispatch(AssignBattleDoctrineCommand.new(pid_s, pid_s, null, GameEnums.BattleDoctrinePresetId.ARABA_KALESI, false))
+	var text_after: String = drawer_panel.get_doctrine_synergy_text()
+	var hud_vm: OtukenHudViewModel = hud.get_view_model()
+	var pulse_27b: OtukenHudViewModel.PulseSummarySnapshot = hud_vm.capture_snapshot()
+	var exposed_chip: CrisisChipButton = hud.get_node_or_null("CrisisChipRail/CrisisChip_doctrine_exposed") as CrisisChipButton
+	var drawer_node_27b: TamgaCardPanel = hud.get_node_or_null("AnalysisDrawerPanel") as TamgaCardPanel
+	var drawer_w_27b: float = drawer_node_27b.get_combined_minimum_size().x if drawer_node_27b != null else 999.0
+	var open_ratio_27b: float = hud.compute_open_map_ratio(false)
+	_expect(text_before.find("Tolgama Kıskacı") != -1 \
+		and text_before.find("PLAN İFŞA!") != -1 \
+		and text_after.find("Araba Kalesi") != -1 \
+		and pulse_27b.active_battle_doctrine_id == &"araba_kalesi" \
+		and pulse_27b.doctrine_plan_exposed \
+		and exposed_chip != null \
+		and exposed_chip.target_drawer_slot == OtukenHudViewModel.SLOT_MILITARY_HERD \
+		and exposed_chip.glossary_term == &"savas_nizami" \
+		and drawer_w_27b <= OtukenHudRoot.DRAWER_WIDTH_PX \
+		and open_ratio_27b >= 0.82,
+		"Read-only UI/HUD updates battle doctrine live via EventBus, surfaces CrisisChip_doctrine_exposed, and preserves <=332px drawer & >=82%% open map.")
+
+	remove_child(hud)
+	hud.free()
+	remove_child(army)
+	army.free()
+
+	var no_leak_27b: bool = true
+	for s_name: StringName in sigs_27b:
+		if EventBus.get_signal_connection_list(s_name).size() != base_27b_counts[s_name]:
+			no_leak_27b = false
+	_expect(no_leak_27b,
+		"OtukenHudRoot + TacticalCommandDrawerPanel release all Phase 27B EventBus subscriptions cleanly on free() (0 leaks).")
+	EventBus.battle_doctrine_assigned.emit(999, 999, &"probe_post_free", GameEnums.BattleDoctrinePresetId.KURT_KAPANI)
+	EventBus.doctrine_matchup_evaluated.emit(999, 998, DoctrineMatchupResult.new())
+
+	# 9. Full Singleton Cleanup Prior to _test_main_scene_integration()
+	_reset_p27b_singletons(&"p27b_cleanup_kut")
+

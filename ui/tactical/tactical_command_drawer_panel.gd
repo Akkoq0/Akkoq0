@@ -35,6 +35,7 @@ var _telemetry_card: TamgaCardPanel = null
 var _army_title_lbl: Label = null
 var _legacy_lbl: Label = null
 var _fatigue_lbl: Label = null
+var _doctrine_synergy_lbl: Label = null
 var _btn_armor: Button = null
 var _btn_mud: Button = null
 var _btn_slope: Button = null
@@ -117,6 +118,11 @@ func get_fatigue_warning_text() -> String:
 	return _fatigue_lbl.text if _fatigue_lbl != null else ""
 
 
+func get_doctrine_synergy_text() -> String:
+	_ensure_ui()
+	return _doctrine_synergy_lbl.text if _doctrine_synergy_lbl != null else ""
+
+
 func refresh_panel() -> void:
 	_ensure_ui()
 	var vm: TacticalCommandViewModel = get_view_model()
@@ -142,6 +148,19 @@ func refresh_panel() -> void:
 			armor_label, snap.heavy_armor_fatigue_mult, snap.current_morale, snap.current_cohesion]
 		var warn_col: Color = NeoSteppePalette.EMBER_BRIGHT if (snap.is_heavy_armor and snap.heavy_armor_fatigue_mult >= 2.5) else NeoSteppePalette.TEXT_SECONDARY
 		_fatigue_lbl.add_theme_color_override(&"font_color", warn_col)
+
+	if _doctrine_synergy_lbl != null:
+		var expo_txt: String = " · PLAN İFŞA!" if snap.courier_plan_exposed_global else ""
+		var doc_head: String = snap.active_doctrine_summary if snap.active_doctrine_id != &"" else snap.active_doctrine_name
+		_doctrine_synergy_lbl.text = "Nizam: %s\nSinerji %.2fx · Tempo %.2fx · Rezonans %d (%s)%s" % [
+			doc_head,
+			snap.synergy_combat_power_mult,
+			snap.synergy_courier_tempo_mult,
+			snap.synergy_active_resonance_count,
+			snap.synergy_primary_resonance_name,
+			expo_txt]
+		var doc_col: Color = NeoSteppePalette.EMBER_BRIGHT if snap.courier_plan_exposed_global else (NeoSteppePalette.JADE_PRIMARY if snap.active_doctrine_id != &"" else NeoSteppePalette.TEXT_MUTED)
+		_doctrine_synergy_lbl.add_theme_color_override(&"font_color", doc_col)
 
 	if _telemetry_card != null:
 		var tone: StringName = &"ember" if (not snap.commander_alive or snap.cascade_routing or snap.supply_isolated) else (&"gold" if snap.battle_fatigue >= 65.0 else &"jade")
@@ -200,6 +219,12 @@ func _ensure_ui() -> void:
 	_fatigue_lbl.theme_type_variation = &"CaptionLabel"
 	_fatigue_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	t_box.add_child(_fatigue_lbl)
+
+	_doctrine_synergy_lbl = Label.new()
+	_doctrine_synergy_lbl.name = "DoctrineSynergyLabel"
+	_doctrine_synergy_lbl.theme_type_variation = &"CaptionLabel"
+	_doctrine_synergy_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	t_box.add_child(_doctrine_synergy_lbl)
 
 	var preview_flow: HFlowContainer = HFlowContainer.new()
 	preview_flow.add_theme_constant_override(&"h_separation", 4)
@@ -294,6 +319,8 @@ func _connect_bus() -> void:
 	_sub(EventBus.cascade_rout_triggered, _on_bus_refresh.unbind(3))
 	_sub(EventBus.feigned_retreat_lured, _on_bus_refresh.unbind(5))
 	_sub(EventBus.crescent_trap_sprung, _on_bus_refresh.unbind(4))
+	_sub(EventBus.battle_doctrine_assigned, _on_bus_refresh.unbind(4))
+	_sub(EventBus.systemic_synergy_evaluated, _on_bus_refresh.unbind(1))
 
 
 func _sub(sig: Signal, cb: Callable) -> void:

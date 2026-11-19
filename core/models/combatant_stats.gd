@@ -47,6 +47,14 @@ var remount_horse_ratio: float = 1.0
 var commander_leadership: float = 50.0
 var attacker_dread_morale_shock_ratio: float = 0.0
 
+## Phase 27B Modular Battle Doctrine & Matchup Context attributes.
+var player_id: int = 0
+var army_id: int = 0
+var troop_count: int = 0
+var region_coord: Vector2i = Vector2i.ZERO
+var battle_doctrine: BattleDoctrineResource = null
+var is_mud_terrain: bool = false
+
 
 func _init(p_entity_id: int, p_attack: float, p_defense: float, p_health: float, p_supply_ratio: float) -> void:
 	entity_id = p_entity_id

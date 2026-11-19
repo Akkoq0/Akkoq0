@@ -84,6 +84,16 @@ func get_combatant_stats() -> CombatantStats:
 		template.get_total_defense(),
 		template.get_total_health(),
 		supply.get_supply_ratio())
+	stats.player_id = owner_id
+	stats.army_id = army_id
+	var total_troops: int = 0
+	for stack: UnitStack in template.stacks:
+		if stack != null and stack.is_populated():
+			total_troops += stack.count
+	if total_troops <= 0:
+		total_troops = CommandBus.get_army_rider_count(army_id)
+	stats.troop_count = maxi(total_troops, 0)
+	stats.battle_doctrine = CombatCalculator.get_assigned_doctrine(army_id)
 	stats.morale = supply.get_battle_morale()
 	stats.remount_horse_ratio = supply.get_remount_horse_ratio()
 	stats.quiver_ammo_ratio = clampf(supply.get_quiver_ammo_reserve() / 100.0, 0.0, 1.0)

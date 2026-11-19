@@ -369,6 +369,32 @@ enum SynergyResonanceId {
 	EXILE_KINGMAKER_NET = 4, ## Yersiz Yurtsuz Kral-Yapıcı Ağı: Sürgün + Ele geçirilen ulak + İstihbarat ticareti
 }
 
+## Phase 27B Modular Steppe Battle Doctrine: Layer 2 Opening Tactic.
+enum OpeningTactic {
+	YELME_HARASSMENT = 0, ## Yelme / Öncü Taciz Atışı
+	DUST_SCREEN_FEINT = 1, ## Yılkı Toz Perdesi Yanıltması
+	NIGHT_STORM_RAID = 2, ## Gece / Fırtına Baskını
+	DIRECT_WEDGE_CHARGE = 3, ## Doğrudan Börü Kama Hücumu
+}
+
+## Phase 27B Modular Steppe Battle Doctrine: Layer 3 Decisive Maneuver.
+enum DecisiveManeuver {
+	KURT_KAPANI_FEIGNED_RETREAT = 0, ## Kurt Kapanı (Sahte Ricat)
+	TOLGAMA_DOUBLE_ENVELOPMENT = 1, ## Tolgama (Çift Kanat Kuşatması)
+	BORU_HEAVY_WEDGE = 2, ## Börü Ağır Kama Yarma
+	WAGON_CIRCLE_LAAGER = 3, ## Araba Kalesi / Çember Savunma
+	TONYUKUK_WATER_CARAVAN_ATTRITION = 4, ## Tonyukuk Su ve Kervan Yıpratma
+}
+
+## Phase 27B Modular Steppe Battle Doctrine Preset Identifiers (`DoctrinePresetCatalog`).
+enum BattleDoctrinePresetId {
+	KURT_KAPANI = 0,
+	BORU_KAMASI = 1,
+	TOLGAMA_KISKACI = 2,
+	ARABA_KALESI = 3,
+	TONYUKUK_YIPRATMASI = 4,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

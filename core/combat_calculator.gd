@@ -13,6 +13,8 @@ var _season: SeasonData = null
 var _sulfur_ore: OreData = null
 var _pending_toy_loot_pool: float = 0.0
 var _captured_slave_worker_pool: int = 0
+var _assigned_doctrines: Dictionary[int, BattleDoctrineResource] = {}
+var _last_matchup_result: DoctrineMatchupResult = null
 
 
 func _ready() -> void:
@@ -24,11 +26,33 @@ func _ready() -> void:
 	EventBus.season_changed.connect(_on_season_changed)
 	CommandBus.register_handler(ResolveCombatCommand.ID, _handle_resolve)
 	CommandBus.register_handler(SulfurFireTrapCommand.ID, _handle_sulfur_fire_trap)
+	CommandBus.register_handler(AssignBattleDoctrineCommand.ID, _handle_assign_battle_doctrine)
+	CommandBus.register_handler(EvaluateDoctrineMatchupCommand.ID, _handle_evaluate_doctrine_matchup)
 
 
 func _exit_tree() -> void:
 	CommandBus.unregister_handler(ResolveCombatCommand.ID, _handle_resolve)
 	CommandBus.unregister_handler(SulfurFireTrapCommand.ID, _handle_sulfur_fire_trap)
+	CommandBus.unregister_handler(AssignBattleDoctrineCommand.ID, _handle_assign_battle_doctrine)
+	CommandBus.unregister_handler(EvaluateDoctrineMatchupCommand.ID, _handle_evaluate_doctrine_matchup)
+
+
+## Clears stored Phase 27B modular battle doctrines and cached matchup outcome.
+func reset_doctrine_state() -> void:
+	_assigned_doctrines.clear()
+	_last_matchup_result = null
+
+
+## Read-only accessor returning the modular BattleDoctrineResource assigned to `army_id`, or null.
+func get_assigned_doctrine(army_id: int) -> BattleDoctrineResource:
+	if _assigned_doctrines.has(army_id):
+		return _assigned_doctrines[army_id]
+	return null
+
+
+## Read-only accessor returning the latest Phase 27B DoctrineMatchupResult.
+func get_last_matchup_result() -> DoctrineMatchupResult:
+	return _last_matchup_result
 
 
 ## Accumulated Toy loot value captured from annihilated or routed enemy armies.
@@ -60,6 +84,17 @@ static func _safe_float(value: float, fallback: float, min_val: float = -INF, ma
 	if is_nan(value) or is_inf(value):
 		return fallback
 	return clampf(value, min_val, max_val)
+
+
+func _resolve_combatant_doctrine(stats: CombatantStats) -> BattleDoctrineResource:
+	if stats == null:
+		return null
+	if stats.battle_doctrine != null:
+		return stats.battle_doctrine
+	var lookup_id: int = stats.army_id if stats.army_id > 0 else stats.entity_id
+	if lookup_id > 0:
+		return get_assigned_doctrine(lookup_id)
+	return null
 
 
 ## Pure resolution of one exchange under the Triple Collapse & Phase 4 Psychological Warfare Model.
@@ -99,23 +134,41 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 
 	var pre_defender_health: float = defender.health
 
-	# --- Phase 4 Battle Fatigue accumulation & lance momentum decay ----------
-	if attacker.combat_duration_sec > 0.0:
-		attacker.fatigue = clampf(attacker.fatigue + attacker.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
-	if defender.combat_duration_sec > 0.0:
-		defender.fatigue = clampf(defender.fatigue + defender.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
-	var fatigue_momentum_mult: float = _rules.compute_fatigue_momentum_multiplier(attacker.fatigue)
-	result.attacker_fatigue_momentum_multiplier = fatigue_momentum_mult
-
-	# --- Phase 4 Elite Vanguard Destruction -> Cascade Rout & 2.1x Rear Strike
+	# --- Phase 4 & Phase 27B Angle Classification & Modular Doctrine Matchup --
 	var angle: GameEnums.CombatEngagementAngle = _rules.classify_engagement_angle(
 		attacker.attack_vector, defender.facing_vector)
 	if defender.elite_vanguard_destroyed or defender.is_fleeing_rout:
 		result.cascade_rout_triggered = true
 		angle = GameEnums.CombatEngagementAngle.REAR
 
+	var atk_doc: BattleDoctrineResource = _resolve_combatant_doctrine(attacker)
+	var def_doc: BattleDoctrineResource = _resolve_combatant_doctrine(defender)
+	var matchup: DoctrineMatchupResult = null
+	if atk_doc != null or def_doc != null:
+		matchup = DoctrineMatchupResolver.evaluate(
+			attacker, defender, atk_doc, def_doc, defender_terrain, season, angle)
+		result.doctrine_matchup = matchup
+		_last_matchup_result = matchup
+
+	# --- Phase 4 Battle Fatigue accumulation & lance momentum decay ----------
+	var atk_fatigue_mult: float = matchup.attacker_fatigue_multiplier if matchup != null else 1.0
+	if attacker.combat_duration_sec > 0.0:
+		attacker.fatigue = clampf(attacker.fatigue + attacker.combat_duration_sec * _rules.fatigue_accumulation_per_sec * atk_fatigue_mult, 0.0, 100.0)
+	if defender.combat_duration_sec > 0.0:
+		defender.fatigue = clampf(defender.fatigue + defender.combat_duration_sec * _rules.fatigue_accumulation_per_sec, 0.0, 100.0)
+	var fatigue_momentum_mult: float = _rules.compute_fatigue_momentum_multiplier(attacker.fatigue)
+	result.attacker_fatigue_momentum_multiplier = fatigue_momentum_mult
+
+	# --- Phase 4 Elite Vanguard Destruction -> Cascade Rout & 2.1x Rear Strike
+	if matchup != null and matchup.force_rear_exposure and not result.cascade_rout_triggered and not matchup.laager_encirclement_damped:
+		angle = GameEnums.CombatEngagementAngle.REAR
+
 	var dir_damage_mult: float = _rules.get_directional_damage_multiplier(angle)
 	var dir_cohesion_mult: float = _rules.get_directional_cohesion_multiplier(angle)
+	if matchup != null and matchup.laager_encirclement_damped and (angle == GameEnums.CombatEngagementAngle.FLANK or angle == GameEnums.CombatEngagementAngle.REAR):
+		var damping: float = clampf(matchup.flank_rear_damping_ratio, 0.0, 0.95)
+		dir_damage_mult = lerpf(1.0, dir_damage_mult, 1.0 - damping)
+		dir_cohesion_mult = lerpf(1.0, dir_cohesion_mult, 1.0 - damping)
 	result.engagement_angle = angle
 	result.directional_damage_multiplier = dir_damage_mult
 
@@ -123,14 +176,19 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 	var terrain_attack: float = _compute_terrain_attack(attacker, defender_terrain)
 	var season_defense: float = maxf(season.defense_multiplier, 0.1) if season != null else 1.0
 
-	var armor_collapse_factor: float = clampf(1.0 - defender.armor_collapse_ratio, 0.1, 1.0)
+	var effective_collapse: float = defender.armor_collapse_ratio
+	if matchup != null and matchup.bonus_defender_armor_collapse_ratio > 0.0:
+		effective_collapse = clampf(effective_collapse + matchup.bonus_defender_armor_collapse_ratio, 0.0, 0.9)
+	var armor_collapse_factor: float = clampf(1.0 - effective_collapse, 0.1, 1.0)
 	var steel_pen_factor: float = (1.0 - _rules.steel_armor_penetration_ratio) if attacker.has_steel_weapons else 1.0
 
-	var attacker_power: float = _effective_attack(attacker) * fatigue_momentum_mult * terrain_attack * dir_damage_mult
+	var doc_atk_mult: float = matchup.attacker_attack_multiplier if matchup != null else 1.0
+	var doc_def_mult: float = matchup.defender_defense_multiplier if matchup != null else 1.0
+	var attacker_power: float = _effective_attack(attacker) * fatigue_momentum_mult * terrain_attack * dir_damage_mult * doc_atk_mult
 	var defender_def_base: float = _safe_float(defender.defense, 0.0, 0.0, 1000000.0)
 	var defender_totem_def: float = maxf(1.0 + _safe_float(defender.totem_defense_bonus, 0.0, -0.95, 10.0), 0.05)
 	var defender_armor: float = defender_def_base * defender_totem_def \
-		* terrain_defense * season_defense * armor_collapse_factor * steel_pen_factor
+		* terrain_defense * season_defense * armor_collapse_factor * steel_pen_factor * doc_def_mult
 	result.damage_to_defender = _mitigated_damage(attacker_power, defender_armor, safe_rng)
 
 	var defender_power: float = _effective_attack(defender) * _rules.compute_fatigue_momentum_multiplier(defender.fatigue)
@@ -145,10 +203,15 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 
 	# --- Formation Cohesion & Battle Will / Fear collapse -------------------
 	var steel_break_mult: float = _rules.steel_shield_break_multiplier if attacker.has_steel_weapons else 1.0
-	var cohesion_loss: float = result.damage_to_defender * _rules.base_cohesion_damage_ratio * dir_cohesion_mult * steel_break_mult
+	var doc_coh_mult: float = matchup.defender_cohesion_damage_multiplier if matchup != null else 1.0
+	var doc_mor_mult: float = matchup.defender_morale_damage_multiplier if matchup != null else 1.0
+	var cohesion_loss: float = result.damage_to_defender * _rules.base_cohesion_damage_ratio * dir_cohesion_mult * steel_break_mult * doc_coh_mult
 	var morale_loss: float = result.damage_to_defender * _rules.base_morale_damage_ratio
 	if angle == GameEnums.CombatEngagementAngle.REAR:
-		morale_loss += _rules.rear_panic_morale_drop
+		var rear_panic: float = _rules.rear_panic_morale_drop
+		if matchup != null and matchup.laager_encirclement_damped:
+			rear_panic *= clampf(1.0 - matchup.flank_rear_damping_ratio, 0.05, 1.0)
+		morale_loss += rear_panic
 	if attacker.has_meteoric_iron_weapon:
 		morale_loss += _rules.meteoric_iron_dread_morale_drop
 	if result.cascade_rout_triggered:
@@ -156,7 +219,7 @@ func calculate(attacker: CombatantStats, defender: CombatantStats, defender_terr
 		morale_loss += _rules.elite_vanguard_loss_morale_shock * clampf(defender.rookie_troop_ratio, 0.2, 1.5)
 
 	var dread_shock_mult: float = 1.0 + _safe_float(attacker.attacker_dread_morale_shock_ratio, 0.0, 0.0, 0.25)
-	morale_loss *= dread_shock_mult
+	morale_loss *= dread_shock_mult * doc_mor_mult
 
 	result.cohesion_damage_to_defender = maxf(cohesion_loss, 0.0)
 	result.morale_damage_to_defender = maxf(morale_loss, 0.0)
@@ -194,6 +257,11 @@ func _handle_resolve(command: GameCommand) -> bool:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = resolve.rng_seed
 	resolve.result = calculate(resolve.attacker, resolve.defender, resolve.defender_terrain, _season, rng)
+	if resolve.result.doctrine_matchup != null:
+		EventBus.doctrine_matchup_evaluated.emit(
+			resolve.result.attacker_id,
+			resolve.result.defender_id,
+			resolve.result.doctrine_matchup)
 	if resolve.result.cascade_rout_triggered:
 		EventBus.cascade_rout_triggered.emit(
 			resolve.result.defender_id,
@@ -212,6 +280,78 @@ func _handle_resolve(command: GameCommand) -> bool:
 			resolve.result.defender_annihilated_in_crescent,
 			resolve.result.captured_toy_loot_value)
 	EventBus.combat_resolved.emit(resolve.result)
+	return true
+
+
+func _handle_assign_battle_doctrine(command: GameCommand) -> bool:
+	var cmd: AssignBattleDoctrineCommand = command as AssignBattleDoctrineCommand
+	if cmd == null:
+		return command.reject("Expected AssignBattleDoctrineCommand.")
+	if cmd.army_id <= 0 or cmd.player_id <= 0:
+		return command.reject("AssignBattleDoctrineCommand requires positive army_id and player_id.")
+
+	var chosen_doc: BattleDoctrineResource = null
+	if cmd.doctrine != null:
+		var errs: PackedStringArray = cmd.doctrine.get_validation_errors()
+		if not errs.is_empty():
+			return command.reject("Invalid BattleDoctrineResource: %s" % "; ".join(errs))
+		chosen_doc = cmd.doctrine.duplicate_clean()
+	else:
+		chosen_doc = DoctrinePresetCatalog.create_preset(cmd.preset_id)
+
+	if chosen_doc == null or not chosen_doc.is_valid():
+		return command.reject("Failed to resolve valid BattleDoctrineResource.")
+
+	_assigned_doctrines[cmd.army_id] = chosen_doc
+	cmd.applied = true
+	cmd.applied_doctrine = chosen_doc
+	cmd.applied_summary = chosen_doc.format_summary()
+
+	if cmd.sync_offline_contingency:
+		var offline_cfg: OfflineDoctrineConfig = OfflineDoctrineConfig.from_battle_doctrine(chosen_doc, cmd.army_id, cmd.player_id)
+		var cfg_cmd: ConfigureOfflineDoctrineCommand = ConfigureOfflineDoctrineCommand.new(
+			offline_cfg.army_id,
+			offline_cfg.player_id,
+			offline_cfg.trigger_condition,
+			offline_cfg.power_ratio_threshold,
+			offline_cfg.low_supply_threshold,
+			offline_cfg.action_tactic,
+			offline_cfg.pack_sefer_arabasi,
+			offline_cfg.evade_combat,
+			offline_cfg.target_terrain_class,
+			offline_cfg.target_geography_class)
+		if CommandBus.dispatch(cfg_cmd):
+			cmd.synced_offline_config = offline_cfg
+
+	EventBus.battle_doctrine_assigned.emit(cmd.army_id, cmd.player_id, chosen_doc.doctrine_id, chosen_doc.preset_id)
+	return true
+
+
+func _handle_evaluate_doctrine_matchup(command: GameCommand) -> bool:
+	var cmd: EvaluateDoctrineMatchupCommand = command as EvaluateDoctrineMatchupCommand
+	if cmd == null:
+		return command.reject("Expected EvaluateDoctrineMatchupCommand.")
+	var atk_doc: BattleDoctrineResource = cmd.attacker_doctrine if cmd.attacker_doctrine != null else _resolve_combatant_doctrine(cmd.attacker)
+	var def_doc: BattleDoctrineResource = cmd.defender_doctrine if cmd.defender_doctrine != null else _resolve_combatant_doctrine(cmd.defender)
+	var eff_season: SeasonData = cmd.season if cmd.season != null else _season
+
+	var res: DoctrineMatchupResult = DoctrineMatchupResolver.evaluate(
+		cmd.attacker,
+		cmd.defender,
+		atk_doc,
+		def_doc,
+		cmd.terrain,
+		eff_season,
+		cmd.engagement_angle,
+		cmd.is_mud,
+		cmd.is_steep_slope,
+		cmd.is_storm,
+		cmd.region_coord)
+	_last_matchup_result = res
+	cmd.result = res
+	var atk_id: int = cmd.attacker.entity_id if cmd.attacker != null else 0
+	var def_id: int = cmd.defender.entity_id if cmd.defender != null else 0
+	EventBus.doctrine_matchup_evaluated.emit(atk_id, def_id, res)
 	return true
 
 

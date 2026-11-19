@@ -66,3 +66,25 @@ func format_summary() -> String:
 		format_action_label(action_tactic, pack_sefer_arabasi, evade_combat),
 		format_target_label(target_terrain_class, target_geography_class),
 	]
+
+
+static func from_battle_doctrine(
+		doctrine: BattleDoctrineResource,
+		p_army_id: int = 1,
+		p_player_id: int = 1) -> OfflineDoctrineConfig:
+	var cfg: OfflineDoctrineConfig = OfflineDoctrineConfig.new()
+	cfg.army_id = maxi(p_army_id, 1)
+	cfg.player_id = maxi(p_player_id, 1)
+	if doctrine == null:
+		return cfg
+	cfg.trigger_condition = doctrine.contingency_trigger
+	var raw_ratio: float = doctrine.contingency_power_ratio_threshold
+	cfg.power_ratio_threshold = clampf(1.5 if (is_nan(raw_ratio) or is_inf(raw_ratio)) else raw_ratio, 1.05, 10.0)
+	var raw_sup: float = doctrine.contingency_low_supply_threshold
+	cfg.low_supply_threshold = clampf(0.20 if (is_nan(raw_sup) or is_inf(raw_sup)) else raw_sup, 0.05, 0.85)
+	cfg.action_tactic = doctrine.contingency_action_tactic
+	cfg.pack_sefer_arabasi = doctrine.contingency_pack_sefer_arabasi
+	cfg.evade_combat = doctrine.contingency_evade_combat
+	cfg.target_terrain_class = doctrine.contingency_target_terrain_class
+	cfg.target_geography_class = doctrine.contingency_target_geography_class
+	return cfg

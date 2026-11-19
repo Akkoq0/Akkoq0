@@ -26,6 +26,9 @@ var attacker_fatigue_momentum_multiplier: float = 1.0
 var cascade_rout_triggered: bool = false
 var captured_slave_workers: int = 0
 
+## Phase 27B Modular Battle Doctrine matchup outcome (null when no BattleDoctrineResource is active).
+var doctrine_matchup: DoctrineMatchupResult = null
+
 
 
 ## True when the defender has no health left.
