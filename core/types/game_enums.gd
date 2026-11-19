@@ -395,6 +395,21 @@ enum BattleDoctrinePresetId {
 	TONYUKUK_YIPRATMASI = 4,
 }
 
+## Phase 28 Unified Singleplayer + Online Persistent World Session Mode.
+enum SessionMode {
+	SINGLEPLAYER_SESSION = 0,
+	ONLINE_PERSISTENT_WORLD = 1,
+}
+
+## Phase 28 Authoritative CommandEnvelope validation & rejection status.
+enum CommandEnvelopeStatus {
+	ACCEPTED = 0,
+	REJECTED_PAUSE_IN_ONLINE = 1,
+	REJECTED_UNAUTHORIZED = 2,
+	REJECTED_STALE_OR_DUPLICATE = 3,
+	REJECTED_INVALID = 4,
+}
+
 ## Bit flags (1 << WorldLayer) used by `@export_flags` layer masks.
 const LAYER_FLAG_MACRO: int = 1 << WorldLayer.MACRO
 const LAYER_FLAG_MICRO: int = 1 << WorldLayer.MICRO

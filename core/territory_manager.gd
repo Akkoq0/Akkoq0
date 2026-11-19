@@ -447,3 +447,52 @@ func _handle_resolve_conquest_aftermath(command: GameCommand) -> bool:
 	EventBus.region_control_changed.emit(
 		region.coord, region.owner_id, region.control_percent, cmd.choice, region.scorched_seasons_remaining)
 	return true
+
+
+func export_state_dict() -> Dictionary:
+	var regs: Dictionary = {}
+	for coord: Vector2i in _regions:
+		var r: RegionData = _regions[coord]
+		var key: String = "%d,%d" % [coord.x, coord.y]
+		regs[key] = {
+			"control_percent": r.control_percent,
+			"geography_class": int(r.geography_class),
+			"has_sacred_kurgan": r.has_sacred_kurgan,
+			"is_core_oba": r.is_core_oba,
+			"owner_id": r.owner_id,
+			"scorched_seasons_remaining": r.scorched_seasons_remaining,
+			"vassal_bey_id": String(r.vassal_bey_id),
+			"x": coord.x,
+			"y": coord.y,
+		}
+	var cands: Dictionary = {}
+	for pid: int in _khagan_candidates:
+		cands[str(pid)] = _khagan_candidates[pid]
+	return {
+		"khagan_candidates": cands,
+		"regions": regs,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("regions") is Dictionary):
+		return false
+	reset_territory_state()
+	var regs: Dictionary = DeterministicStateHasher.v_dict(data.get("regions"))
+	for key: Variant in regs:
+		var rd: Dictionary = DeterministicStateHasher.v_dict(regs[key])
+		var coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(rd.get("x", 0)), DeterministicStateHasher.v_int(rd.get("y", 0)))
+		var reg: RegionData = RegionData.new(
+			coord,
+			DeterministicStateHasher.v_int(rd.get("geography_class", 0)) as GameEnums.RegionGeographyClass,
+			DeterministicStateHasher.v_int(rd.get("owner_id", 0)),
+			DeterministicStateHasher.v_bool(rd.get("is_core_oba", false)),
+			DeterministicStateHasher.v_bool(rd.get("has_sacred_kurgan", false)),
+			DeterministicStateHasher.v_float(rd.get("control_percent", 100.0), 100.0))
+		reg.scorched_seasons_remaining = DeterministicStateHasher.v_int(rd.get("scorched_seasons_remaining", 0))
+		reg.vassal_bey_id = StringName(DeterministicStateHasher.v_str(rd.get("vassal_bey_id", "")))
+		_regions[coord] = reg
+	var cands: Dictionary = DeterministicStateHasher.v_dict(data.get("khagan_candidates", {}))
+	for pid_key: Variant in cands:
+		_khagan_candidates[DeterministicStateHasher.v_str(pid_key).to_int()] = DeterministicStateHasher.v_bool(cands[pid_key])
+	return true

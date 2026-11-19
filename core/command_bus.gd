@@ -22,6 +22,10 @@ var _army_riders: Dictionary[int, int] = {}
 var _army_quiver_ammo: Dictionary[int, float] = {}
 var _army_roles: Dictionary[int, GameEnums.DetachmentRole] = {}
 var _nomadic_outposts: Dictionary[StringName, Vector2i] = {}
+var _envelope_queue: Array[CommandEnvelope] = []
+var _last_sequence_by_sender: Dictionary[String, int] = {}
+var _queued_envelope_keys: Dictionary[String, bool] = {}
+var _envelope_army_owners: Dictionary[int, int] = {}
 
 
 func _ready() -> void:
@@ -333,4 +337,300 @@ func _fail(command: GameCommand, reason: String) -> bool:
 		command.rejection_reason = reason
 	command_rejected.emit(command, reason)
 	return false
+
+
+func reset_envelope_state() -> void:
+	_envelope_queue.clear()
+	_last_sequence_by_sender.clear()
+	_queued_envelope_keys.clear()
+	_envelope_army_owners.clear()
+
+
+func register_envelope_army_owner(army_id: int, player_id: int) -> void:
+	if army_id > 0 and player_id > 0:
+		_envelope_army_owners[army_id] = player_id
+
+
+func get_pending_envelope_count() -> int:
+	return _envelope_queue.size()
+
+
+func get_last_sequence_for_sender(sender_player_id: String) -> int:
+	return _last_sequence_by_sender.get(sender_player_id, 0)
+
+
+func _reject_envelope(
+		envelope: CommandEnvelope,
+		status: GameEnums.CommandEnvelopeStatus,
+		reason: String) -> bool:
+	if envelope != null:
+		envelope.status = status
+		envelope.rejection_reason = reason
+		EventBus.command_envelope_rejected.emit(envelope.sequence_id, envelope.sender_player_id, status, reason)
+	command_rejected.emit(null, reason)
+	return false
+
+
+func enqueue_envelope(envelope: CommandEnvelope, current_tick: int = -1) -> bool:
+	if envelope == null:
+		return _reject_envelope(null, GameEnums.CommandEnvelopeStatus.REJECTED_INVALID, "Null CommandEnvelope.")
+	if envelope.sender_player_id.strip_edges().is_empty() or envelope.command_type.strip_edges().is_empty():
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_INVALID, "Missing sender_player_id or command_type.")
+
+	var sender_pid: int = envelope.parse_player_id()
+	if sender_pid <= 0:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: invalid sender_player_id.")
+
+	var effective_tick: int = current_tick if current_tick >= 0 else SessionClockAuthority.get_current_tick()
+	var last_seq: int = _last_sequence_by_sender.get(envelope.sender_player_id, 0)
+	var env_key: String = "%s:%d" % [envelope.sender_player_id, envelope.sequence_id]
+	if envelope.sequence_id <= 0 or envelope.sequence_id <= last_seq or _queued_envelope_keys.has(env_key):
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_STALE_OR_DUPLICATE, "REJECTED_STALE_OR_DUPLICATE: sequence_id %d." % envelope.sequence_id)
+	if envelope.target_tick < effective_tick:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_STALE_OR_DUPLICATE, "REJECTED_STALE_OR_DUPLICATE: past target_tick %d < %d." % [envelope.target_tick, effective_tick])
+
+	var payload: Dictionary = envelope.payload
+	if payload.has("player_id") and DeterministicStateHasher.v_int(payload.get("player_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: player_id mismatch.")
+	if payload.has("owner_id") and DeterministicStateHasher.v_int(payload.get("owner_id"), -1) != sender_pid:
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: owner_id mismatch.")
+	if payload.has("army_id"):
+		var aid: int = DeterministicStateHasher.v_int(payload.get("army_id"), 0)
+		if _envelope_army_owners.has(aid) and _envelope_army_owners[aid] != sender_pid:
+			return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: army %d owned by another player." % aid)
+	if payload.has("region_x") and payload.has("region_y"):
+		var r_coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(payload.get("region_x"), 0), DeterministicStateHasher.v_int(payload.get("region_y"), 0))
+		var reg: RegionData = TerritoryManager.get_region(r_coord)
+		if reg != null and reg.owner_id > 0 and reg.owner_id != sender_pid and envelope.command_type != "sabotage_well":
+			return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED, "REJECTED_UNAUTHORIZED: region owned by another player.")
+
+	var cmd_type: String = envelope.command_type
+	var wants_pause: bool = (cmd_type == "pause_session" and DeterministicStateHasher.v_bool(payload.get("paused", true), true)) \
+		or (cmd_type == "change_game_state" and DeterministicStateHasher.v_int(payload.get("target_state", -1), -1) == int(GameEnums.GameState.PAUSED))
+	if wants_pause and not SessionClockAuthority.can_pause():
+		SessionClockAuthority.request_pause(true, envelope.sender_player_id)
+		return _reject_envelope(envelope, GameEnums.CommandEnvelopeStatus.REJECTED_PAUSE_IN_ONLINE, "REJECTED_PAUSE_IN_ONLINE")
+
+	var stored: CommandEnvelope = envelope.duplicate_envelope()
+	stored.status = GameEnums.CommandEnvelopeStatus.ACCEPTED
+	_queued_envelope_keys[env_key] = true
+	_envelope_queue.append(stored)
+	_envelope_queue.sort_custom(func(a: CommandEnvelope, b: CommandEnvelope) -> bool:
+		if a.target_tick != b.target_tick:
+			return a.target_tick < b.target_tick
+		if a.sequence_id != b.sequence_id:
+			return a.sequence_id < b.sequence_id
+		return a.sender_player_id < b.sender_player_id
+	)
+	envelope.status = GameEnums.CommandEnvelopeStatus.ACCEPTED
+	return true
+
+
+func flush_envelopes_for_tick(tick: int = -1) -> int:
+	var target: int = tick if tick >= 0 else SessionClockAuthority.get_current_tick()
+	var executed: int = 0
+	var remaining: Array[CommandEnvelope] = []
+	for env: CommandEnvelope in _envelope_queue:
+		if env.target_tick <= target:
+			var env_key: String = "%s:%d" % [env.sender_player_id, env.sequence_id]
+			_queued_envelope_keys.erase(env_key)
+			var prev_seq: int = _last_sequence_by_sender.get(env.sender_player_id, 0)
+			if env.sequence_id > prev_seq:
+				_last_sequence_by_sender[env.sender_player_id] = env.sequence_id
+			if _execute_envelope(env):
+				executed += 1
+		else:
+			remaining.append(env)
+	_envelope_queue = remaining
+	return executed
+
+
+func _execute_envelope(envelope: CommandEnvelope) -> bool:
+	var p: Dictionary = envelope.payload
+	var sender_pid: int = envelope.parse_player_id()
+	match envelope.command_type:
+		"deposit_resources":
+			var cmd: DepositResourcesCommand = DepositResourcesCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				StringName(DeterministicStateHasher.v_str(p.get("ore_id", "iron"), "iron")),
+				DeterministicStateHasher.v_int(p.get("amount", 0)))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"spend_resources":
+			var reg_ores: OreRegistry = ResourceManager.get_registry()
+			var ore: OreData = reg_ores.find_ore(StringName(DeterministicStateHasher.v_str(p.get("ore_id", "iron"), "iron"))) if reg_ores != null else null
+			if ore == null:
+				return false
+			var cost: ResourceAmount = ResourceAmount.new()
+			cost.ore = ore
+			cost.amount = DeterministicStateHasher.v_int(p.get("amount", 0))
+			var costs: Array[ResourceAmount] = [cost]
+			var cmd: SpendResourcesCommand = SpendResourcesCommand.new(DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid), costs)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"modify_kut":
+			var cmd: ModifyKutCommand = ModifyKutCommand.new(
+				DeterministicStateHasher.v_float(p.get("delta_kut", 0.0)),
+				StringName(DeterministicStateHasher.v_str(p.get("reason", "envelope_kut"), "envelope_kut")))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"assign_battle_doctrine":
+			var cmd: AssignBattleDoctrineCommand = AssignBattleDoctrineCommand.new(
+				DeterministicStateHasher.v_int(p.get("army_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				null,
+				DeterministicStateHasher.v_int(p.get("preset_id", int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)), int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)) as GameEnums.BattleDoctrinePresetId,
+				DeterministicStateHasher.v_bool(p.get("sync_offline_contingency", true), true))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"toggle_dust_screen":
+			var cmd: ToggleDustScreenCommand = ToggleDustScreenCommand.new(
+				DeterministicStateHasher.v_int(p.get("army_id", 1), 1),
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				DeterministicStateHasher.v_bool(p.get("enable", true), true),
+				DeterministicStateHasher.v_float(p.get("remount_horse_ratio", 1.0), 1.0))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"collect_regional_tax":
+			var cmd: CollectRegionalTaxCommand = CollectRegionalTaxCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				DeterministicStateHasher.v_int(p.get("controlled_region_count", 1), 1),
+				DeterministicStateHasher.v_int(p.get("rich_region_count", 0), 0))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"sabotage_well":
+			var coord_s: Vector2i = Vector2i(DeterministicStateHasher.v_int(p.get("region_x", 0)), DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: SabotageWellCommand = SabotageWellCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				coord_s,
+				StringName(DeterministicStateHasher.v_str(p.get("source_id", ""))),
+				DeterministicStateHasher.v_int(p.get("duration_seasons", 3), 3))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"restore_water_source":
+			var coord_r: Vector2i = Vector2i(DeterministicStateHasher.v_int(p.get("region_x", 0)), DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: RestoreWaterSourceCommand = RestoreWaterSourceCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				coord_r,
+				StringName(DeterministicStateHasher.v_str(p.get("source_id", ""))))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"execute_barter_trade":
+			var coord_b: Vector2i = Vector2i(DeterministicStateHasher.v_int(p.get("region_x", 0)), DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: ExecuteBarterTradeCommand = ExecuteBarterTradeCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				coord_b,
+				StringName(DeterministicStateHasher.v_str(p.get("commodity_id", "iron"), "iron")),
+				DeterministicStateHasher.v_int(p.get("direction", int(GameEnums.BarterDirection.BUY_FROM_MARKET)), int(GameEnums.BarterDirection.BUY_FROM_MARKET)) as GameEnums.BarterDirection,
+				DeterministicStateHasher.v_int(p.get("quantity", 1), 1),
+				DeterministicStateHasher.v_bool(p.get("use_black_market", false)))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"delegate_region":
+			var coord_d: Vector2i = Vector2i(DeterministicStateHasher.v_int(p.get("region_x", 0)), DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: DelegateRegionToVassalCommand = DelegateRegionToVassalCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				coord_d,
+				StringName(DeterministicStateHasher.v_str(p.get("bey_id", ""))),
+				DeterministicStateHasher.v_int(p.get("personality_trait", int(GameEnums.VassalPersonalityTrait.LOYAL)), int(GameEnums.VassalPersonalityTrait.LOYAL)) as GameEnums.VassalPersonalityTrait)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"resolve_conquest_aftermath":
+			var coord_c: Vector2i = Vector2i(DeterministicStateHasher.v_int(p.get("region_x", 0)), DeterministicStateHasher.v_int(p.get("region_y", 0)))
+			var cmd: ResolveConquestAftermathCommand = ResolveConquestAftermathCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				coord_c,
+				DeterministicStateHasher.v_int(p.get("choice", int(GameEnums.ConquestAftermathChoice.HOLD_GARRISON_CONTROL)), int(GameEnums.ConquestAftermathChoice.HOLD_GARRISON_CONTROL)) as GameEnums.ConquestAftermathChoice,
+				StringName(DeterministicStateHasher.v_str(p.get("vassal_bey_id", "appointed_vassal_bey"), "appointed_vassal_bey")))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"select_collapse_path":
+			var cmd: SelectCollapsePathCommand = SelectCollapsePathCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				DeterministicStateHasher.v_int(p.get("choice", int(GameEnums.CollapsePathChoice.SUBMIT_VASSAL)), int(GameEnums.CollapsePathChoice.SUBMIT_VASSAL)) as GameEnums.CollapsePathChoice,
+				DeterministicStateHasher.v_float(p.get("requested_tribute_rate", 0.20), 0.20),
+				DeterministicStateHasher.v_int(p.get("slot_seed", 0)),
+				Vector2i(DeterministicStateHasher.v_int(p.get("frontier_w", 12), 12), DeterministicStateHasher.v_int(p.get("frontier_h", 12), 12)))
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"resolve_succession_crisis":
+			var cmd: ResolveSuccessionCrisisCommand = ResolveSuccessionCrisisCommand.new(
+				DeterministicStateHasher.v_int(p.get("player_id", sender_pid), sender_pid),
+				DeterministicStateHasher.v_int(p.get("response", int(GameEnums.SuccessionCrisisResponse.COUNCIL_REGENCY_TRANSITION)), int(GameEnums.SuccessionCrisisResponse.COUNCIL_REGENCY_TRANSITION)) as GameEnums.SuccessionCrisisResponse)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"change_game_state":
+			var cmd: ChangeGameStateCommand = ChangeGameStateCommand.new(
+				DeterministicStateHasher.v_int(p.get("target_state", int(GameEnums.GameState.PLAYING)), int(GameEnums.GameState.PLAYING)) as GameEnums.GameState)
+			envelope.executed_command = cmd
+			return dispatch(cmd)
+		"pause_session":
+			return SessionClockAuthority.request_pause(DeterministicStateHasher.v_bool(p.get("paused", true), true), envelope.sender_player_id)
+		"resume_session":
+			return SessionClockAuthority.request_pause(false, envelope.sender_player_id)
+		"set_tempo_speed":
+			return SessionClockAuthority.set_speed_scale(DeterministicStateHasher.v_float(p.get("speed_scale", 1.0), 1.0))
+		"advance_season":
+			SeasonManager.advance_season_cycle(DeterministicStateHasher.v_float(p.get("pasture_yield_multiplier", -1.0), -1.0))
+			return true
+		_:
+			return false
+
+
+func export_envelope_state_dict() -> Dictionary:
+	var seqs: Dictionary = {}
+	for k: String in _last_sequence_by_sender:
+		seqs[k] = _last_sequence_by_sender[k]
+	var sat: Dictionary = {}
+	for b: StringName in _bey_satisfaction:
+		sat[String(b)] = _bey_satisfaction[b]
+	var rogues: Dictionary = {}
+	for b: StringName in _rogue_warbands:
+		rogues[String(b)] = _rogue_warbands[b]
+	var iso: Dictionary = {}
+	for aid: int in _isolated_armies:
+		iso[str(aid)] = _isolated_armies[aid]
+	var riders: Dictionary = {}
+	for aid: int in _army_riders:
+		riders[str(aid)] = _army_riders[aid]
+	var owners: Dictionary = {}
+	for aid: int in _envelope_army_owners:
+		owners[str(aid)] = _envelope_army_owners[aid]
+	return {
+		"army_owners": owners,
+		"army_riders": riders,
+		"bey_satisfaction": sat,
+		"isolated_armies": iso,
+		"last_sequence_by_sender": seqs,
+		"rogue_warbands": rogues,
+	}
+
+
+func import_envelope_state_dict(data: Dictionary) -> bool:
+	if not (data.get("last_sequence_by_sender") is Dictionary):
+		return false
+	reset_envelope_state()
+	_bey_satisfaction.clear()
+	_rogue_warbands.clear()
+	_isolated_armies.clear()
+	_army_riders.clear()
+	var seqs: Dictionary = DeterministicStateHasher.v_dict(data.get("last_sequence_by_sender"))
+	for k: Variant in seqs:
+		_last_sequence_by_sender[DeterministicStateHasher.v_str(k)] = DeterministicStateHasher.v_int(seqs[k])
+	var sat: Dictionary = DeterministicStateHasher.v_dict(data.get("bey_satisfaction", {}))
+	for k: Variant in sat:
+		_bey_satisfaction[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_float(sat[k])
+	var rogues: Dictionary = DeterministicStateHasher.v_dict(data.get("rogue_warbands", {}))
+	for k: Variant in rogues:
+		_rogue_warbands[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_str(rogues[k])
+	var iso: Dictionary = DeterministicStateHasher.v_dict(data.get("isolated_armies", {}))
+	for k: Variant in iso:
+		_isolated_armies[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_bool(iso[k])
+	var riders: Dictionary = DeterministicStateHasher.v_dict(data.get("army_riders", {}))
+	for k: Variant in riders:
+		_army_riders[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_int(riders[k])
+	var owners: Dictionary = DeterministicStateHasher.v_dict(data.get("army_owners", {}))
+	for k: Variant in owners:
+		_envelope_army_owners[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_int(owners[k])
+	return true
 

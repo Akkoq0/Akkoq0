@@ -452,3 +452,73 @@ func _mitigated_damage(power: float, armor: float, rng: RandomNumberGenerator) -
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 	_season = season
+
+
+func export_state_dict() -> Dictionary:
+	var docs: Dictionary = {}
+	for aid: int in _assigned_doctrines:
+		var d: BattleDoctrineResource = _assigned_doctrines[aid]
+		if d == null:
+			continue
+		docs[str(aid)] = {
+			"center_ratio": d.center_ratio,
+			"contingency_action_tactic": int(d.contingency_action_tactic),
+			"contingency_evade_combat": d.contingency_evade_combat,
+			"contingency_low_supply_threshold": d.contingency_low_supply_threshold,
+			"contingency_pack_sefer_arabasi": d.contingency_pack_sefer_arabasi,
+			"contingency_power_ratio_threshold": d.contingency_power_ratio_threshold,
+			"contingency_target_geography_class": int(d.contingency_target_geography_class),
+			"contingency_target_terrain_class": int(d.contingency_target_terrain_class),
+			"contingency_trigger": int(d.contingency_trigger),
+			"decisive_maneuver": int(d.decisive_maneuver),
+			"display_name": d.display_name,
+			"doctrine_id": String(d.doctrine_id),
+			"flank_ratio": d.flank_ratio,
+			"is_heavy_armor_doctrine": d.is_heavy_armor_doctrine,
+			"laager_flank_damping": d.laager_flank_damping,
+			"laager_mobility_multiplier": d.laager_mobility_multiplier,
+			"laager_rear_damping": d.laager_rear_damping,
+			"opening_tactic": int(d.opening_tactic),
+			"preset_id": int(d.preset_id),
+			"reserve_ratio": d.reserve_ratio,
+		}
+	return {
+		"assigned_doctrines": docs,
+		"captured_slave_worker_pool": _captured_slave_worker_pool,
+		"pending_toy_loot_pool": _pending_toy_loot_pool,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("assigned_doctrines") is Dictionary):
+		return false
+	reset_doctrine_state()
+	_pending_toy_loot_pool = maxf(DeterministicStateHasher.v_float(data.get("pending_toy_loot_pool", 0.0)), 0.0)
+	_captured_slave_worker_pool = maxi(DeterministicStateHasher.v_int(data.get("captured_slave_worker_pool", 0)), 0)
+	var docs: Dictionary = DeterministicStateHasher.v_dict(data.get("assigned_doctrines"))
+	for aid_key: Variant in docs:
+		var aid: int = DeterministicStateHasher.v_str(aid_key).to_int()
+		var dd: Dictionary = DeterministicStateHasher.v_dict(docs[aid_key])
+		var doc: BattleDoctrineResource = DoctrinePresetCatalog.create_preset(
+			DeterministicStateHasher.v_int(dd.get("preset_id", int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)), int(GameEnums.BattleDoctrinePresetId.KURT_KAPANI)) as GameEnums.BattleDoctrinePresetId)
+		doc.doctrine_id = StringName(DeterministicStateHasher.v_str(dd.get("doctrine_id", "kurt_kapani"), "kurt_kapani"))
+		doc.display_name = DeterministicStateHasher.v_str(dd.get("display_name", doc.display_name), doc.display_name)
+		doc.is_heavy_armor_doctrine = DeterministicStateHasher.v_bool(dd.get("is_heavy_armor_doctrine", doc.is_heavy_armor_doctrine), doc.is_heavy_armor_doctrine)
+		doc.center_ratio = DeterministicStateHasher.v_float(dd.get("center_ratio", doc.center_ratio), doc.center_ratio)
+		doc.flank_ratio = DeterministicStateHasher.v_float(dd.get("flank_ratio", doc.flank_ratio), doc.flank_ratio)
+		doc.reserve_ratio = DeterministicStateHasher.v_float(dd.get("reserve_ratio", doc.reserve_ratio), doc.reserve_ratio)
+		doc.opening_tactic = DeterministicStateHasher.v_int(dd.get("opening_tactic", int(doc.opening_tactic)), int(doc.opening_tactic)) as GameEnums.OpeningTactic
+		doc.decisive_maneuver = DeterministicStateHasher.v_int(dd.get("decisive_maneuver", int(doc.decisive_maneuver)), int(doc.decisive_maneuver)) as GameEnums.DecisiveManeuver
+		doc.laager_mobility_multiplier = DeterministicStateHasher.v_float(dd.get("laager_mobility_multiplier", doc.laager_mobility_multiplier), doc.laager_mobility_multiplier)
+		doc.laager_flank_damping = DeterministicStateHasher.v_float(dd.get("laager_flank_damping", doc.laager_flank_damping), doc.laager_flank_damping)
+		doc.laager_rear_damping = DeterministicStateHasher.v_float(dd.get("laager_rear_damping", doc.laager_rear_damping), doc.laager_rear_damping)
+		doc.contingency_trigger = DeterministicStateHasher.v_int(dd.get("contingency_trigger", int(doc.contingency_trigger)), int(doc.contingency_trigger)) as GameEnums.OfflineDoctrineTrigger
+		doc.contingency_power_ratio_threshold = DeterministicStateHasher.v_float(dd.get("contingency_power_ratio_threshold", doc.contingency_power_ratio_threshold), doc.contingency_power_ratio_threshold)
+		doc.contingency_low_supply_threshold = DeterministicStateHasher.v_float(dd.get("contingency_low_supply_threshold", doc.contingency_low_supply_threshold), doc.contingency_low_supply_threshold)
+		doc.contingency_action_tactic = DeterministicStateHasher.v_int(dd.get("contingency_action_tactic", int(doc.contingency_action_tactic)), int(doc.contingency_action_tactic)) as GameEnums.TuranTacticPhase
+		doc.contingency_target_terrain_class = DeterministicStateHasher.v_int(dd.get("contingency_target_terrain_class", int(doc.contingency_target_terrain_class)), int(doc.contingency_target_terrain_class)) as GameEnums.TerrainClass
+		doc.contingency_target_geography_class = DeterministicStateHasher.v_int(dd.get("contingency_target_geography_class", int(doc.contingency_target_geography_class)), int(doc.contingency_target_geography_class)) as GameEnums.RegionGeographyClass
+		doc.contingency_pack_sefer_arabasi = DeterministicStateHasher.v_bool(dd.get("contingency_pack_sefer_arabasi", doc.contingency_pack_sefer_arabasi), doc.contingency_pack_sefer_arabasi)
+		doc.contingency_evade_combat = DeterministicStateHasher.v_bool(dd.get("contingency_evade_combat", doc.contingency_evade_combat), doc.contingency_evade_combat)
+		_assigned_doctrines[aid] = doc
+	return true

@@ -125,6 +125,7 @@ func _run_suite() -> void:
 	_test_phase26_tactical_ui_and_compass()
 	_test_phase26a_systemic_synergy_and_equilibrium()
 	_test_phase27b_modular_doctrine_and_matchups()
+	_test_phase28_dual_mode_determinism_and_saveload()
 	_test_main_scene_integration()
 
 	if _failures.is_empty():
@@ -5433,4 +5434,210 @@ func _test_phase27b_modular_doctrine_and_matchups() -> void:
 
 	# 9. Full Singleton Cleanup Prior to _test_main_scene_integration()
 	_reset_p27b_singletons(&"p27b_cleanup_kut")
+
+
+func _run_p28_deterministic_scenario() -> String:
+	_reset_p27b_singletons(&"p28_determinism_kut")
+	GameManager.import_state_dict({
+		"kut_score": 75.0,
+		"state": int(GameEnums.GameState.PLAYING),
+		"layer": int(GameEnums.WorldLayer.MACRO),
+		"consecutive_battle_losses": 0,
+		"council_active": false,
+		"legitimacy_multiplier": 1.0,
+	})
+	ResourceManager.import_state_dict({"stockpiles": {}})
+	SeasonManager.import_state_dict({"index": 0, "elapsed_sec": 0.0, "food_reserve": 120, "pasture_yield_multipliers": {}})
+	IntelligenceManager.reset_intelligence_state()
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	SessionClockAuthority.configure_session_mode(GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD, 1.0, 10.0)
+	GracePeriodManager.configure_persistent_world(true, 100.0)
+	GracePeriodManager.register_player(2801, false, Vector2i(10, 10), 1)
+	GracePeriodManager.register_player(2802, false, Vector2i(10, 10), 2)
+	GracePeriodManager.advance_world_hours(60.0)
+
+	var coord_1: Vector2i = Vector2i(28, 1)
+	var coord_2: Vector2i = Vector2i(28, 2)
+	TerritoryManager.register_region(coord_1, GameEnums.RegionGeographyClass.HIGH_PLATEAU_YAYLAK, 2801, true, false, 100.0)
+	TerritoryManager.register_region(coord_2, GameEnums.RegionGeographyClass.SHELTERED_VALLEY_KISLAK, 2802, true, false, 100.0)
+	WaterRouteManager.register_water_source(coord_1, &"well_2801", GameEnums.WaterSourceType.WELL, 2801)
+	WaterRouteManager.register_water_source(coord_2, &"well_2802", GameEnums.WaterSourceType.WELL, 2802)
+	CommandBus.register_envelope_army_owner(2801, 2801)
+	CommandBus.register_envelope_army_owner(2802, 2802)
+	SuccessionManager.register_dynasty(2801, &"Bilge Kağan", 110, 1)
+	SuccessionManager.register_commander(2801, 2801, 2801, &"Kül Tigin", 104, GameEnums.CommanderTrait.BORU_YUREK)
+
+	var seq_1: int = 1
+	var seq_2: int = 1
+	for season_step: int in range(20):
+		var tick: int = SessionClockAuthority.advance_tick(1)
+		var env_a: CommandEnvelope = CommandEnvelope.new(
+			seq_1, "2801", tick, "deposit_resources",
+			{"player_id": 2801, "ore_id": "iron", "amount": 5 + (season_step % 3)})
+		seq_1 += 1
+		CommandBus.enqueue_envelope(env_a, tick)
+
+		if season_step == 2:
+			var env_doc: CommandEnvelope = CommandEnvelope.new(
+				seq_1, "2801", tick, "assign_battle_doctrine",
+				{"player_id": 2801, "army_id": 2801, "preset_id": int(GameEnums.BattleDoctrinePresetId.TOLGAMA_KISKACI), "sync_offline_contingency": true})
+			seq_1 += 1
+			CommandBus.enqueue_envelope(env_doc, tick)
+		if season_step == 5:
+			var env_sab: CommandEnvelope = CommandEnvelope.new(
+				seq_1, "2801", tick, "sabotage_well",
+				{"player_id": 2801, "region_x": coord_2.x, "region_y": coord_2.y, "source_id": "well_2802", "duration_seasons": 3})
+			seq_1 += 1
+			CommandBus.enqueue_envelope(env_sab, tick)
+		if season_step == 8:
+			var env_barter: CommandEnvelope = CommandEnvelope.new(
+				seq_2, "2802", tick, "execute_barter_trade",
+				{"player_id": 2802, "region_x": coord_2.x, "region_y": coord_2.y, "commodity_id": "iron", "direction": int(GameEnums.BarterDirection.BUY_FROM_MARKET), "quantity": 2, "use_black_market": false})
+			seq_2 += 1
+			CommandBus.enqueue_envelope(env_barter, tick)
+		var env_season: CommandEnvelope = CommandEnvelope.new(
+			seq_1, "2801", tick, "advance_season", {"pasture_yield_multiplier": 1.0})
+		seq_1 += 1
+		CommandBus.enqueue_envelope(env_season, tick)
+		CommandBus.flush_envelopes_for_tick(tick)
+
+	var state_dict: Dictionary = WorldSnapshotSerializer.export_state_dict()
+	return DeterministicStateHasher.compute_world_hash(state_dict)
+
+
+func _test_phase28_dual_mode_determinism_and_saveload() -> void:
+	_reset_p27b_singletons(&"p28_baseline_kut")
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+
+	var arch_errors: PackedStringArray = ArchitectureVerifier.run_all_checks()
+	_expect(arch_errors.is_empty(),
+		"Phase 28 passes ArchitectureVerifier strictly with 0 DAG or Level-2 typing violations.")
+
+	# 1. Dual-Mode Tempo Profiles & Online Pause Rejection + CrisisChip
+	var sp_prof: SimulationTempoProfile = SessionClockAuthority.configure_session_mode(
+		GameEnums.SessionMode.SINGLEPLAYER_SESSION, 2.0, 10.0)
+	var sp_can_pause: bool = sp_prof.can_pause and SessionClockAuthority.can_pause()
+	var sp_speed_4: bool = SessionClockAuthority.set_speed_scale(4.0)
+	var sp_paused_ok: bool = SessionClockAuthority.request_pause(true, "1")
+	var tick_before_pause: int = SessionClockAuthority.get_current_tick()
+	var tick_while_paused: int = SessionClockAuthority.advance_tick(5)
+	var sp_resumed_ok: bool = SessionClockAuthority.request_pause(false, "1")
+	var tick_after_resume: int = SessionClockAuthority.advance_tick(3)
+	_expect(sp_can_pause and sp_speed_4 and is_equal_approx(SessionClockAuthority.get_speed_scale(), 4.0) \
+		and sp_paused_ok and tick_while_paused == tick_before_pause \
+		and sp_resumed_ok and tick_after_resume == tick_before_pause + 3 \
+		and not SessionClockAuthority.is_offline_doctrine_protection_active(),
+		"SINGLEPLAYER_SESSION supports pause/resume and 1x/2x/4x speed scaling without activating offline watch.")
+
+	var online_prof: SimulationTempoProfile = SessionClockAuthority.configure_session_mode(
+		GameEnums.SessionMode.ONLINE_PERSISTENT_WORLD, 1.0, 10.0)
+	var pause_reject_codes: Array[StringName] = []
+	var on_pause_rej: Callable = func(_sender: String, code: StringName) -> void:
+		pause_reject_codes.append(code)
+	EventBus.session_pause_rejected.connect(on_pause_rej)
+	var online_pause_res: bool = SessionClockAuthority.request_pause(true, "1")
+	var online_speed_rej: bool = not SessionClockAuthority.set_speed_scale(4.0)
+	var hud_scene: PackedScene = ResourceLoader.load("res://ui/hud/otuken_hud_root.tscn") as PackedScene
+	var hud: OtukenHudRoot = hud_scene.instantiate() as OtukenHudRoot
+	hud.set_player_context(1, 1)
+	add_child(hud)
+	var gm_pause_cmd: ChangeGameStateCommand = ChangeGameStateCommand.new(GameEnums.GameState.PAUSED)
+	var gm_pause_rej: bool = not CommandBus.dispatch(gm_pause_cmd)
+	hud.refresh_from_viewmodel()
+	var pause_chip: CrisisChipButton = null
+	for chip: CrisisChipButton in hud._crisis_chips:
+		if chip != null and chip.name == "CrisisChip_online_pause_rejected":
+			pause_chip = chip
+			break
+	var has_pause_chip: bool = pause_chip != null
+	remove_child(hud)
+	hud.free()
+	EventBus.session_pause_rejected.disconnect(on_pause_rej)
+	_expect(not online_prof.can_pause and SessionClockAuthority.is_offline_doctrine_protection_active() \
+		and not online_pause_res and not SessionClockAuthority.is_paused() \
+		and online_speed_rej and is_equal_approx(SessionClockAuthority.get_speed_scale(), 1.0) \
+		and gm_pause_rej and gm_pause_cmd.rejection_reason == "REJECTED_PAUSE_IN_ONLINE" \
+		and pause_reject_codes.has(&"REJECTED_PAUSE_IN_ONLINE") \
+		and has_pause_chip,
+		"ONLINE_PERSISTENT_WORLD rejects pause (REJECTED_PAUSE_IN_ONLINE), locks 1x tick rate, activates offline watch, and surfaces CrisisChip.")
+
+	# 2. Authorized CommandEnvelope & Stale/Duplicate Rejection (Zero State Mutation)
+	SessionClockAuthority.advance_tick(10)
+	var cur_tick: int = SessionClockAuthority.get_current_tick()
+	var p2_iron_before: int = ResourceManager.get_amount(2892, &"iron")
+	CommandBus.register_envelope_army_owner(2892, 2892)
+	var unauth_pid_env: CommandEnvelope = CommandEnvelope.new(
+		1, "2891", cur_tick, "deposit_resources", {"player_id": 2892, "ore_id": "iron", "amount": 500})
+	var unauth_army_env: CommandEnvelope = CommandEnvelope.new(
+		2, "2891", cur_tick, "assign_battle_doctrine", {"army_id": 2892, "preset_id": int(GameEnums.BattleDoctrinePresetId.BORU_KAMASI)})
+	var stale_tick_env: CommandEnvelope = CommandEnvelope.new(
+		1, "2891", cur_tick - 1, "deposit_resources", {"player_id": 2891, "ore_id": "iron", "amount": 50})
+	var valid_env: CommandEnvelope = CommandEnvelope.new(
+		1, "2891", cur_tick, "deposit_resources", {"player_id": 2891, "ore_id": "iron", "amount": 25})
+	var dup_env: CommandEnvelope = CommandEnvelope.new(
+		1, "2891", cur_tick, "deposit_resources", {"player_id": 2891, "ore_id": "iron", "amount": 25})
+	var online_pause_env: CommandEnvelope = CommandEnvelope.new(
+		2, "2891", cur_tick, "pause_session", {"paused": true})
+
+	var rej_pid: bool = not CommandBus.enqueue_envelope(unauth_pid_env, cur_tick)
+	var rej_army: bool = not CommandBus.enqueue_envelope(unauth_army_env, cur_tick)
+	var rej_stale: bool = not CommandBus.enqueue_envelope(stale_tick_env, cur_tick)
+	var ok_valid: bool = CommandBus.enqueue_envelope(valid_env, cur_tick)
+	var rej_dup: bool = not CommandBus.enqueue_envelope(dup_env, cur_tick)
+	var rej_pause_env: bool = not CommandBus.enqueue_envelope(online_pause_env, cur_tick)
+	var p1_iron_before: int = ResourceManager.get_amount(2891, &"iron")
+	var flushed: int = CommandBus.flush_envelopes_for_tick(cur_tick)
+	var p1_iron_after: int = ResourceManager.get_amount(2891, &"iron")
+	var p2_iron_after: int = ResourceManager.get_amount(2892, &"iron")
+	var replay_seq_rej: bool = not CommandBus.enqueue_envelope(
+		CommandEnvelope.new(1, "2891", cur_tick, "deposit_resources", {"player_id": 2891, "ore_id": "iron", "amount": 99}), cur_tick)
+
+	_expect(rej_pid and unauth_pid_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED \
+		and rej_army and unauth_army_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_UNAUTHORIZED \
+		and rej_stale and stale_tick_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_STALE_OR_DUPLICATE \
+		and ok_valid and rej_dup and dup_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_STALE_OR_DUPLICATE \
+		and rej_pause_env and online_pause_env.status == GameEnums.CommandEnvelopeStatus.REJECTED_PAUSE_IN_ONLINE \
+		and flushed == 1 and p1_iron_after == p1_iron_before + 25 and p2_iron_after == p2_iron_before \
+		and replay_seq_rej,
+		"CommandBus rejects unauthorized, stale/duplicate, and online-pause envelopes with 0 state mutation and executes valid envelopes deterministically.")
+
+	# 3. 20-Season Dual-Run Determinism & SHA-256 Save/Load Verification
+	var hash_run_a: String = _run_p28_deterministic_scenario()
+	var hash_run_b: String = _run_p28_deterministic_scenario()
+	var saved_pkg: String = SaveLoadRepository.serialize_save_package()
+	var save_path: String = "user://phase28_verify_save.json"
+	var file_saved: bool = SaveLoadRepository.save_to_file(save_path)
+
+	# Mutate live world heavily, then verify corrupt saves fail without mutating, and valid save restores exact hash
+	CommandBus.dispatch(DepositResourcesCommand.new(2801, &"iron", 999))
+	CommandBus.dispatch(ModifyKutCommand.new(-40.0, &"p28_mutation_probe"))
+	var mutated_hash: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	var bad_json_rej: bool = not SaveLoadRepository.load_save_package("{broken_json")
+	var bad_schema_pkg: String = saved_pkg.replace("\"schema_version\":1", "\"schema_version\":99")
+	var bad_schema_rej: bool = not SaveLoadRepository.load_save_package(bad_schema_pkg)
+	var bad_hash_pkg: String = saved_pkg.replace(hash_run_b, "0".repeat(64))
+	var bad_hash_rej: bool = not SaveLoadRepository.load_save_package(bad_hash_pkg)
+	var hash_after_bad_loads: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+
+	var file_loaded: bool = SaveLoadRepository.load_from_file(save_path)
+	var hash_after_valid_load: String = DeterministicStateHasher.compute_world_hash(WorldSnapshotSerializer.export_state_dict())
+	if FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
+
+	_expect(hash_run_a.length() == 64 \
+		and hash_run_a == hash_run_b \
+		and mutated_hash != hash_run_a \
+		and bad_json_rej and bad_schema_rej and bad_hash_rej \
+		and hash_after_bad_loads == mutated_hash \
+		and file_saved and file_loaded \
+		and hash_after_valid_load == hash_run_a,
+		"Two independent 20-season CommandEnvelope runs yield identical SHA-256 hash; Save/Load restores exact hash while corrupt payloads leave live world untouched.")
+
+	# 4. Clean Reset Prior to Next Phase / Main Scene Integration
+	SessionClockAuthority.reset_session_clock()
+	CommandBus.reset_envelope_state()
+	_reset_p27b_singletons(&"p28_cleanup_kut")
 

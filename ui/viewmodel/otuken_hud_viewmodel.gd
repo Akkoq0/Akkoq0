@@ -98,6 +98,12 @@ class PulseSummarySnapshot:
 	var active_battle_doctrine_name: String = "Atanmamış"
 	var doctrine_plan_exposed: bool = false
 
+	# Phase 28 Unified Session Tempo & Online Pause Guard Telemetry
+	var session_mode: GameEnums.SessionMode = GameEnums.SessionMode.SINGLEPLAYER_SESSION
+	var session_paused: bool = false
+	var session_speed_scale: float = 1.0
+	var online_pause_rejected: bool = false
+
 
 class CrisisChipDescriptor:
 	var crisis_id: StringName = &""
@@ -334,12 +340,27 @@ func capture_snapshot() -> PulseSummarySnapshot:
 	if syn_snap != null and syn_snap.doctrine_exposed:
 		snap.doctrine_plan_exposed = true
 
+	# --- 7. Phase 28 Unified Session Tempo & Online Pause Rejection ----------
+	snap.session_mode = SessionClockAuthority.get_session_mode()
+	snap.session_paused = SessionClockAuthority.is_paused()
+	snap.session_speed_scale = SessionClockAuthority.get_speed_scale()
+	snap.online_pause_rejected = SessionClockAuthority.get_last_pause_rejection_code() == &"REJECTED_PAUSE_IN_ONLINE"
+
 	return snap
 
 
 func collect_active_crises(snap: PulseSummarySnapshot = null) -> Array[CrisisChipDescriptor]:
 	var s: PulseSummarySnapshot = snap if snap != null else capture_snapshot()
 	var crises: Array[CrisisChipDescriptor] = []
+
+	if s.online_pause_rejected:
+		crises.append(CrisisChipDescriptor.new(
+			&"online_pause_rejected",
+			"Kalıcı Dünya Akıyor",
+			"Çevrimiçi oturum duraklatılamaz",
+			&"gold",
+			SLOT_MILITARY_HERD,
+			&"bozkir_nobeti"))
 
 	if s.council_active or s.kut_score < 30.0:
 		crises.append(CrisisChipDescriptor.new(

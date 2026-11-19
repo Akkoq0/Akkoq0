@@ -337,3 +337,63 @@ func _get_or_create_stockpile(player_id: int) -> Stockpile:
 				stockpile.add(refined.id, refined.starting_amount)
 	_stockpiles[player_id] = stockpile
 	return stockpile
+
+
+func export_state_dict() -> Dictionary:
+	var stockpiles_dict: Dictionary = {}
+	for pid: int in _stockpiles:
+		var sp: Stockpile = _stockpiles[pid]
+		var ore_dict: Dictionary = {}
+		if _registry != null:
+			for ore: OreData in _registry.ores:
+				if ore != null:
+					ore_dict[String(ore.id)] = sp.get_amount(ore.id)
+			for ref_ore: OreData in _registry.refined_ores:
+				if ref_ore != null:
+					ore_dict[String(ref_ore.id)] = sp.get_amount(ref_ore.id)
+		stockpiles_dict[str(pid)] = ore_dict
+	var bindings_dict: Dictionary = {}
+	for b_key: StringName in _meteoric_bindings:
+		bindings_dict[String(b_key)] = _meteoric_bindings[b_key]
+	var mig_dict: Dictionary = {}
+	for pid: int in _camp_migrating_state:
+		mig_dict[str(pid)] = _camp_migrating_state[pid]
+	var cut_dict: Dictionary = {}
+	for pid: int in _camp_supply_cut_state:
+		cut_dict[str(pid)] = _camp_supply_cut_state[pid]
+	return {
+		"camp_migrating_state": mig_dict,
+		"camp_supply_cut_state": cut_dict,
+		"meteoric_bindings": bindings_dict,
+		"stockpiles": stockpiles_dict,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("stockpiles") is Dictionary):
+		return false
+	_stockpiles.clear()
+	_meteoric_bindings.clear()
+	_camp_migrating_state.clear()
+	_camp_supply_cut_state.clear()
+	var stockpiles_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("stockpiles"))
+	var max_cap: int = _economy_rules.max_ore_stockpile_capacity if _economy_rules != null else 0
+	for pid_key: Variant in stockpiles_dict:
+		var pid: int = DeterministicStateHasher.v_str(pid_key).to_int()
+		var sp: Stockpile = Stockpile.new(pid, max_cap)
+		var ore_map: Dictionary = DeterministicStateHasher.v_dict(stockpiles_dict[pid_key])
+		for ore_key: Variant in ore_map:
+			var amt: int = maxi(DeterministicStateHasher.v_int(ore_map[ore_key]), 0)
+			if amt > 0:
+				sp.add(StringName(DeterministicStateHasher.v_str(ore_key)), amt)
+		_stockpiles[pid] = sp
+	var bindings_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("meteoric_bindings", {}))
+	for b_key: Variant in bindings_dict:
+		_meteoric_bindings[StringName(DeterministicStateHasher.v_str(b_key))] = DeterministicStateHasher.v_bool(bindings_dict[b_key])
+	var mig_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("camp_migrating_state", {}))
+	for pid_key: Variant in mig_dict:
+		_camp_migrating_state[DeterministicStateHasher.v_str(pid_key).to_int()] = DeterministicStateHasher.v_bool(mig_dict[pid_key])
+	var cut_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("camp_supply_cut_state", {}))
+	for pid_key: Variant in cut_dict:
+		_camp_supply_cut_state[DeterministicStateHasher.v_str(pid_key).to_int()] = DeterministicStateHasher.v_bool(cut_dict[pid_key])
+	return true

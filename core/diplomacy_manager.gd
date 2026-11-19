@@ -324,3 +324,44 @@ func _on_kagan_glory_changed(_army_id: int, _previous_glory: float, new_glory: f
 
 func _on_season_changed(_season: SeasonData, _cycle_index: int) -> void:
 	step_seasonal_diplomatic_decay(1)
+
+
+func export_state_dict() -> Dictionary:
+	var trust_dict: Dictionary = {}
+	for did: StringName in _trust_scores:
+		trust_dict[String(did)] = _trust_scores[did]
+	var stance_dict: Dictionary = {}
+	for did: StringName in _stances:
+		stance_dict[String(did)] = int(_stances[did])
+	return {
+		"coalition_war_active": _coalition_war_active,
+		"espionage_deterrence_bonus": _espionage_deterrence_bonus,
+		"player_army_size": _player_army_size,
+		"raid_frequency": _raid_frequency,
+		"recent_assassination_infamy": _recent_assassination_infamy,
+		"spy_exposure_penalty": _spy_exposure_penalty,
+		"stances": stance_dict,
+		"tracked_kagan_glory": _tracked_kagan_glory,
+		"trust_scores": trust_dict,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("trust_scores") is Dictionary):
+		return false
+	_trust_scores.clear()
+	_stances.clear()
+	var trust_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("trust_scores"))
+	for k: Variant in trust_dict:
+		_trust_scores[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_float(trust_dict[k], 50.0)
+	var stance_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("stances", {}))
+	for k: Variant in stance_dict:
+		_stances[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_int(stance_dict[k]) as GameEnums.DynastyAttitude
+	_player_army_size = DeterministicStateHasher.v_float(data.get("player_army_size", 1000.0), 1000.0)
+	_raid_frequency = DeterministicStateHasher.v_float(data.get("raid_frequency", 0.0))
+	_coalition_war_active = DeterministicStateHasher.v_bool(data.get("coalition_war_active", false))
+	_espionage_deterrence_bonus = DeterministicStateHasher.v_float(data.get("espionage_deterrence_bonus", 0.0))
+	_spy_exposure_penalty = DeterministicStateHasher.v_float(data.get("spy_exposure_penalty", 0.0))
+	_recent_assassination_infamy = DeterministicStateHasher.v_float(data.get("recent_assassination_infamy", 0.0))
+	_tracked_kagan_glory = DeterministicStateHasher.v_float(data.get("tracked_kagan_glory", 0.0))
+	return true

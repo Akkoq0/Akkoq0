@@ -350,3 +350,28 @@ func _broadcast(pasture_yield_multiplier: float = -1.0) -> void:
 				if delta_kut > 0.0:
 					CommandBus.dispatch(ModifyKutCommand.new(delta_kut, &"seasonal_pasture_prosperity"))
 
+
+func export_state_dict() -> Dictionary:
+	var yields: Dictionary = {}
+	for pid: int in _pasture_yield_multipliers:
+		yields[str(pid)] = _pasture_yield_multipliers[pid]
+	return {
+		"elapsed_sec": _elapsed_sec,
+		"food_reserve": _food_reserve,
+		"index": _index,
+		"pasture_yield_multipliers": yields,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not data.has("index") or not data.has("food_reserve"):
+		return false
+	_index = maxi(DeterministicStateHasher.v_int(data.get("index", 0)), 0)
+	_elapsed_sec = maxf(DeterministicStateHasher.v_float(data.get("elapsed_sec", 0.0)), 0.0)
+	_food_reserve = maxi(DeterministicStateHasher.v_int(data.get("food_reserve", 0)), 0)
+	_pasture_yield_multipliers.clear()
+	var yields: Dictionary = DeterministicStateHasher.v_dict(data.get("pasture_yield_multipliers", {}))
+	for k: Variant in yields:
+		_pasture_yield_multipliers[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(yields[k], 1.0)
+	return true
+

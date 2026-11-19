@@ -461,3 +461,84 @@ func _on_amanat_pact_broken(pact_id: StringName, betrayer_id: int, hostage_forfe
 				cmdr.held_as_amanat = false
 				inflict_commander_battle_trauma(cid, true)
 				break
+
+
+func export_state_dict() -> Dictionary:
+	var dyn_dict: Dictionary = {}
+	for pid: int in _dynasties:
+		var d: DynastyRulerProfile = _dynasties[pid]
+		dyn_dict[str(pid)] = {
+			"age_seasons": d.age_seasons,
+			"competence": d.competence,
+			"crisis_id": String(d.crisis_id),
+			"designated_heir_name": String(d.designated_heir_name),
+			"generation": d.generation,
+			"heir_age_seasons": d.heir_age_seasons,
+			"heir_competence": d.heir_competence,
+			"heir_held_as_amanat": d.heir_held_as_amanat,
+			"is_alive": d.is_alive,
+			"regency_status": int(d.regency_status),
+			"ruler_name": String(d.ruler_name),
+		}
+	var cmd_dict: Dictionary = {}
+	for cid: int in _commanders:
+		var c: CommanderProfile = _commanders[cid]
+		cmd_dict[str(cid)] = {
+			"age_seasons": c.age_seasons,
+			"assigned_army_id": c.assigned_army_id,
+			"commander_id": c.commander_id,
+			"commander_name": String(c.commander_name),
+			"commander_trait": int(c.commander_trait),
+			"is_alive": c.is_alive,
+			"leadership": c.leadership,
+			"player_id": c.player_id,
+			"scars": c.scars,
+			"veteran_score": c.veteran_score,
+		}
+	return {
+		"commanders": cmd_dict,
+		"crisis_counter": _crisis_counter,
+		"dynasties": dyn_dict,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("dynasties") is Dictionary) or not (data.get("commanders") is Dictionary):
+		return false
+	reset_succession_state()
+	_crisis_counter = maxi(DeterministicStateHasher.v_int(data.get("crisis_counter", 0)), 0)
+	var dyn_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("dynasties"))
+	for k: Variant in dyn_dict:
+		var pid: int = DeterministicStateHasher.v_str(k).to_int()
+		var dd: Dictionary = DeterministicStateHasher.v_dict(dyn_dict[k])
+		var d: DynastyRulerProfile = DynastyRulerProfile.new(
+			pid,
+			StringName(DeterministicStateHasher.v_str(dd.get("ruler_name", "Bilge Khagan"), "Bilge Khagan")),
+			DeterministicStateHasher.v_int(dd.get("age_seasons", 128), 128),
+			DeterministicStateHasher.v_float(dd.get("competence", 75.0), 75.0))
+		d.generation = DeterministicStateHasher.v_int(dd.get("generation", 1), 1)
+		d.is_alive = DeterministicStateHasher.v_bool(dd.get("is_alive", true), true)
+		d.crisis_id = StringName(DeterministicStateHasher.v_str(dd.get("crisis_id", "")))
+		d.designated_heir_name = StringName(DeterministicStateHasher.v_str(dd.get("designated_heir_name", "")))
+		d.heir_age_seasons = DeterministicStateHasher.v_int(dd.get("heir_age_seasons", 0))
+		d.heir_competence = DeterministicStateHasher.v_float(dd.get("heir_competence", 0.0))
+		d.heir_held_as_amanat = DeterministicStateHasher.v_bool(dd.get("heir_held_as_amanat", false))
+		d.regency_status = DeterministicStateHasher.v_int(dd.get("regency_status", 0)) as GameEnums.RegencyStatus
+		_dynasties[pid] = d
+	var cmd_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("commanders"))
+	for k: Variant in cmd_dict:
+		var cid: int = DeterministicStateHasher.v_str(k).to_int()
+		var cd: Dictionary = DeterministicStateHasher.v_dict(cmd_dict[k])
+		var c: CommanderProfile = CommanderProfile.new(
+			cid,
+			DeterministicStateHasher.v_int(cd.get("player_id", 1), 1),
+			DeterministicStateHasher.v_int(cd.get("assigned_army_id", cid), cid),
+			StringName(DeterministicStateHasher.v_str(cd.get("commander_name", "Komutan"), "Komutan")),
+			DeterministicStateHasher.v_int(cd.get("age_seasons", 96), 96),
+			DeterministicStateHasher.v_int(cd.get("commander_trait", 0)) as GameEnums.CommanderTrait)
+		c.is_alive = DeterministicStateHasher.v_bool(cd.get("is_alive", true), true)
+		c.leadership = DeterministicStateHasher.v_float(cd.get("leadership", 65.0), 65.0)
+		c.scars = DeterministicStateHasher.v_int(cd.get("scars", 0))
+		c.veteran_score = DeterministicStateHasher.v_float(cd.get("veteran_score", 0.0))
+		_commanders[cid] = c
+	return true

@@ -344,3 +344,91 @@ func _compute_spawn_coord(outer_rim: bool, grid_size: Vector2i, slot_seed: int, 
 			return Vector2i(hash_idx % w, 0)
 		return Vector2i(hash_idx % w, h - 1)
 	return Vector2i(clampi(w / 2 + (hash_idx % 3) - 1, 1, w - 2), clampi(h / 2 + ((hash_idx / 3) % 3) - 1, 1, h - 2))
+
+
+func export_state_dict() -> Dictionary:
+	var joins: Dictionary = {}
+	for pid: int in _player_join_hours:
+		joins[str(pid)] = _player_join_hours[pid]
+	var untils: Dictionary = {}
+	for pid: int in _personal_peace_until_hours:
+		untils[str(pid)] = _personal_peace_until_hours[pid]
+	var forfeits: Dictionary = {}
+	for pid: int in _personal_peace_forfeited:
+		forfeits[str(pid)] = _personal_peace_forfeited[pid]
+	var spawns: Dictionary = {}
+	for pid: int in _player_spawn_coords:
+		var c: Vector2i = _player_spawn_coords[pid]
+		spawns[str(pid)] = {"x": c.x, "y": c.y}
+	var idles: Dictionary = {}
+	for pid: int in _player_idle_hours:
+		idles[str(pid)] = _player_idle_hours[pid]
+	var offline_cfgs: Dictionary = {}
+	for aid: int in _offline_doctrine_configs:
+		var cfg: OfflineDoctrineConfig = _offline_doctrine_configs[aid]
+		if cfg == null:
+			continue
+		offline_cfgs[str(aid)] = {
+			"action_tactic": int(cfg.action_tactic),
+			"army_id": cfg.army_id,
+			"evade_combat": cfg.evade_combat,
+			"low_supply_threshold": cfg.low_supply_threshold,
+			"pack_sefer_arabasi": cfg.pack_sefer_arabasi,
+			"player_id": cfg.player_id,
+			"power_ratio_threshold": cfg.power_ratio_threshold,
+			"target_geography_class": int(cfg.target_geography_class),
+			"target_terrain_class": int(cfg.target_terrain_class),
+			"trigger_condition": int(cfg.trigger_condition),
+		}
+	return {
+		"global_stage": int(_global_stage),
+		"offline_doctrine_configs": offline_cfgs,
+		"persistent_mode_active": _persistent_mode_active,
+		"personal_peace_forfeited": forfeits,
+		"personal_peace_until_hours": untils,
+		"player_idle_hours": idles,
+		"player_join_hours": joins,
+		"player_spawn_coords": spawns,
+		"server_elapsed_hours": _server_elapsed_hours,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not data.has("persistent_mode_active") or not data.has("server_elapsed_hours"):
+		return false
+	reset_persistent_world()
+	_persistent_mode_active = DeterministicStateHasher.v_bool(data.get("persistent_mode_active", false))
+	_server_elapsed_hours = maxf(DeterministicStateHasher.v_float(data.get("server_elapsed_hours", 0.0)), 0.0)
+	_global_stage = DeterministicStateHasher.v_int(data.get("global_stage", 0)) as GameEnums.TorePeaceStage
+	var joins: Dictionary = DeterministicStateHasher.v_dict(data.get("player_join_hours", {}))
+	for k: Variant in joins:
+		_player_join_hours[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(joins[k])
+	var untils: Dictionary = DeterministicStateHasher.v_dict(data.get("personal_peace_until_hours", {}))
+	for k: Variant in untils:
+		_personal_peace_until_hours[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(untils[k])
+	var forfeits: Dictionary = DeterministicStateHasher.v_dict(data.get("personal_peace_forfeited", {}))
+	for k: Variant in forfeits:
+		_personal_peace_forfeited[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_bool(forfeits[k])
+	var spawns: Dictionary = DeterministicStateHasher.v_dict(data.get("player_spawn_coords", {}))
+	for k: Variant in spawns:
+		var sd: Dictionary = DeterministicStateHasher.v_dict(spawns[k])
+		_player_spawn_coords[DeterministicStateHasher.v_str(k).to_int()] = Vector2i(DeterministicStateHasher.v_int(sd.get("x", 0)), DeterministicStateHasher.v_int(sd.get("y", 0)))
+	var idles: Dictionary = DeterministicStateHasher.v_dict(data.get("player_idle_hours", {}))
+	for k: Variant in idles:
+		_player_idle_hours[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(idles[k])
+	var cfgs: Dictionary = DeterministicStateHasher.v_dict(data.get("offline_doctrine_configs", {}))
+	for k: Variant in cfgs:
+		var cd: Dictionary = DeterministicStateHasher.v_dict(cfgs[k])
+		var cfg: OfflineDoctrineConfig = OfflineDoctrineConfig.new()
+		cfg.army_id = DeterministicStateHasher.v_int(cd.get("army_id", DeterministicStateHasher.v_str(k).to_int()))
+		cfg.player_id = DeterministicStateHasher.v_int(cd.get("player_id", 1))
+		cfg.trigger_condition = DeterministicStateHasher.v_int(cd.get("trigger_condition", 0)) as GameEnums.OfflineDoctrineTrigger
+		cfg.power_ratio_threshold = DeterministicStateHasher.v_float(cd.get("power_ratio_threshold", 1.5), 1.5)
+		cfg.low_supply_threshold = DeterministicStateHasher.v_float(cd.get("low_supply_threshold", 0.2), 0.2)
+		cfg.action_tactic = DeterministicStateHasher.v_int(cd.get("action_tactic", 0)) as GameEnums.TuranTacticPhase
+		cfg.pack_sefer_arabasi = DeterministicStateHasher.v_bool(cd.get("pack_sefer_arabasi", true), true)
+		cfg.evade_combat = DeterministicStateHasher.v_bool(cd.get("evade_combat", true), true)
+		cfg.target_terrain_class = DeterministicStateHasher.v_int(cd.get("target_terrain_class", 0)) as GameEnums.TerrainClass
+		cfg.target_geography_class = DeterministicStateHasher.v_int(cd.get("target_geography_class", 0)) as GameEnums.RegionGeographyClass
+		_offline_doctrine_configs[DeterministicStateHasher.v_str(k).to_int()] = cfg
+	return true

@@ -242,3 +242,44 @@ func _on_border_node_captured(region_coord: Vector2i, _node_id: StringName, _pre
 		var boost: float = _rules.quarry_loss_scarcity_boost if _rules != null else 0.35
 		boost_scarcity(region_coord, &"iron", boost, &"quarry_node_contested")
 		boost_scarcity(region_coord, &"coal", boost, &"quarry_node_contested")
+
+
+func export_state_dict() -> Dictionary:
+	var markets_dict: Dictionary = {}
+	for coord: Vector2i in _markets:
+		var m: RegionalMarketState = _markets[coord]
+		var sc: Dictionary = {}
+		for cid: StringName in m.scarcity_multipliers:
+			sc[String(cid)] = m.scarcity_multipliers[cid]
+		markets_dict["%d,%d" % [coord.x, coord.y]] = {
+			"scarcity_multipliers": sc,
+			"total_volume_traded": m.total_volume_traded,
+			"x": coord.x,
+			"y": coord.y,
+		}
+	var herds: Dictionary = {}
+	for pid: int in _player_yilki_herds:
+		herds[str(pid)] = _player_yilki_herds[pid]
+	return {
+		"markets": markets_dict,
+		"player_yilki_herds": herds,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("markets") is Dictionary):
+		return false
+	reset_market_state()
+	var markets_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("markets"))
+	for key: Variant in markets_dict:
+		var md: Dictionary = DeterministicStateHasher.v_dict(markets_dict[key])
+		var coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(md.get("x", 0)), DeterministicStateHasher.v_int(md.get("y", 0)))
+		var st: RegionalMarketState = get_or_create_market(coord)
+		st.total_volume_traded = DeterministicStateHasher.v_int(md.get("total_volume_traded", 0))
+		var sc: Dictionary = DeterministicStateHasher.v_dict(md.get("scarcity_multipliers", {}))
+		for cid_key: Variant in sc:
+			st.scarcity_multipliers[StringName(DeterministicStateHasher.v_str(cid_key))] = DeterministicStateHasher.v_float(sc[cid_key], 1.0)
+	var herds: Dictionary = DeterministicStateHasher.v_dict(data.get("player_yilki_herds", {}))
+	for pid_key: Variant in herds:
+		_player_yilki_herds[DeterministicStateHasher.v_str(pid_key).to_int()] = DeterministicStateHasher.v_int(herds[pid_key])
+	return true

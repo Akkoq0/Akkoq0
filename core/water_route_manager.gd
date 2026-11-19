@@ -260,3 +260,41 @@ func _on_region_control_changed(
 
 func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
 	step_seasonal_water_recovery(season)
+
+
+func export_state_dict() -> Dictionary:
+	var sources: Dictionary = {}
+	for sid: StringName in _sources_by_id:
+		var node: WaterSourceNode = _sources_by_id[sid]
+		sources[String(sid)] = {
+			"base_capacity": node.base_capacity,
+			"contaminated_seasons_remaining": node.contaminated_seasons_remaining,
+			"frozen_in_winter": node.frozen_in_winter,
+			"owner_id": node.owner_id,
+			"region_x": node.region_coord.x,
+			"region_y": node.region_coord.y,
+			"source_id": String(node.source_id),
+			"source_type": int(node.source_type),
+		}
+	return {"sources": sources}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("sources") is Dictionary):
+		return false
+	reset_water_state()
+	var sources: Dictionary = DeterministicStateHasher.v_dict(data.get("sources"))
+	for key: Variant in sources:
+		var sd: Dictionary = DeterministicStateHasher.v_dict(sources[key])
+		var coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(sd.get("region_x", 0)), DeterministicStateHasher.v_int(sd.get("region_y", 0)))
+		var sid: StringName = StringName(DeterministicStateHasher.v_str(sd.get("source_id", DeterministicStateHasher.v_str(key)), DeterministicStateHasher.v_str(key)))
+		var node: WaterSourceNode = register_water_source(
+			coord,
+			sid,
+			DeterministicStateHasher.v_int(sd.get("source_type", int(GameEnums.WaterSourceType.WELL)), int(GameEnums.WaterSourceType.WELL)) as GameEnums.WaterSourceType,
+			DeterministicStateHasher.v_int(sd.get("owner_id", 0)))
+		if node != null:
+			node.base_capacity = DeterministicStateHasher.v_float(sd.get("base_capacity", 100.0), 100.0)
+			node.contaminated_seasons_remaining = DeterministicStateHasher.v_int(sd.get("contaminated_seasons_remaining", 0))
+			node.frozen_in_winter = DeterministicStateHasher.v_bool(sd.get("frozen_in_winter", false))
+	return true

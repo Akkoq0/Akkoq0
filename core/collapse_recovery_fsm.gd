@@ -385,3 +385,35 @@ func _handle_select_collapse_path(command: GameCommand) -> bool:
 	cmd.resulting_state = rec.state
 	EventBus.collapse_path_selected.emit(cmd.player_id, cmd.choice, rec.state, rec.overlord_id)
 	return true
+
+
+func export_state_dict() -> Dictionary:
+	var recs: Dictionary = {}
+	for pid: int in _records:
+		var r: CollapseRecord = _records[pid]
+		recs[str(pid)] = {
+			"frontier_x": r.frontier_coord.x,
+			"frontier_y": r.frontier_coord.y,
+			"overlord_id": r.overlord_id,
+			"player_id": r.player_id,
+			"state": int(r.state),
+			"truce_remaining_hours": r.truce_remaining_hours,
+		}
+	return {"records": recs}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("records") is Dictionary):
+		return false
+	reset_collapse_state()
+	var recs: Dictionary = DeterministicStateHasher.v_dict(data.get("records"))
+	for k: Variant in recs:
+		var pid: int = DeterministicStateHasher.v_str(k).to_int()
+		var rd: Dictionary = DeterministicStateHasher.v_dict(recs[k])
+		var r: CollapseRecord = CollapseRecord.new(pid)
+		r.state = DeterministicStateHasher.v_int(rd.get("state", 0)) as GameEnums.CollapseState
+		r.overlord_id = DeterministicStateHasher.v_int(rd.get("overlord_id", 0))
+		r.truce_remaining_hours = DeterministicStateHasher.v_float(rd.get("truce_remaining_hours", 0.0))
+		r.frontier_coord = Vector2i(DeterministicStateHasher.v_int(rd.get("frontier_x", 0)), DeterministicStateHasher.v_int(rd.get("frontier_y", 0)))
+		_records[pid] = r
+	return true

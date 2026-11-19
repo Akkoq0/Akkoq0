@@ -200,3 +200,10 @@ signal systemic_synergy_evaluated(snapshot: SynergyEvaluationSnapshot)
 # --- Phase 27B Modular Battle Doctrine & Counter-Tactic Matchups -----------
 signal battle_doctrine_assigned(army_id: int, player_id: int, doctrine_id: StringName, preset_id: GameEnums.BattleDoctrinePresetId)
 signal doctrine_matchup_evaluated(attacker_id: int, defender_id: int, result: DoctrineMatchupResult)
+
+# --- Phase 28 Unified Session Tempo, Command Envelopes & Save/Load ---------
+signal session_tempo_changed(session_mode: GameEnums.SessionMode, is_paused: bool, speed_scale: float, offline_protection_active: bool)
+signal session_pause_rejected(sender_player_id: String, reason_code: StringName)
+signal command_envelope_rejected(sequence_id: int, sender_player_id: String, status: GameEnums.CommandEnvelopeStatus, reason: String)
+signal world_state_saved(world_hash: String, schema_version: int)
+signal world_state_loaded(world_hash: String, schema_version: int)

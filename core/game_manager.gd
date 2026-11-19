@@ -115,6 +115,9 @@ func _handle_change_state(command: GameCommand) -> bool:
 	var change: ChangeGameStateCommand = command as ChangeGameStateCommand
 	if change == null:
 		return command.reject("Expected ChangeGameStateCommand.")
+	if change.target_state == GameEnums.GameState.PAUSED and not SessionClockAuthority.can_pause():
+		SessionClockAuthority.request_pause(true, "1")
+		return command.reject("REJECTED_PAUSE_IN_ONLINE")
 	if not can_transition(_state, change.target_state):
 		return command.reject("Illegal transition %s -> %s." % [
 			GameEnums.GameState.keys()[_state], GameEnums.GameState.keys()[change.target_state]])
@@ -203,3 +206,27 @@ func _on_layer_transition_started(_target_layer: GameEnums.WorldLayer, _focus_po
 
 func _on_layer_transition_finished(_layer_reached: GameEnums.WorldLayer) -> void:
 	_is_layer_transitioning = false
+
+
+func export_state_dict() -> Dictionary:
+	return {
+		"consecutive_battle_losses": _consecutive_battle_losses,
+		"council_active": _council_active,
+		"kut_score": _kut_score,
+		"layer": int(_layer),
+		"legitimacy_multiplier": _legitimacy_multiplier,
+		"state": int(_state),
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not data.has("kut_score") or not data.has("state"):
+		return false
+	_kut_score = clampf(DeterministicStateHasher.v_float(data.get("kut_score", 75.0), 75.0), 0.0, 100.0)
+	_consecutive_battle_losses = maxi(DeterministicStateHasher.v_int(data.get("consecutive_battle_losses", 0)), 0)
+	_council_active = DeterministicStateHasher.v_bool(data.get("council_active", false))
+	_legitimacy_multiplier = clampf(DeterministicStateHasher.v_float(data.get("legitimacy_multiplier", 1.0), 1.0), 0.0, 2.0)
+	_layer = DeterministicStateHasher.v_int(data.get("layer", int(GameEnums.WorldLayer.MACRO)), int(GameEnums.WorldLayer.MACRO)) as GameEnums.WorldLayer
+	var next_state: GameEnums.GameState = DeterministicStateHasher.v_int(data.get("state", int(GameEnums.GameState.PLAYING)), int(GameEnums.GameState.PLAYING)) as GameEnums.GameState
+	_set_state(next_state)
+	return true

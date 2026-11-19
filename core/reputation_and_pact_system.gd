@@ -324,3 +324,36 @@ func _handle_investigate_proxy_war(command: GameCommand) -> bool:
 	EventBus.proxy_war_exposed_casus_belli.emit(
 		contract.sponsor_id, cmd.investigator_id, cmd.warband_id, true)
 	return true
+
+
+func export_state_dict() -> Dictionary:
+	var rel: Dictionary = {}
+	for pid: int in _word_reliability:
+		rel[str(pid)] = _word_reliability[pid]
+	var dread: Dictionary = {}
+	for pid: int in _dread_score:
+		dread[str(pid)] = _dread_score[pid]
+	var honor: Dictionary = {}
+	for pid: int in _honor_score:
+		honor[str(pid)] = _honor_score[pid]
+	return {
+		"dread_score": dread,
+		"honor_score": honor,
+		"word_reliability": rel,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("word_reliability") is Dictionary):
+		return false
+	reset_reputation_state()
+	var rel: Dictionary = DeterministicStateHasher.v_dict(data.get("word_reliability"))
+	for k: Variant in rel:
+		_word_reliability[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(rel[k], 1.0)
+	var dread: Dictionary = DeterministicStateHasher.v_dict(data.get("dread_score", {}))
+	for k: Variant in dread:
+		_dread_score[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(dread[k])
+	var honor: Dictionary = DeterministicStateHasher.v_dict(data.get("honor_score", {}))
+	for k: Variant in honor:
+		_honor_score[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_float(honor[k])
+	return true

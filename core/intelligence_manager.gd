@@ -265,3 +265,38 @@ func _pair_key(faction_a: int, faction_b: int) -> StringName:
 	var low: int = mini(faction_a, faction_b)
 	var high: int = maxi(faction_a, faction_b)
 	return StringName("%d_%d" % [low, high])
+
+
+func export_state_dict() -> Dictionary:
+	var st_dict: Dictionary = {}
+	for k: StringName in _stances:
+		st_dict[String(k)] = int(_stances[k])
+	var tw_dict: Dictionary = {}
+	for k: StringName in _total_war_seasons:
+		tw_dict[String(k)] = _total_war_seasons[k]
+	var ic_dict: Dictionary = {}
+	for pid: int in _intercepted_courier_owners:
+		ic_dict[str(pid)] = _intercepted_courier_owners[pid]
+	return {
+		"intercepted_courier_owners": ic_dict,
+		"season_tick": _season_tick,
+		"stances": st_dict,
+		"total_war_seasons": tw_dict,
+	}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("stances") is Dictionary):
+		return false
+	reset_intelligence_state()
+	_season_tick = maxi(DeterministicStateHasher.v_int(data.get("season_tick", 0)), 0)
+	var st_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("stances"))
+	for k: Variant in st_dict:
+		_stances[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_int(st_dict[k]) as GameEnums.DiplomaticStance
+	var tw_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("total_war_seasons", {}))
+	for k: Variant in tw_dict:
+		_total_war_seasons[StringName(DeterministicStateHasher.v_str(k))] = DeterministicStateHasher.v_int(tw_dict[k])
+	var ic_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("intercepted_courier_owners", {}))
+	for k: Variant in ic_dict:
+		_intercepted_courier_owners[DeterministicStateHasher.v_str(k).to_int()] = DeterministicStateHasher.v_int(ic_dict[k])
+	return true

@@ -991,6 +991,8 @@ func _connect_event_bus() -> void:
 	_subscribe_bus(EventBus.battle_doctrine_assigned, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.courier_ambushed_plan_exposed, _on_telemetry_dirty.unbind(4))
 	_subscribe_bus(EventBus.systemic_synergy_evaluated, _on_systemic_synergy_evaluated)
+	_subscribe_bus(EventBus.session_pause_rejected, _on_telemetry_dirty.unbind(2))
+	_subscribe_bus(EventBus.session_tempo_changed, _on_telemetry_dirty.unbind(4))
 
 
 func _subscribe_bus(bus_signal: Signal, callback: Callable) -> void:

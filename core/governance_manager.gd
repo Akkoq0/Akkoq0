@@ -244,3 +244,44 @@ func _handle_sign_ulus_contract(command: GameCommand) -> bool:
 		EventBus.vassal_silent_sabotage_delayed.emit(
 			cmd.bey_id, assignment.reinforcement_delay_hours, assignment.reinforcement_troop_mult)
 	return true
+
+
+func export_state_dict() -> Dictionary:
+	var vassals_dict: Dictionary = {}
+	for bey_id: StringName in _vassals:
+		var v: VassalBeyAssignment = _vassals[bey_id]
+		vassals_dict[String(bey_id)] = {
+			"bey_id": String(v.bey_id),
+			"loyalty": v.loyalty,
+			"personality_trait": int(v.personality_trait),
+			"region_x": v.region_coord.x,
+			"region_y": v.region_coord.y,
+			"reinforcement_delay_hours": v.reinforcement_delay_hours,
+			"reinforcement_troop_mult": v.reinforcement_troop_mult,
+			"silent_sabotage_active": v.silent_sabotage_active,
+			"suzerain_id": v.suzerain_id,
+		}
+	return {"vassals": vassals_dict}
+
+
+func import_state_dict(data: Dictionary) -> bool:
+	if not (data.get("vassals") is Dictionary):
+		return false
+	reset_governance_state()
+	var vassals_dict: Dictionary = DeterministicStateHasher.v_dict(data.get("vassals"))
+	for k: Variant in vassals_dict:
+		var vd: Dictionary = DeterministicStateHasher.v_dict(vassals_dict[k])
+		var coord: Vector2i = Vector2i(DeterministicStateHasher.v_int(vd.get("region_x", 0)), DeterministicStateHasher.v_int(vd.get("region_y", 0)))
+		var bey_id: StringName = StringName(DeterministicStateHasher.v_str(vd.get("bey_id", DeterministicStateHasher.v_str(k)), DeterministicStateHasher.v_str(k)))
+		var v: VassalBeyAssignment = VassalBeyAssignment.new(
+			bey_id,
+			DeterministicStateHasher.v_int(vd.get("suzerain_id", 1), 1),
+			coord,
+			DeterministicStateHasher.v_int(vd.get("personality_trait", 0)) as GameEnums.VassalPersonalityTrait)
+		v.loyalty = DeterministicStateHasher.v_float(vd.get("loyalty", 75.0), 75.0)
+		v.silent_sabotage_active = DeterministicStateHasher.v_bool(vd.get("silent_sabotage_active", false))
+		v.reinforcement_delay_hours = DeterministicStateHasher.v_float(vd.get("reinforcement_delay_hours", 0.0))
+		v.reinforcement_troop_mult = DeterministicStateHasher.v_float(vd.get("reinforcement_troop_mult", 1.0), 1.0)
+		_vassals[bey_id] = v
+		_delegated_by_coord[coord] = bey_id
+	return true
