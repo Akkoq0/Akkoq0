@@ -147,6 +147,10 @@ func _on_macro_world_generated(world_state: MacroWorldState) -> void:
 func _on_campaign_launch_requested(cfg: GameShellViewModel.NewGameLaunchConfig) -> void:
 	if cfg == null:
 		return
+	set_meta(&"quick_match", cfg.quick_match)
+	set_meta(&"seasons_elapsed", 0)
+	if not EventBus.season_changed.is_connected(_on_season_changed_victory_check):
+		EventBus.season_changed.connect(_on_season_changed_victory_check)
 	var macro_gen: MacroWorldGenerator = get_node_or_null("MacroWorldGenerator") as MacroWorldGenerator
 	if macro_gen != null and macro_gen.config != null:
 		macro_gen.config.world_seed = maxi(cfg.world_seed, 1)
@@ -155,3 +159,16 @@ func _on_campaign_launch_requested(cfg: GameShellViewModel.NewGameLaunchConfig) 
 	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
 	if hud != null:
 		hud.refresh_from_viewmodel()
+
+
+func _on_season_changed_victory_check(_season: SeasonData, _cycle_index: int) -> void:
+	var seasons_done: int = DeterministicStateHasher.v_int(get_meta(&"seasons_elapsed", 0), 0) + 1
+	set_meta(&"seasons_elapsed", seasons_done)
+	var is_quick: bool = DeterministicStateHasher.v_bool(get_meta(&"quick_match", false), false)
+	var kut_val: float = GameManager.get_kut_score() if GameManager != null else 50.0
+	var s1: MatchVictoryEvaluator.PlayerStandingInput = MatchVictoryEvaluator.PlayerStandingInput.new(
+		_player_id, kut_val, 1, 10, 0, kut_val <= 0.0, 1)
+	var res: MatchVictoryEvaluator.MatchOutcomeResult = MatchVictoryEvaluator.evaluate(
+		[s1], seasons_done, is_quick, _player_id)
+	if res.concluded:
+		EventBus.match_concluded.emit(res.winner_id, res.reason)

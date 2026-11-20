@@ -136,6 +136,7 @@ func _run_suite() -> void:
 	_test_online_transport_sync_desync_and_reconnect()
 	_test_phase32_revolutionary_tom_ai_evolution_and_story_hook()
 	_test_main_scene_integration()
+	_test_mobile_touch_victory_tutorial_mp_and_audio()
 
 	if _failures.is_empty():
 		print("[PASS] Ötüken Full Architecture & Causal Chains validation succeeded (%d assertions, 0 failures)." % _assertions)
@@ -7648,6 +7649,110 @@ func _test_phase32_revolutionary_tom_ai_evolution_and_story_hook() -> void:
 	ResourceManager.import_state_dict({"stockpiles": {}})
 	SessionClockAuthority.reset_session_clock()
 	CommandBus.reset_envelope_state()
+
+
+func _test_mobile_touch_victory_tutorial_mp_and_audio() -> void:
+	print("--- Running Mobile Touch, Victory, Tutorial, Multiplayer & Audio Tests ---")
+
+	# 1. TouchGestureRecognizer: Tap, Pan Drag, Pinch Zoom, Long Press
+	var tap_box: Array[int] = [0]
+	var pan_box: Array[Vector2] = [Vector2.ZERO]
+	var pinch_box: Array[float] = [0.0]
+	var long_box: Array[int] = [0]
+	var rec: TouchGestureRecognizer = TouchGestureRecognizer.new(160, 0.35)
+	rec.tap_detected.connect(func(_p: Vector2) -> void: tap_box[0] += 1)
+	rec.pan_delta.connect(func(d: Vector2) -> void: pan_box[0] += d)
+	rec.pinch_zoom_delta.connect(func(z: float, _f: Vector2) -> void: pinch_box[0] += z)
+	rec.long_press_detected.connect(func(_p: Vector2) -> void: long_box[0] += 1)
+
+	var t_down: InputEventScreenTouch = InputEventScreenTouch.new()
+	t_down.index = 0
+	t_down.pressed = true
+	t_down.position = Vector2(200.0, 200.0)
+	rec.process_event(t_down)
+	var t_up: InputEventScreenTouch = InputEventScreenTouch.new()
+	t_up.index = 0
+	t_up.pressed = false
+	t_up.position = Vector2(204.0, 202.0)
+	rec.process_event(t_up)
+	_expect(tap_box[0] == 1, "TouchGestureRecognizer detects tap within dp threshold.")
+
+	rec.process_event(t_down)
+	var drag: InputEventScreenDrag = InputEventScreenDrag.new()
+	drag.index = 0
+	drag.position = Vector2(240.0, 220.0)
+	drag.relative = Vector2(40.0, 20.0)
+	rec.process_event(drag)
+	rec.process_event(t_up)
+	_expect(pan_box[0].x >= 39.0 and tap_box[0] == 1, "TouchGestureRecognizer emits pan_delta and suppresses tap on drag.")
+
+	rec.process_event(t_down)
+	rec.tick(0.40)
+	rec.process_event(t_up)
+	_expect(long_box[0] == 1, "TouchGestureRecognizer emits long_press_detected after hold threshold.")
+
+	var f0_down: InputEventScreenTouch = InputEventScreenTouch.new()
+	f0_down.index = 0
+	f0_down.pressed = true
+	f0_down.position = Vector2(100.0, 200.0)
+	var f1_down: InputEventScreenTouch = InputEventScreenTouch.new()
+	f1_down.index = 1
+	f1_down.pressed = true
+	f1_down.position = Vector2(200.0, 200.0)
+	rec.process_event(f0_down)
+	rec.process_event(f1_down)
+	var f1_drag: InputEventScreenDrag = InputEventScreenDrag.new()
+	f1_drag.index = 1
+	f1_drag.position = Vector2(260.0, 200.0)
+	f1_drag.relative = Vector2(60.0, 0.0)
+	rec.process_event(f1_drag)
+	_expect(pinch_box[0] > 0.2, "TouchGestureRecognizer detects two-finger pinch zoom.")
+	rec.reset()
+
+	# 2. MatchVictoryEvaluator
+	var p1: MatchVictoryEvaluator.PlayerStandingInput = MatchVictoryEvaluator.PlayerStandingInput.new(1, 75.0, 5, 10, 2, false, 1)
+	var p2: MatchVictoryEvaluator.PlayerStandingInput = MatchVictoryEvaluator.PlayerStandingInput.new(2, 40.0, 2, 10, 0, false, 1)
+	var res_quick: MatchVictoryEvaluator.MatchOutcomeResult = MatchVictoryEvaluator.evaluate([p1, p2], 6, true, 1)
+	_expect(res_quick.concluded and res_quick.winner_id == 1 and res_quick.is_local_victory,
+		"MatchVictoryEvaluator triggers Quick Match conquest/hegemony victory deterministically.")
+
+	var p1_dead: MatchVictoryEvaluator.PlayerStandingInput = MatchVictoryEvaluator.PlayerStandingInput.new(1, 0.0, 0, 10, 0, true, 0)
+	var res_defeat: MatchVictoryEvaluator.MatchOutcomeResult = MatchVictoryEvaluator.evaluate([p1_dead, p2], 5, false, 1)
+	_expect(res_defeat.concluded and not res_defeat.is_local_victory,
+		"MatchVictoryEvaluator detects local dynasty extinction defeat.")
+
+	# 3. TutorialDirector
+	var tut_path: String = "user://test_otuken_tutorial.json"
+	if FileAccess.file_exists(tut_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(tut_path))
+	var td: TutorialDirector = TutorialDirector.new(tut_path)
+	td.start_tutorial()
+	_expect(td.is_active() and td.get_current_index() == 0, "TutorialDirector starts at step 0.")
+	td.advance_step()
+	_expect(td.get_current_index() == 1, "TutorialDirector advances to step 1 (move_order).")
+	var act_ok: bool = td.notify_action(&"move_order")
+	_expect(act_ok and td.get_current_index() == 2, "TutorialDirector advances on matching action notification.")
+	td.skip_tutorial()
+	_expect(not td.is_active() and td.is_completed(), "TutorialDirector persists completion on skip.")
+	if FileAccess.file_exists(tut_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(tut_path))
+
+	# 4. MultiplayerSessionCoordinator (Loopback lobby)
+	var mp: MultiplayerSessionCoordinator = MultiplayerSessionCoordinator.new()
+	var lb: LoopbackNetworkTransport = LoopbackNetworkTransport.new()
+	var hosted_ok: bool = mp.host_lobby(&"TEST_ROOM", 7777, 2026, true, true, "Kağan", lb)
+	_expect(hosted_ok and mp.is_host() and mp.get_roster_list().size() == 1,
+		"MultiplayerSessionCoordinator hosts lobby and populates host roster.")
+	mp.stop_session()
+	mp.free()
+
+	# 5. GraphicsQualityApplier & AudioDirector
+	GraphicsQualityApplier.apply_to_scene(get_tree(), 1, 1.0, false)
+	_expect(Engine.max_fps == 60, "GraphicsQualityApplier applies balanced 60 FPS mobile profile.")
+	if AudioDirector != null:
+		AudioDirector.apply_volumes(0.8, 0.7, 0.9)
+		_expect(AudioDirector.get_current_mood() != AudioDirector.MusicMood.BATTLE,
+			"AudioDirector initializes cleanly in headless mode.")
 
 
 

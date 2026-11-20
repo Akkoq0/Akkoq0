@@ -22,10 +22,14 @@ class CellVisual:
 		has_marker = false
 
 
+const TEX_STEPPE_PATH: String = "res://assets/textures/Grass001_1K-JPG_Color.jpg"
+const TEX_WINTER_PATH: String = "res://assets/textures/Snow006_1K-JPG_Color.jpg"
+
 @export var render_profile: WorldRenderProfile
 
 var _cells_instance: MultiMeshInstance3D = null
 var _markers_instance: MultiMeshInstance3D = null
+var _cell_material: StandardMaterial3D = null
 
 
 func _ready() -> void:
@@ -34,6 +38,35 @@ func _ready() -> void:
 		return
 	_cells_instance = _create_instance(BoxMesh.new(), "Cells")
 	_markers_instance = _create_instance(SphereMesh.new(), "OreMarkers")
+	if _cells_instance != null and _cells_instance.multimesh != null and _cells_instance.multimesh.mesh is PrimitiveMesh:
+		var prim: PrimitiveMesh = _cells_instance.multimesh.mesh as PrimitiveMesh
+		if prim.material is StandardMaterial3D:
+			_cell_material = prim.material as StandardMaterial3D
+			_apply_terrain_texture(false)
+	if not EventBus.season_changed.is_connected(_on_season_changed):
+		EventBus.season_changed.connect(_on_season_changed)
+
+
+func _exit_tree() -> void:
+	if EventBus.season_changed.is_connected(_on_season_changed):
+		EventBus.season_changed.disconnect(_on_season_changed)
+
+
+func _on_season_changed(season: SeasonData, _cycle_index: int) -> void:
+	_apply_terrain_texture(season != null and season.season_type == GameEnums.SeasonType.WINTER)
+
+
+func _apply_terrain_texture(is_winter: bool) -> void:
+	if _cell_material == null:
+		return
+	var tex_path: String = TEX_WINTER_PATH if is_winter else TEX_STEPPE_PATH
+	if ResourceLoader.exists(tex_path):
+		var tex: Texture2D = ResourceLoader.load(tex_path) as Texture2D
+		if tex != null:
+			_cell_material.albedo_texture = tex
+			_cell_material.uv1_scale = Vector3(2.0, 2.0, 2.0)
+			return
+	_cell_material.albedo_texture = null
 
 
 ## Rebuilds both MultiMeshes from `cells`.

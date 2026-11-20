@@ -73,6 +73,7 @@ class NewGameLaunchConfig:
 	var ai_difficulty: GameEnums.AIDifficultyTier = GameEnums.AIDifficultyTier.SANCAK_BEYI
 	var ai_personality: GameEnums.SteppeAIPersonality = GameEnums.SteppeAIPersonality.GOLGE_SABOTOR
 	var world_seed: int = 1071
+	var quick_match: bool = false
 
 
 class SaveSlotSummary:

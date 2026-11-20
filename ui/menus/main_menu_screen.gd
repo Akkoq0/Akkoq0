@@ -7,6 +7,7 @@ signal new_game_requested()
 signal continue_game_requested(slot_id: String)
 signal load_menu_requested()
 signal multiplayer_lobby_requested()
+signal tutorial_requested()
 signal settings_requested()
 signal quit_requested()
 
@@ -21,6 +22,7 @@ var _btn_new_game: Button = null
 var _btn_continue: Button = null
 var _btn_load: Button = null
 var _btn_online: Button = null
+var _btn_tutorial: Button = null
 var _btn_settings: Button = null
 var _btn_quit: Button = null
 var _btn_callbacks: Dictionary[Button, Callable] = {}
@@ -148,8 +150,10 @@ func _ensure_built() -> void:
 	vbox.add_child(_btn_new_game)
 	_btn_load = _make_menu_btn("BtnMainLoad", "Kayıt Yükle", NeoSteppePalette.BRONZE_WEATHERED, _on_load_pressed)
 	vbox.add_child(_btn_load)
-	_btn_online = _make_menu_btn("BtnMainOnline", "Çok Oyunculu / Online Lobi", NeoSteppePalette.ICE_BLUE, _on_online_pressed)
+	_btn_online = _make_menu_btn("BtnMainOnline", "Arkadaşlarla Oyna (Wi-Fi / IP)", NeoSteppePalette.ICE_BLUE, _on_online_pressed)
 	vbox.add_child(_btn_online)
+	_btn_tutorial = _make_menu_btn("BtnMainTutorial", "Öğretici (3 dk)", NeoSteppePalette.JADE_BRIGHT, _on_tutorial_pressed)
+	vbox.add_child(_btn_tutorial)
 	_btn_settings = _make_menu_btn("BtnMainSettings", "Ayarlar", NeoSteppePalette.BRONZE_WEATHERED, _on_settings_pressed)
 	vbox.add_child(_btn_settings)
 	_btn_quit = _make_menu_btn("BtnMainQuit", "Çıkış", NeoSteppePalette.EMBER_RED, _on_quit_pressed)
@@ -165,7 +169,7 @@ func _make_menu_btn(
 	btn.name = p_name
 	btn.theme_type_variation = &"PrimaryCommandButton"
 	btn.text = p_text
-	btn.custom_minimum_size = Vector2(0.0, 34.0)
+	btn.custom_minimum_size = Vector2(0.0, 44.0)
 	OtukenThemeFactory.apply_button_semantic_styles(btn, p_col, false, 12, 6)
 	btn.pressed.connect(p_cb)
 	_btn_callbacks[btn] = p_cb
@@ -187,6 +191,10 @@ func _on_load_pressed() -> void:
 
 func _on_online_pressed() -> void:
 	multiplayer_lobby_requested.emit()
+
+
+func _on_tutorial_pressed() -> void:
+	tutorial_requested.emit()
 
 
 func _on_settings_pressed() -> void:

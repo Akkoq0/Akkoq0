@@ -23,6 +23,8 @@ var _tween: Tween = null
 var _macro_focus: Vector3 = Vector3.ZERO
 var _pan_bounds: Vector2 = Vector2(80.0, 80.0)
 var _zoom_factor: float = 1.0
+var _pan_inertia_xz: Vector2 = Vector2.ZERO
+var _touch_pan_sensitivity: float = 0.14
 
 
 func _ready() -> void:
@@ -64,13 +66,46 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if _tween != null and _tween.is_running():
+		_pan_inertia_xz = Vector2.ZERO
 		return
 	var input_dir: Vector2 = Input.get_vector(
 		&"camera_pan_left", &"camera_pan_right", &"camera_pan_forward", &"camera_pan_back")
-	if input_dir == Vector2.ZERO:
+	if input_dir != Vector2.ZERO:
+		_pan_inertia_xz = Vector2.ZERO
+		var step: Vector2 = input_dir * profile.get_pan_speed(_layer) * delta
+		pan_by(step)
+	elif _pan_inertia_xz.length_squared() > 0.001:
+		pan_by(_pan_inertia_xz * delta)
+		_pan_inertia_xz = _pan_inertia_xz.lerp(Vector2.ZERO, clampf(delta * 7.5, 0.0, 1.0))
+
+
+func apply_touch_pan(screen_delta: Vector2) -> void:
+	if profile == null:
 		return
-	var step: Vector2 = input_dir * profile.get_pan_speed(_layer) * delta
-	pan_by(step)
+	var layer_scale: float = 1.0 if _layer == GameEnums.WorldLayer.MACRO else 0.45
+	var world_delta: Vector2 = Vector2(-screen_delta.x, -screen_delta.y) * _touch_pan_sensitivity * _zoom_factor * layer_scale
+	# Rotate delta by camera yaw so pan matches screen orientation
+	var cos_y: float = cos(rotation.y)
+	var sin_y: float = sin(rotation.y)
+	var rotated: Vector2 = Vector2(
+		world_delta.x * cos_y + world_delta.y * sin_y,
+		-world_delta.x * sin_y + world_delta.y * cos_y)
+	pan_by(rotated)
+	_pan_inertia_xz = rotated * 14.0
+
+
+func apply_pinch_zoom(zoom_ratio_delta: float) -> void:
+	var prev_zoom: float = _zoom_factor
+	zoom_by(-zoom_ratio_delta * 0.9)
+	if not is_transitioning():
+		if _layer == GameEnums.WorldLayer.MACRO and prev_zoom <= min_zoom_factor + 0.03 and zoom_ratio_delta > 0.06:
+			CommandBus.dispatch(SwitchLayerCommand.new(GameEnums.WorldLayer.MICRO))
+		elif _layer == GameEnums.WorldLayer.MICRO and prev_zoom >= max_zoom_factor - 0.03 and zoom_ratio_delta < -0.06:
+			CommandBus.dispatch(SwitchLayerCommand.new(GameEnums.WorldLayer.MACRO))
+
+
+func apply_twist(angle_rad: float) -> void:
+	rotation.y = wrapf(rotation.y + angle_rad * 0.6, -PI, PI)
 
 
 func pan_by(delta_xz: Vector2) -> Vector3:

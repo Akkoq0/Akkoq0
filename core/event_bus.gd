@@ -227,3 +227,7 @@ signal network_peer_disconnected(room_id: StringName, peer_id: int, offline_doct
 signal network_tick_confirmed(tick: int, envelope_count: int, world_hash: String)
 signal network_desync_detected(tick: int, peer_id: int, expected_hash: String, received_hash: String)
 signal network_snapshot_resynced(peer_id: int, tick: int, world_hash: String)
+
+# --- Match Conclusion & Tutorial --------------------------------------------
+signal match_concluded(winner_id: int, reason: StringName)
+signal tutorial_step_completed(step_id: StringName)

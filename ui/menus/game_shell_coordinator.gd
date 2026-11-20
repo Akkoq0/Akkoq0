@@ -22,10 +22,10 @@ var _save_load_panel: SaveLoadMenuPanel = null
 var _settings_panel: SettingsPanel = null
 var _pause_panel: PauseMenuPanel = null
 var _summary_screen: MatchSummaryScreen = null
-var _lobby_panel: TamgaCardPanel = null
-var _lobby_status_lbl: Label = null
-var _lobby_close_btn: Button = null
-var _lobby_close_cb: Callable = Callable()
+var _lobby_panel: MultiplayerLobbyPanel = null
+var _mp_coordinator: MultiplayerSessionCoordinator = null
+var _tutorial_director: TutorialDirector = null
+var _tutorial_overlay: TutorialOverlay = null
 
 
 func _init() -> void:
@@ -110,9 +110,20 @@ func open_match_summary(forced_outcome: int = -1) -> void:
 func open_online_lobby() -> void:
 	_ensure_built()
 	_hide_all_screens()
-	_lobby_panel.visible = true
+	_lobby_panel.open_lobby(_mp_coordinator)
 	_set_active_screen(&"online_lobby")
 	multiplayer_lobby_opened.emit()
+
+
+func start_tutorial() -> void:
+	_ensure_built()
+	close_all_menus()
+	if _tutorial_overlay != null:
+		_tutorial_overlay.start_guided_tour()
+
+
+func get_multiplayer_coordinator() -> MultiplayerSessionCoordinator:
+	return _mp_coordinator
 
 
 func close_all_menus() -> void:
@@ -215,46 +226,20 @@ func _ensure_built() -> void:
 	_summary_screen = _center_card(MatchSummaryScreen.new(), Vector2(580.0, 440.0)) as MatchSummaryScreen
 	add_child(_summary_screen)
 
-	_build_lobby_stub()
-	_connect_shell_signals()
+	_mp_coordinator = MultiplayerSessionCoordinator.new()
+	add_child(_mp_coordinator)
 
-
-func _build_lobby_stub() -> void:
-	_lobby_panel = _center_card(TamgaCardPanel.new(), Vector2(420.0, 220.0)) as TamgaCardPanel
-	_lobby_panel.name = "OnlineLobbyPanel"
-	_lobby_panel.semantic_tone = &"ice"
-	_lobby_panel.visible = false
+	_lobby_panel = _center_card(MultiplayerLobbyPanel.new(), Vector2(560.0, 440.0)) as MultiplayerLobbyPanel
 	add_child(_lobby_panel)
 
-	var m: MarginContainer = _lobby_panel.get_content_container()
-	m.add_theme_constant_override(&"margin_left", 16)
-	m.add_theme_constant_override(&"margin_right", 16)
-	m.add_theme_constant_override(&"margin_top", 14)
-	m.add_theme_constant_override(&"margin_bottom", 14)
+	_tutorial_director = TutorialDirector.new()
+	_tutorial_overlay = TutorialOverlay.new()
+	_tutorial_overlay.bind_director(_tutorial_director)
+	add_child(_tutorial_overlay)
 
-	var v: VBoxContainer = VBoxContainer.new()
-	v.add_theme_constant_override(&"separation", 8)
-	m.add_child(v)
-
-	var t: Label = Label.new()
-	t.theme_type_variation = &"TitleLabel"
-	t.text = "ONLINE LOBİ & SUNUCU BAĞLANTISI"
-	v.add_child(t)
-
-	_lobby_status_lbl = Label.new()
-	_lobby_status_lbl.theme_type_variation = &"BodyLabel"
-	_lobby_status_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_lobby_status_lbl.text = "Otoriter sunucu odasına katılmaya hazır (ENet / Loopback Taşıma Katmanı)."
-	v.add_child(_lobby_status_lbl)
-
-	_lobby_close_btn = Button.new()
-	_lobby_close_btn.name = "CloseLobbyBtn"
-	_lobby_close_btn.theme_type_variation = &"GhostIconButton"
-	_lobby_close_btn.text = "Ana Menüye Dön"
-	OtukenThemeFactory.apply_button_semantic_styles(_lobby_close_btn, NeoSteppePalette.BRONZE_WEATHERED, false, 10, 5)
-	_lobby_close_cb = open_main_menu
-	_lobby_close_btn.pressed.connect(_lobby_close_cb)
-	v.add_child(_lobby_close_btn)
+	_connect_shell_signals()
+	var init_settings: GameShellViewModel.UserSettingsSnapshot = vm.load_user_settings()
+	_on_settings_applied(init_settings)
 
 
 func _center_card(card: TamgaCardPanel, box_size: Vector2) -> TamgaCardPanel:
@@ -296,6 +281,7 @@ func _connect_shell_signals() -> void:
 	_main_menu.continue_game_requested.connect(_on_continue_slot_requested)
 	_main_menu.load_menu_requested.connect(_on_main_load_requested)
 	_main_menu.multiplayer_lobby_requested.connect(open_online_lobby)
+	_main_menu.tutorial_requested.connect(start_tutorial)
 	_main_menu.settings_requested.connect(open_settings)
 	_main_menu.quit_requested.connect(_on_quit_requested)
 
@@ -306,6 +292,10 @@ func _connect_shell_signals() -> void:
 	_save_load_panel.panel_closed.connect(open_main_menu)
 
 	_settings_panel.panel_closed.connect(open_main_menu)
+	_settings_panel.settings_applied.connect(_on_settings_applied)
+
+	_lobby_panel.lobby_closed.connect(open_main_menu)
+	_lobby_panel.campaign_launch_requested.connect(_on_new_game_confirmed)
 
 	_pause_panel.resume_requested.connect(close_all_menus)
 	_pause_panel.save_load_requested.connect(_on_pause_save_load_requested)
@@ -316,8 +306,13 @@ func _connect_shell_signals() -> void:
 	_summary_screen.replay_requested.connect(_on_replay_requested)
 	_summary_screen.main_menu_requested.connect(open_main_menu)
 
+	if not EventBus.match_concluded.is_connected(_on_match_concluded):
+		EventBus.match_concluded.connect(_on_match_concluded)
+
 
 func _disconnect_shell_signals() -> void:
+	if EventBus.match_concluded.is_connected(_on_match_concluded):
+		EventBus.match_concluded.disconnect(_on_match_concluded)
 	if _main_menu != null and is_instance_valid(_main_menu):
 		if _main_menu.new_game_requested.is_connected(open_new_game_setup):
 			_main_menu.new_game_requested.disconnect(open_new_game_setup)
@@ -327,6 +322,8 @@ func _disconnect_shell_signals() -> void:
 			_main_menu.load_menu_requested.disconnect(_on_main_load_requested)
 		if _main_menu.multiplayer_lobby_requested.is_connected(open_online_lobby):
 			_main_menu.multiplayer_lobby_requested.disconnect(open_online_lobby)
+		if _main_menu.tutorial_requested.is_connected(start_tutorial):
+			_main_menu.tutorial_requested.disconnect(start_tutorial)
 		if _main_menu.settings_requested.is_connected(open_settings):
 			_main_menu.settings_requested.disconnect(open_settings)
 		if _main_menu.quit_requested.is_connected(_on_quit_requested):
@@ -344,6 +341,13 @@ func _disconnect_shell_signals() -> void:
 	if _settings_panel != null and is_instance_valid(_settings_panel):
 		if _settings_panel.panel_closed.is_connected(open_main_menu):
 			_settings_panel.panel_closed.disconnect(open_main_menu)
+		if _settings_panel.settings_applied.is_connected(_on_settings_applied):
+			_settings_panel.settings_applied.disconnect(_on_settings_applied)
+	if _lobby_panel != null and is_instance_valid(_lobby_panel):
+		if _lobby_panel.lobby_closed.is_connected(open_main_menu):
+			_lobby_panel.lobby_closed.disconnect(open_main_menu)
+		if _lobby_panel.campaign_launch_requested.is_connected(_on_new_game_confirmed):
+			_lobby_panel.campaign_launch_requested.disconnect(_on_new_game_confirmed)
 	if _pause_panel != null and is_instance_valid(_pause_panel):
 		if _pause_panel.resume_requested.is_connected(close_all_menus):
 			_pause_panel.resume_requested.disconnect(close_all_menus)
@@ -360,10 +364,19 @@ func _disconnect_shell_signals() -> void:
 			_summary_screen.replay_requested.disconnect(_on_replay_requested)
 		if _summary_screen.main_menu_requested.is_connected(open_main_menu):
 			_summary_screen.main_menu_requested.disconnect(open_main_menu)
-	if _lobby_close_btn != null and is_instance_valid(_lobby_close_btn) and _lobby_close_cb.is_valid():
-		if _lobby_close_btn.pressed.is_connected(_lobby_close_cb):
-			_lobby_close_btn.pressed.disconnect(_lobby_close_cb)
-	_lobby_close_cb = Callable()
+
+
+func _on_settings_applied(s: GameShellViewModel.UserSettingsSnapshot) -> void:
+	if s == null:
+		return
+	GraphicsQualityApplier.apply_to_scene(get_tree(), s.graphics_quality, s.ui_scale, s.touch_friendly_layout)
+	if AudioDirector != null:
+		AudioDirector.apply_volumes(s.master_volume, s.music_volume, s.sfx_volume)
+
+
+func _on_match_concluded(winner_id: int, _reason: StringName) -> void:
+	var local_pid: int = _mp_coordinator.get_local_player_id() if _mp_coordinator != null and _mp_coordinator.get_role() != MultiplayerSessionCoordinator.NetRole.NONE else 1
+	open_match_summary(1 if winner_id == local_pid else 0)
 
 
 func _on_continue_slot_requested(slot_id: String) -> void:

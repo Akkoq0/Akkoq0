@@ -124,6 +124,11 @@ static func apply_button_semantic_styles(
 static func create_theme() -> Theme:
 	var theme: Theme = Theme.new()
 	theme.default_font_size = NeoSteppePalette.FONT_SIZE_BODY
+	const FONT_PATH: String = "res://assets/fonts/NotoSans-Regular.ttf"
+	if ResourceLoader.exists(FONT_PATH):
+		var loaded_font: Font = ResourceLoader.load(FONT_PATH) as Font
+		if loaded_font != null:
+			theme.default_font = loaded_font
 
 	# --- Base Panel / PanelContainer -----------------------------------------
 	var base_panel: StyleBoxFlat = build_card_style(NeoSteppePalette.BRONZE_DARK, 1, NeoSteppePalette.OBSIDIAN_DEEP, 10, 8)

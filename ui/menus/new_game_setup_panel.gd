@@ -29,6 +29,7 @@ var _difficulty_desc_lbl: Label = null
 
 var _start_btn: Button = null
 var _cancel_btn: Button = null
+var _quick_match_chk: CheckBox = null
 var _btn_callbacks: Dictionary[Button, Callable] = {}
 
 
@@ -100,6 +101,7 @@ func build_launch_config() -> GameShellViewModel.NewGameLaunchConfig:
 	cfg.world_seed = int(roundf(_seed_spin.value)) if _seed_spin != null else _world_seed
 	var raw_clan: String = _clan_edit.text.strip_edges() if _clan_edit != null else ""
 	cfg.clan_name = raw_clan if not raw_clan.is_empty() else "Ötüken Kök Boyu"
+	cfg.quick_match = _quick_match_chk.button_pressed if _quick_match_chk != null else false
 	return cfg
 
 
@@ -263,6 +265,11 @@ func _ensure_built() -> void:
 	_difficulty_desc_lbl.theme_type_variation = &"MutedLabel"
 	_difficulty_desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_difficulty_desc_lbl)
+
+	_quick_match_chk = CheckBox.new()
+	_quick_match_chk.text = "Hızlı Maç Modu (20-30 dk, hızlı mevsim & 1.5x kaynak)"
+	_quick_match_chk.button_pressed = false
+	vbox.add_child(_quick_match_chk)
 
 	# 5. Confirm / Cancel
 	var footer_h: HBoxContainer = HBoxContainer.new()

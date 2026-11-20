@@ -192,6 +192,14 @@ func _ready() -> void:
 	_build_hud_structure()
 	_connect_event_bus()
 	refresh_from_viewmodel()
+	GraphicsQualityApplier.apply_safe_area_margins(self)
+	var touch_bar: TouchActionBar = TouchActionBar.new()
+	add_child(touch_bar)
+	var sh: GameShellCoordinator = get_game_shell()
+	if sh != null:
+		touch_bar.pause_requested.connect(sh.open_pause_menu)
+		var st: GameShellViewModel.UserSettingsSnapshot = sh.get_view_model().load_user_settings()
+		touch_bar.refresh_visibility(st.touch_friendly_layout)
 
 
 func _exit_tree() -> void:
