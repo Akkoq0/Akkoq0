@@ -231,3 +231,11 @@ signal network_snapshot_resynced(peer_id: int, tick: int, world_hash: String)
 # --- Match Conclusion & Tutorial --------------------------------------------
 signal match_concluded(winner_id: int, reason: StringName)
 signal tutorial_step_completed(step_id: StringName)
+
+# --- Live Mobile RTS & Graphics Settings ------------------------------------
+signal graphics_settings_updated(profile_index: int, show_fps_counter: bool)
+signal rts_building_constructed(entity_id: int, owner_id: int, building_id: StringName, world_pos: Vector3)
+signal rts_unit_trained(entity_id: int, owner_id: int, unit_id: StringName, world_pos: Vector3)
+signal rts_combat_hit(attacker_id: int, target_id: int, damage: float, world_pos: Vector3, is_ranged: bool)
+signal rts_entity_destroyed(entity_id: int, owner_id: int, is_building: bool, is_headquarters: bool, world_pos: Vector3)
+

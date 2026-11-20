@@ -8,6 +8,8 @@ var _tactical_panel: TacticalCommandDrawerPanel = null
 var _world_ecology_panel: WorldEcologyDrawerPanel = null
 var _sovereignty_panel: SovereigntyDrawerPanel = null
 var _map_3d_controller: Steppe3DMapController = null
+var _mobile_hud: MobileRtsHud = null
+var _gfx_modal: GraphicsSettingsModal = null
 var _shell_launch_cb: Callable = Callable()
 
 var _player_id: int = 1
@@ -18,10 +20,12 @@ var _selected_region: Vector2i = Vector2i.ZERO
 func _ready() -> void:
 	EventBus.macro_world_generated.connect(_on_macro_world_generated, CONNECT_ONE_SHOT)
 	var vanguard: ArmyController = get_node_or_null("ArmyRegistry/VanguardArmy") as ArmyController
-	_player_id = vanguard.owner_id if (vanguard != null and vanguard.owner_id > 0) else 1
+	_player_id = MatchSessionConfig.local_player_id if MatchSessionConfig.is_multiplayer_session() else (vanguard.owner_id if (vanguard != null and vanguard.owner_id > 0) else 1)
 	_army_id = vanguard.army_id if (vanguard != null and vanguard.army_id > 0) else 1
 	_mount_hud_panels(vanguard)
 	_bind_3d_map_bridge()
+	var saved_gfx: GraphicsQualityApplier.GraphicsConfigData = GraphicsQualityApplier.load_graphics_settings()
+	GraphicsQualityApplier.apply_detailed_settings(get_tree(), saved_gfx, false)
 
 
 func _exit_tree() -> void:
@@ -56,11 +60,16 @@ func get_map_3d_controller() -> Steppe3DMapController:
 	return _map_3d_controller
 
 
+func get_mobile_hud() -> MobileRtsHud:
+	return _mobile_hud
+
+
 func _mount_hud_panels(vanguard: ArmyController) -> void:
 	var hud: OtukenHudRoot = get_node_or_null("HudLayer/OtukenHudRoot") as OtukenHudRoot
 	if hud == null:
 		return
 	hud.set_player_context(_player_id, _army_id)
+	hud.set_mobile_rts_mode(true)
 	var sh: GameShellCoordinator = hud.get_game_shell()
 	if sh != null:
 		_shell_launch_cb = _on_campaign_launch_requested
@@ -79,6 +88,32 @@ func _mount_hud_panels(vanguard: ArmyController) -> void:
 	_tactical_panel = TacticalCommandDrawerPanel.new()
 	_tactical_panel.bind_context(_player_id, _army_id, vanguard)
 	hud.mount_panel_to_slot(OtukenHudRoot.SLOT_TACTICAL_COMMAND, _tactical_panel)
+
+	var hud_layer: CanvasLayer = get_node_or_null("HudLayer") as CanvasLayer
+	if hud_layer != null:
+		_mobile_hud = MobileRtsHud.new()
+		hud_layer.add_child(_mobile_hud)
+		_gfx_modal = GraphicsSettingsModal.new()
+		hud_layer.add_child(_gfx_modal)
+		_mobile_hud.settings_requested.connect(func() -> void: _gfx_modal.open_modal())
+		_mobile_hud.details_toggled.connect(func() -> void: hud.toggle_drawer(OtukenHudRoot.SLOT_TACTICAL_COMMAND, false))
+		_mobile_hud.menu_requested.connect(_on_return_to_main_menu)
+		_mobile_hud.return_to_main_menu_requested.connect(_on_return_to_main_menu)
+		_mobile_hud.minimap_jump_requested.connect(_on_minimap_jump)
+
+
+func _on_minimap_jump(world_pos: Vector3) -> void:
+	var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
+	if cam != null:
+		cam.focus_world_position(world_pos)
+
+
+func _on_return_to_main_menu() -> void:
+	var mp: MultiplayerAPI = get_tree().get_multiplayer()
+	if mp != null and mp.multiplayer_peer != null:
+		mp.multiplayer_peer.close()
+		mp.multiplayer_peer = null
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 func _bind_3d_map_bridge() -> void:

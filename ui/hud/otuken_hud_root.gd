@@ -171,6 +171,8 @@ var _metric_chip_callbacks: Dictionary[Button, Callable] = {}
 var _card_click_callbacks: Dictionary[TamgaCardPanel, Callable] = {}
 var _bus_subscriptions: Array[BusSignalSubscription] = []
 var _signals_connected: bool = false
+var _touch_bar: TouchActionBar = null
+var _mobile_rts_mode: bool = false
 
 
 func _init() -> void:
@@ -193,13 +195,32 @@ func _ready() -> void:
 	_connect_event_bus()
 	refresh_from_viewmodel()
 	GraphicsQualityApplier.apply_safe_area_margins(self)
-	var touch_bar: TouchActionBar = TouchActionBar.new()
-	add_child(touch_bar)
+	_touch_bar = TouchActionBar.new()
+	_touch_bar.offset_top = -118.0
+	_touch_bar.offset_bottom = -64.0
+	add_child(_touch_bar)
 	var sh: GameShellCoordinator = get_game_shell()
 	if sh != null:
-		touch_bar.pause_requested.connect(sh.open_pause_menu)
+		_touch_bar.pause_requested.connect(sh.open_pause_menu)
 		var st: GameShellViewModel.UserSettingsSnapshot = sh.get_view_model().load_user_settings()
-		touch_bar.refresh_visibility(st.touch_friendly_layout)
+		_touch_bar.refresh_visibility(st.touch_friendly_layout)
+
+
+func set_mobile_rts_mode(enabled: bool) -> void:
+	_build_hud_structure()
+	_mobile_rts_mode = enabled
+	if _top_pulse_margin != null:
+		_top_pulse_margin.visible = not enabled
+	if _tactical_lens_dock != null:
+		_tactical_lens_dock.visible = not enabled
+	if _analytics_dock != null:
+		_analytics_dock.visible = not enabled
+	if _session_clock_dock != null:
+		_session_clock_dock.visible = not enabled
+	if _crisis_chip_rail != null and enabled:
+		_crisis_chip_rail.visible = false
+	if _touch_bar != null:
+		_touch_bar.visible = false if enabled else _touch_bar.visible
 
 
 func _exit_tree() -> void:
@@ -1499,7 +1520,7 @@ func _rebuild_crisis_chips(crises: Array[OtukenHudViewModel.CrisisChipDescriptor
 	var next_sig: String = ";".join(sig_parts)
 
 	if next_sig == _last_crisis_signature:
-		_crisis_chip_rail.visible = not _crisis_chips.is_empty()
+		_crisis_chip_rail.visible = (not _crisis_chips.is_empty()) and (not _mobile_rts_mode)
 		return
 	_last_crisis_signature = next_sig
 
@@ -1518,7 +1539,7 @@ func _rebuild_crisis_chips(crises: Array[OtukenHudViewModel.CrisisChipDescriptor
 			_glossary_tooltip.bind_control(chip, desc.glossary_term)
 		_crisis_chips.append(chip)
 
-	_crisis_chip_rail.visible = not _crisis_chips.is_empty()
+	_crisis_chip_rail.visible = (not _crisis_chips.is_empty()) and (not _mobile_rts_mode)
 
 
 func _clear_crisis_chips() -> void:
