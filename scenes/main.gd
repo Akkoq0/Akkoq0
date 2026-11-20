@@ -10,6 +10,7 @@ var _sovereignty_panel: SovereigntyDrawerPanel = null
 var _map_3d_controller: Steppe3DMapController = null
 var _mobile_hud: MobileRtsHud = null
 var _gfx_modal: GraphicsSettingsModal = null
+var _battlefield_mgr: RtsBattlefieldManager = null
 var _shell_launch_cb: Callable = Callable()
 
 var _player_id: int = 1
@@ -24,8 +25,11 @@ func _ready() -> void:
 	_army_id = vanguard.army_id if (vanguard != null and vanguard.army_id > 0) else 1
 	_mount_hud_panels(vanguard)
 	_bind_3d_map_bridge()
+	_mount_battlefield_manager()
 	var saved_gfx: GraphicsQualityApplier.GraphicsConfigData = GraphicsQualityApplier.load_graphics_settings()
 	GraphicsQualityApplier.apply_detailed_settings(get_tree(), saved_gfx, false)
+	if AudioDirector != null:
+		AudioDirector.set_music_mood(AudioDirector.MusicMood.EXPLORE)
 
 
 func _exit_tree() -> void:
@@ -114,6 +118,16 @@ func _on_return_to_main_menu() -> void:
 		mp.multiplayer_peer.close()
 		mp.multiplayer_peer = null
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _mount_battlefield_manager() -> void:
+	_battlefield_mgr = RtsBattlefieldManager.new()
+	add_child(_battlefield_mgr)
+	var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
+	_battlefield_mgr.setup_match(_mobile_hud, cam)
+	if _map_3d_controller != null:
+		_map_3d_controller.visible = false
+		_map_3d_controller.set_process_unhandled_input(false)
 
 
 func _bind_3d_map_bridge() -> void:

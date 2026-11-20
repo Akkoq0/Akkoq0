@@ -233,6 +233,8 @@ func collect_visible_buttons() -> Array[Button]:
 
 
 func _gather_visible_buttons(node: Node, out: Array[Button]) -> void:
+	if node.is_queued_for_deletion():
+		return
 	if node is Control and not (node as Control).visible:
 		return
 	if node is Button:
