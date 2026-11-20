@@ -61,3 +61,10 @@
 2. **Aynı Wi-Fi / LAN Oyna** seçildiğinde gerçek `ENet` Port `7777` lobisi; Kurucu ekranda kendi yerel IP'sini büyük görür, arkadaşı IP yazıp bağlanır.
 3. Maça girildiğinde tek parça engebeli yeşil-altın bozkır vadisi, ortada dalgalanan nehir, uzak dağlar, çam ormanları, güneybatıda kendi Baş Otağı ve 5 kişilik süvari bölüğü; üstte tek satır kaynak barı, sağ üstte tıklanabilir Minimap, altta başparmak boyutunda bağlamsal inşa/asker/saldırı çubuğu.
 4. Bina dikip asker bastıkça kuzeydoğudaki AI rakip ~10 saniye içinde kendi binalarını dikip asker basarak baskına gelir ve 3D can barları ile ok/kılıç çatışması başlar.
+
+---
+
+## 4. Git & Push Durumu
+- `https://github.com/Akkoq0/Akkoq0.git` hedefine `git push` denendi ancak GitHub scoped token `HTTP 403 (Permission denied)` döndürdü.
+- Tüm Faz 0–4 commitleri yerel `main` dalına işlendi ve `/shared/user/.gemini/otuken-transfer/otuken.bundle` dosyası son `main` dalını içerecek şekilde güncellendi.
+
