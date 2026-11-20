@@ -11,6 +11,7 @@ var _map_3d_controller: Steppe3DMapController = null
 var _mobile_hud: MobileRtsHud = null
 var _gfx_modal: GraphicsSettingsModal = null
 var _battlefield_mgr: RtsBattlefieldManager = null
+var _pbr_terrain: SteppePbrTerrain = null
 var _shell_launch_cb: Callable = Callable()
 
 var _player_id: int = 1
@@ -23,6 +24,8 @@ func _ready() -> void:
 	var vanguard: ArmyController = get_node_or_null("ArmyRegistry/VanguardArmy") as ArmyController
 	_player_id = MatchSessionConfig.local_player_id if MatchSessionConfig.is_multiplayer_session() else (vanguard.owner_id if (vanguard != null and vanguard.owner_id > 0) else 1)
 	_army_id = vanguard.army_id if (vanguard != null and vanguard.army_id > 0) else 1
+	_hide_legacy_debug_visuals()
+	_mount_pbr_terrain()
 	_mount_hud_panels(vanguard)
 	_bind_3d_map_bridge()
 	_mount_battlefield_manager()
@@ -66,6 +69,36 @@ func get_map_3d_controller() -> Steppe3DMapController:
 
 func get_mobile_hud() -> MobileRtsHud:
 	return _mobile_hud
+
+
+func get_battlefield_manager() -> RtsBattlefieldManager:
+	return _battlefield_mgr
+
+
+func get_pbr_terrain() -> SteppePbrTerrain:
+	return _pbr_terrain
+
+
+func _hide_legacy_debug_visuals() -> void:
+	for path: String in ["MacroWorldRenderer", "MicroZoneRenderer", "SupplyDepotNode", "ArmyRegistry"]:
+		var n3d: Node3D = get_node_or_null(path) as Node3D
+		if n3d != null:
+			n3d.visible = false
+	var cmd_in: Node = get_node_or_null("PlayerCommandInput")
+	if cmd_in != null:
+		cmd_in.set_process_unhandled_input(false)
+
+
+func _mount_pbr_terrain() -> void:
+	_pbr_terrain = SteppePbrTerrain.new()
+	_pbr_terrain.name = "SteppePbrTerrain"
+	add_child(_pbr_terrain)
+	_pbr_terrain.build_world(MatchSessionConfig.world_seed)
+	var sun: DirectionalLight3D = get_node_or_null("DirectionalLight3D") as DirectionalLight3D
+	if sun != null:
+		sun.light_color = Color(1.0, 0.87, 0.66, 1.0)
+		sun.light_energy = 1.25
+		sun.rotation_degrees = Vector3(-34.0, 42.0, 0.0)
 
 
 func _mount_hud_panels(vanguard: ArmyController) -> void:
@@ -124,7 +157,13 @@ func _mount_battlefield_manager() -> void:
 	_battlefield_mgr = RtsBattlefieldManager.new()
 	add_child(_battlefield_mgr)
 	var cam: DualLayerCamera = get_node_or_null("DualLayerCamera") as DualLayerCamera
-	_battlefield_mgr.setup_match(_mobile_hud, cam)
+	if cam != null:
+		cam.zoom_by(-0.38)
+	var h_cb: Callable = _pbr_terrain.get_height_at if _pbr_terrain != null else Callable()
+	var p_cb: Callable = _pbr_terrain.is_passable_at if _pbr_terrain != null else Callable()
+	_battlefield_mgr.setup_match(_mobile_hud, cam, h_cb, p_cb)
+	if _mobile_hud != null and _pbr_terrain != null:
+		_mobile_hud.set_minimap_terrain(48, 48, _pbr_terrain.get_minimap_grid(48, 48, RtsBattlefieldManager.MAP_HALF_EXTENT), RtsBattlefieldManager.MAP_HALF_EXTENT)
 	if _map_3d_controller != null:
 		_map_3d_controller.visible = false
 		_map_3d_controller.set_process_unhandled_input(false)
